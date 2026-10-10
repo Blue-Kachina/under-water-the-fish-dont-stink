@@ -1,0 +1,17 @@
+**/.idea
+**/.DS_Store
+**/.godot
+
+# CMake build directories (Rider uses cmake-build-<profile>)
+cmake-build-*/
+build/
+
+# Compiled GDExtension binaries (rebuilt by CMake; the .gdextension file stays tracked)
+addons/under-water-the-fish-dont-stinkExt/bin/*/
+native/*/bin/
+
+# Third-party addons downloaded by cmake/GodotAddonsManager.cmake
+addons/rider-plugin/
+
+# Exported game builds
+builds/

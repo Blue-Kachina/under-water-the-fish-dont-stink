@@ -1,0 +1,55 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/arena.gd" id="2_arena"]
+[ext_resource type="PackedScene" path="res://scenes/fish.tscn" id="3_fish"]
+[ext_resource type="Script" path="res://scripts/follow_camera.gd" id="4_camera"]
+[ext_resource type="Script" path="res://scripts/hud.gd" id="5_hud"]
+[ext_resource type="Script" path="res://scripts/debug_panel.gd" id="6_panel"]
+
+[sub_resource type="Environment" id="Environment_water"]
+background_mode = 1
+background_color = Color(0.02, 0.1, 0.16, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.35, 0.55, 0.65, 1)
+ambient_light_energy = 0.7
+tonemap_mode = 2
+glow_enabled = true
+fog_enabled = true
+fog_light_color = Color(0.04, 0.2, 0.28, 1)
+fog_density = 0.012
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_water")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-1.0, 0.5, 0)
+light_color = Color(0.75, 0.95, 1, 1)
+shadow_enabled = true
+
+[node name="Arena" type="Node3D" parent="." node_paths=PackedStringArray("fish")]
+script = ExtResource("2_arena")
+fish = NodePath("../Fish")
+
+[node name="Fish" parent="." instance=ExtResource("3_fish")]
+position = Vector3(0, 12, 72)
+
+[node name="FollowCamera" type="Camera3D" parent="." node_paths=PackedStringArray("fish")]
+position = Vector3(0, 13.4, 77.5)
+current = true
+script = ExtResource("4_camera")
+fish = NodePath("../Fish")
+
+[node name="HUD" type="CanvasLayer" parent="." node_paths=PackedStringArray("fish", "arena")]
+script = ExtResource("5_hud")
+fish = NodePath("../Fish")
+arena = NodePath("../Arena")
+
+[node name="DebugPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("fish", "follow_camera")]
+layer = 2
+script = ExtResource("6_panel")
+fish = NodePath("../Fish")
+follow_camera = NodePath("../FollowCamera")

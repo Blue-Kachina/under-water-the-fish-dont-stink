@@ -1,0 +1,40 @@
+[configuration]
+
+entry_symbol = "gdextension_init"
+compatibility_minimum = "4.6"
+reloadable = false
+
+[libraries]
+
+macos.debug = "./macos/libunder-water-the-fish-dont-stinkExt.macos.template_debug.dylib"
+macos.release = "./macos/libunder-water-the-fish-dont-stinkExt.macos.template_release.dylib"
+
+ios.arm64.debug = "./ios/libunder-water-the-fish-dont-stinkExt.ios.template_debug.arm64.dylib"
+ios.arm64.release = "./ios/libunder-water-the-fish-dont-stinkExt.ios.template_release.arm64.dylib"
+
+windows.x86_32.debug = "./windows/under-water-the-fish-dont-stinkExt.windows.template_debug.x86_32.dll"
+windows.x86_32.release = "./windows/under-water-the-fish-dont-stinkExt.windows.template_release.x86_32.dll"
+
+windows.x86_64.debug = "./windows/under-water-the-fish-dont-stinkExt.windows.template_debug.x86_64.dll"
+windows.x86_64.release = "./windows/under-water-the-fish-dont-stinkExt.windows.template_release.x86_64.dll"
+
+windows.arm64.debug = "./windows/under-water-the-fish-dont-stinkExt.windows.template_debug.arm64.dll"
+windows.arm64.release = "./windows/under-water-the-fish-dont-stinkExt.windows.template_release.arm64.dll"
+
+linux.x86_64.debug = "./linux/libunder-water-the-fish-dont-stinkExt.linux.template_debug.x86_64.so"
+linux.x86_64.release = "./linux/libunder-water-the-fish-dont-stinkExt.linux.template_release.x86_64.so"
+
+linux.arm64.debug = "./linux/libunder-water-the-fish-dont-stinkExt.linux.template_debug.arm64.so"
+linux.arm64.release = "./linux/libunder-water-the-fish-dont-stinkExt.linux.template_release.arm64.so"
+
+linux.rv64.debug = "./linux/libunder-water-the-fish-dont-stinkExt.linux.template_debug.rv64.so"
+linux.rv64.release = "./linux/libunder-water-the-fish-dont-stinkExt.linux.template_release.rv64.so"
+
+android.x86_64.debug = "./android/libunder-water-the-fish-dont-stinkExt.android.template_debug.x86_64.so"
+android.x86_64.release = "./android/libunder-water-the-fish-dont-stinkExt.android.template_release.x86_64.so"
+
+android.arm64.debug = "./android/libunder-water-the-fish-dont-stinkExt.android.template_debug.arm64.so"
+android.arm64.release = "./android/libunder-water-the-fish-dont-stinkExt.android.template_release.arm64.so"
+
+web.wasm32.debug = "./web/libunder-water-the-fish-dont-stinkExt.web.template_debug.wasm32.nothreads.wasm"
+web.wasm32.release = "./web/libunder-water-the-fish-dont-stinkExt.web.template_release.wasm32.nothreads.wasm"

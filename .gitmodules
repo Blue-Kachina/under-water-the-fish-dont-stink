@@ -1,0 +1,3 @@
+[submodule "native/under-water-the-fish-dont-stinkExt/godot-cpp"]
+	path = native/under-water-the-fish-dont-stinkExt/godot-cpp
+	url = https://github.com/godotengine/godot-cpp
