@@ -192,6 +192,12 @@ func request_reset() -> void:
 	_reset_queued = true
 
 
+## Move the reset point (e.g. when switching environments) and go there.
+func set_spawn(spawn: Transform3D) -> void:
+	_spawn_transform = spawn
+	request_reset()
+
+
 func _physics_process(delta: float) -> void:
 	input_forward = Input.get_action_strength("thrust_forward")
 	input_reverse = Input.get_action_strength("thrust_reverse")

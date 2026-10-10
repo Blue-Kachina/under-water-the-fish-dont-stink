@@ -48,6 +48,16 @@ func _process(delta: float) -> void:
 		course_time += delta
 
 
+func spawn_transform() -> Transform3D:
+	return Transform3D(Basis.IDENTITY, Vector3(0, 12, 72))
+
+
+func configure_environment(env: Environment) -> void:
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color(0.02, 0.1, 0.16)
+	env.sky = null
+
+
 func reset_course() -> void:
 	running = false
 	next_hoop = 0

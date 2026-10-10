@@ -28,6 +28,7 @@ var peak := 0.0
 func _ready() -> void:
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
+	main.set_environment("Obstacle Course", false)
 	fish = main.get_node("Fish")
 	_next()
 

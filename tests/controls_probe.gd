@@ -20,6 +20,7 @@ func _ready() -> void:
 	Controls.apply_profile("Personal", false)
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
+	main.set_environment("Obstacle Course", false)
 	fish = main.get_node("Fish")
 
 func _button_name(index: int) -> String:

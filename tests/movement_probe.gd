@@ -12,8 +12,9 @@ var events := {}
 func _ready() -> void:
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
+	main.set_environment("Obstacle Course", false)
 	fish = main.get_node("Fish")
-	arena = main.get_node("Arena")
+	arena = main.get("_environment")
 	camera = main.get_node("FollowCamera")
 
 func once(key: String, at: float) -> bool:

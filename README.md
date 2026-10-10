@@ -6,6 +6,13 @@ A swimming game with Rocket League-style movement. See
 The current build is a **movement playground**: an underwater arena with hoops, obstacles,
 speed readouts and a live tuning panel for dialling in how the fish handles.
 
+Two environments, picked from the tuning panel's *Environment* dropdown (remembered per PC):
+
+- **Obstacle Course**: walled arena with a timed 10-hoop course, tunnel, pillars, ramps and an arch.
+- **Ocean**: endless open water with no walls, floor or obstacles. Floating specks surround you
+  wherever you go, and the water is lighter above and darker below so you can tell up from down.
+  Environments are listed in `ENVIRONMENTS` in `scripts/main.gd`.
+
 ## Running it
 
 Open the project in Godot 4.7 (or from Rider) and press **Play** (F5). An Xbox controller is

@@ -17,6 +17,9 @@ var _defaults := {}
 var _editors := {}  # "section/property" -> HSlider or CheckBox
 var _panel: PanelContainer
 var _status: Label
+var _environment_row: HBoxContainer
+
+signal environment_selected(env_name: String)
 
 
 func _ready() -> void:
@@ -77,6 +80,9 @@ func _build_ui() -> void:
 		_status.text = "Controller profile: %s (remembered on this PC)" % Controls.current_profile)
 	profile_row.add_child(profiles)
 
+	_environment_row = HBoxContainer.new()  # filled in by set_environments()
+	root.add_child(_environment_row)
+
 	_status = Label.new()
 	_status.modulate = Color(1, 1, 1, 0.6)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -92,6 +98,23 @@ func _build_ui() -> void:
 
 	for section: String in _targets:
 		_build_section(list, section, _targets[section])
+
+
+## Adds the environment picker; selections are reported via environment_selected.
+func set_environments(names: Array, current: String) -> void:
+	var label := Label.new()
+	label.text = "Environment"
+	_environment_row.add_child(label)
+	var picker := OptionButton.new()
+	picker.focus_mode = Control.FOCUS_NONE
+	for env_name: String in names:
+		picker.add_item(env_name)
+		if env_name == current:
+			picker.select(picker.item_count - 1)
+	picker.item_selected.connect(func(index: int) -> void:
+		environment_selected.emit(picker.get_item_text(index))
+		_status.text = "Environment: %s (remembered on this PC)" % picker.get_item_text(index))
+	_environment_row.add_child(picker)
 
 
 func _build_section(list: VBoxContainer, section: String, target: Object) -> void:

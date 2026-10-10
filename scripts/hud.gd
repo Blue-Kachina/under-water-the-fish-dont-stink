@@ -59,8 +59,18 @@ func _ready() -> void:
 	hint.modulate = Color(1, 1, 1, 0.6)
 	add_child(hint)
 
+	set_arena(arena)
+
+
+## Point the course readout at a new arena, or null for environments without one.
+func set_arena(new_arena: Arena) -> void:
+	if is_instance_valid(arena) and arena.course_finished.is_connected(_on_course_finished):
+		arena.course_finished.disconnect(_on_course_finished)
+	arena = new_arena
 	if arena:
 		arena.course_finished.connect(_on_course_finished)
+	if _course:
+		_course.text = ""
 
 
 func _process(delta: float) -> void:
@@ -83,8 +93,8 @@ func _process(delta: float) -> void:
 	_speed_bar.value = fish.speed
 	_boost_bar.value = 100.0 if fish.boost_unlimited else fish.boost_amount
 
-	if arena:
-		var best := "--" if is_inf(arena.best_time) else "%.2f" % arena.best_time
+	if is_instance_valid(arena):
+		var best :="--" if is_inf(arena.best_time) else "%.2f" % arena.best_time
 		if arena.running:
 			_course.text = "Hoop %d / %d    %.2f s    best %s" % [arena.next_hoop + 1, arena.hoops.size(), arena.course_time, best]
 		else:
