@@ -75,6 +75,7 @@ func _process(delta: float) -> void:
 		"Drift     %5.0f°" % fish.drift_angle,
 		"Spin      %5.2f rad/s" % fish.angular_speed,
 		"Jump      %s" % jump_names[fish.jump_state],
+		"Strokes   %s" % ("x%d  timing %3.0f%%" % [fish.stroke_chain, fish.stroke_quality * 100.0] if fish.stroke_chain > 0 else "-"),
 		"Pad       %s" % (Input.get_joy_name(pad[0]) if not pad.is_empty() else "none (keyboard)"),
 		"Controls  %s" % Controls.current_profile,
 	])
@@ -91,7 +92,12 @@ func _process(delta: float) -> void:
 
 	_banner_time_left -= delta
 	if _banner_time_left <= 0.0:
-		_banner.text = "TORPEDO!" if fish.is_boosting and fish.speed > fish.max_speed else ""
+		if fish.is_boosting and fish.speed > fish.max_speed:
+			_banner.text = "TORPEDO!"
+		elif fish.stroke_chain >= 4 and fish.stroke_quality >= 0.8:
+			_banner.text = "IN THE RHYTHM  x%d" % fish.stroke_chain
+		else:
+			_banner.text = ""
 
 
 func _on_course_finished(time: float, is_best: bool) -> void:

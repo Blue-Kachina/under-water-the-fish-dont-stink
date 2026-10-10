@@ -34,6 +34,10 @@ keyboard keys are the same in every profile. Profiles live in `PROFILES` in `scr
 | Default | Jump | Boost | Air roll | Powerslide | Roll left | Roll right |
 | Personal | Jump | Roll right | Roll left | — | Powerslide | Boost |
 
+**Swim strokes:** sweep the left stick side to side (or up and down) in a steady rhythm for extra
+speed on top of throttle. Steady timing gives full-strength strokes; mashing gives nothing. The HUD
+shows your stroke count and timing.
+
 Stick forward pitches the nose **down**, as in Rocket League (`invert_pitch` in the panel flips it).
 
 ## Making a standalone build
