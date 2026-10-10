@@ -26,14 +26,16 @@ const PROFILES := {
 		"powerslide": JOY_BUTTON_Y,
 		"roll_left": JOY_BUTTON_LEFT_SHOULDER,
 		"roll_right": JOY_BUTTON_RIGHT_SHOULDER,
+		"direction_lock": JOY_BUTTON_RIGHT_STICK,  # every face/shoulder button is taken
 	},
-	# Directional air roll on face buttons, powerslide on LB, boost on RB.
+	# Directional air roll on face buttons, powerslide on LB, direction lock on RB
+	# (experiment: replaces boost, which has no controller button here for now).
 	"Personal": {
 		"jump": JOY_BUTTON_A,
 		"roll_right": JOY_BUTTON_B,
 		"roll_left": JOY_BUTTON_X,
 		"powerslide": JOY_BUTTON_LEFT_SHOULDER,
-		"boost": JOY_BUTTON_RIGHT_SHOULDER,
+		"direction_lock": JOY_BUTTON_RIGHT_SHOULDER,
 	},
 }
 
@@ -45,6 +47,7 @@ const BUTTON_KEYS := {
 	"powerslide": [KEY_CTRL],
 	"roll_left": [KEY_Q],
 	"roll_right": [KEY_E],
+	"direction_lock": [KEY_F],
 }
 
 var current_profile := "Default"

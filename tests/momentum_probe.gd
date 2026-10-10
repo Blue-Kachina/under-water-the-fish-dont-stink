@@ -6,9 +6,11 @@ extends Node
 const START := Vector3(-40, 35, 75)
 const RUN_TIME := 3.0
 
-## name, throttle held, stick axis ("x"/"y"/""), beat intervals (cycled)
+## name, throttle held, stick axis ("x"/"y"/""), beat intervals (cycled),
+## optional: hold the direction lock (default true)
 const SCENARIOS := [
 	["throttle only", true, "", []],
+	["side strokes, no lock (0.30s)", false, "x", [0.30], false],
 	["steady side strokes (0.30s)", false, "x", [0.30]],
 	["steady up/down strokes (0.30s)", false, "y", [0.30]],
 	["irregular strokes (0.2/0.5s)", false, "x", [0.2, 0.5]],
@@ -24,12 +26,15 @@ var beat_index := 0
 var side := 1
 var phase := "setup"
 var peak := 0.0
+var boosted_beats := 0
+var start_forward := Vector3.FORWARD
 
 func _ready() -> void:
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	main.set_environment("Obstacle Course", false)
 	fish = main.get_node("Fish")
+	fish.stroked.connect(func(_quality: float) -> void: boosted_beats += 1)
 	_next()
 
 func _next() -> void:
@@ -37,11 +42,12 @@ func _next() -> void:
 	scenario += 1
 	clock = 0.0
 	peak = 0.0
+	boosted_beats = 0
 	phase = "setup"
 	fish.request_reset()
 
 func _release_all() -> void:
-	for action in ["thrust_forward", "stick_left", "stick_right", "stick_up", "stick_down", "jump"]:
+	for action in ["thrust_forward", "stick_left", "stick_right", "stick_up", "stick_down", "jump", "direction_lock"]:
 		Input.action_release(action)
 
 func _physics_process(delta: float) -> void:
@@ -50,6 +56,7 @@ func _physics_process(delta: float) -> void:
 		if clock < 0.05:
 			return
 		fish.global_position = START
+		start_forward = -fish.global_basis.z
 		phase = "run"
 		clock = 0.0
 		next_beat = 0.0
@@ -70,6 +77,8 @@ func _run_stroke_scenario(s: Array) -> void:
 	if s[1]:
 		Input.action_press("thrust_forward")
 	var beats: Array = s[3]
+	if s[2] != "" and (s.size() < 5 or s[4]):
+		Input.action_press("direction_lock")
 	if s[2] != "" and clock >= next_beat:
 		var actions := ["stick_left", "stick_right"] if s[2] == "x" else ["stick_up", "stick_down"]
 		Input.action_release(actions[0]); Input.action_release(actions[1])
@@ -79,7 +88,7 @@ func _run_stroke_scenario(s: Array) -> void:
 		beat_index += 1
 	peak = maxf(peak, fish.speed)
 	if clock >= RUN_TIME:
-		print("%-32s speed after %.0fs: %5.1f m/s (peak %5.1f)  chain=%d" % [s[0], RUN_TIME, fish.speed, peak, fish.stroke_chain])
+		print("%-32s speed after %.0fs: %5.1f m/s (peak %5.1f)  boosted beats=%2d  heading drift %4.1f°" % [s[0], RUN_TIME, fish.speed, peak, boosted_beats, rad_to_deg(start_forward.angle_to(-fish.global_basis.z))])
 		_next()
 
 ## Cruise at full throttle, then (optionally) jump + forward dodge and keep cruising.

@@ -36,14 +36,25 @@ The table shows the **Default** controller profile. Pick another in the tuning p
 *Controller profile* dropdown; the choice is remembered on that PC only. Sticks, triggers and
 keyboard keys are the same in every profile. Profiles live in `PROFILES` in `scripts/controls.gd`.
 
-| Profile | A | B | X | Y | LB | RB |
-|---|---|---|---|---|---|---|
-| Default | Jump | Boost | Air roll | Powerslide | Roll left | Roll right |
-| Personal | Jump | Roll right | Roll left | — | Powerslide | Boost |
+| Profile | A | B | X | Y | LB | RB | R3 |
+|---|---|---|---|---|---|---|---|
+| Default | Jump | Boost | Air roll | Powerslide | Roll left | Roll right | Direction lock |
+| Personal | Jump | Roll right | Roll left | — | Powerslide | Direction lock | — |
 
-**Swim strokes:** sweep the left stick side to side (or up and down) in a steady rhythm for extra
-speed on top of throttle. Steady timing gives full-strength strokes; mashing gives nothing. The HUD
-shows your stroke count and timing.
+**Direction lock and swim strokes:** hold the direction lock (keyboard F) to keep the nose pointed
+where it faced when you pressed it: no turning left/right/up/down, but rolling still works. While
+it's held, sweep the stick side to side (or up and down) in a steady rhythm. The first two beats
+set the tempo; every on-tempo beat after that adds a small speed boost. An off-tempo beat breaks
+the rhythm.
+
+**Roll and dodge timing match Rocket League:** air roll, dodge flips and flip cancels use
+RocketSim's constants at the same 120 Hz tick rate. A full roll from rest takes 1.242 s (149 ticks).
+Flips complete in the time they do in RL when you hold the flip direction: 1.333 s for front/back
+flips (0.65 s of flip torque, 0.3 s pitch lock, then held pitch) and 1.150 s for side flips (as if
+holding air roll). Pull the stick against a front/back flip during its first 0.65 s to cancel it,
+for half flips. RL's flip Z-damp is in too: early in a flip most vertical speed is removed, so
+dodges stay flat. `tests/roll_timing_probe` checks all of this against a reference simulation.
+Toggles in the panel: *RL Roll Timing*, *RL Dodge Timing*, *Complete Flips*, *RL Flip Z Damp*.
 
 Stick forward pitches the nose **down**, as in Rocket League (`invert_pitch` in the panel flips it).
 

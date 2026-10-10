@@ -104,7 +104,7 @@ func _process(delta: float) -> void:
 	if _banner_time_left <= 0.0:
 		if fish.is_boosting and fish.speed > fish.max_speed:
 			_banner.text = "TORPEDO!"
-		elif fish.stroke_chain >= 4 and fish.stroke_quality >= 0.8:
+		elif fish.stroke_chain >= 3:
 			_banner.text = "IN THE RHYTHM  x%d" % fish.stroke_chain
 		else:
 			_banner.text = ""
@@ -183,12 +183,13 @@ class InputViz extends Control:
 			["BOOST", fish.boost_held],
 			["AIR ROLL", fish.air_roll_held],
 			["POWERSLIDE", fish.is_powersliding],
+			["LOCK", fish.direction_lock_held],
 			["ROLL %+.0f" % fish.input_roll, fish.input_roll != 0.0],
 		]
-		var y := 16.0
+		var y := 12.0
 		for entry: Array in buttons:
 			draw_string(font, Vector2(190, y), entry[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE if entry[1] else dim)
-			y += 20.0
+			y += 18.0
 
 	func _trigger(pos: Vector2, label: String, amount: float, color: Color) -> void:
 		var bar := Rect2(pos, Vector2(18, size.y - 32.0))
