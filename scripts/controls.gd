@@ -23,7 +23,8 @@ const PROFILES := {
 		"jump": JOY_BUTTON_A,
 		"boost": JOY_BUTTON_B,
 		"air_roll": JOY_BUTTON_X,
-		"powerslide": JOY_BUTTON_Y,
+		"ball_cam": JOY_BUTTON_Y,
+		"powerslide": JOY_BUTTON_LEFT_STICK,  # Y is ball cam, as in RL
 		"roll_left": JOY_BUTTON_LEFT_SHOULDER,
 		"roll_right": JOY_BUTTON_RIGHT_SHOULDER,
 		"direction_lock": JOY_BUTTON_RIGHT_STICK,  # every face/shoulder button is taken
@@ -35,6 +36,7 @@ const PROFILES := {
 		"roll_left": JOY_BUTTON_X,
 		"powerslide": JOY_BUTTON_LEFT_SHOULDER,
 		"boost": JOY_BUTTON_RIGHT_SHOULDER,
+		"ball_cam": JOY_BUTTON_Y,
 	},
 }
 
@@ -47,6 +49,7 @@ const BUTTON_KEYS := {
 	"roll_left": [KEY_Q],
 	"roll_right": [KEY_E],
 	"direction_lock": [KEY_F],
+	"ball_cam": [KEY_Y],
 }
 
 var current_profile := "Default"

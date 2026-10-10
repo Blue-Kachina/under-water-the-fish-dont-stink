@@ -3,6 +3,7 @@ extends CanvasLayer
 
 @export var fish: FishController
 @export var arena: Arena
+@export var aquarium: AquariumArena
 
 var _stats: Label
 var _speed_bar: ProgressBar
@@ -51,7 +52,7 @@ func _ready() -> void:
 	add_child(viz)
 
 	var hint := Label.new()
-	hint.text = "View/F1: tuning panel    Start/R: reset    Right stick/IJKL: look around"
+	hint.text = "View/F1: tuning panel    Start/R: reset    Right stick/IJKL: look around    Y: ball cam"
 	hint.anchor_top = 1.0
 	hint.anchor_bottom = 1.0
 	hint.offset_left = 16.0
@@ -71,6 +72,15 @@ func set_arena(new_arena: Arena) -> void:
 		arena.course_finished.connect(_on_course_finished)
 	if _course:
 		_course.text = ""
+
+
+## Point the score readout at a new aquarium, or null for environments without one.
+func set_aquarium(new_aquarium: AquariumArena) -> void:
+	if is_instance_valid(aquarium) and aquarium.goal_scored.is_connected(_on_goal_scored):
+		aquarium.goal_scored.disconnect(_on_goal_scored)
+	aquarium = new_aquarium
+	if aquarium:
+		aquarium.goal_scored.connect(_on_goal_scored)
 
 
 func _process(delta: float) -> void:
@@ -99,6 +109,11 @@ func _process(delta: float) -> void:
 			_course.text = "Hoop %d / %d    %.2f s    best %s" % [arena.next_hoop + 1, arena.hoops.size(), arena.course_time, best]
 		else:
 			_course.text = "Swim through the yellow hoop to start    best %s" % best
+	elif is_instance_valid(aquarium):
+		var line := "BLUE  %d  -  %d  ORANGE    ball %4.1f m/s" % [aquarium.scores[0], aquarium.scores[1], aquarium.ball.speed]
+		if aquarium.ball.popped:
+			line += "    next ball in %.1f s" % maxf(aquarium.respawn_time_left, 0.0)
+		_course.text = line
 
 	_banner_time_left -= delta
 	if _banner_time_left <= 0.0:
@@ -112,6 +127,11 @@ func _process(delta: float) -> void:
 
 func _on_course_finished(time: float, is_best: bool) -> void:
 	_banner.text = "Course complete: %.2f s%s" % [time, "  NEW BEST!" if is_best else ""]
+	_banner_time_left = 3.0
+
+
+func _on_goal_scored(team: int) -> void:
+	_banner.text = "%s SCORES!" % AquariumArena.TEAM_NAMES[team].to_upper()
 	_banner_time_left = 3.0
 
 

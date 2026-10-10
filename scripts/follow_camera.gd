@@ -2,8 +2,15 @@ extends Camera3D
 ## Third-person chase camera. Follows the fish's facing (not its velocity), with
 ## limited roll and a right-stick look-around that springs back when released.
 ## Camera input never affects where the fish swims.
+##
+## Ball cam (toggled with the ball_cam action, like Rocket League) swings the
+## camera behind the fish on the line from the ball, so the ball stays in view,
+## with a level horizon. It falls back to the normal view while there's no ball.
 
 @export var fish: FishController
+## Set by the environment; null when there's no ball.
+var ball: Node3D
+var ball_cam := false
 
 @export_group("Follow")
 @export_range(1.0, 20.0, 0.1) var distance := 2.9
@@ -57,16 +64,24 @@ func _process(delta: float) -> void:
 	if fish == null:
 		return
 
+	if Input.is_action_just_pressed("ball_cam"):
+		ball_cam = not ball_cam
+
 	var fish_xform := fish.get_global_transform_interpolated()
 	var fish_up := fish_xform.basis.y
+	var to_ball := Vector3.ZERO
+	if ball_cam and is_instance_valid(ball) and ball.visible:
+		to_ball = ball.get_global_transform_interpolated().origin - fish_xform.origin
+	var tracking_ball := to_ball.length_squared() > 0.01
 	# Hold still for the whole flip, cancelled or not: the fish is still spinning.
-	if follow_dodge_spin or not fish.is_flipping():
+	# Ball cam keeps tracking the ball through flips, as in Rocket League.
+	if tracking_ball or follow_dodge_spin or not fish.is_flipping():
 		# Aim where the fish faces, but with the camera's own (levelled) up
 		# rather than the fish's full orientation. Turning to face backwards
 		# after a half flip is then a level swing around, not a tumble over the
 		# top, which would flip the view as it passed straight up.
-		var target_forward := -fish_xform.basis.z
-		var target_frame := Basis.looking_at(target_forward, _target_up(target_forward, fish_up))
+		var target_forward := to_ball.normalized() if tracking_ball else -fish_xform.basis.z
+		var target_frame := Basis.looking_at(target_forward, _target_up(target_forward, fish_up, tracking_ball))
 		_rotation = _rotation.slerp(target_frame.get_rotation_quaternion(), 1.0 - exp(-rotation_stiffness * delta))
 	var follow := Basis(_rotation)
 	var forward := -follow.z
@@ -74,7 +89,7 @@ func _process(delta: float) -> void:
 	# Carry last frame's up onto the new view plane, then turn it toward the target.
 	var up := _up - forward * _up.dot(forward)
 	up = follow.y if up.length_squared() < 0.0001 else up.normalized()
-	var target_up := _target_up(forward, fish_up)
+	var target_up := _target_up(forward, fish_up, tracking_ball)
 	up = up.rotated(forward, up.signed_angle_to(target_up, forward) * (1.0 - exp(-roll_stiffness * delta)))
 	_up = up
 
@@ -99,9 +114,9 @@ func _process(delta: float) -> void:
 	global_transform = Transform3D(Basis.looking_at(anchor - eye, view.y), eye)
 
 
-## The up direction the camera's roll eases toward.
-func _target_up(forward: Vector3, fish_up: Vector3) -> Vector3:
-	if lock_roll_to_fish:
+## The up direction the camera's roll eases toward. `level_only` keeps the horizon level (ball cam).
+func _target_up(forward: Vector3, fish_up: Vector3, level_only: bool) -> Vector3:
+	if lock_roll_to_fish and not level_only:
 		return fish_up
 	var level := Vector3.UP - forward * forward.dot(Vector3.UP)
 	if level.length_squared() < 0.04:
@@ -111,4 +126,4 @@ func _target_up(forward: Vector3, fish_up: Vector3) -> Vector3:
 	# Unlike blending the two up vectors, this never has a point where it flips.
 	var fish_roll := level.signed_angle_to(fish_up, forward)
 	var lean := fish_roll if absf(fish_roll) <= PI / 2.0 else signf(fish_roll) * (PI - absf(fish_roll))
-	return level.rotated(forward, lean * roll_follow)
+	return level if level_only else level.rotated(forward, lean * roll_follow)

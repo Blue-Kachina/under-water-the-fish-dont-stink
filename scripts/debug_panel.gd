@@ -1,7 +1,7 @@
 extends CanvasLayer
 ## Live tuning panel. Lists every @export_range float and @export bool on the
-## fish and the camera, writes changes to them immediately, and saves/loads
-## them. Add a new @export_range to either script and it appears here.
+## fish, the camera and the ball settings, writes changes to them immediately,
+## and saves/loads them. Add a new @export_range to any of them and it appears here.
 ##
 ## Controls are mouse-only (no keyboard/gamepad focus) so the controller keeps
 ## flying the fish while you drag sliders.
@@ -11,6 +11,7 @@ const SAVE_PATH_USER := "user://tuning.cfg"   # exported builds can't write res:
 
 @export var fish: FishController
 @export var follow_camera: Camera3D
+@export var ball_settings: BallSettings
 
 var _targets := {}
 var _defaults := {}
@@ -23,7 +24,7 @@ signal environment_selected(env_name: String)
 
 
 func _ready() -> void:
-	_targets = {"fish": fish, "camera": follow_camera}
+	_targets = {"fish": fish, "camera": follow_camera, "ball": ball_settings}
 	for section: String in _targets:
 		_defaults[section] = _snapshot(_targets[section])
 	_build_ui()

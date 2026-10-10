@@ -6,8 +6,12 @@ extends Node3D
 const ENVIRONMENTS := {
 	"Obstacle Course": preload("res://scripts/arena.gd"),
 	"Ocean": preload("res://scripts/ocean.gd"),
+	"Aquarium Arena": preload("res://scripts/aquarium_arena.gd"),
 }
 const SETTINGS_PATH := "user://playground.cfg"
+
+## Shared with the tuning panel so ball tuning outlives any one arena.
+@export var ball_settings: BallSettings
 
 var current_environment := ""
 var _environment: Node3D
@@ -16,6 +20,7 @@ var _environment: Node3D
 @onready var _world: WorldEnvironment = $WorldEnvironment
 @onready var _hud: Node = $HUD
 @onready var _panel: Node = $DebugPanel
+@onready var _camera: Node = $FollowCamera
 
 
 func _ready() -> void:
@@ -38,9 +43,14 @@ func set_environment(env_name: String, remember := true) -> void:
 	_environment.name = env_name.replace(" ", "")
 	if _environment is Arena:
 		(_environment as Arena).fish = _fish
+	elif _environment is AquariumArena:
+		(_environment as AquariumArena).fish = _fish
+		(_environment as AquariumArena).ball_settings = ball_settings
 	add_child(_environment)
 	_environment.configure_environment(_world.environment)
 	_hud.set_arena(_environment as Arena)
+	_hud.set_aquarium(_environment as AquariumArena)
+	_camera.ball = (_environment as AquariumArena).ball if _environment is AquariumArena else null
 	_fish.set_spawn(_environment.spawn_transform())
 
 	if remember:
@@ -55,3 +65,5 @@ func _process(_delta: float) -> void:
 		_fish.request_reset()
 		if _environment is Arena:
 			(_environment as Arena).reset_course()
+		elif _environment is AquariumArena:
+			(_environment as AquariumArena).reset_kickoff()

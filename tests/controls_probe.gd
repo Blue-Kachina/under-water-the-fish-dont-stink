@@ -25,7 +25,7 @@ func _ready() -> void:
 
 func _button_name(index: int) -> String:
 	return {JOY_BUTTON_A: "A", JOY_BUTTON_B: "B", JOY_BUTTON_X: "X", JOY_BUTTON_Y: "Y",
-		JOY_BUTTON_LEFT_SHOULDER: "LB", JOY_BUTTON_RIGHT_SHOULDER: "RB", JOY_BUTTON_RIGHT_STICK: "R3"}.get(index, str(index))
+		JOY_BUTTON_LEFT_SHOULDER: "LB", JOY_BUTTON_RIGHT_SHOULDER: "RB", JOY_BUTTON_LEFT_STICK: "L3", JOY_BUTTON_RIGHT_STICK: "R3"}.get(index, str(index))
 
 func once(key: String, at: float) -> bool:
 	if t >= at and not events.has(key):
