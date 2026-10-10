@@ -1,14 +1,16 @@
 class_name AquariumArena
 extends Node3D
-## Sandbox match arena: a big rounded tank with a recessed goal in each end
-## wall and a bubble ball. Long axis is Z. The fish plays for Blue, starts at
-## the +Z end and attacks the Orange goal at -Z.
+## Sandbox match arena: a big rounded tank with a goal recessed into each end
+## wall at floor level and a bubble ball. Long axis is Z. The fish plays for
+## Blue, starts at the +Z end and attacks the Orange goal at -Z.
 
 signal goal_scored(team: int)
 
 const SIZE := Vector3(90.0, 50.0, 130.0)  # floor at y = 0, centred on x/z
 const CORNER_RADIUS := 12.0
 const CORNER_STEPS := 8  # segments per rounded edge
+## Goal mouth width x height, standing on the floor. Taller than CORNER_RADIUS so
+## its top edge is on the flat part of the end wall.
 const GOAL_SIZE := Vector2(28.0, 16.0)
 const GOAL_DEPTH := 12.0
 const GRID_SHADER := preload("res://shaders/grid.gdshader")
@@ -40,7 +42,7 @@ func _ready() -> void:
 	ball.name = "Ball"
 	ball.settings = ball_settings
 	ball.fish = fish
-	ball.position = centre
+	ball.position = ball_spawn()
 	add_child(ball)
 
 
@@ -48,7 +50,7 @@ func _physics_process(delta: float) -> void:
 	if ball.popped:
 		respawn_time_left -= delta
 		if respawn_time_left <= 0.0:
-			ball.respawn(centre)
+			ball.respawn(ball_spawn())
 		return
 	for goal in goals:
 		if goal.contains_ball(ball.global_position, ball.settings.radius):
@@ -56,8 +58,17 @@ func _physics_process(delta: float) -> void:
 			return
 
 
+## Kickoff spot: a Water ball floats mid-tank; a Surface ball rests on the floor, as in RL.
+func ball_spawn() -> Vector3:
+	if ball_settings.ball_type == BallSettings.BallType.SURFACE:
+		return Vector3(0.0, ball_settings.radius, 0.0)
+	return centre
+
+
+## Facing the ball from the +Z end, level with where it spawns.
 func spawn_transform() -> Transform3D:
-	return Transform3D(Basis.IDENTITY, centre + Vector3(0.0, 0.0, SIZE.z / 2.0 - 25.0))
+	var height := maxf(ball_spawn().y, 1.0)
+	return Transform3D(Basis.IDENTITY, Vector3(0.0, height, SIZE.z / 2.0 - 25.0))
 
 
 func configure_environment(env: Environment) -> void:
@@ -66,10 +77,10 @@ func configure_environment(env: Environment) -> void:
 	env.sky = null
 
 
-## Ball back to centre for a kickoff. Scores are kept.
+## Ball back to its kickoff spot. Scores are kept.
 func reset_kickoff() -> void:
 	respawn_time_left = 0.0
-	ball.respawn(centre)
+	ball.respawn(ball_spawn())
 
 
 func _score(goal: Goal) -> void:
@@ -85,26 +96,32 @@ func _score(goal: Goal) -> void:
 
 ## The tank's inside surface as one mesh (sand floor + glass walls) and one
 ## matching trimesh collider. Each cube face is gridded so its flat middle is a
-## few big quads and its edges bend round onto the neighbouring face; the end
-## walls skip the cells inside the goal mouths.
+## few big quads and its edges bend round onto the neighbouring face. At each
+## goal the rounded floor-to-wall edge is notched out so the floor runs flat
+## into the goal mouth, with flat cheeks closing the sides of the notch.
+## Works in tank-centred coordinates; _append_triangle moves into place.
 func _build_shell() -> void:
 	var half := SIZE / 2.0
 	var floor_tris := [[], []]  # vertices, normals
 	var wall_tris := [[], []]
-	var hole := GOAL_SIZE / 2.0
+	var mouth_x := GOAL_SIZE.x / 2.0
+	var mouth_top := GOAL_SIZE.y - half.y
+
+	# Grid coordinates along each axis, per face axis; goal edges get their own lines.
+	var xs := _face_coords(half.x, [-mouth_x, mouth_x])
+	var ys := _face_coords(half.y, [mouth_top])
+	var zs := _face_coords(half.z, [])
+	var coords := [xs, ys, zs]
 
 	for axis in 3:
 		var u := (axis + 1) % 3
 		var v := (axis + 2) % 3
-		var is_goal_face := axis == 2  # u = x, v = y
-		var us := _face_coords(half[u], hole.x if is_goal_face else 0.0)
-		var vs := _face_coords(half[v], hole.y if is_goal_face else 0.0)
+		var us: PackedFloat32Array = coords[u]
+		var vs: PackedFloat32Array = coords[v]
 		for side: float in [-1.0, 1.0]:
 			var target: Array = floor_tris if axis == 1 and side < 0.0 else wall_tris
 			for i in us.size() - 1:
 				for j in vs.size() - 1:
-					if is_goal_face and absf(us[i] + us[i + 1]) / 2.0 < hole.x and absf(vs[j] + vs[j + 1]) / 2.0 < hole.y:
-						continue
 					var corners: Array[Vector3] = []
 					for c: Vector2 in [Vector2(us[i], vs[j]), Vector2(us[i + 1], vs[j]), Vector2(us[i + 1], vs[j + 1]), Vector2(us[i], vs[j + 1])]:
 						var p := Vector3.ZERO
@@ -112,8 +129,40 @@ func _build_shell() -> void:
 						p[u] = c.x
 						p[v] = c.y
 						corners.append(p)
-					_add_triangle(target, corners[0], corners[1], corners[2])
-					_add_triangle(target, corners[0], corners[2], corners[3])
+					var middle := _round(corners[0].lerp(corners[2], 0.5))
+					if absf(middle.x) < mouth_x and middle.y < mouth_top and absf(middle.z) > half.z - CORNER_RADIUS + 0.001:
+						continue  # inside a goal mouth or its notch
+					_add_rounded_triangle(target, corners[0], corners[1], corners[2])
+					_add_rounded_triangle(target, corners[0], corners[2], corners[3])
+
+	for end: float in [-1.0, 1.0]:
+		# Flat floor across the notch, up to the goal line.
+		var near := end * (half.z - CORNER_RADIUS)
+		var line := end * half.z
+		var a := Vector3(-mouth_x, -half.y, near)
+		var b := Vector3(mouth_x, -half.y, near)
+		var c := Vector3(mouth_x, -half.y, line)
+		var d := Vector3(-mouth_x, -half.y, line)
+		_add_flat_triangle(floor_tris, a, b, c, Vector3.UP)
+		_add_flat_triangle(floor_tris, a, c, d, Vector3.UP)
+		# Cheeks: fans from the foot of each goal post to the cut edge of the
+		# rounded band, through the band's own grid points so there are no gaps.
+		for x: float in [-mouth_x, mouth_x]:
+			# Floor edge -> 45 degrees -> wall edge.
+			var arc: Array[Vector3] = []
+			for z in zs:
+				if absf(z) >= half.z - CORNER_RADIUS and signf(z) == end:
+					arc.append(_round(Vector3(x, -half.y, z)))
+			if end < 0.0:
+				arc.reverse()
+			for y in ys:
+				if y <= -half.y + CORNER_RADIUS:
+					arc.append(_round(Vector3(x, y, line)))
+			var foot := Vector3(x, -half.y, line)
+			var inward := Vector3(-signf(x), 0.0, 0.0)
+			for k in arc.size() - 1:
+				if arc[k].distance_to(arc[k + 1]) > 0.001:
+					_add_flat_triangle(wall_tris, foot, arc[k], arc[k + 1], inward)
 
 	var mesh := ArrayMesh.new()
 	for part: Array in [floor_tris, wall_tris]:
@@ -144,33 +193,53 @@ func _build_shell() -> void:
 
 ## Grid line positions across one face, from -half to half: CORNER_STEPS steps
 ## through each rounded band (spaced so the bend is even), the flat middle,
-## and the edges of a centred hole when hole_half > 0.
-func _face_coords(half: float, hole_half: float) -> PackedFloat32Array:
+## and any extra cuts, which must lie within the flat middle.
+func _face_coords(half: float, cuts: Array) -> PackedFloat32Array:
 	var flat := half - CORNER_RADIUS
 	var coords := PackedFloat32Array()
 	for k in range(CORNER_STEPS, 0, -1):
 		coords.append(-flat - CORNER_RADIUS * tan(PI / 4.0 * k / CORNER_STEPS))
 	coords.append(-flat)
-	if hole_half > 0.0:
-		coords.append(-hole_half)
-		coords.append(hole_half)
+	var sorted_cuts := cuts.duplicate()
+	sorted_cuts.sort()
+	for cut: float in sorted_cuts:
+		assert(absf(cut) < flat, "shell cut %.1f is outside the flat part of the face" % cut)
+		coords.append(cut)
 	coords.append(flat)
 	for k in range(1, CORNER_STEPS + 1):
 		coords.append(flat + CORNER_RADIUS * tan(PI / 4.0 * k / CORNER_STEPS))
 	return coords
 
 
-## Adds one triangle of the shell from three points on the unrounded box,
-## pulling each onto the rounded surface and facing it into the tank.
-func _add_triangle(target: Array, a: Vector3, b: Vector3, c: Vector3) -> void:
+## A point on the unrounded box pulled onto the rounded surface.
+func _round(p: Vector3) -> Vector3:
+	var limit := SIZE / 2.0 - Vector3.ONE * CORNER_RADIUS
+	var core := p.clamp(-limit, limit)
+	return core + (p - core).normalized() * CORNER_RADIUS
+
+
+## Adds one triangle from three points on the unrounded box, pulled onto the
+## rounded surface with smooth normals facing into the tank.
+func _add_rounded_triangle(target: Array, a: Vector3, b: Vector3, c: Vector3) -> void:
+	var limit := SIZE / 2.0 - Vector3.ONE * CORNER_RADIUS
 	var points: Array[Vector3] = []
 	var normals: Array[Vector3] = []
-	var limit := SIZE / 2.0 - Vector3.ONE * CORNER_RADIUS
 	for p in [a, b, c]:
 		var core: Vector3 = p.clamp(-limit, limit)
 		var outward: Vector3 = (p - core).normalized()
-		points.append(centre + core + outward * CORNER_RADIUS)
+		points.append(core + outward * CORNER_RADIUS)
 		normals.append(-outward)
+	_append_triangle(target, points, normals)
+
+
+## Adds one flat triangle facing `normal`.
+func _add_flat_triangle(target: Array, a: Vector3, b: Vector3, c: Vector3, normal: Vector3) -> void:
+	var points: Array[Vector3] = [a, b, c]
+	var normals: Array[Vector3] = [normal, normal, normal]
+	_append_triangle(target, points, normals)
+
+
+func _append_triangle(target: Array, points: Array[Vector3], normals: Array[Vector3]) -> void:
 	# Godot treats clockwise triangles as front faces.
 	var facing := normals[0] + normals[1] + normals[2]
 	if (points[1] - points[0]).cross(points[2] - points[0]).dot(facing) > 0.0:
@@ -181,7 +250,7 @@ func _add_triangle(target: Array, a: Vector3, b: Vector3, c: Vector3) -> void:
 		normals[1] = normals[2]
 		normals[2] = swap_normal
 	for i in 3:
-		target[0].append(points[i])
+		target[0].append(centre + points[i])
 		target[1].append(normals[i])
 
 
@@ -193,9 +262,11 @@ func _build_goals() -> void:
 		goal.width = GOAL_SIZE.x
 		goal.height = GOAL_SIZE.y
 		goal.depth = GOAL_DEPTH
+		goal.bottom_post = false  # the floor runs straight in
 		# Blue defends +Z, Orange -Z; each goal's +Z points out through its wall.
 		var out := 1.0 if team == 0 else -1.0
-		goal.transform = Transform3D(Basis(Vector3.UP, 0.0 if team == 0 else PI), centre + Vector3(0, 0, out * SIZE.z / 2.0))
+		var mouth := Vector3(0.0, GOAL_SIZE.y / 2.0, out * SIZE.z / 2.0)
+		goal.transform = Transform3D(Basis(Vector3.UP, 0.0 if team == 0 else PI), mouth)
 		goal.name = "%sGoal" % TEAM_NAMES[team]
 		add_child(goal)
 		goals.append(goal)

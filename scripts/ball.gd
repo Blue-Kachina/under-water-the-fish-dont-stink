@@ -1,8 +1,9 @@
 class_name Ball
 extends RigidBody3D
-## The match ball: an air bubble that drifts through the water. Physics values
-## come from a BallSettings resource and are re-read every tick, so the tuning
-## panel changes it live. Water drag and buoyancy can follow the fish's.
+## The match ball, drawn as an air bubble. Physics values come from a
+## BallSettings resource and are re-read every tick, so the tuning panel changes
+## it live. A Water ball drifts with water drag and buoyancy (optionally the
+## fish's); a Surface ball ignores the water and falls like Rocket League's.
 
 const BUBBLE_SHADER := preload("res://shaders/bubble.gdshader")
 
@@ -129,13 +130,18 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var spin := state.angular_velocity
 	velocity = _apply_hits(state, velocity)
 
-	var inherit := settings.inherit_water and is_instance_valid(fish)
-	var linear_drag := fish.linear_drag if inherit else settings.linear_drag
-	var angular_drag := fish.angular_drag if inherit else settings.angular_drag
-	var buoyancy := fish.buoyancy if inherit else settings.buoyancy
-	velocity *= exp(-linear_drag * dt)
-	velocity.y += buoyancy * dt
-	spin *= exp(-angular_drag * dt)
+	if settings.ball_type == BallSettings.BallType.SURFACE:
+		velocity *= exp(-settings.air_drag * dt)
+		velocity.y -= settings.gravity * dt
+		spin *= exp(-settings.spin_drag * dt)
+	else:
+		var inherit := settings.inherit_water and is_instance_valid(fish)
+		var linear_drag := fish.linear_drag if inherit else settings.linear_drag
+		var angular_drag := fish.angular_drag if inherit else settings.angular_drag
+		var buoyancy := fish.buoyancy if inherit else settings.buoyancy
+		velocity *= exp(-linear_drag * dt)
+		velocity.y += buoyancy * dt
+		spin *= exp(-angular_drag * dt)
 
 	state.linear_velocity = velocity.limit_length(settings.max_speed)
 	state.angular_velocity = spin.limit_length(settings.max_angular_speed)

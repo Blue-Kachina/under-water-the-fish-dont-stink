@@ -13,7 +13,7 @@ var ball: Node3D
 var ball_cam := false
 
 @export_group("Follow")
-@export_range(1.0, 20.0, 0.1) var distance := 2.9
+@export_range(1.0, 20.0, 0.1) var distance := 2.1
 @export_range(-5.0, 10.0, 0.1) var height := 1.1
 ## Height above the fish's centre that the camera aims at.
 @export_range(-3.0, 5.0, 0.1) var look_height := 1.2
@@ -22,7 +22,7 @@ var ball_cam := false
 ## How much the camera leans with the fish's roll. 0 = horizon stays level.
 ## The lean peaks when the fish is on its side and eases back to level as it
 ## goes fully inverted, so an air roll never flips the view.
-@export_range(0.0, 1.0, 0.05) var roll_follow := 0.5
+@export_range(0.0, 1.0, 0.05) var roll_follow := 0.0
 ## Roll exactly with the fish instead (ignores roll_follow).
 @export var lock_roll_to_fish := false
 ## How quickly the camera's roll catches up to its target.
@@ -41,7 +41,7 @@ var ball_cam := false
 @export_range(1.0, 30.0, 0.5) var look_stiffness := 12.0
 
 @export_group("Collision")
-@export_range(0.0, 1.0, 0.05) var collision_margin := 0.3
+@export_range(0.0, 1.0, 0.05) var collision_margin := 0.5
 
 var _rotation := Quaternion.IDENTITY
 ## Camera up, carried from frame to frame so its roll can only turn, never jump.
@@ -58,6 +58,11 @@ func _ready() -> void:
 	if fish:
 		_rotation = fish.global_basis.get_rotation_quaternion()
 		_up = fish.global_basis.y
+
+
+## Whether a setting does anything with the current toggles; the tuning panel hides the rest.
+func is_option_active(property: String) -> bool:
+	return property != "roll_follow" or not lock_roll_to_fish
 
 
 func _process(delta: float) -> void:

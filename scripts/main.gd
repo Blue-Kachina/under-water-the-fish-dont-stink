@@ -62,7 +62,7 @@ func set_environment(env_name: String, remember := true) -> void:
 
 func _process(_delta: float) -> void:
 	if Input.is_action_just_pressed("reset"):
-		_fish.request_reset()
+		_fish.set_spawn(_environment.spawn_transform())  # re-read: the aquarium's depends on the ball type
 		if _environment is Arena:
 			(_environment as Arena).reset_course()
 		elif _environment is AquariumArena:

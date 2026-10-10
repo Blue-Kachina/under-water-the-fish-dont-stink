@@ -1,7 +1,8 @@
 extends CanvasLayer
-## Live tuning panel. Lists every @export_range float and @export bool on the
-## fish, the camera and the ball settings, writes changes to them immediately,
-## and saves/loads them. Add a new @export_range to any of them and it appears here.
+## Live tuning panel. Lists every @export_range float, @export bool and @export
+## enum on the fish, the camera and the ball settings, writes changes to them
+## immediately, and saves/loads them. Add a new export to any of them and it
+## appears here. A target can hide options that don't apply with is_option_active().
 ##
 ## Controls are mouse-only (no keyboard/gamepad focus) so the controller keeps
 ## flying the fish while you drag sliders.
@@ -15,7 +16,9 @@ const SAVE_PATH_USER := "user://tuning.cfg"   # exported builds can't write res:
 
 var _targets := {}
 var _defaults := {}
-var _editors := {}  # "section/property" -> HSlider or CheckBox
+var _editors := {}  # "section/property" -> HSlider, CheckBox or OptionButton
+var _rows := {}  # "section/property" -> the control to hide when the option doesn't apply
+var _group_labels := {}  # group heading Label -> its "section/property" keys
 var _panel: PanelContainer
 var _status: Label
 var _environment_row: HBoxContainer
@@ -125,23 +128,50 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 	list.add_child(header)
 
 	var shown_group := ""
+	var group_label: Label
 	for property in _tunable_properties(target):
 		var prop: String = property.name
+		var key := "%s/%s" % [section, prop]
 		if property.group != shown_group:
 			shown_group = property.group
-			var group_label := Label.new()
+			group_label = Label.new()
 			group_label.text = shown_group
 			group_label.modulate = Color(0.55, 0.85, 1.0)
 			list.add_child(group_label)
+			_group_labels[group_label] = []
+		_group_labels[group_label].append(key)
 
 		var editor: Control
 		if property.type == TYPE_BOOL:
 			var check := CheckBox.new()
 			check.text = prop.capitalize()
 			check.button_pressed = target.get(prop)
-			check.toggled.connect(func(on: bool) -> void: target.set(prop, on))
+			check.toggled.connect(func(on: bool) -> void:
+				target.set(prop, on)
+				_refresh_visibility())
 			editor = check
 			list.add_child(check)
+			_rows[key] = check
+		elif property.type == TYPE_INT:  # enum
+			var row := HBoxContainer.new()
+			var name_label := Label.new()
+			name_label.text = prop.capitalize()
+			name_label.custom_minimum_size.x = 170.0
+			name_label.tooltip_text = prop
+			row.add_child(name_label)
+			var picker := OptionButton.new()
+			for option: String in property.hint_string.split(","):
+				var parts := option.split(":")
+				picker.add_item(parts[0], parts[1].to_int() if parts.size() > 1 else picker.item_count)
+			picker.select(picker.get_item_index(target.get(prop)))
+			picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			picker.item_selected.connect(func(index: int) -> void:
+				target.set(prop, picker.get_item_id(index))
+				_refresh_visibility())
+			row.add_child(picker)
+			editor = picker
+			list.add_child(row)
+			_rows[key] = row
 		else:
 			var row := HBoxContainer.new()
 			var name_label := Label.new()
@@ -171,14 +201,27 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 				value_label.text = "%.2f" % value)
 			editor = slider
 			list.add_child(row)
+			_rows[key] = row
 
 		editor.focus_mode = Control.FOCUS_NONE
-		_editors["%s/%s" % [section, prop]] = editor
+		_editors[key] = editor
 
 	list.add_child(HSeparator.new())
+	_refresh_visibility()
 
 
-## Script variables exported as a float range or a bool, tagged with their @export_group.
+## Hides options a target says don't apply right now (via an optional
+## is_option_active(property) method), and group headings left empty.
+func _refresh_visibility() -> void:
+	for key: String in _rows:
+		var parts := key.split("/")
+		var target: Object = _targets[parts[0]]
+		_rows[key].visible = not target.has_method("is_option_active") or target.is_option_active(parts[1])
+	for label: Label in _group_labels:
+		label.visible = _group_labels[label].any(func(key: String) -> bool: return _rows[key].visible)
+
+
+## Script variables exported as a float range, a bool or an enum, tagged with their @export_group.
 func _tunable_properties(target: Object) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var group := ""
@@ -189,7 +232,8 @@ func _tunable_properties(target: Object) -> Array[Dictionary]:
 		if not (property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE) or not (property.usage & PROPERTY_USAGE_EDITOR):
 			continue
 		var is_range: bool = property.type == TYPE_FLOAT and property.hint == PROPERTY_HINT_RANGE
-		if is_range or property.type == TYPE_BOOL:
+		var is_enum: bool = property.type == TYPE_INT and property.hint == PROPERTY_HINT_ENUM
+		if is_range or is_enum or property.type == TYPE_BOOL:
 			var entry: Dictionary = property.duplicate()
 			entry["group"] = group
 			result.append(entry)
@@ -210,6 +254,10 @@ func _apply(section: String, values: Dictionary) -> void:
 			(editor as HSlider).value = values[prop]  # emits value_changed, which updates the target
 		elif editor is CheckBox:
 			(editor as CheckBox).button_pressed = values[prop]
+		elif editor is OptionButton:
+			var picker := editor as OptionButton
+			picker.select(picker.get_item_index(values[prop]))
+			picker.item_selected.emit(picker.selected)  # select() doesn't emit it
 
 
 func _to_config() -> ConfigFile:

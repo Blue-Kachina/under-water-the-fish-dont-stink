@@ -48,42 +48,47 @@ const RL_FLIP_Z_DAMP_START := 0.15
 const RL_FLIP_Z_DAMP_END := 0.21
 ## How quickly a direction lock pulls the nose back onto the locked direction.
 const LOCK_ALIGN_RATE := 12.0
+# Rocket League jump (RocketSim RLConst.h, Car::_UpdateJump): an instant push,
+# then extra push while jump is held, for at least JUMP_MIN_TIME even on a tap.
+const RL_JUMP_MIN_HOLD := 0.025
+## An uncompleted flip counts as over once its spin drops below this (rad/s).
+const FLIP_SPIN_OUT_MIN_RATE := 1.5
 ## Tolerance for comparing summed tick times to RL durations (78 ticks of 1/120 s
 ## add up to a hair over 0.65 in floating point).
 const TIME_EPSILON := 0.0001
 
 @export_group("Thrust")
-@export_range(0.0, 60.0, 0.5) var forward_accel := 14.0
-@export_range(0.0, 60.0, 0.5) var reverse_accel := 8.0
+@export_range(0.0, 60.0, 0.5) var forward_accel := 12.5
+@export_range(0.0, 60.0, 0.5) var reverse_accel := 20.0
 ## Deceleration when holding reverse while still swimming forward.
 @export_range(0.0, 120.0, 1.0) var brake_accel := 31.0
 ## Keep below max_boost_speed so boosting raises top speed. Throttle alone can
 ## never pass forward_accel / linear_drag (drag balances thrust there).
-@export_range(0.0, 60.0, 0.5) var max_speed := 32.0
+@export_range(0.0, 60.0, 0.5) var max_speed := 35.0
 @export_range(0.0, 30.0, 0.5) var max_reverse_speed := 6.0
 
 @export_group("Boost")
-@export_range(0.0, 60.0, 0.5) var boost_accel := 18.5
+@export_range(0.0, 60.0, 0.5) var boost_accel := 10.0
 ## Absolute speed cap, also applied to jumps and dodges.
-@export_range(0.0, 80.0, 0.5) var max_boost_speed := 45.0
-@export var boost_unlimited := true
+@export_range(0.0, 120.0, 0.5) var max_boost_speed := 75.0
+@export var boost_unlimited := false
 ## Percent of the tank used per second (Rocket League: 33.3).
-@export_range(0.0, 100.0, 0.5) var boost_drain := 33.0
-@export_range(0.0, 100.0, 0.5) var boost_regen := 10.0
+@export_range(0.0, 100.0, 0.5) var boost_drain := 50.0
+@export_range(0.0, 100.0, 0.5) var boost_regen := 25.0
 
 @export_group("Water")
 ## Fraction of speed lost per second.
-@export_range(0.0, 3.0, 0.01) var linear_drag := 0.4
+@export_range(0.0, 3.0, 0.01) var linear_drag := 0.29
 ## Momentum above max_speed (from dodges, swim strokes or boost) fades at this
 ## rate while you keep swimming (throttle, boost or a stroke rhythm), like
 ## holding throttle above top speed in Rocket League. Applies to the extra speed
 ## only: 0.5 halves it in about 1.4 s. Coasting uses linear_drag as normal.
 @export_range(0.0, 3.0, 0.01) var overspeed_drag := 0.5
 ## Extra drag on sideways/vertical slip. 0 = free drift, high = carves like it's on rails.
-@export_range(0.0, 10.0, 0.05) var lateral_drag := 3.9
-@export_range(0.0, 5.0, 0.05) var angular_drag := 2.45
+@export_range(0.0, 10.0, 0.05) var lateral_drag := 1.0
+@export_range(0.0, 5.0, 0.05) var angular_drag := 1.0
 ## Upward acceleration. 0 = neutral buoyancy, negative sinks.
-@export_range(-10.0, 10.0, 0.1) var buoyancy := 0.0
+@export_range(-10.0, 10.0, 0.1) var buoyancy := -7.5
 @export_range(0.0, 1.0, 0.05) var wall_bounce := 0.2:
 	set(value):
 		wall_bounce = value
@@ -100,11 +105,11 @@ const TIME_EPSILON := 0.0001
 @export var rl_roll_timing := true
 @export_range(0.0, 60.0, 0.1) var pitch_torque := 12.15
 @export_range(0.0, 60.0, 0.1) var yaw_torque := 8.8
-@export_range(0.0, 80.0, 0.1) var roll_torque := 36.2
-@export_range(0.0, 20.0, 0.05) var pitch_damping := 2.8
+@export_range(0.0, 80.0, 0.1) var roll_torque := 80.0
+@export_range(0.0, 20.0, 0.05) var pitch_damping := 2.75
 @export_range(0.0, 20.0, 0.05) var yaw_damping := 1.85
-@export_range(0.0, 20.0, 0.05) var roll_damping := 4.47
-@export_range(0.0, 15.0, 0.1) var max_angular_speed := 5.5
+@export_range(0.0, 20.0, 0.05) var roll_damping := 4.05
+@export_range(0.0, 15.0, 0.1) var max_angular_speed := 5.4
 @export var invert_pitch := false
 
 @export_group("Steering")
@@ -115,10 +120,10 @@ const TIME_EPSILON := 0.0001
 ## Steer pitch (nose up/down) the same way. Off = pitch still works at a standstill.
 @export var car_steering_pitch := true
 ## Turning circle at a crawl and at top boost speed. Tighter when slow, like Rocket League cars.
-@export_range(0.5, 20.0, 0.1) var min_turn_radius := 2.5
+@export_range(0.5, 20.0, 0.1) var min_turn_radius := 2.6
 @export_range(1.0, 60.0, 0.5) var max_turn_radius := 15.0
 ## How quickly the turn rate follows the stick.
-@export_range(1.0, 40.0, 0.5) var steer_response := 12.0
+@export_range(1.0, 40.0, 0.5) var steer_response := 5.0
 
 @export_group("Swim Strokes")
 ## Sweep the stick side to side (or up and down) in a steady rhythm to swim
@@ -129,7 +134,7 @@ const TIME_EPSILON := 0.0001
 ## Strokes only count while the direction lock is held. Off = they always count.
 @export var strokes_need_lock := false
 ## Speed added by each on-tempo beat (from the 3rd beat on).
-@export_range(0.0, 10.0, 0.1) var stroke_impulse := 2.5
+@export_range(0.0, 10.0, 0.1) var stroke_impulse := 3.5
 ## Strokes stop adding speed here. Above max_speed, so good rhythm beats plain throttle.
 @export_range(0.0, 80.0, 0.5) var stroke_max_speed := 40.0
 ## How far the stick must reach on each side for a stroke to count.
@@ -143,13 +148,21 @@ const TIME_EPSILON := 0.0001
 @export_range(0.05, 1.0, 0.05) var rhythm_tolerance := 0.3
 
 @export_group("Jump & Dodge")
-## Impulse along the fish's up axis, for both the first jump and a double jump.
-@export_range(0.0, 40.0, 0.1) var jump_impulse := 20.0
-@export_range(0.0, 60.0, 0.1) var dodge_impulse := 30.0
+## Instant push along the fish's up axis on pressing jump. A double jump is this alone.
+@export_range(0.0, 40.0, 0.1) var jump_impulse := 10.2
+## Holding jump pushes higher, as in Rocket League: the first jump keeps
+## accelerating while held, up to jump_hold_time. Off = every jump is a tap.
+@export var variable_jump := true
+## Push while held. RL's full hold adds as much again as the instant push
+## (jump_impulse / jump_hold_time), so a full hold is twice a tap.
+@export_range(0.0, 150.0, 0.5) var jump_hold_accel := 33.5
+## Longest the hold keeps pushing. RL: 0.2 s.
+@export_range(0.05, 1.0, 0.01) var jump_hold_time := 0.2
+@export_range(0.0, 60.0, 0.1) var dodge_impulse := 7.0
 ## Time after the first jump during which a second press double-jumps or dodges.
-@export_range(0.0, 3.0, 0.05) var double_jump_window := 1.25
+@export_range(0.0, 3.0, 0.05) var double_jump_window := 1.2
 ## Wait after the second jump (or an unused window) before jumping again.
-@export_range(0.0, 5.0, 0.05) var jump_cooldown := 1.0
+@export_range(0.0, 5.0, 0.05) var jump_cooldown := 0.0
 ## Stick deflection needed for a dodge; below it the second press is a double jump.
 @export_range(0.0, 1.0, 0.05) var dodge_deadzone := 0.5
 ## Flip with Rocket League's exact dodge rotation (RocketSim's constants):
@@ -161,27 +174,27 @@ const TIME_EPSILON := 0.0001
 ## as if the stick (front/back flips) or air roll (side flips) were held, pitch
 ## lock included, and the fish stops square at one turn. A cancelled flip
 ## doesn't complete. Off = RL with no input: a flip stops short (~311°).
-@export var complete_flips := true
+@export var complete_flips := false
 ## RL's flip Z-damp: early in a flip most vertical (world up/down) speed is
 ## removed, so dodges stay flat instead of drifting up with the jump.
 @export var rl_flip_z_damp := true
 ## Scripted flip (only when RL Dodge Timing is off): full rotations and duration.
 @export_range(0.0, 2.0, 0.05) var dodge_flip_turns := 1.0
-@export_range(0.1, 2.0, 0.05) var dodge_flip_duration := 0.5
+@export_range(0.1, 2.0, 0.05) var dodge_flip_duration := 0.1
 ## Touching a surface refreshes the jumps, like landing in Rocket League.
 @export var contact_refreshes_jump := true
 ## Lateral drag right after a jump or dodge, so the impulse carries instead of
 ## being eaten by carving drag. Eases back to lateral_drag over the time below.
-@export_range(0.0, 10.0, 0.05) var post_jump_lateral_drag := 0.3
-@export_range(0.0, 3.0, 0.05) var post_jump_drag_time := 1.0
+@export_range(0.0, 10.0, 0.05) var post_jump_lateral_drag := 0.0
+@export_range(0.0, 3.0, 0.05) var post_jump_drag_time := 0.0
 
 @export_group("Powerslide")
 ## Lateral drag while powersliding: low = the fish keeps sliding the old way while it turns.
-@export_range(0.0, 10.0, 0.05) var powerslide_lateral_drag := 0.15
+@export_range(0.0, 10.0, 0.05) var powerslide_lateral_drag := 0.35
 ## Multiplies pitch/yaw torque and the spin cap while powersliding.
-@export_range(1.0, 4.0, 0.05) var powerslide_turn_multiplier := 1.6
+@export_range(1.0, 4.0, 0.05) var powerslide_turn_multiplier := 1.35
 ## Forward thrust kept while powersliding (1 = full thrust).
-@export_range(0.0, 1.0, 0.05) var powerslide_thrust_scale := 0.6
+@export_range(0.0, 1.0, 0.05) var powerslide_thrust_scale := 0.7
 # Telemetry, read by the HUD.
 var speed := 0.0
 var forward_speed := 0.0
@@ -203,6 +216,7 @@ var input_reverse := 0.0
 var input_stick := Vector2.ZERO
 var input_roll := 0.0
 var air_roll_held := false
+var jump_held := false
 var boost_held := false
 var powerslide_held := false
 ## Direction lock: holds the current heading, and turns stick sweeps into swim strokes.
@@ -211,6 +225,8 @@ var direction_lock_held := false
 var _jump_queued := false
 var _jump_was_held := false
 var _jump_timer := 0.0
+## Time since the first jump began while its hold push is running; -1 when it isn't.
+var _jump_hold_elapsed := -1.0
 var _post_jump_time_left := 0.0
 var _steer_speed := 0.0
 var _lock_direction := Vector3.FORWARD
@@ -223,6 +239,9 @@ var _flip_torque := Vector3.ZERO
 ## Rotation so far about the flip's axis, and whether the flip was cancelled.
 var _flip_angle := 0.0
 var _flip_cancelled := false
+## A flip that ended short of a full turn while the fish is still turning the
+## same way (e.g. stick held); the camera keeps holding until it's round.
+var _flip_spin_out := false
 ## Normalized dodge direction (x = forward, y = right), as in RocketSim's dodgeDir.
 var _flip_direction := Vector2.ZERO
 var _flip_time_left := 0.0
@@ -255,9 +274,37 @@ func request_reset() -> void:
 
 
 ## True from a dodge until its flip is fully over, including a cancelled flip's
-## wind-down (unlike is_dodging, which a cancel clears straight away).
+## wind-down (unlike is_dodging, which a cancel clears straight away) and an
+## uncompleted flip that's still turning round on its own.
 func is_flipping() -> bool:
-	return is_dodging or _flip_time >= 0.0
+	return is_dodging or _flip_time >= 0.0 or _flip_spin_out
+
+
+## Whether a setting does anything with the current toggles; the tuning panel hides the rest.
+func is_option_active(property: String) -> bool:
+	match property:
+		"roll_torque", "roll_damping", "max_angular_speed":
+			return not rl_roll_timing
+		"pitch_torque", "pitch_damping":
+			return not (car_steering and car_steering_pitch)
+		"yaw_torque", "yaw_damping":
+			return not car_steering
+		"angular_drag":  # water damping on whichever rotations use torque (a Water ball can still inherit it)
+			return not (car_steering and car_steering_pitch and rl_roll_timing)
+		"car_steering_pitch", "min_turn_radius", "max_turn_radius", "steer_response":
+			return car_steering
+		"boost_drain", "boost_regen":
+			return not boost_unlimited
+		"strokes_need_lock", "stroke_impulse", "stroke_max_speed", "stroke_threshold", \
+				"stroke_min_interval", "stroke_max_interval", "rhythm_tolerance":
+			return swim_strokes
+		"jump_hold_accel", "jump_hold_time":
+			return variable_jump
+		"complete_flips", "rl_flip_z_damp":
+			return rl_dodge_timing
+		"dodge_flip_turns", "dodge_flip_duration":
+			return not rl_dodge_timing
+	return true
 
 
 ## Move the reset point (e.g. when switching environments) and go there.
@@ -280,7 +327,7 @@ func _sample_input(delta: float) -> void:
 	direction_lock_held = Input.is_action_pressed("direction_lock")
 	# Detect the press ourselves: "just pressed" is tracked per frame and isn't
 	# reliable this early in the physics tick.
-	var jump_held := Input.is_action_pressed("jump")
+	jump_held = Input.is_action_pressed("jump")
 	if jump_held and not _jump_was_held:
 		_jump_queued = true
 	_jump_was_held = jump_held
@@ -376,7 +423,11 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 
 	# Steering uses the full speed (so a sliding fish can still steer), signed
 	# negative when swimming backwards so steering flips like a reversing car.
-	_steer_speed = -velocity.length() if velocity.dot(forward) < -0.5 else velocity.length()
+	# Only while reverse is held: judging by velocity alone, turning away from a
+	# drift (e.g. pitching up while sinking) would flip the steering part-way
+	# round and stall the turn.
+	var reversing := input_reverse > 0.0 and velocity.dot(forward) < -0.5
+	_steer_speed = -velocity.length() if reversing else velocity.length()
 
 	# Work on angular velocity in the fish's own frame: x = pitch, y = yaw, z = roll.
 	var local_spin := body_basis.transposed() * state.angular_velocity
@@ -479,9 +530,20 @@ func _apply_jump(velocity: Vector3, body_basis: Basis, touching: bool, dt: float
 				velocity += body_basis.y * jump_impulse
 				jump_state = JumpState.SECOND_JUMP
 				_jump_timer = double_jump_window
+				_jump_hold_elapsed = 0.0 if variable_jump else -1.0
 				_post_jump_time_left = post_jump_drag_time
 				jumped.emit()
 		JumpState.SECOND_JUMP:
+			if _jump_hold_elapsed >= 0.0:
+				# Holding the first jump keeps pushing; the double jump window
+				# only starts counting once the hold is over, as in RL.
+				_jump_hold_elapsed += dt
+				var holding := jump_held or _jump_hold_elapsed <= RL_JUMP_MIN_HOLD + TIME_EPSILON
+				if holding and not pressed and _jump_hold_elapsed <= jump_hold_time + TIME_EPSILON:
+					velocity += body_basis.y * jump_hold_accel * dt
+					_jump_timer = double_jump_window
+				else:
+					_jump_hold_elapsed = -1.0
 			if pressed:
 				velocity = _second_jump(velocity, body_basis)
 				_post_jump_time_left = post_jump_drag_time
@@ -530,6 +592,7 @@ func _start_rl_flip() -> void:
 	_flip_time = 0.0
 	_flip_angle = 0.0
 	_flip_cancelled = false
+	_flip_spin_out = false
 	_flip_direction = dodge_dir
 	is_dodging = true
 
@@ -592,7 +655,13 @@ func _apply_rotation(local_spin: Vector3, dt: float) -> Vector3:
 	var spin := Vector3(pitch_rate, -yaw_rate, -roll_rate)
 	# RL clamps total spin to 5.5 rad/s; a powerslide still allows extra turning.
 	var cap := RL_MAX_ANGULAR_SPEED if rl_roll_timing else max_angular_speed
-	return spin.limit_length(cap * turn)
+	spin = spin.limit_length(cap * turn)
+	if _flip_spin_out:
+		var rate := spin.dot(_flip_torque.normalized())
+		_flip_angle += rate * dt
+		if _flip_angle >= TAU or rate < FLIP_SPIN_OUT_MIN_RATE:
+			_flip_spin_out = false
+	return spin
 
 
 ## One tick of a Rocket League dodge flip (RocketSim Car::_UpdateAirTorque),
@@ -673,6 +742,7 @@ func _complete_flip(spin: Vector3, axis: Vector3, dt: float) -> Vector3:
 ## The whole flip counts as dodging (no thrust, held camera); the low
 ## post-jump drag starts once it's over.
 func _end_flip() -> void:
+	_flip_spin_out = not _flip_cancelled and _flip_torque != Vector3.ZERO and _flip_angle < TAU - TIME_EPSILON
 	_flip_time = -1.0
 	is_dodging = false
 	_post_jump_time_left = post_jump_drag_time
@@ -694,11 +764,13 @@ func _apply_reset(state: PhysicsDirectBodyState3D) -> void:
 	state.angular_velocity = Vector3.ZERO
 	_flip_time_left = 0.0
 	_flip_time = -1.0
+	_flip_spin_out = false
 	_post_jump_time_left = 0.0
 	_queued_stroke = 0.0
 	stroke_chain = 0
 	is_dodging = false
 	jump_state = JumpState.READY
+	_jump_hold_elapsed = -1.0
 	boost_amount = 100.0
 	reset_physics_interpolation.call_deferred()
 

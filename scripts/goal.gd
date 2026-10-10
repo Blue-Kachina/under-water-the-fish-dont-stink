@@ -13,6 +13,8 @@ const WALL := 1.0  # thickness of the solid net panels
 @export var width := 28.0
 @export var height := 16.0
 @export var depth := 12.0
+## Off for a goal standing on the floor, so the ball can roll straight in.
+@export var bottom_post := true
 
 
 func _ready() -> void:
@@ -38,7 +40,8 @@ func _ready() -> void:
 	_add_post(Vector3(half_w, 0, 0), Vector3.UP, height, frame)
 	_add_post(Vector3(-half_w, 0, 0), Vector3.UP, height, frame)
 	_add_post(Vector3(0, half_h, 0), Vector3.RIGHT, width, frame)
-	_add_post(Vector3(0, -half_h, 0), Vector3.RIGHT, width, frame)
+	if bottom_post:
+		_add_post(Vector3(0, -half_h, 0), Vector3.RIGHT, width, frame)
 
 	var glow := OmniLight3D.new()
 	glow.light_color = color
