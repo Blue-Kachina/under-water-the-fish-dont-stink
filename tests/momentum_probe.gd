@@ -7,10 +7,11 @@ const START := Vector3(-40, 35, 75)
 const RUN_TIME := 3.0
 
 ## name, throttle held, stick axis ("x"/"y"/""), beat intervals (cycled),
-## optional: hold the direction lock (default true)
+## optional: raw stick strength of each sweep (default full; small taps that
+## don't reach stroke_threshold shouldn't count)
 const SCENARIOS := [
 	["throttle only", true, "", []],
-	["side strokes, no lock (0.30s)", false, "x", [0.30], false],
+	["small taps (0.30s)", false, "x", [0.30], 0.3],
 	["steady side strokes (0.30s)", false, "x", [0.30]],
 	["steady up/down strokes (0.30s)", false, "y", [0.30]],
 	["irregular strokes (0.2/0.5s)", false, "x", [0.2, 0.5]],
@@ -77,12 +78,10 @@ func _run_stroke_scenario(s: Array) -> void:
 	if s[1]:
 		Input.action_press("thrust_forward")
 	var beats: Array = s[3]
-	if s[2] != "" and (s.size() < 5 or s[4]):
-		Input.action_press("direction_lock")
 	if s[2] != "" and clock >= next_beat:
 		var actions := ["stick_left", "stick_right"] if s[2] == "x" else ["stick_up", "stick_down"]
 		Input.action_release(actions[0]); Input.action_release(actions[1])
-		Input.action_press(actions[0] if side < 0 else actions[1])
+		Input.action_press(actions[0] if side < 0 else actions[1], s[4] if s.size() > 4 else 1.0)
 		side = -side
 		next_beat += beats[beat_index % beats.size()]
 		beat_index += 1

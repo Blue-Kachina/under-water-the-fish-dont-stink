@@ -39,13 +39,18 @@ keyboard keys are the same in every profile. Profiles live in `PROFILES` in `scr
 | Profile | A | B | X | Y | LB | RB | R3 |
 |---|---|---|---|---|---|---|---|
 | Default | Jump | Boost | Air roll | Powerslide | Roll left | Roll right | Direction lock |
-| Personal | Jump | Roll right | Roll left | — | Powerslide | Direction lock | — |
+| Personal | Jump | Roll right | Roll left | — | Powerslide | Boost | — |
 
-**Direction lock and swim strokes:** hold the direction lock (keyboard F) to keep the nose pointed
-where it faced when you pressed it: no turning left/right/up/down, but rolling still works. While
-it's held, sweep the stick side to side (or up and down) in a steady rhythm. The first two beats
-set the tempo; every on-tempo beat after that adds a small speed boost. An off-tempo beat breaks
-the rhythm.
+**Swim strokes:** sweep the left stick side to side (or up and down) in a steady rhythm. The first
+two beats set the tempo; every on-tempo beat after that adds a small speed boost. An off-tempo
+beat breaks the rhythm, and mashing gives nothing. Sweeps also steer, so the fish wiggles as it
+swims; a lower *Steer Response* makes that gentler.
+
+**Boost works at any time**, including mid-dodge, and always pushes the way the fish is facing.
+A flip cancel hands control straight back (throttle, boost, camera) while the spin winds down.
+
+**Direction lock** (keyboard F; R3 in the Default profile): keeps the nose pointed where it faced
+when pressed. No turning, but rolling still works.
 
 **Roll and dodge timing match Rocket League:** air roll, dodge flips and flip cancels use
 RocketSim's constants at the same 120 Hz tick rate. A full roll from rest takes 1.242 s (149 ticks).

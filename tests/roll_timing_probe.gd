@@ -40,6 +40,9 @@ func _ready() -> void:
 		_lock_test,
 		func() -> bool: return _z_damp_test(true),
 		func() -> bool: return _z_damp_test(false),
+		func() -> bool: return _boost_dodge_test(false),
+		func() -> bool: return _boost_dodge_test(true),
+		_cancel_control_test,
 	]
 
 
@@ -109,7 +112,7 @@ func _physics_process(_delta: float) -> void:
 
 
 func _release_all() -> void:
-	for action in ["roll_right", "jump", "stick_up", "stick_down", "stick_right", "direction_lock", "thrust_forward"]:
+	for action in ["roll_right", "jump", "stick_up", "stick_down", "stick_right", "direction_lock", "thrust_forward", "boost"]:
 		Input.action_release(action)
 
 
@@ -234,6 +237,59 @@ func _z_damp_test(z_damp: bool) -> bool:
 			line += "  (RL rule: x0.65^8 = %.3f of step 17)" % pow(0.65, 8)
 		print(line)
 		fish.rl_flip_z_damp = true
+		return true
+	return false
+
+
+## Side dodge from a standstill, with or without boost held from the dodge on:
+## boost must work mid-flip, pushing along the fish's (spinning) nose.
+func _boost_dodge_test(boost: bool) -> bool:
+	if tick == 1:
+		fish.request_reset()
+	if tick == 10:
+		Input.action_press("jump")
+	if tick == 12:
+		Input.action_release("jump")
+	if tick == 40:
+		Input.action_press("stick_right")
+		Input.action_press("jump")
+		if boost:
+			Input.action_press("boost")
+	if tick == 42:
+		Input.action_release("stick_right")
+		Input.action_release("jump")
+	if tick == 40 + TORQUE_TICKS:
+		print("Side dodge, boost %s: speed %.1f m/s at the end of the flip torque, boosting=%s mid-flip" % ["held" if boost else "off ", fish.speed, marks.get("boosting", false)])
+		Input.action_release("boost")
+		return true
+	if tick == 70:
+		marks["boosting"] = fish.is_boosting and fish.is_dodging
+	return false
+
+
+## Back flip with throttle held, cancelled 0.15 s in: control (throttle, camera)
+## must come back at the cancel, not at the end of the pitch lock (0.95 s).
+func _cancel_control_test() -> bool:
+	if tick == 1:
+		fish.request_reset()
+	if tick == 10:
+		Input.action_press("jump")
+	if tick == 12:
+		Input.action_release("jump")
+	if tick == 40:
+		Input.action_press("stick_down")
+		Input.action_press("jump")
+		Input.action_press("thrust_forward")
+	if tick == 42:
+		Input.action_release("stick_down")
+		Input.action_release("jump")
+	if tick == 58:
+		Input.action_press("stick_up")  # cancel
+	if tick == 60:
+		marks["dodging_after_cancel"] = fish.is_dodging
+		marks["speed_at_cancel"] = fish.speed
+	if tick == 100:
+		print("Half flip with throttle: dodging right after the cancel=%s; speed %.1f -> %.1f m/s in the next 0.33 s (pitch lock still running=%s)" % [marks["dodging_after_cancel"], marks["speed_at_cancel"], fish.speed, fish.get("_flip_time") >= 0.0])
 		return true
 	return false
 

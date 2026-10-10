@@ -58,16 +58,23 @@ func _process(delta: float) -> void:
 		return
 
 	var fish_xform := fish.get_global_transform_interpolated()
-	if follow_dodge_spin or not fish.is_dodging:
-		var target_rotation := fish_xform.basis.get_rotation_quaternion()
-		_rotation = _rotation.slerp(target_rotation, 1.0 - exp(-rotation_stiffness * delta))
+	var fish_up := fish_xform.basis.y
+	# Hold still for the whole flip, cancelled or not: the fish is still spinning.
+	if follow_dodge_spin or not fish.is_flipping():
+		# Aim where the fish faces, but with the camera's own (levelled) up
+		# rather than the fish's full orientation. Turning to face backwards
+		# after a half flip is then a level swing around, not a tumble over the
+		# top, which would flip the view as it passed straight up.
+		var target_forward := -fish_xform.basis.z
+		var target_frame := Basis.looking_at(target_forward, _target_up(target_forward, fish_up))
+		_rotation = _rotation.slerp(target_frame.get_rotation_quaternion(), 1.0 - exp(-rotation_stiffness * delta))
 	var follow := Basis(_rotation)
 	var forward := -follow.z
 
 	# Carry last frame's up onto the new view plane, then turn it toward the target.
 	var up := _up - forward * _up.dot(forward)
 	up = follow.y if up.length_squared() < 0.0001 else up.normalized()
-	var target_up := _target_up(forward, follow.y)
+	var target_up := _target_up(forward, fish_up)
 	up = up.rotated(forward, up.signed_angle_to(target_up, forward) * (1.0 - exp(-roll_stiffness * delta)))
 	_up = up
 

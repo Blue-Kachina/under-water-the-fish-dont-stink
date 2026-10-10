@@ -121,14 +121,13 @@ const TIME_EPSILON := 0.0001
 @export_range(1.0, 40.0, 0.5) var steer_response := 12.0
 
 @export_group("Swim Strokes")
-## Hold the direction lock and sweep the stick side to side (or up and down) in
-## a steady rhythm to swim faster, like a fish's tail or a dolphin's kick. The
-## lock keeps you travelling along one line while the fish still turns and
-## rolls freely. The first two beats set the tempo; every on-tempo beat after
-## that adds speed along the locked line.
+## Sweep the stick side to side (or up and down) in a steady rhythm to swim
+## faster, like a fish's tail or a dolphin's kick. The sweeps also steer, so the
+## fish wiggles as it swims (gentler with a low steer_response). The first two
+## beats set the tempo; every on-tempo beat after that adds speed.
 @export var swim_strokes := true
 ## Strokes only count while the direction lock is held. Off = they always count.
-@export var strokes_need_lock := true
+@export var strokes_need_lock := false
 ## Speed added by each on-tempo beat (from the 3rd beat on).
 @export_range(0.0, 10.0, 0.1) var stroke_impulse := 2.5
 ## Strokes stop adding speed here. Above max_speed, so good rhythm beats plain throttle.
@@ -255,6 +254,12 @@ func request_reset() -> void:
 	_reset_queued = true
 
 
+## True from a dodge until its flip is fully over, including a cancelled flip's
+## wind-down (unlike is_dodging, which a cancel clears straight away).
+func is_flipping() -> bool:
+	return is_dodging or _flip_time >= 0.0
+
+
 ## Move the reset point (e.g. when switching environments) and go there.
 func set_spawn(spawn: Transform3D) -> void:
 	_spawn_transform = spawn
@@ -295,13 +300,9 @@ func _detect_strokes(delta: float) -> void:
 		return
 	for axis in 2:
 		var value := input_stick[axis]
-		var side := 0
-		if value > stroke_threshold:
-			side = 1
-		elif value < -stroke_threshold:
-			side = -1
-		if side == 0:
+		if absf(value) < stroke_threshold:
 			continue
+		var side := 1 if value > 0.0 else -1
 		if side == -_stroke_side[axis]:
 			_register_stroke(axis)
 		_stroke_side[axis] = side
@@ -391,21 +392,20 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 
 
 func _apply_thrust(velocity: Vector3, forward: Vector3, dt: float) -> Vector3:
-	if is_dodging:
-		# The nose spins through every direction mid-flip; thrusting along it
-		# would brake the dodge, so the flip coasts on its own momentum.
-		is_boosting = false
-		return velocity
 	var along := velocity.dot(forward)
 	var accel := 0.0
-	if input_forward > 0.0 and along < max_speed:
-		var thrust_scale := powerslide_thrust_scale if is_powersliding else 1.0
-		accel += forward_accel * input_forward * thrust_scale
-	if input_reverse > 0.0:
-		if along > 0.5:
-			accel -= brake_accel * input_reverse
-		elif -along < max_reverse_speed:
-			accel -= reverse_accel * input_reverse
+	# Mid-flip the nose spins through every direction, so swim throttle would
+	# brake the dodge; it pauses until the flip is over. Boost never pauses: it
+	# always pushes the way the fish is facing, as in Rocket League.
+	if not is_dodging:
+		if input_forward > 0.0 and along < max_speed:
+			var thrust_scale := powerslide_thrust_scale if is_powersliding else 1.0
+			accel += forward_accel * input_forward * thrust_scale
+		if input_reverse > 0.0:
+			if along > 0.5:
+				accel -= brake_accel * input_reverse
+			elif -along < max_reverse_speed:
+				accel -= reverse_accel * input_reverse
 
 	is_boosting = boost_held and (boost_unlimited or boost_amount > 0.0)
 	if is_boosting:
@@ -612,6 +612,10 @@ func _apply_rl_flip(spin: Vector3, yaw_in: float, roll_in: float, dt: float) -> 
 		if cancelling:
 			torque.x *= 1.0 - minf(absf(rl_pitch), 1.0)
 			_flip_cancelled = true
+			# A cancel drops you straight back into normal air play, as in RL:
+			# throttle, boost, strokes and camera follow return right away, while
+			# RL's air rules (pitch locked until 0.95 s) wind the spin down.
+			is_dodging = false
 		# A normal flip has no air control or damping; a cancel or a stall does.
 		air_control = cancelling or _flip_torque == Vector3.ZERO
 		spin += torque * dt
