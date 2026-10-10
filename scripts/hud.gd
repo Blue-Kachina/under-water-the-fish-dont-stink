@@ -95,6 +95,7 @@ func _process(delta: float) -> void:
 		"Drift     %5.0f°" % fish.drift_angle,
 		"Spin      %5.2f rad/s" % fish.angular_speed,
 		"Jump      %s" % jump_names[fish.jump_state],
+		"Surface   %s" % _surface_name(),
 		"Strokes   %s" % ("x%d  timing %3.0f%%" % [fish.stroke_chain, fish.stroke_quality * 100.0] if fish.stroke_chain > 0 else "-"),
 		"Pad       %s" % (Input.get_joy_name(pad[0]) if not pad.is_empty() else "none (keyboard)"),
 		"Controls  %s" % Controls.current_profile,
@@ -133,6 +134,14 @@ func _on_course_finished(time: float, is_best: bool) -> void:
 func _on_goal_scored(team: int) -> void:
 	_banner.text = "%s SCORES!" % AquariumArena.TEAM_NAMES[team].to_upper()
 	_banner_time_left = 3.0
+
+
+func _surface_name() -> String:
+	if not fish.on_surface:
+		return "- (swimming)"
+	if fish.surface_normal.y > 0.7:
+		return "floor"
+	return "ceiling" if fish.surface_normal.y < -0.7 else "wall"
 
 
 func _make_panel() -> PanelContainer:

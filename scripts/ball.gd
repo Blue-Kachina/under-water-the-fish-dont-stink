@@ -14,6 +14,10 @@ const HIT_CURVE := [Vector2(0.0, 0.65), Vector2(10.0, 0.65), Vector2(46.0, 0.55)
 ## A fish that stays in contact only gets the extra impulse once per touch, and
 ## at most this often while bumping repeatedly.
 const HIT_COOLDOWN := 0.1
+## Friction while the ball rests on a fish, as RL's grippy car-ball contact
+## (RocketSim CARBALL_COLLISION_FRICTION). The fish has no friction of its own
+## while driving, so this is what lets it carry the ball.
+const CARRY_FRICTION := 2.0
 
 signal touched(by: Node3D, hit_speed: float)
 
@@ -138,9 +142,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		var inherit := settings.inherit_water and is_instance_valid(fish)
 		var linear_drag := fish.linear_drag if inherit else settings.linear_drag
 		var angular_drag := fish.angular_drag if inherit else settings.angular_drag
-		var buoyancy := fish.buoyancy if inherit else settings.buoyancy
 		velocity *= exp(-linear_drag * dt)
-		velocity.y += buoyancy * dt
+		velocity.y += _buoyancy() * dt
 		spin *= exp(-angular_drag * dt)
 
 	state.linear_velocity = velocity.limit_length(settings.max_speed)
@@ -151,6 +154,11 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		_fish_velocity = fish.linear_velocity
 
 
+## A Water ball's buoyancy: the fish's when inheriting, otherwise its own.
+func _buoyancy() -> float:
+	return fish.buoyancy if settings.inherit_water and is_instance_valid(fish) else settings.buoyancy
+
+
 ## Rocket League's extra impulse on a fresh touch from the fish (RocketSim
 ## Ball::OnHit): push along fish -> ball with the world-vertical part and the
 ## fish's forward part of that direction scaled down, by the relative speed
@@ -158,15 +166,34 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 func _apply_hits(state: PhysicsDirectBodyState3D, velocity: Vector3) -> Vector3:
 	_hit_cooldown -= state.step
 	var hitter: FishController = null
+	var normal := Vector3.ZERO
 	for i in state.get_contact_count():
 		var collider := state.get_contact_collider_object(i)
 		if collider is FishController:
 			hitter = collider
+			normal = state.get_contact_local_normal(i)
 			break
 	var fresh := hitter != null and not _touching_fish
 	_touching_fish = hitter != null
+	if hitter != null and not fresh:
+		# Friction: stop the ball sliding across the fish, up to what its weight
+		# pressing on the fish allows (friction x weight).
+		var slide := velocity - hitter.linear_velocity
+		slide -= normal * slide.dot(normal)
+		var weight := settings.gravity if settings.ball_type == BallSettings.BallType.SURFACE else maxf(-_buoyancy(), 0.0)
+		return velocity - slide.limit_length(CARRY_FRICTION * weight * maxf(normal.y, 0.0) * state.step)
 	if not fresh:
 		return velocity
+
+	# Fish-ball touches don't bounce (RocketSim CARBALL_COLLISION_RESTITUTION
+	# is 0): the ball leaves with the fish's speed along the contact normal and
+	# the extra impulse below supplies the bounce. Otherwise a ball resting on
+	# the fish gains speed every bounce and can never be carried.
+	if normal.dot(state.transform.origin - hitter.global_position) < 0.0:
+		normal = -normal  # point from the fish to the ball
+	var approach := (_last_velocity - _fish_velocity).dot(normal)
+	if approach < 0.0:
+		velocity = _last_velocity - normal * approach
 
 	var hit_speed := minf((_last_velocity - _fish_velocity).length(), HIT_CURVE[-1].x)
 	touched.emit(hitter, hit_speed)
