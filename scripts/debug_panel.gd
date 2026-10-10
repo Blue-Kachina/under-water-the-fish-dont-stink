@@ -61,6 +61,22 @@ func _build_ui() -> void:
 	buttons.add_child(_button("Defaults", _restore_defaults))
 	buttons.add_child(_button("Copy", _copy_to_clipboard))
 
+	var profile_row := HBoxContainer.new()
+	root.add_child(profile_row)
+	var profile_label := Label.new()
+	profile_label.text = "Controller profile"
+	profile_row.add_child(profile_label)
+	var profiles := OptionButton.new()
+	profiles.focus_mode = Control.FOCUS_NONE
+	for profile_name: String in Controls.profile_names():
+		profiles.add_item(profile_name)
+		if profile_name == Controls.current_profile:
+			profiles.select(profiles.item_count - 1)
+	profiles.item_selected.connect(func(index: int) -> void:
+		Controls.apply_profile(profiles.get_item_text(index))
+		_status.text = "Controller profile: %s (remembered on this PC)" % Controls.current_profile)
+	profile_row.add_child(profiles)
+
 	_status = Label.new()
 	_status.modulate = Color(1, 1, 1, 0.6)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

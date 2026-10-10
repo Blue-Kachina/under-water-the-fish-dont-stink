@@ -65,6 +65,19 @@ enum JumpState { READY, SECOND_JUMP, COOLDOWN }
 @export_range(0.0, 15.0, 0.1) var max_angular_speed := 5.5
 @export var invert_pitch := false
 
+@export_group("Steering")
+## Car-style steering: the stick picks a turning circle, so the fish only turns
+## while it's moving (and steers backwards in reverse, like a car). Off = turn
+## on the spot with the torque/damping values above, like a Rocket League aerial.
+@export var car_steering := true
+## Steer pitch (nose up/down) the same way. Off = pitch still works at a standstill.
+@export var car_steering_pitch := true
+## Turning circle at a crawl and at top boost speed. Tighter when slow, like Rocket League cars.
+@export_range(0.5, 20.0, 0.1) var min_turn_radius := 2.5
+@export_range(1.0, 60.0, 0.5) var max_turn_radius := 15.0
+## How quickly the turn rate follows the stick.
+@export_range(1.0, 40.0, 0.5) var steer_response := 12.0
+
 @export_group("Jump & Dodge")
 ## Impulse along the fish's up axis, for both the first jump and a double jump.
 @export_range(0.0, 40.0, 0.1) var jump_impulse := 20.0
@@ -92,7 +105,6 @@ enum JumpState { READY, SECOND_JUMP, COOLDOWN }
 @export_range(1.0, 4.0, 0.05) var powerslide_turn_multiplier := 1.6
 ## Forward thrust kept while powersliding (1 = full thrust).
 @export_range(0.0, 1.0, 0.05) var powerslide_thrust_scale := 0.6
-
 # Telemetry, read by the HUD.
 var speed := 0.0
 var forward_speed := 0.0
@@ -117,6 +129,7 @@ var powerslide_held := false
 var _jump_queued := false
 var _jump_timer := 0.0
 var _post_jump_time_left := 0.0
+var _steer_speed := 0.0
 var _flip_time_left := 0.0
 var _flip_axis := Vector3.ZERO
 var _reset_queued := false
@@ -166,6 +179,10 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	velocity = _apply_water(velocity, forward, dt)
 	velocity = _apply_jump(velocity, body_basis, state.get_contact_count() > 0, dt)
 	velocity = velocity.limit_length(max_boost_speed)
+
+	# Steering uses the full speed (so a sliding fish can still steer), signed
+	# negative when swimming backwards so steering flips like a reversing car.
+	_steer_speed = -velocity.length() if velocity.dot(forward) < -0.5 else velocity.length()
 
 	# Work on angular velocity in the fish's own frame: x = pitch, y = yaw, z = roll.
 	var local_spin := body_basis.transposed() * state.angular_velocity
@@ -296,12 +313,31 @@ func _apply_rotation(local_spin: Vector3, dt: float) -> Vector3:
 	var yaw_rate := -local_spin.y
 	var roll_rate := -local_spin.z
 	var turn := powerslide_turn_multiplier if is_powersliding else 1.0
-	pitch_rate += (pitch_torque * turn * pitch_in - pitch_damping * (1.0 - absf(pitch_in)) * pitch_rate) * dt
-	yaw_rate += (yaw_torque * turn * yaw_in - yaw_damping * (1.0 - absf(yaw_in)) * yaw_rate) * dt
+	var water := exp(-angular_drag * dt)
+	if car_steering and car_steering_pitch:
+		pitch_rate = _steer(pitch_rate, pitch_in * turn, dt)
+	else:
+		pitch_rate += (pitch_torque * turn * pitch_in - pitch_damping * (1.0 - absf(pitch_in)) * pitch_rate) * dt
+		pitch_rate *= water
+	if car_steering:
+		yaw_rate = _steer(yaw_rate, yaw_in * turn, dt)
+	else:
+		yaw_rate += (yaw_torque * turn * yaw_in - yaw_damping * (1.0 - absf(yaw_in)) * yaw_rate) * dt
+		yaw_rate *= water
 	roll_rate += (roll_torque * roll_in - roll_damping * roll_rate) * dt
+	roll_rate *= water
 
-	var spin := Vector3(pitch_rate, -yaw_rate, -roll_rate) * exp(-angular_drag * dt)
+	var spin := Vector3(pitch_rate, -yaw_rate, -roll_rate)
 	return spin.limit_length(max_angular_speed * turn)
+
+
+## Car-style steering: ease the turn rate toward speed / turning radius.
+## Standing still gives a target of zero, so the fish doesn't turn on the spot.
+func _steer(rate: float, steer_in: float, dt: float) -> float:
+	var speed_fraction := clampf(absf(_steer_speed) / maxf(max_boost_speed, 0.001), 0.0, 1.0)
+	var radius := lerpf(min_turn_radius, max_turn_radius, speed_fraction)
+	var target := steer_in * _steer_speed / radius
+	return lerpf(rate, target, 1.0 - exp(-steer_response * dt))
 
 
 func _apply_reset(state: PhysicsDirectBodyState3D) -> void:

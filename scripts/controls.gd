@@ -1,13 +1,53 @@
 extends Node
-## Registers the playground's input actions at startup (autoloaded as "Controls").
+## Registers the playground's input actions (autoloaded as "Controls") and
+## swaps controller button profiles at runtime.
 ##
-## Bindings live here rather than in Project Settings so that swappable
-## Rocket League-style binding profiles can be added in one place later.
-## Xbox defaults mirror Rocket League: RT/LT throttle, A jump, B boost, X air roll.
+## Sticks, triggers and keyboard keys are the same in every profile; a profile
+## only decides which controller buttons trigger which actions. The chosen
+## profile is remembered per machine in user://controls.cfg, so testers start
+## on "Default" unless they pick something else.
+
+signal profile_changed(profile: String)
 
 const DEADZONE_STICK := 0.15
 const DEADZONE_TRIGGER := 0.05
 const DEADZONE_BUTTON := 0.5
+const SETTINGS_PATH := "user://controls.cfg"
+
+## Profile name -> { action: controller button }. Actions a profile leaves out
+## have no controller button in it (they still work from the keyboard).
+const PROFILES := {
+	# Rocket League defaults. Powerslide gets its own button because RL's shared
+	# powerslide/air-roll button depends on being on the ground.
+	"Default": {
+		"jump": JOY_BUTTON_A,
+		"boost": JOY_BUTTON_B,
+		"air_roll": JOY_BUTTON_X,
+		"powerslide": JOY_BUTTON_Y,
+		"roll_left": JOY_BUTTON_LEFT_SHOULDER,
+		"roll_right": JOY_BUTTON_RIGHT_SHOULDER,
+	},
+	# Directional air roll on face buttons, powerslide on LB, boost on RB.
+	"Personal": {
+		"jump": JOY_BUTTON_A,
+		"roll_right": JOY_BUTTON_B,
+		"roll_left": JOY_BUTTON_X,
+		"powerslide": JOY_BUTTON_LEFT_SHOULDER,
+		"boost": JOY_BUTTON_RIGHT_SHOULDER,
+	},
+}
+
+## Keyboard keys for every button action, identical across profiles.
+const BUTTON_KEYS := {
+	"jump": [KEY_SPACE],
+	"boost": [KEY_SHIFT],
+	"air_roll": [KEY_C],
+	"powerslide": [KEY_CTRL],
+	"roll_left": [KEY_Q],
+	"roll_right": [KEY_E],
+}
+
+var current_profile := "Default"
 
 
 func _enter_tree() -> void:
@@ -24,17 +64,38 @@ func _enter_tree() -> void:
 	_axis("camera_up", JOY_AXIS_RIGHT_Y, -1.0, [KEY_I])
 	_axis("camera_down", JOY_AXIS_RIGHT_Y, 1.0, [KEY_K])
 
-	_button("jump", JOY_BUTTON_A, [KEY_SPACE])
-	_button("boost", JOY_BUTTON_B, [KEY_SHIFT])
-	_button("air_roll", JOY_BUTTON_X, [KEY_C])
-	# Rocket League shares powerslide with air roll; underwater there's no ground
-	# to tell them apart, so it gets its own button (Y is ball cam in RL).
-	_button("powerslide", JOY_BUTTON_Y, [KEY_CTRL])
-	_button("roll_left", JOY_BUTTON_LEFT_SHOULDER, [KEY_Q])
-	_button("roll_right", JOY_BUTTON_RIGHT_SHOULDER, [KEY_E])
-
 	_button("reset", JOY_BUTTON_START, [KEY_R])
 	_button("toggle_panel", JOY_BUTTON_BACK, [KEY_F1, KEY_TAB])
+
+	var settings := ConfigFile.new()
+	if settings.load(SETTINGS_PATH) == OK:
+		current_profile = settings.get_value("controls", "profile", current_profile)
+	apply_profile(current_profile, false)
+
+
+func profile_names() -> Array:
+	return PROFILES.keys()
+
+
+func apply_profile(profile: String, remember := true) -> void:
+	if not PROFILES.has(profile):
+		profile = "Default"
+	current_profile = profile
+	var buttons: Dictionary = PROFILES[profile]
+	for action: String in BUTTON_KEYS:
+		_reset_action(action, DEADZONE_BUTTON)
+		if buttons.has(action):
+			var event := InputEventJoypadButton.new()
+			event.device = -1
+			event.button_index = buttons[action]
+			InputMap.action_add_event(action, event)
+		_add_keys(action, BUTTON_KEYS[action])
+
+	if remember:
+		var settings := ConfigFile.new()
+		settings.set_value("controls", "profile", profile)
+		settings.save(SETTINGS_PATH)
+	profile_changed.emit(profile)
 
 
 func _axis(action: StringName, axis: JoyAxis, direction: float, keys: Array, deadzone := DEADZONE_STICK) -> void:

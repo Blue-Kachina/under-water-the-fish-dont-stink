@@ -83,8 +83,28 @@ func _physics_process(delta: float) -> void:
 	if once("roll_end", 17.5):
 		Input.action_release("air_roll"); Input.action_release("stick_right")
 		print("air roll: fish rolled %.0f°, camera roll range %.0f°..%.0f°, biggest camera change in one tick %.1f°" % [rad_to_deg(fish_roll_total), rad_to_deg(cam_roll_min), rad_to_deg(cam_roll_max), rad_to_deg(max_cam_step)])
-	if once("quit", 18.0): get_tree().quit()
+	# Car steering: no turning at a standstill, a turning circle at speed, flipped in reverse
+	if once("reset6", 18.0): fish.request_reset()
+	if once("still", 18.1): heading_start = heading(); Input.action_press("stick_right")
+	if once("still_log", 19.1): print("steer: stationary, stick right 1s -> heading change %.1f°" % (heading() - heading_start)); Input.action_release("stick_right")
+	if once("move_d", 19.2): fish.global_position = Vector3(-40, 35, 70); Input.action_press("thrust_forward")
+	if once("circle", 20.7): Input.action_press("stick_right")
+	if once("circle_log", 21.7):
+		var yaw_rate := absf((fish.global_basis.transposed() * fish.angular_velocity).y)
+		print("steer: full right at %.1f m/s -> yaw %.2f rad/s, turning radius %.1f m" % [fish.speed, yaw_rate, fish.speed / maxf(yaw_rate, 0.001)])
+		Input.action_release("stick_right"); Input.action_release("thrust_forward")
+	if once("reset7", 22.0): fish.request_reset()
+	if once("rev", 22.1): fish.global_position = Vector3(-40, 35, 40); Input.action_press("thrust_reverse")
+	if once("rev_steer", 23.1): heading_start = heading(); Input.action_press("stick_right")
+	if once("rev_log", 23.6): print("steer: reversing at %.1f m/s, stick right 0.5s -> heading change %.1f° (negative = nose swings left, like a car)" % [fish.speed, heading() - heading_start]); Input.action_release("stick_right"); Input.action_release("thrust_reverse")
+	if once("quit", 23.7): get_tree().quit()
 
+
+var heading_start := 0.0
+
+func heading() -> float:
+	var fwd := -fish.global_basis.z
+	return rad_to_deg(atan2(fwd.x, -fwd.z))
 
 var prev_cam_roll := 0.0
 var prev_fish_up := Vector3.UP

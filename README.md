@@ -25,6 +25,15 @@ recommended; keyboard works for quick checks.
 | Reset fish and course | Start | R |
 | Show / hide tuning panel | View | F1 / Tab |
 
+The table shows the **Default** controller profile. Pick another in the tuning panel's
+*Controller profile* dropdown; the choice is remembered on that PC only. Sticks, triggers and
+keyboard keys are the same in every profile. Profiles live in `PROFILES` in `scripts/controls.gd`.
+
+| Profile | A | B | X | Y | LB | RB |
+|---|---|---|---|---|---|---|
+| Default | Jump | Boost | Air roll | Powerslide | Roll left | Roll right |
+| Personal | Jump | Roll right | Roll left | — | Powerslide | Boost |
+
 Stick forward pitches the nose **down**, as in Rocket League (`invert_pitch` in the panel flips it).
 
 ## Making a standalone build

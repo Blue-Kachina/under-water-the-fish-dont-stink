@@ -76,6 +76,7 @@ func _process(delta: float) -> void:
 		"Spin      %5.2f rad/s" % fish.angular_speed,
 		"Jump      %s" % jump_names[fish.jump_state],
 		"Pad       %s" % (Input.get_joy_name(pad[0]) if not pad.is_empty() else "none (keyboard)"),
+		"Controls  %s" % Controls.current_profile,
 	])
 	_speed_bar.max_value = fish.max_boost_speed
 	_speed_bar.value = fish.speed
