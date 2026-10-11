@@ -1,0 +1,5 @@
+.venv/
+out/
+__pycache__/
+# Dumped from Rocket League; Psyonix assets, never commit them.
+collision_meshes/

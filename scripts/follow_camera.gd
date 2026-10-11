@@ -9,6 +9,14 @@ extends Camera3D
 
 ## Clearance kept between walls and the point the camera aims at.
 const ANCHOR_CLEARANCE := 0.1
+## How far behind the camera falls per m/s at stiffness 0 (s). RL doesn't
+## publish its formula; this gives about a metre at top speed at stiffness 0.45.
+const MAX_LAG_TIME := 0.08
+const LAG_RATE := 6.0
+## Right-stick look-around rate per unit of swivel speed (1/s).
+const SWIVEL_RATE := 2.0
+## Seconds a ball cam toggle takes at transition speed 1 (approximate).
+const TRANSITION_TIME := 0.5
 
 @export var fish: FishController
 ## Set by the environment; null when there's no ball.
@@ -16,12 +24,15 @@ var ball: Node3D
 var ball_cam := false
 
 @export_group("Follow")
-## Defaults are Rocket League's default camera: 270 uu back, 100 up, FOV 110,
-## tilted 3 degrees down.
-@export_range(1.0, 20.0, 0.1) var distance := 2.7
-@export_range(-5.0, 10.0, 0.1) var height := 1.0
-## Height above the fish's centre that the camera aims at.
-@export_range(-3.0, 5.0, 0.01) var look_height := 0.86
+## Rocket League's camera settings, with the same meanings (RL's uu are cm).
+## Defaults: RL's default camera with the usual 110 FOV.
+@export_range(1.0, 20.0, 0.01) var distance := 2.7
+@export_range(-5.0, 10.0, 0.01) var height := 1.0
+## Camera tilt in degrees; negative looks down. RL: Angle.
+@export_range(-15.0, 15.0, 0.1) var angle := -3.0
+## How firmly the camera keeps its distance as the fish speeds up: 1 = fixed,
+## lower falls further behind at speed. RL: Stiffness (approximate).
+@export_range(0.0, 1.0, 0.01) var stiffness := 0.5
 ## How quickly the camera swings around to match the fish's rotation.
 @export_range(0.5, 40.0, 0.5) var rotation_stiffness := 9.0
 ## How much the camera leans with the fish's roll. 0 = horizon stays level.
@@ -35,15 +46,19 @@ var ball_cam := false
 ## Off (Rocket League style): the camera holds its orientation while a dodge
 ## flips the fish, and only follows its position.
 @export var follow_dodge_spin := false
-@export_range(60.0, 120.0, 1.0) var field_of_view := 110.0:
+## Horizontal, as in Rocket League (16:9). RL: FOV.
+@export_range(60.0, 130.0, 1.0) var field_of_view := 110.0:
 	set(value):
 		field_of_view = value
 		fov = value
+## How quickly a ball cam toggle swings the view. RL: Transition Speed (approximate).
+@export_range(0.5, 3.0, 0.05) var transition_speed := 1.2
 
 @export_group("Look Around")
 @export_range(0.0, 3.2, 0.05) var look_yaw_range := PI
 @export_range(0.0, 1.5, 0.05) var look_pitch_range := 0.9
-@export_range(1.0, 30.0, 0.5) var look_stiffness := 12.0
+## How quickly the right stick turns the view. RL: Swivel Speed (approximate).
+@export_range(1.0, 10.0, 0.1) var swivel_speed := 2.5
 
 @export_group("Collision")
 @export_range(0.0, 1.0, 0.05) var collision_margin := 0.5
@@ -53,12 +68,16 @@ var _rotation := Quaternion.IDENTITY
 var _up := Vector3.UP
 var _look_yaw := 0.0
 var _look_pitch := 0.0
+## How far the camera has fallen behind (see stiffness).
+var _lag := Vector3.ZERO
+var _transition_left := 0.0
 
 
 func _ready() -> void:
 	# Moved every rendered frame from the fish's interpolated transform, so the
 	# camera itself must not be physics-interpolated.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	keep_aspect = Camera3D.KEEP_WIDTH  # fov is horizontal, like RL's
 	fov = field_of_view
 	if fish:
 		_rotation = fish.global_basis.get_rotation_quaternion()
@@ -76,6 +95,8 @@ func _process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("ball_cam"):
 		ball_cam = not ball_cam
+		_transition_left = TRANSITION_TIME / transition_speed
+	_transition_left = maxf(_transition_left - delta, 0.0)
 
 	var fish_xform := fish.get_global_transform_interpolated()
 	var fish_up := fish_xform.basis.y
@@ -92,7 +113,9 @@ func _process(delta: float) -> void:
 		# top, which would flip the view as it passed straight up.
 		var target_forward := to_ball.normalized() if tracking_ball else -fish_xform.basis.z
 		var target_frame := Basis.looking_at(target_forward, _target_up(target_forward, fish_up, tracking_ball))
-		_rotation = _rotation.slerp(target_frame.get_rotation_quaternion(), 1.0 - exp(-rotation_stiffness * delta))
+		# A ball cam toggle swings over at the transition speed instead.
+		var rate := 3.0 / (TRANSITION_TIME / transition_speed) if _transition_left > 0.0 else rotation_stiffness
+		_rotation = _rotation.slerp(target_frame.get_rotation_quaternion(), 1.0 - exp(-rate * delta))
 	var follow := Basis(_rotation)
 	var forward := -follow.z
 
@@ -104,16 +127,19 @@ func _process(delta: float) -> void:
 	_up = up
 
 	var look_input := Input.get_vector("camera_left", "camera_right", "camera_up", "camera_down")
-	var look_blend := 1.0 - exp(-look_stiffness * delta)
+	var look_blend := 1.0 - exp(-swivel_speed * SWIVEL_RATE * delta)
 	_look_yaw = lerpf(_look_yaw, -look_input.x * look_yaw_range, look_blend)
 	_look_pitch = lerpf(_look_pitch, -look_input.y * look_pitch_range, look_blend)
 
 	var view := Basis.looking_at(forward, up) \
 			* Basis(Vector3.UP, _look_yaw) \
 			* Basis(Vector3.RIGHT, _look_pitch)
-	var anchor := fish_xform.origin + view.y * look_height
-	var eye := fish_xform.origin + view * Vector3(0.0, height, distance)
-	var look := anchor - eye
+	# Falls behind at speed, by how loose the stiffness is.
+	var lag_target := -fish.linear_velocity * MAX_LAG_TIME * (1.0 - stiffness)
+	_lag = _lag.lerp(lag_target, 1.0 - exp(-LAG_RATE * delta))
+	var anchor := fish_xform.origin + view.y * height
+	var eye := fish_xform.origin + view * Vector3(0.0, height, distance) + _lag
+	var look_basis := view * Basis(Vector3.RIGHT, deg_to_rad(angle))
 
 	# Keep clear of walls: sweep a sphere from the fish up to the anchor (which
 	# can be inside a wall or ceiling the fish is up against), then from there
@@ -123,7 +149,7 @@ func _process(delta: float) -> void:
 	anchor = _sweep(fish_xform.origin, anchor, ANCHOR_CLEARANCE)
 	eye = _sweep(anchor, eye, collision_margin)
 
-	global_transform = Transform3D(Basis.looking_at(look, view.y), eye)
+	global_transform = Transform3D(look_basis.orthonormalized(), eye)
 
 
 ## How far a sphere of `radius` gets from `from` toward `to` before touching

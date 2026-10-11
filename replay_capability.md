@@ -128,6 +128,213 @@
   - Ball-touch heights on the ground now line up with RL's.
 - **Probes:** `surface_probe` spawn heights were raised to 0.6 m.
 
+
+### 2.4 Update 2026-10-10: RocketSim parity harness (roadmap phase 2) and its findings
+
+`tools/rocketsim_compare/` (Python via `uv`, with the `rocketsim` 2.2.1 bindings) and `tests/physics_parity_probe` run identical scripted inputs through RocketSim and through the game, tick for tick, and diff them. `uv run run.py` runs everything in about 50 s; see its README.
+- Alignment is exact: free fall and double jump match to 0.00 m.
+- The game side hooks a new `FishController.physics_tick` signal, emitted at the start of each physics tick before input is sampled.
+- Only airborne ("void") scenarios run so far. Ground scenarios need RocketSim's collision meshes (dumped from Rocket League, not redistributable). They are defined, and skip themselves until meshes are provided.
+
+**Matches RocketSim (≤ 2 cm, ≤ 0.01 m/s over 1–2 s):**
+- gravity
+- air throttle and reverse
+- air boost from rest
+- air-control angular velocities (pitch, yaw, roll, damping)
+- double jump
+- dodge impulse at rest
+- ball gravity and flight (0.11 m over 2 s)
+
+**Differences found, largest effect first:**
+
+| # | Difference | Evidence | Fix |
+|---|---|---|---|
+| P1 | **RL clamps speed and spin *after* each step's integration.** The car moves and rotates at the clamped value plus one tick of acceleration, then reports the clamped value. In flips the flip torque takes spin to about 7.4 rad/s each tick before the 5.5 clamp, so **RL flips rotate about 60° further than a clamp-first model** by the end of the flip torque. | front, back and side flips: 67–78° orientation error by 1.6 s (the integrated *reported* pitch matches exactly); air roll at the cap: 5.6 vs 5.5 rad/s actual, 15.8° after 3 s; boost at the 23 m/s cap: 0.14 m | Clamp the incoming velocities at the *start* of `_integrate_forces` and hand the step the unclamped result, for both linear (23 m/s) and angular (5.5) velocity. The same applies to the ball (60 m/s, 6 rad/s). The internal "RL reference" in `roll_timing_probe` assumed clamp-first and needs the same change. |
+| P2 | **Hits are too strong.** On a hit the ball takes the car's full approach speed, as if the car were infinitely heavy. RL shares momentum at 6:1 with restitution 0, then adds the extra impulse aimed from the car's **centre of mass**. | centre hit, 0.1 s after: ball 26.7 vs 23.9 m/s, car 13.5 vs 15.8 m/s; RL's level hit leaves slightly upward | In `ball.gd`, a mass-weighted inelastic exchange along the normal (or let Jolt's restitution-0 collision do it), and the extra-impulse direction from the RL CoM point (below). |
+| P3 | **Centre of mass in the wrong place.** RL's is 0.14 m behind and 0.21 m below the hitbox centre. Ours is wherever Godot puts it from the box and belly colliders. Every rotation pivots about the wrong point. | `hitbox` column 0.25–0.4 m on pure rotations, while `path` is 0.00 | `center_of_mass_mode = CUSTOM`, `center_of_mass = (0, -0.2076, +0.1388)` (fish frame, nose −Z). |
+| P4 | **Dodge from roll alone does a double jump.** RL dodges when \|pitch\|+\|yaw\|+\|roll\| ≥ 0.5; `_second_jump` only checks the stick. | roll_flip_right: 7.8 m off, no flip | Include `input_roll` in the deadzone test, the way `_start_rl_flip` already includes it in the direction. |
+| P5 | **No dodge-impulse speed scaling.** RL scales side dodges by (1 + 0.9·r) and back dodges by (1 + 1.5·r)·16/15, with r = forward speed / 2300. | moving side flip 4.3 m, moving back flip 8.1 m off after 1.6 s; forward dodge at speed matches | RocketSim `Car::_UpdateDoubleJumpOrFlip` (already listed as gap G5). |
+| P6 | **Flip torque starts one tick early.** RL applies the dodge impulse on the press tick and the flip torque from the next. | first flip tick: 1.87 vs 0.10 rad/s | Start `_flip_time` torque a tick later. |
+| P7 | **No kickoff float.** RL's ball floats until first touched. | RocketSim's ball stays put until hit; the harness wakes it to compare | Add a "frozen until touched" ball state for kickoffs. |
+| P8 | Small: flip Z-damp leaves −0.10 vs −0.15 m/s vertical, and ball drag is exp(−0.03t) vs Bullet's (1−0.03)^t. | 0.05 m/s; 0.11 m over 2 s | Ball `air_drag` 0.0305; check the Z-damp window. |
+
+Re-run `uv run run.py` after each fix. The goal is every void scenario at ≤ 0.05 m and ≤ 1° over its run.
+
+
+### 2.5 Update 2026-10-10: parity fixes P1–P6 applied
+
+| # | Change | Harness before → after (worst over the run) |
+|---|---|---|
+| P1 | Speed and spin are now capped at the **start** of each tick, on the last step's result, for the fish (`max_boost_speed`, 5.5 rad/s) and the ball (60 m/s, 6 rad/s). The end-of-function caps in air control, flips and auto-flip are gone. | air roll at cap 15.8° → 0.0°; front, back and side flips 67–78° → 0.0°; boost cap 0.14 → 0.01 m |
+| P2 | Fresh fish–ball touches share momentum along the contact normal (restitution 0, masses 1 : 0.167). Both bodies do their half (`FishController._apply_ball_contact`, `Ball._apply_hits`), using each other's `velocity_for_last_step()` so the order of their physics callbacks doesn't matter. The extra hit impulse is aimed from the fish's centre of mass. | centre hit, ball 0.1 s after: 26.7 → 24.6 m/s (RL 24.0); car 13.5 → 14.7 (RL 14.8) |
+| P3 | `center_of_mass_mode = CUSTOM`, with `RL_COM_FROM_HITBOX` = (0, −0.208, +0.139) in the fish frame. | visible-hitbox error on rotations 0.25–0.39 m → 0.00 m |
+| P4 | Dodge deadzone is now \|stick x\| + \|stick y\| + \|roll\|, so air roll alone dodges sideways. | roll flip 7.8 m → 0.00 m |
+| P5 | `_rl_dodge_push`: dodge push in the ground plane. Side ×(1 + 0.9r), backwards ×(1 + 1.5r)·16/15, forwards unscaled. | moving side flip 4.3 m → 0.00; moving back flip 8.1 m → 0.00 |
+| P6 | Flip torque starts the tick after the press (that tick is ordinary air control). The flip Z-damp keeps RL's clock, which counts from the press, and now runs **before** the tick's gravity and thrust, as RL damps the velocity the step starts with. | first flip tick 1.87 → 0.10 rad/s (RL 0.10); flip vertical speed −0.10 → −0.155 m/s (RL −0.155) |
+
+**Current result:** all 26 non-ball void scenarios are within 0.03 m and 0.0° of RocketSim over their whole run. Every jump, flip, cancel and roll matches tick for tick. Ball flight is within 0.11 m over 2 s.
+
+**Still open:**
+- **Ball hits:** within about 1 m/s, but not exact. Our tangential/friction response and the car's spin inertia come from Jolt, while RL uses friction 2.0 and its own inertia tensor. Example: offset hit, ball 24.0 vs 21.9 m/s, car spin 4.6 vs 4.0 rad/s. The fish's correction lands one tick after the contact, leaving a one-tick velocity blip.
+- **P7:** done in §2.6.
+- **P8:** done in §2.6.
+- **Ground scenarios:** still need RocketSim's collision meshes.
+
+**Side effects checked with all 16 probes:**
+- **Hitbox probe:** a ball resting on the fish now settles about 0.3 m off-centre, because the centre of mass sits behind the roof's middle as in RL.
+- **`roll_timing_probe`:** its built-in reference model was updated to integrate before capping. It now reads 3–4° ahead of the fish at the end of the flip torque, likely a one-tick sampling offset in the probe (unconfirmed). The RocketSim harness shows 0°, so treat the harness as the authority.
+- **`autoflip_probe`:** the roll-over that came in with the belly collider is fixed in §2.6.
+
+
+### 2.6 Update 2026-10-10: roof roll-over, P7, P8
+- **Roof roll-over fixed.** A fish lying on its roof or upper flank against the arena or a goal (`_resting_on_roof`: a static contact against its up axis) gets no air-control torque, so air roll can't right it. Only the auto-flip jump can, as in RL. Ball contacts don't count, so air dribbles keep air control. `autoflip_probe`: roll alone stays at up·world −1.00; jump rights it to +1.00.
+- **P7 kickoff float.** `Ball.respawn(at, kickoff)` with `BallSettings.kickoff_float` (on by default; surface ball only). The ball holds still with no gravity until a fish touches it. The arena uses it for the opening kickoff, `reset_kickoff()` and post-goal resets. Probe drops use plain `respawn(at)` and fall normally. The harness has a `ball_hit_kickoff` scenario that leaves both balls floating; it matches as closely as the other hits.
+- **P8 ball drag.** Gravity first, then Bullet-style damping `v × (1 − air_drag)^dt`.
+- **Harness ball start.** `ball_flight` went from 0.11 m to **0.00 m** over 2 s. That error was the harness: Godot runs the ball's physics callback before the fish's, so the probe's starting velocity skipped a tick of gravity. The probe now accounts for that, and reports the ball's velocity from `velocity_for_last_step()`.
+- **Current harness result:** every airborne scenario matches within 0.03 m and 0.0°, except the ball hits, which stay about 1–2 m apart after 1 s. The `ballv` figure on those rows is one tick at the moment of contact, where the game can report the pre-hit velocity while RocketSim reports the post-hit one.
+- **Remaining for hits:** contact friction and spin inertia, which come from Jolt.
+
+
+### 2.7 Update 2026-10-10: stale tuning, RL-style controls and camera, car-ball contact solve, carry study
+- **Stale saved tuning.** The exported build had been loading `user://tuning.cfg`, saved before the switch to RL physics: water drag, sinking, about 2× speeds, a 2.5 m ball with 0.75 mass, and the old camera. So manual tests ran the old feel. The file is moved aside to `tuning.pre-rl-2026-10-10.cfg`. Saves now carry `[meta] version=2`, and older ones are skipped at startup (Load still applies them on request).
+- **Controller settings with RL's meanings** (fish, Controller group):
+  - `controller_deadzone`, with `deadzone_shape` Circle or Cross.
+  - `steering_sensitivity` on surfaces and `aerial_sensitivity` in the air: stick × sensitivity, each axis capped at 1.
+  - The stick is read raw, so these deadzones are the only ones applied.
+- **Camera with RL's meanings:**
+  - `field_of_view` is now **horizontal**, like RL. It used to be passed to Godot as vertical, which made "110" much wider than RL's 110.
+  - `distance`, `height` and `angle` in degrees are exact geometry.
+  - `stiffness`, `swivel_speed` and `transition_speed` are approximations, since RL doesn't publish its formulas.
+  - The Water preset converts the old view (vertical 95° → horizontal 125°, angle +2.7°).
+- **BeastMode preset** (`presets/beast_mode.cfg`, "Beast Mode" in the Preset menu). Sources: Gamer Guides June 2026, Blast.tv; The Global Gaming 2023 had swivel 6.10 and transition 1.00.
+  - Camera: FOV 109, distance 270, height 90, angle −4, stiffness 0.45, swivel 7.00, transition 1.20.
+  - Controller: deadzone 0.05 Cross, dodge deadzone 0.70, steering and aerial sensitivity 1.30.
+  - It switches to the new **BeastMode** controller profile: Cross jump, Circle boost, Square powerslide + air roll, Triangle ball cam, L1 air roll left. Presets can now name a `[controls] profile`.
+- `powerslide_thrust_scale` defaults to 1.0 (RL's handbrake doesn't cut throttle). The Water preset keeps 0.7.
+- **Car-ball contact solved like Bullet.** The engine no longer collides fish and ball (collision exception). `Ball._resolve_fish_contact` does it each tick instead:
+  - sequential impulses (10 passes), restitution 0, friction 2.0;
+  - both bodies' mass and spin inertia (fish: a solid box the size of the hitbox, as RocketSim; ball: a solid sphere);
+  - speculative contact and penetration push-out;
+  - the fish takes its half via `apply_ball_impulse`;
+  - RL's extra impulse on fresh touches, aimed from the centre of mass.
+- **Hit results:**
+
+  | Hit | Before | Now | RocketSim |
+  |---|---|---|---|
+  | Centre, ball speed | 24.6 m/s | 24.08 m/s | 23.97 m/s |
+  | Centre, ball spin | (not compared) | −1.53 rad/s | −1.71 rad/s |
+  | Centre, ball position error after 1 s | 1.16 m | 0.11 m | — |
+  | Kickoff (float), ball position error after 1 s | (not compared) | 0.23 m | — |
+  | Edge (offset), ball position error after 1 s | 2.2 m | 0.72 m | — |
+
+  The edge hit has a different spin split from RocketSim's box contact.
+- **Recoil.** It now comes only from the 6:1 momentum share plus inertia, the same as RL. The heavy recoil seen in manual testing came from the stale tuning's 0.75 ball mass.
+- **Carry study** (`tests/carry_probe`, trace with `-- trace N`):
+  - Catches work: a ball dropped onto a still fish, or onto one moving at 4–8 m/s, rides the roof for 2.5–2.9 s.
+  - Pushes and scoops on the ground do **not** lift the ball, even closing at 0.3 m/s. Two reasons:
+    - The ball's centre sits 0.35 m above the hitbox top, so the nose touches only at its top edge, pushing about 24° above horizontal. Lifting the ball needs about 15 m/s² of push.
+    - Each fresh touch gets RL's extra pop, which bumps the ball forward.
+  - Whether RL lifts the ball in these same cases can't be checked yet. That needs RocketSim's soccar meshes (ground scenarios) or side-by-side video.
+  - A ball on the roof **rolls** without slipping when the fish speeds up or slows (about 5/7 of the fish's acceleration, backward when accelerating), so carrying needs feathering, as in RL. The old code faked carrying with a sliding-friction cap.
+  - `surface_probe` now dribbles with a feathered throttle, and the roof drops in `hitbox_probe`/`surface_probe` land over the centre of mass.
+
+
+### 2.8 Update 2026-10-10: Soccar collision meshes, ground parity, and carry ground truth
+- **Meshes extracted** with RLArenaCollisionDumper v1.1.0, built from its reviewed source. Rocket League was launched without Easy Anti-Cheat (offline), in Free Play.
+  - The current RL build has **10** arena meshes, which the tool doesn't recognise as Soccar, so they were dumped with `-custommap` and copied to `tools/rocketsim_compare/collision_meshes/soccar/` (gitignored: Psyonix assets).
+  - Extents match Soccar: x ±4100, y ±6000, height about 2100 uu.
+  - RocketSim 2.2.1 loads them: a car settles on 4 wheels at z = 17 uu, and 3 s of throttle reaches 1410 uu/s.
+- **Ground scenarios vs RocketSim** (game side runs in the Aquarium):
+
+  | Scenario | Result |
+  |---|---|
+  | Throttle from rest | **matches**: ≤ 0.05 m; speeds equal to 0.05 m/s at every checkpoint |
+  | Coast | **matches**: ≤ 0.09 m |
+  | Brake | ≤ 0.15 m |
+  | Boost | speed matches; the meter differs only because RL's car drives over two boost pads (+12 each), which the game lacks |
+  | Full-lock turn at 14 m/s | **18° behind after 2 s**: turns slightly slower |
+  | Powerslide turn | **far off**: RL bleeds speed 14 → 4.9 m/s over 1.5 s and rotates differently; we keep 11.9 m/s |
+  | Jump | **too weak**: the first tick gives +2.40 vs RL's +2.99 m/s (the sticky force and leaving-ground handling are probably eating it); the hold adds net about 6 vs 7.9 m/s²; a full jump peaks about 0.6 m low |
+- **Carry ground truth (RocketSim, real arena).** A ball pushed or scooped along the ground does **not** climb onto the car in RL's physics either, matching the game:
+  - straight pushes held at 0.5–2 m/s, or at throttle 0.15–0.6;
+  - matched-speed scoops of a ball rolling at 5 m/s, closing at +0.3 to +1.5 m/s;
+  - meeting a ball rolling toward a still car;
+  - low bounces just ahead of the nose;
+  - a jump tap at the touch.
+
+  A ball dropped onto the car (still, or moving at 4–8 m/s) **does** ride the roof, 1.4–1.7 s with no balancing (game: 2.5–2.9 s), then rolls off. Getting the ball up is a catch-from-above skill (pop the ball up first, then get under it at matching speed), not something a push does.
+- **Next fixes from this data:** ground steering rate, powerslide (RL's handbrake friction curves), and the ground jump (first-tick impulse and sticky force while jumping, hold acceleration). Then add wall/ramp driving, ball-floor bounce, and ground carry scenarios to the harness.
+
+
+### 2.9 Update 2026-10-10: ground jumps, steering and powerslide fitted to RocketSim
+- **Harness fix.** The Aquarium respawns a popped ball at kickoff, so ground scenarios had the floating ball sitting on the car. The probe now parks it in a far corner. Ground scenarios also run with `controller_deadzone` 0, since RocketSim's controls are already past any deadzone. New scenarios: slow, half-lock and boosted turns; a slow powerslide; a released powerslide; a straight handbrake. `run.py --set name=value` overrides fish settings for fitting, and `inspect_ground.py` prints yaw, speed and slip side by side.
+- **Jumps now match RocketSim exactly through the flight**: same vertical speed at every checkpoint, and the same peak (tap 0.721 m, full 2.148 m). The rules (RocketSim `Car::_UpdateJump`):
+  - the ground holds the car up on the press tick;
+  - the hold push starts on the press tick, at 62% during `JUMP_MIN_TIME`;
+  - the sticky force keeps pulling for 3 ticks while the wheels are still down.
+
+  Still different: RL touches down 0.025–0.04 s earlier, because its unloaded wheels hang below where the fish's belly sits.
+- **Steering** now uses RL's measured turning curvature by speed (RLBot/RLUtilities table) instead of the steer angle over the wheelbase. Grip was fitted (`ground_grip` 30 /s, was 15), and a new `ground_turn_drag` 0.2 models the steered front wheels slowing the car in a turn.
+
+  | Turn | Before (path / heading after 2 s) | Now |
+  |---|---|---|
+  | Full lock at 14 m/s | 2.9 m / 18° | 0.39 m / 2.5° |
+  | Slow | — | 0.60 m / 2.7° |
+  | Half lock | — | 0.37 m / 2.2° |
+  | Boosted | — | 0.53 m / 2.0° |
+
+  Steady yaw rate is 2.36 vs RL 2.33 rad/s.
+- **Powerslide.** The handbrake value now ramps up at 5/s and down at 2/s (RL's rates), blending grip from `ground_grip` down to `powerslide_lateral_drag` (fitted 1.0) and turning up by `powerslide_turn_multiplier` (fitted 1.5) over the whole sliding speed. The slide's direction is held through a spin.
+
+  | Powerslide | Before | Now |
+  |---|---|---|
+  | At 14 m/s, heading after 1.5 s | 122° | 9.4° |
+  | At 14 m/s, speed | — | bleeds like RL (8.4 vs 8.5 m/s at 1 s) |
+  | Slow, heading | — | 33° |
+  | Released after 0.5 s, heading | — | 18° |
+
+  This is the limit of a whole-body model; matching exactly needs RL's per-wheel tyre model. A sideways-grip curve (RocketSim `LAT_FRICTION_CURVE`) was tried and made the slow turn worse, so it was left out.
+- The Water preset keeps its old grip, turn and powerslide values.
+
+
+### 2.10 Update 2026-10-11: the six physics checks against RL's real arena
+1. **Arena shape: fixed.** Measured from the dumped Soccar collision meshes; only measurements are used, not the meshes.
+
+   | Feature | RL measurement | Ours before |
+   |---|---|---|
+   | Floor-to-wall ramp | radius 256 uu (already matched) | 256 uu |
+   | Wall-to-ceiling curve | radius **512** uu | 256 uu |
+   | Ceiling | **2048** uu | 2044 uu |
+   | 45° corner face | at \|x\|+\|y\| = 8064 (already matched) | same |
+   | Corner joins into the walls | **880** uu | sharp 256 uu rounding |
+   | Goal mouth | **1792 × 640** uu | 1785.5 × 642.8 uu |
+   | Net roof | slopes from 640 at the mouth to **512** at the back | flat |
+   | Net back curves | 256 uu (floor and roof) | — |
+
+   `aquarium_arena.gd` now sweeps a rounded-octagon wall line with separate floor and ceiling radii. `goal.gd` has `back_height` for the sloping roof. `goal_net_probe` was updated, and passes.
+2. **Ball against floor, walls, ceiling and corners: already matched, plus one real bug fixed.**
+   - Eleven new ball-only scenarios: drops, spin, sliding to rolling, side and back walls, ramp, ceiling, corner, into the net. All stay within **0.02–0.15 m** over 2–3 s, and velocities within 0.03–0.19 m/s outside the impact ticks (ours registers impacts one tick later).
+   - **Bug:** a ball rolling into a goal **hopped** (1.9–3.4 m/s up) at two seams: the arena floor meeting the separate net mesh, and a vertex mismatch at the notch.
+   - **Fix:** the goal nets' collision is now merged into the shell's mesh (`Goal.own_collision = false`, `net_faces`), with matching vertices at the goal line and the notch, so Jolt's internal-edge removal smooths both. A ball rolled into the net now follows RL up the back and out (within about 1 m after 3 s).
+   - The probe also turns off goal scoring (`AquariumArena.scoring_enabled`) so test balls aren't popped.
+3. **Wall and ceiling driving: mostly matched after two fixes.**
+   - The fish was bouncing off the ramp (RL's car-world restitution 0.3 belongs to the hitbox, not driving), so it now has **no bounce while on a surface**.
+   - The belly's box was catching on the ramp curve. It now collides as **two round axles** (cylinders as wide as the belly, radius half its height, at the Octane's axle positions), so the fish rolls up curves like wheels.
+   - A contact on the fish's underside counts as a surface even when steep. `SURFACE_MIN_DOT` is now 0.5.
+
+   | Scenario | Path / heading |
+   |---|---|
+   | Throttle up the wall | 0.47 m / 15.7° |
+   | Slow climb (RL holds on the ramp) | 0.70 m / 16.5°, holds like RL |
+   | Wall then steer | 1.0 m |
+
+   **Still off:** boosting flat-out into a wall (3.8 m). RL loses about 9 m/s in the curve at 23 m/s (we lose about 6); its suspension probably bottoms out under the load.
+4. **Landing / suspension: not changed.** RL touches down 0.025–0.04 s earlier, because its unloaded wheels hang about 0.12 m lower in the air. Matching it needs a real sprung suspension (wheels that extend in the air and compress on landing). Rigid colliders can't do it without jitter. The effect after landing is small (0.07–0.21 m).
+5. **Powerslide: unchanged from §2.9** (heading 9° at speed, 18–33° slow or released). Closing it needs RL's per-wheel tyre model. Together with item 4 and the boosted wall climb, that points to one next step: a raycast-wheel vehicle model like RocketSim's.
+6. **Edge-of-hitbox ball hits: unchanged** (0.72 m after 1 s; centre hits are 0.11 m). The remaining difference is the spin split at the box edge. Friction-model variants weren't tried; this is lower priority.
+
+- **No regressions:** the full harness (58 scenarios) and all 18 probes pass, and a new build was made.
+
 ---
 
 ## 3. Rocket League `.replay` format reference
@@ -709,7 +916,7 @@ All existing probes must keep passing after every phase. Probes run as `Godot_co
 | **✓ RL physics values (done 2026-10-10)** | Phase 1 below, apart from `rl_space.gd`/`rl_consts.gd` and the `rl_preset_probe` (§2.2) | All 15 probes run; RL-matching checks listed in §2.2 |
 | **0: RL constants + space** | Add `scripts/rl/rl_space.gd` (k = 1) and `rl_consts.gd`. Replace the 2× constants in `fish_controller.gd` (`UU_PER_SPEED` → 100, `GROUND_WHEELBASE` → 0.85) and `ball.gd` (`HIT_CURVE` in uu/s × 0.01) | `rl_space_probe`: position, quaternion and ω round-trips; yaw ½π puts the nose at the correct goal; kickoff transforms |
 | **1: RL physics values** | Move every speed and acceleration export to its k = 1 RL value (§9.2); water off; ball mass 1/6 and bounciness 0.6; camera about 2.7 / 1.0 / FOV 110. Also the preset system (`rl_preset.gd`, panel preset row, no-snap setter) so the water tuning stays available as a preset. Fix the goal-rescore race | `rl_preset_probe`: 100 boost lasts 3.0 s; throttle-only top speed 14.1 m/s; ball falls 10 m in 1.754 s; kickoff boost hit scores again in `aquarium_probe` |
-| **2: RocketSim parity harness** | `tools/rocketsim_compare/` (Python via `uv`, RocketSim bindings): scripted input sequences giving reference state CSVs. Headless `physics_parity_probe` replays the same inputs through our physics and diffs | Per-scenario error budgets: jump apex, dodge, half-flip, air roll, powerslide turn, wall drive, ball bounce, kickoff hit (e.g. < 2 cm / 1° after 1 s) |
+| **2: RocketSim parity harness** (✓ built 2026-10-10, void scenarios; see §2.4) | `tools/rocketsim_compare/` (Python via `uv`, RocketSim bindings): scripted input sequences giving reference state CSVs. Headless `physics_parity_probe` replays the same inputs through our physics and diffs | Per-scenario error budgets: jump apex, dodge, half-flip, air roll, powerslide turn, wall drive, ball bounce, kickoff hit (e.g. < 2 cm / 1° after 1 s) |
 | **3: Converter + loader** | Add `tools/rl_replay/*` (via `uv`), the schema, the fixture and `scripts/replay/replay_data.gd` | Schema tests; `replay_data_probe` (as before); manual real-replay checks (ball \|ω\| ≈ 6, kickoff ball y ≈ 0.93, blue car facing its goal) |
 | **4: Kinematic playback** | The `replay_*.gd` files, `fish_visual.tscn`, `follow_camera.gd` target generalisation, HUD, controls | `replay_playback_probe`: ghosts match the conversion; scrubbing is deterministic; ball inside the goal at goal time; demos hidden |
 | **5: Input sources** | `scripts/input/*`; `fish_controller.gd` `input_source` | Existing probes unchanged; `scripted_input_probe` matches the `Input.action_press` run |

@@ -15,10 +15,17 @@ signal jumped
 signal double_jumped
 signal dodged(direction: Vector3)
 signal stroked(quality: float)
+## Start of every physics tick, before input is sampled: `state` is the result
+## of the last step. Lets a test driver (tests/physics_parity_probe) read the
+## state and set this tick's input with no lag.
+signal physics_tick(state: PhysicsDirectBodyState3D)
 
 ## READY: on the first jump. SECOND_JUMP: a second press within double_jump_window
 ## gives a double jump (stick neutral) or a dodge (stick pushed). COOLDOWN: both used.
 enum JumpState { READY, SECOND_JUMP, COOLDOWN }
+## Rocket League's deadzone shapes. CIRCLE: on the stick's distance from centre.
+## CROSS: on each axis separately, so a nearly straight push stays exactly straight.
+enum DeadzoneShape { CIRCLE, CROSS }
 
 # Rocket League air roll, from RocketSim (RLConst.h): angular acceleration =
 # (CAR_AIR_CONTROL_TORQUE.roll * input - CAR_AIR_CONTROL_DAMPING.roll * roll rate)
@@ -51,6 +58,11 @@ const LOCK_ALIGN_RATE := 12.0
 # Rocket League jump (RocketSim RLConst.h, Car::_UpdateJump): an instant push,
 # then extra push while jump is held, for at least JUMP_MIN_TIME even on a tap.
 const RL_JUMP_MIN_HOLD := 0.025
+## The hold push is this much weaker during JUMP_MIN_TIME (RocketSim JUMP_PRE_MIN_ACCEL_SCALE).
+const RL_JUMP_PRE_MIN_ACCEL_SCALE := 0.62
+## After a jump off a surface, RL's wheels stay on it for a few ticks while the
+## suspension extends, and the sticky force keeps pulling until they lift off.
+const RL_JUMP_WHEEL_CONTACT_TIME := 0.025 + 0.001  # 3 ticks; matches RocketSim tick for tick
 # Rocket League driving (RocketSim RLConst.h). Throttle torque
 # fades from full at a standstill to 10% just under max driving speed (1400 of
 # 1410 uu/s), then to nothing. Steering angle shrinks with speed; the turn rate
@@ -59,10 +71,17 @@ const RL_THROTTLE_FADE_AT := 1400.0 / 1410.0
 const RL_STEER_ANGLE_CURVE := [Vector2(0.0, 0.53356), Vector2(500.0, 0.31930), Vector2(1000.0, 0.18203),
 		Vector2(1500.0, 0.10570), Vector2(1750.0, 0.08507), Vector2(3000.0, 0.03454)]  # uu/s -> rad
 const UU_PER_SPEED := 100.0  # our m/s -> RL uu/s (1 uu = 1 cm)
-const GROUND_WHEELBASE := 0.85
+## RL's turning curvature by forward speed (uu/s -> 1/uu), measured in-game
+## (RLBot wiki, RLUtilities); matches RocketSim's steady turns.
+const RL_TURN_CURVATURE := [Vector2(0.0, 0.0069), Vector2(500.0, 0.00398), Vector2(1000.0, 0.00235),
+		Vector2(1500.0, 0.001375), Vector2(1750.0, 0.0011), Vector2(2300.0, 0.00088)]
+## RL's handbrake value rises and falls at these rates (RocketSim
+## POWERSLIDE_RISE_RATE / FALL_RATE): grip and turning blend in, not snap.
+const RL_HANDBRAKE_RISE_RATE := 5.0
+const RL_HANDBRAKE_FALL_RATE := 2.0
 const GROUND_STEER_RESPONSE := 20.0
 ## A contact counts as a surface under the fish when its normal is within ~45° of the fish's up.
-const SURFACE_MIN_DOT := 0.7
+const SURFACE_MIN_DOT := 0.5  # about 60 degrees: a ramp's contacts still count as the surface
 ## After a jump, surfaces are ignored this long so the fish leaves cleanly.
 const SURFACE_JUMP_GRACE := 0.1
 # Rocket League's auto-flip (RocketSim RLConst.h, Car::_UpdateAutoFlip): jump
@@ -73,6 +92,24 @@ const RL_AUTOFLIP_IMPULSE := 2.0
 const RL_AUTOFLIP_TORQUE := 50.0
 const RL_AUTOFLIP_TIME := 0.4
 const RL_AUTOFLIP_ROLL_THRESH := 2.8
+# Rocket League dodge push scaling (RocketSim RLConst.h, Car::_UpdateDoubleJumpOrFlip).
+const RL_CAR_MAX_SPEED := 23.0  # 2300 uu/s, what "forward speed ratio" is relative to
+const RL_DODGE_SIDE_MAX_SPEED_SCALE := 1.9
+const RL_DODGE_BACKWARD_MAX_SPEED_SCALE := 2.5
+const RL_DODGE_BACKWARD_SCALE := 16.0 / 15.0
+## Below this forward speed (100 uu/s) a dodge counts as backwards by stick alone.
+const RL_DODGE_BACKWARDS_MIN_SPEED := 1.0
+## Where an RL Octane's centre of mass is, from its hitbox centre (RocketSim
+## hitbox offset 13.88 uu forward, 20.76 up): behind and below, in the fish's
+## frame (nose -Z). Rotations pivot about it, as in RL.
+const RL_COM_FROM_HITBOX := Vector3(0.0, -0.20755, 0.138757)
+## The Octane's axles from its centre of mass (RocketSim wheel offsets 51.25 uu
+## forward, 33.75 back).
+const RL_FRONT_AXLE := 0.5125
+const RL_REAR_AXLE := 0.3375
+## A contact counts as on the roof when its normal is this far against the fish's up
+## (lying upside down or over on its upper flank).
+const ROOF_CONTACT_DOT := -0.1
 ## An uncompleted flip counts as over once its spin has wound down below this (rad/s).
 const FLIP_SPIN_OUT_MIN_RATE := 0.2
 ## Tolerance for comparing summed tick times to RL durations (78 ticks of 1/120 s
@@ -226,12 +263,14 @@ const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 @export_range(0.0, 3.0, 0.05) var post_jump_drag_time := 0.0
 
 @export_group("Powerslide")
-## Lateral drag while powersliding: low = the fish keeps sliding the old way while it turns.
-@export_range(0.0, 10.0, 0.05) var powerslide_lateral_drag := 0.35
-## Multiplies pitch/yaw torque and the spin cap while powersliding.
-@export_range(1.0, 4.0, 0.05) var powerslide_turn_multiplier := 1.35
+## Sideways grip at full handbrake (per second; ground_grip is the normal grip):
+## low = the fish keeps sliding the old way while it turns. Fitted to RocketSim.
+@export_range(0.0, 10.0, 0.05) var powerslide_lateral_drag := 1.0
+## Extra turning at full handbrake (on a surface by the whole sliding speed;
+## in water it scales pitch/yaw torque and the spin cap). Fitted to RocketSim.
+@export_range(1.0, 4.0, 0.05) var powerslide_turn_multiplier := 1.5
 ## Forward thrust kept while powersliding (1 = full thrust).
-@export_range(0.0, 1.0, 0.05) var powerslide_thrust_scale := 0.7
+@export_range(0.0, 1.0, 0.05) var powerslide_thrust_scale := 1.0  # RL: the handbrake never cuts throttle
 
 @export_group("Surface")
 ## While the fish's underside touches a surface (floor, walls, ceiling, the
@@ -254,12 +293,15 @@ const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 @export_range(5.0, 120.0, 0.5) var ground_max_boost_speed := 23.0
 ## Tyre grip: how quickly sliding sideways is stopped (per second).
 ## Powersliding uses powerslide_lateral_drag instead.
-@export_range(0.0, 40.0, 0.5) var ground_grip := 15.0
+@export_range(0.0, 60.0, 0.5) var ground_grip := 30.0  # fitted to RocketSim: slip and speed loss in turns
 ## Push into the surface, like RL's sticky force: half of this at rest, and
 ## while driving up to 1.5x on a wall. RL: its gravity, 650 uu/s².
 @export_range(0.0, 40.0, 0.5) var surface_stick := 6.5
 ## How quickly the fish turns to sit flat on the surface it's on.
 @export_range(1.0, 40.0, 0.5) var surface_align_rate := 15.0
+## How much of the cornering grip slows the car, via the steered front wheels'
+## angle. Fitted to RocketSim's turns.
+@export_range(0.0, 2.0, 0.01) var ground_turn_drag := 0.2
 
 @export_group("Hitbox")
 ## A box, like Rocket League's car hitboxes: flat on the floor, flat on top to
@@ -280,6 +322,9 @@ const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 ## A belly under the box, where a Rocket League car's wheels are, so the fish
 ## rides as high as a car does. Octane (RocketSim): the body sits 18.4 uu off
 ## the ground, and the wheels cover about 112 x 70 uu. 0 height = no belly.
+## It collides as two round "axles" (front and rear, at the Octane's wheel
+## positions, as wide as the belly), so it rolls up a curving ramp the way
+## wheels do instead of catching on it.
 @export_range(0.0, 0.5, 0.001) var belly_height := 0.184:
 	set(value):
 		belly_height = value
@@ -297,6 +342,17 @@ const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 	set(value):
 		show_hitbox = value
 		_apply_hitbox()
+@export_group("Controller")
+## Rocket League's controller settings, with the same meanings. Stick travel
+## inside the deadzone counts as nothing; the rest is stretched back to 0..1.
+@export_range(0.0, 0.5, 0.01) var controller_deadzone := 0.15
+@export var deadzone_shape := DeadzoneShape.CIRCLE
+## The stick is multiplied by this (each axis capped at full), so values above 1
+## reach full lock before the stick does. RL: Steering Sensitivity, on a surface.
+@export_range(0.1, 3.0, 0.01) var steering_sensitivity := 1.0
+## The same in the air (pitch, yaw, and air roll from the stick). RL: Aerial Sensitivity.
+@export_range(0.1, 3.0, 0.01) var aerial_sensitivity := 1.0
+
 # Telemetry, read by the HUD.
 var speed := 0.0
 var forward_speed := 0.0
@@ -332,6 +388,12 @@ var _jump_was_held := false
 var _jump_timer := 0.0
 ## Time since the first jump began while its hold push is running; -1 when it isn't.
 var _jump_hold_elapsed := -1.0
+## Ticks left (in seconds) of wheel contact after jumping off a surface, and that surface's normal.
+var _jump_wheel_contact_left := 0.0
+## RL's handbrake value, 0..1 (see RL_HANDBRAKE_RISE_RATE).
+var _handbrake := 0.0
+var _slide_sign := 1.0
+var _jump_surface_normal := Vector3.UP
 var _post_jump_time_left := 0.0
 var _steer_speed := 0.0
 var _lock_direction := Vector3.FORWARD
@@ -351,10 +413,22 @@ var _flip_spin_out := false
 var _flip_direction := Vector2.ZERO
 var _flip_time_left := 0.0
 var _flip_axis := Vector3.ZERO
+## Set by a dodge press; the flip torque waits until the next tick, as in RL.
+var _flip_pressed_this_tick := false
+## Velocity handed to the physics step, this tick and the one before (see velocity_for_last_step).
+var _step_velocity := Vector3.ZERO
+var _prev_step_velocity := Vector3.ZERO
+var _step_frame := -1
+## The ball's push on the fish this tick (Ball._resolve_fish_contact), applied
+## at the start of the next _integrate_forces.
+var _ball_push := Vector3.ZERO
+var _ball_twist := Vector3.ZERO
 var _reset_queued := false
 var _surface_grace := 0.0
 ## Normal of a surface touching the fish's roof while it's nearly upside down (else zero).
 var _roof_normal := Vector3.ZERO
+## Lying on its upper side (roof or upper flank) against the arena: air control can't roll it over.
+var _resting_on_roof := false
 var _autoflip_left := 0.0
 var _autoflip_dir := 1.0
 var _spawn_transform: Transform3D
@@ -374,13 +448,15 @@ var _queued_stroke := 0.0
 @onready var _bubbles: CPUParticles3D = $Bubbles
 @onready var _collision: CollisionShape3D = $Collision
 var _hitbox_view := MeshInstance3D.new()
-var _belly_collision := CollisionShape3D.new()
+var _wheel_collisions: Array[CollisionShape3D] = [CollisionShape3D.new(), CollisionShape3D.new()]
 var _belly_view := MeshInstance3D.new()
 var _belly_hitbox_view := MeshInstance3D.new()
 
 
 func _ready() -> void:
 	_spawn_transform = global_transform
+	center_of_mass_mode = CENTER_OF_MASS_MODE_CUSTOM
+	center_of_mass = RL_COM_FROM_HITBOX
 	physics_material_override = PhysicsMaterial.new()
 	_apply_physics_material()
 	_collision.shape = _collision.shape.duplicate()  # sized per fish
@@ -394,9 +470,11 @@ func _ready() -> void:
 	_hitbox_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_hitbox_view)
 
-	_belly_collision.name = "Belly"
-	_belly_collision.shape = BoxShape3D.new()
-	add_child(_belly_collision)
+	for i in _wheel_collisions.size():
+		_wheel_collisions[i].name = ["FrontWheels", "RearWheels"][i]
+		_wheel_collisions[i].shape = CylinderShape3D.new()
+		_wheel_collisions[i].rotation = Vector3(0.0, 0.0, PI / 2.0)  # the cylinder's axis across the fish
+		add_child(_wheel_collisions[i])
 	_belly_hitbox_view.mesh = BoxMesh.new()
 	_belly_hitbox_view.material_override = material
 	_belly_hitbox_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -418,6 +496,10 @@ func _apply_hitbox() -> void:
 	if _collision == null:  # set before _ready; applied there
 		return
 	var size := Vector3(hitbox_width, hitbox_height, hitbox_length)
+	# Spin inertia of the hitbox as a solid box, as RL's car (RocketSim sizes its
+	# hitboxes to reproduce the game's inertia), whatever else the fish carries.
+	inertia = Vector3(size.y * size.y + size.z * size.z, size.x * size.x + size.z * size.z,
+			size.x * size.x + size.y * size.y) * mass / 12.0
 	(_collision.shape as BoxShape3D).size = size
 	(_hitbox_view.mesh as BoxMesh).size = size
 	_hitbox_view.visible = show_hitbox
@@ -425,10 +507,15 @@ func _apply_hitbox() -> void:
 	var belly := Vector3(belly_width, belly_height, belly_length)
 	var belly_centre := Vector3(0.0, -(hitbox_height + belly_height) / 2.0, 0.0)
 	var has_belly := belly_height > 0.0
-	_belly_collision.disabled = not has_belly
-	if has_belly:
-		(_belly_collision.shape as BoxShape3D).size = belly
-	_belly_collision.position = belly_centre
+	var wheel_radius := belly_height / 2.0
+	var axles := [RL_COM_FROM_HITBOX.z - RL_FRONT_AXLE, RL_COM_FROM_HITBOX.z + RL_REAR_AXLE]
+	for i in _wheel_collisions.size():
+		_wheel_collisions[i].disabled = not has_belly
+		if has_belly:
+			var cylinder := _wheel_collisions[i].shape as CylinderShape3D
+			cylinder.radius = wheel_radius
+			cylinder.height = belly_width
+		_wheel_collisions[i].position = Vector3(0.0, -hitbox_height / 2.0 - wheel_radius, axles[i])
 	(_belly_hitbox_view.mesh as BoxMesh).size = belly
 	_belly_hitbox_view.position = belly_centre
 	_belly_hitbox_view.visible = show_hitbox and has_belly
@@ -439,6 +526,26 @@ func _apply_hitbox() -> void:
 
 	_visual.scale = size / VISUAL_BODY_SIZE
 	_bubbles.position.z = size.z * 0.6  # just behind the tail
+
+
+## The velocity the fish moved with during the physics step that just ran. For
+## contact maths in another body's _integrate_forces, which can run before or
+## after this one's in the same tick.
+func velocity_for_last_step() -> Vector3:
+	return _prev_step_velocity if _step_frame == Engine.get_physics_frames() else _step_velocity
+
+
+## The ball's half of a contact (Ball._resolve_fish_contact): `impulse` at
+## world point `at`, moving and turning the fish by its mass and inertia.
+func apply_ball_impulse(impulse: Vector3, at: Vector3) -> void:
+	_ball_push += impulse / mass
+	_ball_twist += inverse_inertia_world() * (at - global_transform * center_of_mass).cross(impulse)
+
+
+## The fish's inverse inertia tensor in world axes.
+func inverse_inertia_world() -> Basis:
+	var b := global_basis.orthonormalized()
+	return b * Basis.from_scale(Vector3.ONE / inertia) * b.transposed()
 
 
 func request_reset() -> void:
@@ -498,7 +605,7 @@ func set_spawn(spawn: Transform3D) -> void:
 func _sample_input(delta: float) -> void:
 	input_forward = Input.get_action_strength("thrust_forward")
 	input_reverse = Input.get_action_strength("thrust_reverse")
-	input_stick = Input.get_vector("stick_left", "stick_right", "stick_up", "stick_down")
+	input_stick = _processed_stick()
 	input_roll = Input.get_action_strength("roll_right") - Input.get_action_strength("roll_left")
 	air_roll_held = Input.is_action_pressed("air_roll")
 	boost_held = Input.is_action_pressed("boost")
@@ -511,6 +618,26 @@ func _sample_input(delta: float) -> void:
 		_jump_queued = true
 	_jump_was_held = jump_held
 	_detect_strokes(delta)
+
+
+## The left stick after Rocket League's deadzone and sensitivity settings. Read
+## raw (the input map's own stick deadzone is bypassed) so the deadzone and
+## its shape are exactly the ones set here.
+func _processed_stick() -> Vector2:
+	var raw := Vector2(
+			Input.get_action_raw_strength("stick_right") - Input.get_action_raw_strength("stick_left"),
+			Input.get_action_raw_strength("stick_down") - Input.get_action_raw_strength("stick_up"))
+	var stick := Vector2.ZERO
+	var keep := maxf(1.0 - controller_deadzone, 0.001)
+	if deadzone_shape == DeadzoneShape.CROSS:
+		for axis in 2:
+			stick[axis] = signf(raw[axis]) * clampf((absf(raw[axis]) - controller_deadzone) / keep, 0.0, 1.0)
+	else:
+		var length := minf(raw.length(), 1.0)
+		if length > controller_deadzone:
+			stick = raw.normalized() * clampf((length - controller_deadzone) / keep, 0.0, 1.0)
+	var sensitivity := steering_sensitivity if on_surface else aerial_sensitivity
+	return (stick * sensitivity).clamp(-Vector2.ONE, Vector2.ONE)
 
 
 ## A stroke is the stick swinging from one side to the opposite side.
@@ -575,6 +702,19 @@ func _start_rhythm() -> void:
 
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
+	# Rocket League caps speed and spin after each physics step (RocketSim
+	# Car::_PostTickUpdate), so a step itself runs at the capped value plus that
+	# tick's acceleration: a flip turns at ~7.4 rad/s although 5.5 is "the cap".
+	# Capping the last step's result here, before anything reads it, does the same.
+	var spin_cap := RL_MAX_ANGULAR_SPEED if rl_roll_timing else max_angular_speed * (powerslide_turn_multiplier if is_powersliding else 1.0)
+	# The ball's contact push belongs to the step that just ran, before the caps.
+	state.linear_velocity += _ball_push
+	state.angular_velocity += _ball_twist
+	_ball_push = Vector3.ZERO
+	_ball_twist = Vector3.ZERO
+	state.linear_velocity = state.linear_velocity.limit_length(max_boost_speed)
+	state.angular_velocity = state.angular_velocity.limit_length(spin_cap)
+	physics_tick.emit(state)
 	var dt := state.step
 	_sample_input(dt)
 	if _reset_queued:
@@ -585,6 +725,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var forward := -body_basis.z
 	var velocity := state.linear_velocity
 	is_powersliding = powerslide_held and not is_dodging
+	_handbrake = move_toward(_handbrake, 1.0 if powerslide_held else 0.0,
+			(RL_HANDBRAKE_RISE_RATE if powerslide_held else RL_HANDBRAKE_FALL_RATE) * state.step)
 
 	# Direction lock: the nose stays pointed where it faced when the lock was
 	# pressed (no turning left/right/up/down), while roll stays free.
@@ -594,6 +736,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	_lock_local = body_basis.transposed() * _lock_direction
 
 	_detect_surface(state, body_basis, dt)
+	# Before this tick's gravity and thrust, as RL damps the velocity the step starts with.
+	velocity = _apply_flip_z_damp(velocity, dt)
 	if on_surface:
 		velocity = _apply_ground(velocity, body_basis, dt)
 	else:
@@ -602,8 +746,6 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		velocity = _apply_water(velocity, forward, dt)
 	velocity = _start_autoflip(velocity, body_basis)
 	velocity = _apply_jump(velocity, body_basis, state.get_contact_count() > 0, dt)
-	velocity = _apply_flip_z_damp(velocity, dt)
-	velocity = velocity.limit_length(max_boost_speed)
 
 	# Steering uses the full speed (so a sliding fish can still steer), signed
 	# negative when swimming backwards so steering flips like a reversing car.
@@ -617,16 +759,20 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var local_spin := body_basis.transposed() * state.angular_velocity
 	if on_surface:
 		local_spin = _apply_ground_rotation(local_spin, body_basis, velocity, dt)
+	elif _resting_on_roof and _flip_time < 0.0 and not _flip_pressed_this_tick:
+		pass  # on its roof, as in RL: air roll can't right it, only the auto-flip jump
 	else:
 		local_spin = _apply_rotation(local_spin, dt)
 	if _autoflip_left > 0.0:
 		_autoflip_left -= dt
-		# Roll about the nose (local -Z), capped like all RL spin.
+		# Roll about the nose (local -Z); capped like all spin at the next tick's start.
 		local_spin.z -= _autoflip_dir * RL_AUTOFLIP_TORQUE * dt
-		local_spin = local_spin.limit_length(RL_MAX_ANGULAR_SPEED)
 
 	state.linear_velocity = velocity
 	state.angular_velocity = body_basis * local_spin
+	_prev_step_velocity = _step_velocity
+	_step_velocity = velocity
+	_step_frame = Engine.get_physics_frames()
 
 	speed = velocity.length()
 	forward_speed = velocity.dot(forward)
@@ -688,12 +834,21 @@ func _detect_surface(state: PhysicsDirectBodyState3D, body_basis: Basis, dt: flo
 	_surface_grace -= dt
 	var normal_sum := Vector3.ZERO
 	_roof_normal = Vector3.ZERO
+	_resting_on_roof = false
 	for i in state.get_contact_count():
 		var normal := state.get_contact_local_normal(i)
+		# Touching on its underside (belly or the hitbox's bottom) counts too,
+		# however steep: RL's wheels follow a curving ramp, and the fish's flat
+		# bottom meets it at its front edge.
+		var local_point := body_basis.transposed() * (state.get_contact_local_position(i) - state.transform.origin)
+		var underneath := local_point.y < -hitbox_height / 2.0 + 0.05
 		if body_basis.y.angle_to(normal) > RL_AUTOFLIP_ROLL_THRESH:
 			_roof_normal = normal
-		elif normal.dot(body_basis.y) > SURFACE_MIN_DOT:
+		elif normal.dot(body_basis.y) > SURFACE_MIN_DOT or (underneath and normal.dot(body_basis.y) > 0.0):
 			normal_sum += normal
+		# Not the ball: an air dribble keeps its air control.
+		if normal.dot(body_basis.y) < ROOF_CONTACT_DOT and state.get_contact_collider_object(i) is StaticBody3D:
+			_resting_on_roof = true
 	if not rl_surface_mechanics or _surface_grace > 0.0 or _flip_time >= 0.0 or is_dodging:
 		normal_sum = Vector3.ZERO
 	var was_on_surface := on_surface
@@ -727,8 +882,13 @@ func _apply_ground(velocity: Vector3, body_basis: Basis, dt: float) -> Vector3:
 	velocity += forward * accel * dt
 
 	var side := body_basis.x * velocity.dot(body_basis.x)
-	var grip := powerslide_lateral_drag if is_powersliding else ground_grip
-	velocity -= side * (1.0 - exp(-grip * dt))
+	var grip := lerpf(ground_grip, powerslide_lateral_drag, _handbrake)
+	var gripped := side * (1.0 - exp(-grip * dt))
+	velocity -= gripped
+	# Cornering costs speed: RL's steered front wheels point into the turn, so
+	# part of their sideways grip pulls back on the car.
+	var steer_angle := absf(input_stick.x) * _rl_steer_angle(absf(along))
+	velocity -= forward * signf(along) * ground_turn_drag * (gripped.length() / dt) * sin(steer_angle) * dt
 
 	# RL sticky force: half strength always, plus up to full strength more the
 	# further the surface is from level while driving, so walls hold.
@@ -754,10 +914,32 @@ func _apply_ground_rotation(local_spin: Vector3, body_basis: Basis, velocity: Ve
 	var along := velocity.dot(-body_basis.z)
 	var turn := powerslide_turn_multiplier if is_powersliding else 1.0
 	# Signed by the direction of travel, so reversing steers like a car.
-	var target := input_stick.x * turn * along * tan(_rl_steer_angle(absf(along))) / GROUND_WHEELBASE
+	# RL's measured turning circle for this speed. Powersliding, the car keeps
+	# turning by its whole speed, not just the forward part, so a slide keeps
+	# swinging round (RL's rear wheels let go and the front ones pull it round).
+	var speed := along
+	var flat_speed := (velocity - surface_normal * velocity.dot(surface_normal)).length()
+	# Which way the slide is going (forwards or reversing), held through a spin
+	# while the car is mostly sideways, so it keeps swinging the same way.
+	if absf(along) > 0.3 * flat_speed:
+		_slide_sign = signf(along)
+	if _handbrake > 0.0:
+		speed = lerpf(along, flat_speed * _slide_sign, _handbrake)
+	turn = lerpf(1.0, powerslide_turn_multiplier, _handbrake)
+	var target := input_stick.x * turn * speed * _rl_curvature(absf(speed))
 	var yaw_rate := lerpf(-local_spin.y, target, 1.0 - exp(-GROUND_STEER_RESPONSE * dt))
 	var align := body_basis.transposed() * (body_basis.y.cross(surface_normal) * surface_align_rate)
 	return Vector3(align.x, -yaw_rate, align.z)
+
+
+func _rl_curvature(ground_speed: float) -> float:
+	var uu := ground_speed * UU_PER_SPEED
+	for i in range(1, RL_TURN_CURVATURE.size()):
+		var a: Vector2 = RL_TURN_CURVATURE[i - 1]
+		var b: Vector2 = RL_TURN_CURVATURE[i]
+		if uu <= b.x:
+			return lerpf(a.y, b.y, (uu - a.x) / (b.x - a.x)) * UU_PER_SPEED
+	return RL_TURN_CURVATURE[-1].y * UU_PER_SPEED
 
 
 func _rl_steer_angle(ground_speed: float) -> float:
@@ -796,7 +978,10 @@ func _apply_water(velocity: Vector3, forward: Vector3, dt: float) -> Vector3:
 func _apply_flip_z_damp(velocity: Vector3, dt: float) -> Vector3:
 	if not rl_flip_z_damp or _flip_time < 0.0:
 		return velocity
-	var t := _flip_time + dt  # the flip clock for this tick (advanced in _apply_rl_flip)
+	# RL's flip clock for this tick: it counts from the press tick, one tick ahead
+	# of _flip_time, which starts with the torque on the tick after (and isn't
+	# advanced yet this tick).
+	var t := _flip_time + 2.0 * dt
 	var in_window := t >= RL_FLIP_Z_DAMP_START - TIME_EPSILON and t <= RL_FLIP_TORQUE_TIME + TIME_EPSILON
 	if in_window and (velocity.y < 0.0 or t < RL_FLIP_Z_DAMP_END - TIME_EPSILON):
 		velocity.y *= pow(1.0 - RL_FLIP_Z_DAMP_120, dt * 120.0)
@@ -823,14 +1008,28 @@ func _apply_jump(velocity: Vector3, body_basis: Basis, touching: bool, dt: float
 	var pressed := _jump_queued
 	_jump_queued = false
 	_jump_timer -= dt
+	if _jump_wheel_contact_left > 0.0 and not pressed:
+		_jump_wheel_contact_left -= dt
+		# Resting-strength sticky push while the wheels are still down (RocketSim).
+		velocity -= _jump_surface_normal * surface_stick * 0.5 * dt
 
 	match jump_state:
 		JumpState.READY:
 			if pressed:
+				if on_surface:
+					# The ground still holds the fish up on the press tick, as in
+					# RL: no sinking from this tick's gravity and sticky push.
+					velocity -= surface_normal * minf(velocity.dot(surface_normal), 0.0)
+					_jump_wheel_contact_left = RL_JUMP_WHEEL_CONTACT_TIME
+					_jump_surface_normal = surface_normal
 				velocity += body_basis.y * jump_impulse
 				jump_state = JumpState.SECOND_JUMP
 				_jump_timer = double_jump_window
-				_jump_hold_elapsed = 0.0 if variable_jump else -1.0
+				_jump_hold_elapsed = -1.0
+				if variable_jump:
+					# RL's hold push starts on the press tick itself.
+					velocity += body_basis.y * jump_hold_accel * RL_JUMP_PRE_MIN_ACCEL_SCALE * dt
+					_jump_hold_elapsed = dt
 				_surface_grace = SURFACE_JUMP_GRACE
 				_post_jump_time_left = post_jump_drag_time
 				jumped.emit()
@@ -838,11 +1037,15 @@ func _apply_jump(velocity: Vector3, body_basis: Basis, touching: bool, dt: float
 			if _jump_hold_elapsed >= 0.0:
 				# Holding the first jump keeps pushing; the double jump window
 				# only starts counting once the hold is over, as in RL.
-				_jump_hold_elapsed += dt
-				var holding := jump_held or _jump_hold_elapsed <= RL_JUMP_MIN_HOLD + TIME_EPSILON
-				if holding and not pressed and _jump_hold_elapsed <= jump_hold_time + TIME_EPSILON:
-					velocity += body_basis.y * jump_hold_accel * dt
+				# RocketSim Car::_UpdateJump: the push lasts at least JUMP_MIN_TIME
+				# (at 62% strength) and while held up to JUMP_MAX_TIME.
+				var early := _jump_hold_elapsed < RL_JUMP_MIN_HOLD - TIME_EPSILON
+				var holding := jump_held or early
+				if holding and not pressed and _jump_hold_elapsed < jump_hold_time - TIME_EPSILON:
+					var scale := RL_JUMP_PRE_MIN_ACCEL_SCALE if early else 1.0
+					velocity += body_basis.y * jump_hold_accel * scale * dt
 					_jump_timer = double_jump_window
+					_jump_hold_elapsed += dt
 				else:
 					_jump_hold_elapsed = -1.0
 			if pressed:
@@ -858,24 +1061,50 @@ func _apply_jump(velocity: Vector3, body_basis: Basis, touching: bool, dt: float
 	return velocity
 
 
-## Dodge in the stick's direction when it's pushed, otherwise a straight double jump.
+## Dodge when the stick or roll is pushed, otherwise a straight double jump. As
+## in RL, |pitch| + |yaw| + |roll| decides, so air roll alone dodges sideways.
 func _second_jump(velocity: Vector3, body_basis: Basis) -> Vector3:
-	if input_stick.length() < dodge_deadzone:
+	if absf(input_stick.x) + absf(input_stick.y) + absf(input_roll) < dodge_deadzone:
 		double_jumped.emit()
 		return velocity + body_basis.y * jump_impulse
 
-	# Stick up = dodge forward (local -Z), stick right = dodge right (local +X).
-	var local_dir := Vector3(input_stick.x, 0.0, input_stick.y).normalized()
-	var world_dir := body_basis * local_dir
+	# Stick up = dodge forward (local -Z); stick right or roll right = dodge right (local +X).
+	var local_dir := Vector3(input_stick.x + input_roll, 0.0, input_stick.y).normalized()
 	if rl_dodge_timing:
 		_start_rl_flip()
-	elif dodge_flip_turns > 0.0:
+		var push := _rl_dodge_push(velocity, body_basis)
+		dodged.emit(push.normalized())
+		return velocity + push
+	if dodge_flip_turns > 0.0:
 		# Spin so the nose dips toward the dodge direction (front flip, side flip...).
 		_flip_axis = Vector3.UP.cross(local_dir).normalized()
 		_flip_time_left = dodge_flip_duration
 		is_dodging = true
+	var world_dir := body_basis * local_dir
 	dodged.emit(world_dir)
 	return velocity + world_dir * dodge_impulse
+
+
+## Rocket League's dodge push (RocketSim Car::_UpdateDoubleJumpOrFlip): along the
+## dodge direction in the ground plane, and stronger the faster the car is
+## already going: sideways up to 1.9x at top speed, backwards up to 2.5x and
+## 16/15 more even at rest. Forwards doesn't grow. Needs _start_rl_flip first.
+func _rl_dodge_push(velocity: Vector3, body_basis: Basis) -> Vector3:
+	var dir := _flip_direction  # x = forward, y = right; zero for a stall
+	if dir == Vector2.ZERO:
+		return Vector3.ZERO
+	var forward := -body_basis.z
+	var forward_speed := velocity.dot(forward)
+	var speed_ratio := absf(forward_speed) / RL_CAR_MAX_SPEED
+	var backwards := dir.x < 0.0 if absf(forward_speed) < RL_DODGE_BACKWARDS_MIN_SPEED else signf(forward_speed) != signf(dir.x)
+	var push := dir * dodge_impulse
+	if backwards:
+		push.x *= ((RL_DODGE_BACKWARD_MAX_SPEED_SCALE - 1.0) * speed_ratio + 1.0) * RL_DODGE_BACKWARD_SCALE
+	push.y *= (RL_DODGE_SIDE_MAX_SPEED_SCALE - 1.0) * speed_ratio + 1.0
+	var forward_flat := Vector3(forward.x, 0.0, forward.z)
+	forward_flat = forward_flat.normalized() if forward_flat.length() > 0.001 else -body_basis.y  # nose straight up or down
+	var right_flat := forward_flat.cross(Vector3.UP).normalized()
+	return forward_flat * push.x + right_flat * push.y
 
 
 ## Rocket League's dodge direction: forward/back from pitch, sideways from yaw
@@ -896,6 +1125,7 @@ func _start_rl_flip() -> void:
 	_flip_cancelled = false
 	_flip_spin_out = false
 	_flip_direction = dodge_dir
+	_flip_pressed_this_tick = true
 	is_dodging = true
 
 
@@ -921,6 +1151,11 @@ func _apply_rotation(local_spin: Vector3, dt: float) -> Vector3:
 		yaw_in = 0.0
 	roll_in = clampf(roll_in, -1.0, 1.0)
 
+	if _flip_pressed_this_tick:
+		# RL's flip torque starts the tick after the press (RocketSim): the press
+		# tick itself is ordinary air control.
+		_flip_pressed_this_tick = false
+		return _rl_air_control(local_spin, pitch_in, yaw_in, roll_in, dt)
 	if _flip_time >= 0.0:
 		return _apply_rl_flip(local_spin, yaw_in, roll_in, dt)
 
@@ -977,8 +1212,9 @@ func _apply_rotation(local_spin: Vector3, dt: float) -> Vector3:
 
 ## One tick of Rocket League's air control (RocketSim Car::_UpdateAirTorque):
 ## torque from the inputs, damping on pitch and yaw that eases off as their
-## input is held, constant damping on roll, total spin capped at 5.5 rad/s.
-## Spin is in the fish's frame (x = pitch, y = yaw, z = roll) as elsewhere.
+## input is held, constant damping on roll. The 5.5 rad/s cap is applied at the
+## start of the next tick, as in RL. Spin is in the fish's frame (x = pitch,
+## y = yaw, z = roll) as elsewhere.
 func _rl_air_control(spin: Vector3, pitch_in: float, yaw_in: float, roll_in: float, dt: float) -> Vector3:
 	var pitch_rate := spin.x
 	var yaw_rate := -spin.y
@@ -986,7 +1222,7 @@ func _rl_air_control(spin: Vector3, pitch_in: float, yaw_in: float, roll_in: flo
 	pitch_rate += (RL_PITCH_TORQUE * pitch_in - RL_PITCH_DAMPING * (1.0 - absf(pitch_in)) * pitch_rate) * dt
 	yaw_rate += (RL_YAW_TORQUE * yaw_in - RL_YAW_DAMPING * (1.0 - absf(yaw_in)) * yaw_rate) * dt
 	roll_rate += (RL_ROLL_TORQUE * roll_in - RL_ROLL_DAMPING * roll_rate) * dt
-	return Vector3(pitch_rate, -yaw_rate, -roll_rate).limit_length(RL_MAX_ANGULAR_SPEED)
+	return Vector3(pitch_rate, -yaw_rate, -roll_rate)
 
 
 ## One tick of a Rocket League dodge flip (RocketSim Car::_UpdateAirTorque),
@@ -1019,7 +1255,6 @@ func _apply_rl_flip(spin: Vector3, yaw_in: float, roll_in: float, dt: float) -> 
 	if air_control:
 		spin = _rl_air_control(spin, 0.0, yaw_in, roll_in, dt)  # pitch locked: no pitch input, full damping
 
-	spin = spin.limit_length(RL_MAX_ANGULAR_SPEED)
 	_flip_angle += spin.dot(axis) * dt
 	if _flip_time >= RL_FLIP_TORQUE_TIME + RL_FLIP_PITCHLOCK_EXTRA_TIME - TIME_EPSILON:
 		_end_flip()  # pitch lock over (RL-exact path): normal steering resumes
@@ -1076,16 +1311,23 @@ func _apply_reset(state: PhysicsDirectBodyState3D) -> void:
 	state.angular_velocity = Vector3.ZERO
 	_flip_time_left = 0.0
 	_flip_time = -1.0
+	_flip_pressed_this_tick = false
 	_flip_spin_out = false
 	on_surface = false
 	_surface_grace = 0.0
 	_autoflip_left = 0.0
+	_step_velocity = Vector3.ZERO
+	_prev_step_velocity = Vector3.ZERO
+	_ball_push = Vector3.ZERO
+	_ball_twist = Vector3.ZERO
 	_post_jump_time_left = 0.0
 	_queued_stroke = 0.0
 	stroke_chain = 0
 	is_dodging = false
 	jump_state = JumpState.READY
 	_jump_hold_elapsed = -1.0
+	_jump_wheel_contact_left = 0.0
+	_handbrake = 0.0
 	boost_amount = 100.0
 	reset_physics_interpolation.call_deferred()
 
@@ -1093,9 +1335,10 @@ func _apply_reset(state: PhysicsDirectBodyState3D) -> void:
 func _apply_physics_material() -> void:
 	if physics_material_override == null:
 		return
-	physics_material_override.bounce = wall_bounce
-	# Driving, the body doesn't scrape: an RL car rides on its wheels, and the
+	# Driving, the body neither scrapes nor bounces: an RL car rides on its
+	# wheels (the suspension soaks up bumps such as meeting a ramp), and the
 	# ground model already handles grip. (The ball grips a fish it rests on itself.)
+	physics_material_override.bounce = 0.0 if on_surface else wall_bounce
 	physics_material_override.friction = 0.0 if on_surface else wall_friction
 
 

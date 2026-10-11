@@ -14,10 +14,15 @@ const HIT_CURVE := [Vector2(0.0, 0.65), Vector2(5.0, 0.65), Vector2(23.0, 0.55),
 ## A fish that stays in contact only gets the extra impulse once per touch, and
 ## at most this often while bumping repeatedly.
 const HIT_COOLDOWN := 0.1
-## Friction while the ball rests on a fish, as RL's grippy car-ball contact
-## (RocketSim CARBALL_COLLISION_FRICTION). The fish has no friction of its own
-## while driving, so this is what lets it carry the ball.
-const CARRY_FRICTION := 2.0
+## Fish-ball contact, as RL's car-ball contact (RocketSim RLConst.h): no bounce
+## (CARBALL_COLLISION_RESTITUTION 0) and very grippy (CARBALL_COLLISION_FRICTION).
+const CARBALL_FRICTION := 2.0
+## A fish this close counts as touching, so contact doesn't flicker on and off.
+const CONTACT_MARGIN := 0.02
+## Overlap allowed before the ball is pushed back out of the fish.
+const PENETRATION_SLOP := 0.005
+## Contact solver passes per tick (Bullet's default).
+const SOLVER_ITERATIONS := 10
 
 signal touched(by: Node3D, hit_speed: float)
 
@@ -33,6 +38,8 @@ var speed := 0.0
 var respawn_pending: bool:
 	get:
 		return _reset_queued
+## A kickoff ball holding still until its first touch (see respawn()).
+var waiting_for_touch := false
 
 var _shape := SphereShape3D.new()
 var _collision := CollisionShape3D.new()
@@ -43,10 +50,12 @@ var _indicators := BallIndicators.new()
 var _radius := -1.0
 var _reset_queued := false
 var _spawn_position := Vector3.ZERO
-# Both velocities as they were at the end of last tick, before the collision
-# that this tick's contacts report was resolved: what the hit speed measures.
-var _last_velocity := Vector3.ZERO
-var _fish_velocity := Vector3.ZERO
+# Velocity handed to the physics step, this tick and the one before (see
+# velocity_for_last_step): the ball's motion before the collision that this
+# tick's contacts report was resolved.
+var _step_velocity := Vector3.ZERO
+var _prev_step_velocity := Vector3.ZERO
+var _step_frame := -1
 var _touching_fish := false
 var _hit_cooldown := 0.0
 
@@ -63,6 +72,12 @@ func _ready() -> void:
 	angular_damp_mode = RigidBody3D.DAMP_MODE_REPLACE
 	physics_material_override = PhysicsMaterial.new()
 	_spawn_position = global_position
+	# The physics engine would bounce the fish and ball off each other with both
+	# bodies' bounciness and the fish's driving friction (none). RL's car-ball
+	# contact is resolved here instead (_resolve_fish_contact); the engine still
+	# handles the ball against the arena.
+	if fish:
+		add_collision_exception_with(fish)
 
 	_collision.shape = _shape
 	add_child(_collision)
@@ -85,10 +100,13 @@ func _ready() -> void:
 	_apply_settings()
 
 
-## Teleport to `at`, stopped, and bring the ball back if it was popped.
-func respawn(at: Vector3) -> void:
+## Teleport to `at`, stopped, and bring the ball back if it was popped. A
+## kickoff ball waits in place, unaffected by gravity, until a fish touches it
+## (RL's kickoff rule), if settings.kickoff_float is on.
+func respawn(at: Vector3, kickoff := false) -> void:
 	_spawn_position = at
 	_reset_queued = true
+	waiting_for_touch = kickoff and settings.kickoff_float and settings.ball_type == BallSettings.BallType.SURFACE
 	popped = false
 	visible = true
 	freeze = false
@@ -131,23 +149,41 @@ func _apply_settings() -> void:
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var dt := state.step
+	# Like RL (RocketSim Ball::_FinishPhysicsTick), speed and spin are capped
+	# after each step, so a step runs at the cap plus that tick's acceleration.
+	state.linear_velocity = state.linear_velocity.limit_length(settings.max_speed)
+	state.angular_velocity = state.angular_velocity.limit_length(settings.max_angular_speed)
 	if _reset_queued:
 		_reset_queued = false
 		state.transform = Transform3D(Basis.IDENTITY, _spawn_position)
 		state.linear_velocity = Vector3.ZERO
 		state.angular_velocity = Vector3.ZERO
-		_last_velocity = Vector3.ZERO
+		_step_velocity = Vector3.ZERO
+		_prev_step_velocity = Vector3.ZERO
 		_touching_fish = false
 		reset_physics_interpolation.call_deferred()
 		return
 
 	var velocity := state.linear_velocity
 	var spin := state.angular_velocity
-	velocity = _apply_hits(state, velocity)
+	var contact := _fish_contact(state.transform.origin)
+	if waiting_for_touch:
+		if contact.is_empty() or contact.depth <= 0.0:
+			# Held in place: nothing but a fish wakes it (RL's kickoff ball).
+			state.linear_velocity = Vector3.ZERO
+			state.angular_velocity = Vector3.ZERO
+			_prev_step_velocity = _step_velocity
+			_step_velocity = Vector3.ZERO
+			_step_frame = Engine.get_physics_frames()
+			return
+		waiting_for_touch = false
+	var before := velocity
+	_hit_cooldown -= dt
 
 	if settings.ball_type == BallSettings.BallType.SURFACE:
-		velocity *= exp(-settings.air_drag * dt)
+		# Gravity, then drag as Bullet's linear damping (what RL uses): speed x (1 - air_drag) per second.
 		velocity.y -= settings.gravity * dt
+		velocity *= pow(1.0 - settings.air_drag, dt)
 		spin *= exp(-settings.spin_drag * dt)
 	else:
 		var inherit := settings.inherit_water and is_instance_valid(fish)
@@ -157,12 +193,27 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		velocity.y += _buoyancy() * dt
 		spin *= exp(-angular_drag * dt)
 
-	state.linear_velocity = velocity.limit_length(settings.max_speed)
-	state.angular_velocity = spin.limit_length(settings.max_angular_speed)
-	speed = state.linear_velocity.length()
-	_last_velocity = state.linear_velocity
-	if is_instance_valid(fish):
-		_fish_velocity = fish.linear_velocity
+	# After gravity, as a physics engine's contact solver runs after the forces.
+	if contact.is_empty():
+		_touching_fish = false
+	else:
+		var result := _resolve_fish_contact(state, contact, velocity, spin, before)
+		velocity = result[0]
+		spin = result[1]
+
+	state.linear_velocity = velocity
+	state.angular_velocity = spin
+	speed = minf(velocity.length(), settings.max_speed)
+	_prev_step_velocity = _step_velocity
+	_step_velocity = velocity
+	_step_frame = Engine.get_physics_frames()
+
+
+## The velocity the ball moved with during the physics step that just ran. For
+## contact maths in the fish's _integrate_forces, which can run before or after
+## this one's in the same tick.
+func velocity_for_last_step() -> Vector3:
+	return _prev_step_velocity if _step_frame == Engine.get_physics_frames() else _step_velocity
 
 
 ## A Water ball's buoyancy: the fish's when inheriting, otherwise its own.
@@ -170,54 +221,135 @@ func _buoyancy() -> float:
 	return fish.buoyancy if settings.inherit_water and is_instance_valid(fish) else settings.buoyancy
 
 
-## Rocket League's extra impulse on a fresh touch from the fish (RocketSim
-## Ball::OnHit): push along fish -> ball with the world-vertical part and the
-## fish's forward part of that direction scaled down, by the relative speed
-## before the touch.
-func _apply_hits(state: PhysicsDirectBodyState3D, velocity: Vector3) -> Vector3:
-	_hit_cooldown -= state.step
-	var hitter: FishController = null
-	var normal := Vector3.ZERO
-	for i in state.get_contact_count():
-		var collider := state.get_contact_collider_object(i)
-		if collider is FishController:
-			hitter = collider
-			normal = state.get_contact_local_normal(i)
-			break
-	var fresh := hitter != null and not _touching_fish
-	_touching_fish = hitter != null
-	if hitter != null and not fresh:
-		# Friction: stop the ball sliding across the fish, up to what its weight
-		# pressing on the fish allows (friction x weight).
-		var slide := velocity - hitter.linear_velocity
-		slide -= normal * slide.dot(normal)
-		var weight := settings.gravity if settings.ball_type == BallSettings.BallType.SURFACE else maxf(-_buoyancy(), 0.0)
-		return velocity - slide.limit_length(CARRY_FRICTION * weight * maxf(normal.y, 0.0) * state.step)
+## The nearest point where the fish's collision boxes (hitbox and belly) touch
+## the ball at `centre`: {fish, normal (fish -> ball), depth (overlap, negative
+## while still just apart)}, or empty when the fish isn't touching.
+func _fish_contact(centre: Vector3) -> Dictionary:
+	if not is_instance_valid(fish) or popped:
+		return {}
+	var best := {}
+	for child in fish.get_children():
+		var shape_node := child as CollisionShape3D
+		if shape_node == null or shape_node.disabled or not shape_node.shape is BoxShape3D:
+			continue
+		var xform := shape_node.global_transform
+		var half: Vector3 = (shape_node.shape as BoxShape3D).size / 2.0
+		var local := xform.affine_inverse() * centre
+		var closest := local.clamp(-half, half)
+		var normal: Vector3
+		var depth: float
+		if closest == local:
+			# Centre inside the box: out through the nearest face.
+			var room := half - local.abs()
+			var axis := 0 if room.x <= room.y and room.x <= room.z else (1 if room.y <= room.z else 2)
+			var local_normal := Vector3.ZERO
+			local_normal[axis] = signf(local[axis]) if local[axis] != 0.0 else 1.0
+			normal = (xform.basis * local_normal).normalized()
+			depth = _radius + room[axis]
+		else:
+			var offset := centre - xform * closest
+			var distance := offset.length()
+			normal = offset / distance
+			depth = _radius - distance
+		if depth > -CONTACT_MARGIN and (best.is_empty() or depth > best.depth):
+			best = {"fish": fish, "normal": normal, "depth": depth}
+	return best
+
+
+## One tick of Rocket League's car-ball contact against the fish, worked out
+## here as a physics engine would: an impulse at the contact point that stops
+## the two closing (restitution 0) and grips sideways up to friction 2.0, with
+## each body's mass and spin inertia. So a glancing touch spins the ball, the
+## ball can climb the fish's nose, and the fish recoils by how heavy it is (6x
+## the ball). The fish gets its half via FishController.apply_ball_impulse. A
+## fresh touch also gets RL's extra impulse (RocketSim Ball::OnHit): a push
+## along the line from the fish's centre of mass to the ball, with its
+## world-vertical part and the fish's forward part scaled down, by the relative
+## speed before the touch. Returns [velocity, spin].
+func _resolve_fish_contact(state: PhysicsDirectBodyState3D, contact: Dictionary, velocity: Vector3, spin: Vector3, before: Vector3) -> Array:
+	var hitter: FishController = contact.fish
+	var normal: Vector3 = contact.normal
+	var depth: float = contact.depth
+	var centre := state.transform.origin
+	var point := centre - normal * _radius
+	var r_ball := point - centre
+	var r_fish := point - hitter.global_transform * hitter.center_of_mass
+	var fish_velocity := hitter.linear_velocity
+	var fish_spin := hitter.angular_velocity
+	var inv_mass_ball := 1.0 / mass
+	var inv_mass_fish := 1.0 / hitter.mass
+	var inv_inertia_ball := 1.0 / (0.4 * mass * _radius * _radius)  # solid sphere
+	var inv_inertia_fish := hitter.inverse_inertia_world()
+
+	# Speculative: a ball still just apart may close the gap this tick, but no more.
+	var allowed := maxf(-depth, 0.0) / state.step
+	var normal_mass := _inverse_effective_mass(normal, r_ball, r_fish, inv_mass_ball, inv_mass_fish, inv_inertia_ball, inv_inertia_fish)
+	# Sequential impulses, as Bullet's solver: the push and the grip each change
+	# how the bodies move and turn at the contact, which changes what the other
+	# needs (a hit makes the fish pitch, and its face then rubs spin onto the ball).
+	var pushed := 0.0
+	var gripped := Vector3.ZERO
+	var fish_v := fish_velocity
+	var fish_w := fish_spin
+	for i in SOLVER_ITERATIONS:
+		var relative := (velocity + spin.cross(r_ball)) - (fish_v + fish_w.cross(r_fish))
+		var push := maxf(pushed - (relative.dot(normal) + allowed) / normal_mass, 0.0) - pushed
+		pushed += push
+		var impulse := normal * push
+		relative += _contact_velocity_change(impulse, normal, r_ball, r_fish, inv_mass_ball, inv_mass_fish, inv_inertia_ball, inv_inertia_fish)
+		var slide := relative - normal * relative.dot(normal)
+		if slide.length() > 0.00001:
+			var tangent := slide.normalized()
+			var stop := slide.length() / _inverse_effective_mass(tangent, r_ball, r_fish, inv_mass_ball, inv_mass_fish, inv_inertia_ball, inv_inertia_fish)
+			var total := (gripped - tangent * stop).limit_length(CARBALL_FRICTION * pushed)
+			impulse += total - gripped
+			gripped = total
+		velocity += impulse * inv_mass_ball
+		spin += r_ball.cross(impulse) * inv_inertia_ball
+		fish_v -= impulse * inv_mass_fish
+		fish_w -= inv_inertia_fish * r_fish.cross(impulse)
+	if pushed > 0.0 or gripped != Vector3.ZERO:
+		hitter.apply_ball_impulse(-(normal * pushed + gripped), point)
+	if depth > PENETRATION_SLOP:
+		state.transform = Transform3D(state.transform.basis, centre + normal * (depth - PENETRATION_SLOP))
+
+	var fresh := not _touching_fish and depth > 0.0
+	if depth > 0.0:
+		_touching_fish = true
 	if not fresh:
-		return velocity
-
-	# Fish-ball touches don't bounce (RocketSim CARBALL_COLLISION_RESTITUTION
-	# is 0): the ball leaves with the fish's speed along the contact normal and
-	# the extra impulse below supplies the bounce. Otherwise a ball resting on
-	# the fish gains speed every bounce and can never be carried.
-	if normal.dot(state.transform.origin - hitter.global_position) < 0.0:
-		normal = -normal  # point from the fish to the ball
-	var approach := (_last_velocity - _fish_velocity).dot(normal)
-	if approach < 0.0:
-		velocity = _last_velocity - normal * approach
-
-	var hit_speed := minf((_last_velocity - _fish_velocity).length(), HIT_CURVE[-1].x)
+		return [velocity, spin]
+	var hit_speed := minf((before - fish_velocity).length(), HIT_CURVE[-1].x)
 	touched.emit(hitter, hit_speed)
 	if not settings.rl_hit_impulse or _hit_cooldown > 0.0 or hit_speed <= 0.0:
-		return velocity
+		return [velocity, spin]
 	_hit_cooldown = HIT_COOLDOWN
 
 	var forward := -hitter.global_basis.orthonormalized().z
-	var direction := state.transform.origin - hitter.global_position
+	var direction := centre - hitter.global_transform * hitter.center_of_mass
 	direction.y *= settings.hit_up_scale  # world up, as in RL
 	direction = direction.normalized()
 	direction = (direction - forward * direction.dot(forward) * (1.0 - settings.hit_forward_scale)).normalized()
-	return velocity + direction * hit_speed * _hit_factor(hit_speed) * settings.hit_force_scale
+	velocity += direction * hit_speed * _hit_factor(hit_speed) * settings.hit_force_scale
+	return [velocity, spin]
+
+
+## How an `impulse` (on the ball, the opposite on the fish) changes the
+## contact point's relative velocity, ball side minus fish side. Only the
+## normal part is needed mid-iteration, so this is exact for pushes along `normal`.
+func _contact_velocity_change(impulse: Vector3, normal: Vector3, r_ball: Vector3, r_fish: Vector3, inv_mass_ball: float,
+		inv_mass_fish: float, inv_inertia_ball: float, inv_inertia_fish: Basis) -> Vector3:
+	return impulse * (inv_mass_ball + inv_mass_fish) \
+			+ (r_ball.cross(impulse) * inv_inertia_ball).cross(r_ball) \
+			+ (inv_inertia_fish * r_fish.cross(impulse)).cross(r_fish)
+
+
+## 1 / (the effective mass the contact sees along `dir`): both bodies' masses
+## plus how much each would rather turn than move at that point.
+func _inverse_effective_mass(dir: Vector3, r_ball: Vector3, r_fish: Vector3, inv_mass_ball: float, inv_mass_fish: float,
+		inv_inertia_ball: float, inv_inertia_fish: Basis) -> float:
+	return inv_mass_ball + inv_mass_fish \
+			+ dir.dot((r_ball.cross(dir) * inv_inertia_ball).cross(r_ball)) \
+			+ dir.dot((inv_inertia_fish * r_fish.cross(dir)).cross(r_fish))
 
 
 func _hit_factor(hit_speed: float) -> float:

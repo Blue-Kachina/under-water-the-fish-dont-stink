@@ -107,12 +107,23 @@ func _physics_process(delta: float) -> void:
 		print("landed on the ball as a surface: %s" % on_ball)
 		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(-20, 0.6, 45)))
 	if once("carry drop", 15.5):
-		aquarium.ball.respawn(fish.global_position + Vector3(0, 2, 0))
+		aquarium.ball.respawn(fish.global_transform * fish.center_of_mass + Vector3(0, 2, 0))  # over the centre of mass: RL's hit push is then straight up
 	if once("carry go", 20.0):
 		print("ball resting on the fish: %.2f m above it" % (aquarium.ball.global_position.y - fish.global_position.y))
-		Input.action_press("thrust_forward", 0.3)
-	if once("carry read", 22.0):
+	if t > 20.0 and t < 23.0:
+		# Dribble like a player: a ball on the roof rolls back as you speed up and
+		# forward as you slow, so feather the throttle by where it sits.
+		var ahead := -(aquarium.ball.global_position - fish.global_transform * fish.center_of_mass).dot(fish.global_basis.z)
+		var throttle := clampf(0.4 + ahead * 3.0, -1.0, 1.0)
+		Input.action_release("thrust_forward")
+		Input.action_release("thrust_reverse")
+		if throttle > 0.0:
+			Input.action_press("thrust_forward", throttle)
+		elif throttle < 0.0:
+			Input.action_press("thrust_reverse", -throttle)
+	if once("carry read", 23.0):
 		var offset := aquarium.ball.global_position - fish.global_position
-		print("carrying at 30%% throttle for 2 s: fish speed %.1f m/s, ball %.2f m above, %.2f m behind the fish centre (still on top: %s)" % [fish.speed, offset.y, offset.dot(fish.global_basis.z), offset.y > fish.hitbox_height / 2.0 + aquarium.ball.settings.radius * 0.8])
+		print("feathered dribble for 3 s: fish speed %.1f m/s, moved %.1f m, ball %.2f m above, %.2f m behind the fish centre (still on top: %s)" % [fish.speed, fish.global_position.distance_to(Vector3(-20, fish.global_position.y, 45)), offset.y, offset.dot(fish.global_basis.z), offset.y > fish.hitbox_height / 2.0 + aquarium.ball.settings.radius * 0.8])
 		release_all()
+		Input.action_release("thrust_reverse")
 		get_tree().quit()

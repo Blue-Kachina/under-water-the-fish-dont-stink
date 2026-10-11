@@ -1,5 +1,6 @@
 ## Checks air roll, dodge flips and flip cancels against Rocket League (a
-## reference simulation of RocketSim's update rules at 120 Hz), completed
+## reference simulation of RocketSim's update rules at 120 Hz: each step turns
+## at the uncapped rate, then spin is capped at 5.5 rad/s), completed
 ## flips, and that the direction lock stops turning but not rolling.
 ## Run headless: Godot_console.exe --headless --path . res://tests/roll_timing_probe.tscn
 extends Node
@@ -51,8 +52,9 @@ func _print_roll_reference() -> void:
 	var angle := 0.0
 	var found := {}
 	for n in range(1, 1000):
-		rate = minf(rate + (FishController.RL_ROLL_TORQUE - FishController.RL_ROLL_DAMPING * rate) * TICK, FishController.RL_MAX_ANGULAR_SPEED)
+		rate += (FishController.RL_ROLL_TORQUE - FishController.RL_ROLL_DAMPING * rate) * TICK
 		angle += rate * TICK
+		rate = minf(rate, FishController.RL_MAX_ANGULAR_SPEED)
 		for turns in [1, 2]:
 			if angle >= TAU * turns and not found.has(turns):
 				found[turns] = n
@@ -68,10 +70,11 @@ func _flip_reference(torque: float, damping: float, cancel_tick: int) -> String:
 	for n in range(1, LOCK_END_TICKS + 1):
 		var cancelled := cancel_tick > 0 and n >= cancel_tick
 		if n <= TORQUE_TICKS and not cancelled:
-			rate = minf(rate + torque * TICK, FishController.RL_MAX_ANGULAR_SPEED)
+			rate += torque * TICK
 		else:
 			rate -= damping * rate * TICK
 		angle += rate * TICK
+		rate = minf(rate, FishController.RL_MAX_ANGULAR_SPEED)
 		if n == TORQUE_TICKS:
 			at_torque_end = angle
 	return "%5.1f° when the flip torque ends (0.65 s), %5.1f° when pitch lock ends (0.95 s)" % [rad_to_deg(at_torque_end), rad_to_deg(angle)]
@@ -91,8 +94,8 @@ func _held_flip_reference(front: bool) -> Array:
 			rate += (FishController.RL_PITCH_TORQUE * pitch_scale - FishController.RL_PITCH_DAMPING * (1.0 - pitch_scale) * rate) * TICK
 		else:
 			rate += (FishController.RL_ROLL_TORQUE - FishController.RL_ROLL_DAMPING * rate) * TICK
-		rate = minf(rate, FishController.RL_MAX_ANGULAR_SPEED)
 		angle += rate * TICK
+		rate = minf(rate, FishController.RL_MAX_ANGULAR_SPEED)
 		if angle >= TAU - 0.0001:
 			return [n, n * TICK]
 	return [-1, -1.0]

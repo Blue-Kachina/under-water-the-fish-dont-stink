@@ -5,23 +5,27 @@ extends Node3D
 ## bubble ball. Long axis is Z. The fish plays for Blue, starts at the +Z end
 ## and attacks the Orange goal at -Z.
 ##
-## Dimensions are RL's (RocketSim / RLBot), 1 uu = 1 cm: an octagonal floor with
-## the four vertical corners cut at 45 degrees, and rounded ramps where the
-## floor and ceiling meet the walls.
+## Dimensions are RL's, 1 uu = 1 cm, measured from the game's own Soccar
+## collision meshes (tools/rocketsim_compare): an octagonal floor with the four
+## vertical corners cut at 45 degrees and wide rounded joins into the walls,
+## a 2.56 m ramp up from the floor and a 5.12 m curve onto the ceiling.
 
 signal goal_scored(team: int)
 
-const SIZE := Vector3(81.92, 20.44, 102.4)  # floor at y = 0, centred on x/z
+const SIZE := Vector3(81.92, 20.48, 102.4)  # floor at y = 0, centred on x/z
 ## The vertical corners are cut at 45 degrees: the tank is inside |x| + |z| <= CORNER_PLANE.
 const CORNER_PLANE := 80.64
-## Radius of the rounded edges between the walls and the floor and ceiling (RL's
-## ramps rise about 2.56 m), and of the joins between neighbouring walls.
+## Radius of the ramp from the floor up the walls (RL: 256 uu).
 const EDGE_RADIUS := 2.56
+## Radius of the curve from the walls onto the ceiling (RL: 512 uu).
+const CEILING_RADIUS := 5.12
+## Radius of the joins between the 45-degree corners and the walls (RL: about 880 uu).
+const CORNER_JOIN_RADIUS := 8.8
 const EDGE_STEPS := 6  # segments per rounded floor/ceiling edge
-const JOIN_STEPS := 3  # segments per rounded wall-to-wall join
-## Goal mouth width x height, standing on the floor. Taller than EDGE_RADIUS so
-## its top edge is on the flat part of the end wall.
-const GOAL_SIZE := Vector2(17.8551, 6.42775)
+const JOIN_STEPS := 6  # segments per rounded wall-to-wall join
+## Goal mouth width x height, standing on the floor (RL: 1792 x 640 uu). Taller
+## than EDGE_RADIUS so its top edge is on the flat part of the end wall.
+const GOAL_SIZE := Vector2(17.92, 6.40)
 const GOAL_DEPTH := 8.8
 ## RL's kickoff spot furthest back, the fish's start.
 const KICKOFF_DISTANCE := 46.08
@@ -41,13 +45,15 @@ var scores := [0, 0]
 var centre := Vector3(0.0, SIZE.y / 2.0, 0.0)
 ## Seconds until the ball returns after a goal.
 var respawn_time_left := 0.0
+## Off: goals don't score (tests that roll the ball into a net).
+var scoring_enabled := true
 
 var _pop := CPUParticles3D.new()
 
 
 func _ready() -> void:
-	_build_shell()
 	_build_goals()
+	_build_shell()  # after the goals: their nets join the shell's collision mesh
 	_build_specks()
 	_build_pop()
 	ball = Ball.new()
@@ -56,15 +62,16 @@ func _ready() -> void:
 	ball.fish = fish
 	ball.position = ball_spawn()
 	add_child(ball)
+	ball.respawn(ball_spawn(), true)  # the opening kickoff
 
 
 func _physics_process(delta: float) -> void:
 	if ball.popped:
 		respawn_time_left -= delta
 		if respawn_time_left <= 0.0:
-			ball.respawn(ball_spawn())
+			ball.respawn(ball_spawn(), true)
 		return
-	if ball.respawn_pending:
+	if ball.respawn_pending or not scoring_enabled:
 		return  # still at its old spot until the teleport lands; don't score it again
 	for goal in goals:
 		if goal.contains_ball(ball.global_position, ball.settings.radius):
@@ -94,7 +101,7 @@ func configure_environment(env: Environment) -> void:
 ## Ball back to its kickoff spot. Scores are kept.
 func reset_kickoff() -> void:
 	respawn_time_left = 0.0
-	ball.respawn(ball_spawn())
+	ball.respawn(ball_spawn(), true)
 
 
 func _score(goal: Goal) -> void:
@@ -109,18 +116,17 @@ func _score(goal: Goal) -> void:
 
 
 ## The tank's inside surface as one mesh (sand floor + glass walls and ceiling)
-## and one matching trimesh collider. The walls are swept round the floor's
-## octagon: the octagon shrunk by EDGE_RADIUS, pushed back out along a profile
-## that curves up from the floor, runs up the wall and curves onto the ceiling,
-## so every edge and corner is rounded. At each goal the floor ramp is notched
-## out so the floor runs flat into the goal mouth, with flat cheeks closing the
-## sides of the notch.
+## and one matching trimesh collider. The walls are swept round the wall line
+## (the octagon with rounded corner joins) along a profile that curves up from
+## the floor, runs up the wall and curves onto the ceiling. At each goal the
+## floor ramp is notched out so the floor runs flat into the goal mouth, with
+## flat cheeks closing the sides of the notch.
 func _build_shell() -> void:
 	var floor_tris := [[], []]  # vertices, normals
 	var wall_tris := [[], []]
 	var half := SIZE / 2.0
 	var mouth_x := GOAL_SIZE.x / 2.0
-	var ring := _footprint_ring([-mouth_x, mouth_x])
+	var ring := _footprint_ring([-mouth_x, 0.0, mouth_x])  # 0: matches the notch floor's middle vertex
 	var profile := _wall_profile([GOAL_SIZE.y])
 
 	for i in ring.size() - 1:
@@ -137,28 +143,31 @@ func _build_shell() -> void:
 			_append_triangle(wall_tris, [corners[0], corners[1], corners[2]], [normals[0], normals[1], normals[2]])
 			_append_triangle(wall_tris, [corners[0], corners[2], corners[3]], [normals[0], normals[2], normals[3]])
 
-	# Floor and ceiling: fans across the shrunk octagon, meeting the swept edges.
+	# Floor and ceiling: fans across the wall line pulled in by each edge's
+	# radius, meeting the swept edges.
 	for i in ring.size() - 1:
-		var p: Vector2 = ring[i].point
-		var q: Vector2 = ring[i + 1].point
-		if p.is_equal_approx(q):
-			continue  # a rounded wall-to-wall join: no width at floor level
-		_add_flat_triangle(floor_tris, Vector3.ZERO, Vector3(p.x, 0.0, p.y), Vector3(q.x, 0.0, q.y), Vector3.UP)
-		_add_flat_triangle(wall_tris, Vector3(0.0, SIZE.y, 0.0), Vector3(p.x, SIZE.y, p.y), Vector3(q.x, SIZE.y, q.y), Vector3.DOWN)
+		var floor_a := _swept(ring[i], profile[0])
+		var floor_b := _swept(ring[i + 1], profile[0])
+		var ceiling_a := _swept(ring[i], profile[-1])
+		var ceiling_b := _swept(ring[i + 1], profile[-1])
+		_add_flat_triangle(floor_tris, Vector3.ZERO, floor_a, floor_b, Vector3.UP)
+		_add_flat_triangle(wall_tris, Vector3(0.0, SIZE.y, 0.0), ceiling_a, ceiling_b, Vector3.DOWN)
 
 	for end: float in [-1.0, 1.0]:
-		# Flat floor across the notch, up to the goal line.
+		# Flat floor across the notch, up to the goal line, in two halves so its
+		# goal-line vertices match the net floor's (which fans from the middle).
 		var near := end * (half.z - EDGE_RADIUS)
 		var line := end * half.z
-		var a := Vector3(-mouth_x, 0.0, near)
-		var b := Vector3(mouth_x, 0.0, near)
-		var c := Vector3(mouth_x, 0.0, line)
-		var d := Vector3(-mouth_x, 0.0, line)
-		_add_flat_triangle(floor_tris, a, b, c, Vector3.UP)
-		_add_flat_triangle(floor_tris, a, c, d, Vector3.UP)
+		for side: Array in [[-mouth_x, 0.0], [0.0, mouth_x]]:
+			var a := Vector3(side[0], 0.0, near)
+			var b := Vector3(side[1], 0.0, near)
+			var c := Vector3(side[1], 0.0, line)
+			var d := Vector3(side[0], 0.0, line)
+			_add_flat_triangle(floor_tris, a, b, c, Vector3.UP)
+			_add_flat_triangle(floor_tris, a, c, d, Vector3.UP)
 		# Cheeks: fans from the foot of each goal post to the cut edge of the ramp.
 		for x: float in [-mouth_x, mouth_x]:
-			var edge := {"point": Vector2(x, near), "normal": Vector2(0.0, end)}
+			var edge := {"point": Vector2(x, line), "normal": Vector2(0.0, end)}
 			var foot := Vector3(x, 0.0, line)
 			var inward := Vector3(-signf(x), 0.0, 0.0)
 			for k in EDGE_STEPS:
@@ -174,9 +183,13 @@ func _build_shell() -> void:
 	mesh.surface_set_material(0, _grid_material(COLOR_SAND))
 	mesh.surface_set_material(1, _grid_material(COLOR_GLASS))
 
+	var faces := PackedVector3Array(floor_tris[0] + wall_tris[0])
+	for goal in goals:
+		for vertex in goal.net_faces:
+			faces.append(goal.transform * vertex)
 	var shape := ConcavePolygonShape3D.new()
 	shape.backface_collision = true
-	shape.set_faces(PackedVector3Array(floor_tris[0] + wall_tris[0]))
+	shape.set_faces(faces)
 
 	var body := StaticBody3D.new()
 	body.name = "Shell"
@@ -191,53 +204,60 @@ func _build_shell() -> void:
 	add_child(body)
 
 
-## The floor's octagon shrunk by EDGE_RADIUS, walked once round as
+## The wall line (where the straight walls stand), walked once round as
 ## {point: Vector2 (x, z), normal: Vector2 (outward)}, closed by repeating the
-## first entry. Each corner turns the normal in JOIN_STEPS steps on the spot,
-## which sweeps into a rounded join. End walls get extra points at `end_wall_cuts` (x).
+## first entry: the octagon, with each 45-degree corner turned on an arc of
+## CORNER_JOIN_RADIUS. End walls get extra points at `end_wall_cuts` (x).
 func _footprint_ring(end_wall_cuts: Array) -> Array[Dictionary]:
-	var a := SIZE.x / 2.0 - EDGE_RADIUS
-	var b := SIZE.z / 2.0 - EDGE_RADIUS
-	var c := CORNER_PLANE - EDGE_RADIUS * sqrt(2.0)
+	var a := SIZE.x / 2.0
+	var b := SIZE.z / 2.0
+	var c := CORNER_PLANE
 	var vertices: Array[Vector2] = [Vector2(a, a - c), Vector2(a, c - a), Vector2(c - b, b), Vector2(b - c, b),
 			Vector2(-a, c - a), Vector2(-a, a - c), Vector2(b - c, -b), Vector2(c - b, -b)]
 	var ring: Array[Dictionary] = []
 	for i in vertices.size():
 		var v := vertices[i]
 		var next := vertices[(i + 1) % vertices.size()]
-		var before := (v - vertices[i - 1]).orthogonal().angle()  # outward normal of the edge into v
-		var after := (next - v).orthogonal().angle()  # and of the edge out of v
+		var before := (v - vertices[i - 1]).orthogonal().normalized()  # outward normal of the edge into v
+		var after := (next - v).orthogonal().normalized()  # and of the edge out of v
+		# The arc touching both edges: centre inside along the bisector.
+		var half_turn_cos := sqrt((1.0 + before.dot(after)) / 2.0)
+		var centre := v - (before + after).normalized() * (CORNER_JOIN_RADIUS / half_turn_cos)
 		for k in JOIN_STEPS + 1:
-			ring.append({"point": v, "normal": Vector2.from_angle(lerp_angle(before, after, float(k) / JOIN_STEPS))})
+			var normal := Vector2.from_angle(lerp_angle(before.angle(), after.angle(), float(k) / JOIN_STEPS))
+			ring.append({"point": centre + normal * CORNER_JOIN_RADIUS, "normal": normal})
 		if is_equal_approx(absf(v.y), b) and is_equal_approx(absf(next.y), b):  # an end wall
 			var cuts := end_wall_cuts.duplicate()
 			cuts.sort()
 			if next.x < v.x:
 				cuts.reverse()
+			var flat_end: float = absf(v.x) - CORNER_JOIN_RADIUS * tan(PI / 8.0)
 			for x: float in cuts:
-				assert(absf(x) < absf(v.x), "end wall cut %.1f is outside the flat part of the wall" % x)
-				ring.append({"point": Vector2(x, v.y), "normal": Vector2.from_angle(after)})
+				assert(absf(x) < flat_end, "end wall cut %.1f is outside the flat part of the wall" % x)
+				ring.append({"point": Vector2(x, v.y), "normal": after})
 	ring.append(ring[0])
 	return ring
 
 
 ## The wall's cross-section from the floor to the ceiling, as Vector4(outward
-## offset from the shrunk octagon, height, outward normal's horizontal and
-## vertical parts): a quarter circle up from the floor, the straight wall (with
-## extra points at the `wall_cuts` heights) and a quarter circle onto the ceiling.
+## offset from the wall line (0 on the wall, negative inside), height, outward
+## normal's horizontal and vertical parts): a quarter circle of EDGE_RADIUS up
+## from the floor, the straight wall (with extra points at the `wall_cuts`
+## heights) and a quarter circle of CEILING_RADIUS onto the ceiling.
 func _wall_profile(wall_cuts: Array) -> Array[Vector4]:
 	var r := EDGE_RADIUS
-	var top := SIZE.y - r
+	var rc := CEILING_RADIUS
+	var top := SIZE.y - rc
 	var profile: Array[Vector4] = []
 	for k in EDGE_STEPS + 1:
 		var angle := -PI / 2.0 + PI / 2.0 * k / EDGE_STEPS
-		profile.append(Vector4(r * cos(angle), r + r * sin(angle), cos(angle), sin(angle)))
+		profile.append(Vector4(r * cos(angle) - r, r + r * sin(angle), cos(angle), sin(angle)))
 	for height: float in wall_cuts:
 		assert(height > r and height < top, "wall cut %.1f is outside the flat part of the wall" % height)
-		profile.append(Vector4(r, height, 1.0, 0.0))
+		profile.append(Vector4(0.0, height, 1.0, 0.0))
 	for k in EDGE_STEPS + 1:
 		var angle := PI / 2.0 * k / EDGE_STEPS
-		profile.append(Vector4(r * cos(angle), top + r * sin(angle), cos(angle), sin(angle)))
+		profile.append(Vector4(rc * cos(angle) - rc, top + rc * sin(angle), cos(angle), sin(angle)))
 	return profile
 
 
@@ -254,12 +274,14 @@ func _swept_normal(edge: Dictionary, profile: Vector4) -> Vector3:
 
 
 ## Roughly how far `p` is outside the tank's inner surface (negative inside),
-## ignoring the goals. Exact along the walls, a little short near corners.
+## ignoring the goals. Exact along the flat walls and the floor/ceiling
+## curves; near the rounded corner joins it treats them as sharp (so it can
+## under-report there).
 static func distance_outside(p: Vector3) -> float:
-	var r := EDGE_RADIUS
+	var r := EDGE_RADIUS if p.y < SIZE.y / 2.0 else CEILING_RADIUS
 	var across := maxf(maxf(absf(p.x) - (SIZE.x / 2.0 - r), absf(p.z) - (SIZE.z / 2.0 - r)),
 			(absf(p.x) + absf(p.z) - (CORNER_PLANE - r * sqrt(2.0))) / sqrt(2.0))
-	var up := absf(p.y - SIZE.y / 2.0) - (SIZE.y / 2.0 - r)
+	var up := (r - p.y) if p.y < SIZE.y / 2.0 else (p.y - (SIZE.y - r))
 	if across <= 0.0 and up <= 0.0:
 		return maxf(across, up) - r
 	return Vector2(maxf(across, 0.0), maxf(up, 0.0)).length() - r
@@ -297,6 +319,7 @@ func _build_goals() -> void:
 		goal.height = GOAL_SIZE.y
 		goal.depth = GOAL_DEPTH
 		goal.bottom_post = false  # the floor runs straight in
+		goal.own_collision = false  # merged into the shell (see _build_shell)
 		# Blue defends +Z, Orange -Z; each goal's +Z points out through its wall.
 		var out := 1.0 if team == 0 else -1.0
 		var mouth := Vector3(0.0, GOAL_SIZE.y / 2.0, out * SIZE.z / 2.0)

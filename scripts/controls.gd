@@ -29,6 +29,17 @@ const PROFILES := {
 		"roll_right": JOY_BUTTON_RIGHT_SHOULDER,
 		"direction_lock": JOY_BUTTON_RIGHT_STICK,  # every face/shoulder button is taken
 	},
+	# Pro player BeastMode's binds (PlayStation layout: Cross = A, Circle = B,
+	# Square = X, Triangle = Y): one button for powerslide and air roll, as RL's
+	# shared "Powerslide / Air Roll", and directional air roll left only.
+	"BeastMode": {
+		"jump": JOY_BUTTON_A,
+		"boost": JOY_BUTTON_B,
+		"powerslide": JOY_BUTTON_X,
+		"air_roll": JOY_BUTTON_X,
+		"ball_cam": JOY_BUTTON_Y,
+		"roll_left": JOY_BUTTON_LEFT_SHOULDER,
+	},
 	# Directional air roll on face buttons, powerslide on LB, boost on RB.
 	"Personal": {
 		"jump": JOY_BUTTON_A,

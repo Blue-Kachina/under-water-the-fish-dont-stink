@@ -44,7 +44,8 @@ enum BallType { WATER, SURFACE }
 @export_group("Surface Ball")
 ## Downward acceleration. RL: 6.5 m/s²; mutators "low"/"high"/"super high" gravity.
 @export_range(0.0, 60.0, 0.5) var gravity := 6.5
-## Fraction of speed lost per second in the air. RL: 0.03.
+## Fraction of speed lost per second in the air (applied like Bullet's linear
+## damping: speed x (1 - air_drag) each second). RL: 0.03.
 @export_range(0.0, 1.0, 0.01) var air_drag := 0.03
 ## Fraction of spin lost per second. RL: none.
 @export_range(0.0, 5.0, 0.05) var spin_drag := 0.0
@@ -62,6 +63,9 @@ enum BallType { WATER, SURFACE }
 @export_range(0.0, 1.0, 0.05) var hit_forward_scale := 0.65
 
 @export_group("Match")
+## RL's kickoff rule: after a kickoff or goal reset the ball floats where it
+## spawned, ignoring gravity, until a fish first touches it. Surface ball only.
+@export var kickoff_float := true
 ## Seconds after a goal before the ball respawns at centre.
 @export_range(0.0, 10.0, 0.5) var goal_reset_delay := 3.0
 

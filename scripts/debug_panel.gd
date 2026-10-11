@@ -13,6 +13,9 @@ const SAVE_PATH_USER := "user://tuning.cfg"   # exported builds can't write res:
 ## (which are Rocket League's).
 const PRESET_DIR := "res://presets"
 const DEFAULT_PRESET := "Rocket League (defaults)"
+## Saved tuning carries this; older saves (the underwater tuning from before the
+## switch to Rocket League physics) aren't loaded automatically at startup.
+const TUNING_VERSION := 2
 
 @export var fish: FishController
 @export var follow_camera: Camera3D
@@ -87,6 +90,11 @@ func _build_ui() -> void:
 	profiles.item_selected.connect(func(index: int) -> void:
 		Controls.apply_profile(profiles.get_item_text(index))
 		_status.text = "Controller profile: %s (remembered on this PC)" % Controls.current_profile)
+	# Follow profile changes made elsewhere (a preset can pick one).
+	Controls.profile_changed.connect(func(profile: String) -> void:
+		for i in profiles.item_count:
+			if profiles.get_item_text(i) == profile:
+				profiles.select(i))
 	profile_row.add_child(profiles)
 
 	var preset_row := HBoxContainer.new()
@@ -286,6 +294,7 @@ func _apply(section: String, values: Dictionary) -> void:
 
 func _to_config() -> ConfigFile:
 	var config := ConfigFile.new()
+	config.set_value("meta", "version", TUNING_VERSION)
 	for section: String in _targets:
 		var values := _snapshot(_targets[section])
 		for prop: String in values:
@@ -311,6 +320,9 @@ func _load(quiet := false) -> void:
 	if config.load(path) != OK:
 		if not quiet:
 			_status.text = "No saved tuning at %s" % _save_path()
+		return
+	if quiet and int(config.get_value("meta", "version", 1)) < TUNING_VERSION:
+		_status.text = "Skipped saved tuning from before Rocket League physics (%s). Press Load to use it anyway." % path
 		return
 	for section: String in _targets:
 		if not config.has_section(section):
@@ -347,6 +359,8 @@ func _apply_preset(preset_name: String) -> void:
 				for prop in config.get_section_keys(section):
 					values[prop] = config.get_value(section, prop)
 				_apply(section, values)
+		if config.has_section_key("controls", "profile"):
+			Controls.apply_profile(config.get_value("controls", "profile"))
 	_refresh_visibility()
 	_status.text = "Preset: %s (not saved)" % preset_name
 

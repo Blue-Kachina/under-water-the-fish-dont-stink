@@ -1,0 +1,9 @@
+[project]
+name = "rocketsim-compare"
+version = "0.1.0"
+description = "Diff the game's physics against RocketSim with identical scripted inputs"
+requires-python = ">=3.12"
+dependencies = ["rocketsim==2.2.1", "numpy"]
+
+[tool.uv]
+package = false
