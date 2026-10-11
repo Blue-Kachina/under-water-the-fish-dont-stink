@@ -107,6 +107,53 @@ const RL_COM_FROM_HITBOX := Vector3(0.0, -0.20755, 0.138757)
 ## forward, 33.75 back).
 const RL_FRONT_AXLE := 0.5125
 const RL_REAR_AXLE := 0.3375
+## The Octane's four wheels (RocketSim CarConfig): where each suspension is
+## mounted, in the fish's frame from the hitbox centre (front 51.25 uu ahead of
+## the centre of mass and 25.9 out, rear 33.75 behind and 29.5 out, 20.755 up),
+## wheel radius and suspension rest length.
+const RL_WHEELS := [
+	{"mount": Vector3(-0.259, 0.0, -0.3737), "radius": 0.125, "rest": 0.38755},
+	{"mount": Vector3(0.259, 0.0, -0.3737), "radius": 0.125, "rest": 0.38755},
+	{"mount": Vector3(-0.295, 0.0, 0.4763), "radius": 0.15, "rest": 0.37055},
+	{"mount": Vector3(0.295, 0.0, 0.4763), "radius": 0.15, "rest": 0.37055},
+]
+## RocketSim's suspension (RLConst::BTVehicle): each wheel's spring moves 12
+## uu either side of its rest length (the CarConfig one less those 12 uu), its
+## ray reaches that far plus the wheel's radius less 2.5 uu, and it pushes with
+## SUSPENSION_STIFFNESS 500 per BT unit of compression, damped 25 compressing
+## and 40 extending, all times a force scale per axle, against the 180-unit
+## chassis. In our units that's a per-wheel acceleration (m/s²) of
+## (500 compression - damping speed) * scale / 180, compression in m.
+const RL_SUSPENSION_TRAVEL := 0.12
+const RL_SUSPENSION_SUBTRACTION := 0.025
+const RL_SUSPENSION_STIFFNESS := 500.0
+const RL_SUSPENSION_DAMPING_COMPRESS := 25.0
+const RL_SUSPENSION_DAMPING_EXTEND := 40.0
+const RL_SUSPENSION_FORCE_SCALE_FRONT := 36.0 - 1.0 / 4.0
+const RL_SUSPENSION_FORCE_SCALE_BACK := 54.0 + 1.0 / 4.0 + 1.5 / 100.0
+const RL_CAR_MASS_BT := 180.0
+## A wheel pressed further than this past its rest length (2.5 uu) also gets
+## a solid-contact push back out, a quarter of what would stop and unsink its
+## contact point (Bullet resolveSingleCollision, ERP 0.2), as RocketSim's do.
+const RL_SUSPENSION_PUSHBACK_ERP := 0.2
+## RL's tyres (RocketSim btVehicleRL::calcFrictionImpulses): each tick a wheel
+## pushes sideways with a fifth of the impulse that would stop its contact
+## point sliding (Bullet's resolveSingleBilateral), scaled by the chassis mass
+## over 3 (RocketSim's units: 180 / 3) times the tick.
+const RL_TYRE_CONTACT_DAMPING := 0.2
+const RL_TYRE_FRICTION_SCALE := 60.0
+## Braking per wheel ramps with the contact point's forward speed at this rate
+## (1/s) up to the brake's limit (RocketSim ROLLING_FRICTION_SCALE_MAGIC / 3).
+const RL_ROLLING_FRICTION_SLOPE := 113.73963 / 3.0
+## Coasting slower than this (25 uu/s) brakes fully (RL STOPPING_FORWARD_VEL).
+const RL_STOPPING_FORWARD_VEL := 0.25
+## A wheel's slip only counts above this sideways speed at its mount (5 uu/s).
+const RL_FRICTION_SLIP_MIN := 0.05
+## Front wheel angle at full lock while powersliding (rad, by speed in uu/s).
+const RL_POWERSLIDE_STEER_ANGLE_CURVE := [Vector2(0.0, 0.39235), Vector2(2500.0, 0.12610)]
+## How much the hitbox's lower front and rear edges are bevelled for hitting
+## the arena (up, along): see _apply_hitbox.
+const HULL_BEVEL := Vector2(0.0, 0.0)
 ## A contact counts as on the roof when its normal is this far against the fish's up
 ## (lying upside down or over on its upper flank).
 const ROOF_CONTACT_DOT := -0.1
@@ -264,10 +311,12 @@ const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 
 @export_group("Powerslide")
 ## Sideways grip at full handbrake (per second; ground_grip is the normal grip):
-## low = the fish keeps sliding the old way while it turns. Fitted to RocketSim.
+## low = the fish keeps sliding the old way while it turns. On RL's tyres
+## (rl_tyres) a surface powerslide is the tyres' own, so this applies in water.
 @export_range(0.0, 10.0, 0.05) var powerslide_lateral_drag := 1.0
 ## Extra turning at full handbrake (on a surface by the whole sliding speed;
-## in water it scales pitch/yaw torque and the spin cap). Fitted to RocketSim.
+## in water it scales pitch/yaw torque and the spin cap). Not on a surface
+## with rl_tyres, where the front wheels turn further instead, as in RL.
 @export_range(1.0, 4.0, 0.05) var powerslide_turn_multiplier := 1.5
 ## Forward thrust kept while powersliding (1 = full thrust).
 @export_range(0.0, 1.0, 0.05) var powerslide_thrust_scale := 1.0  # RL: the handbrake never cuts throttle
@@ -294,14 +343,29 @@ const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 ## Tyre grip: how quickly sliding sideways is stopped (per second).
 ## Powersliding uses powerslide_lateral_drag instead.
 @export_range(0.0, 60.0, 0.5) var ground_grip := 30.0  # fitted to RocketSim: slip and speed loss in turns
+## Off the throttle on a steep surface, the most sideways push the tyres can
+## give before they slide (m/s², at 45 degrees): a tenth of it on a wall,
+## and no limit on the floor or with the throttle held. So a fish let go on a
+## wall slides off it as RL's car does. Fitted to RocketSim.
+@export_range(0.0, 100.0, 0.5) var ground_lateral_friction := 30.0
 ## Push into the surface, like RL's sticky force: half of this at rest, and
 ## while driving up to 1.5x on a wall. RL: its gravity, 650 uu/s².
 @export_range(0.0, 40.0, 0.5) var surface_stick := 6.5
 ## How quickly the fish turns to sit flat on the surface it's on.
 @export_range(1.0, 40.0, 0.5) var surface_align_rate := 15.0
+## Ride on four sprung wheels as RL's car does (RocketSim's raycast wheels):
+## the wheels decide when the fish is on a surface, and the springs tilt it
+## onto ramps and soak up landings. Off = a rigid belly that snaps flat.
+@export var rl_suspension := true
 ## How much of the cornering grip slows the car, via the steered front wheels'
 ## angle. Fitted to RocketSim's turns.
 @export_range(0.0, 2.0, 0.01) var ground_turn_drag := 0.2
+## Drive on RL's four tyres (RocketSim's btVehicleRL): throttle, brakes and
+## grip act at each wheel and steering turns the front wheels, so the car
+## turns, slides and swings round by those forces as RL's does. Off = grip on
+## the whole body (ground_grip, ground_turn_drag, powerslide_lateral_drag) and
+## turning-circle steering. Needs rl_suspension.
+@export var rl_tyres := true
 
 @export_group("Hitbox")
 ## A box, like Rocket League's car hitboxes: flat on the floor, flat on top to
@@ -392,6 +456,23 @@ var _jump_hold_elapsed := -1.0
 var _jump_wheel_contact_left := 0.0
 ## RL's handbrake value, 0..1 (see RL_HANDBRAKE_RISE_RATE).
 var _handbrake := 0.0
+## The suspension's push this tick (velocity and spin), and how many wheels touch.
+var _suspension_push := Vector3.ZERO
+var _suspension_twist := Vector3.ZERO
+var wheels_touching := 0
+var _tyre_push := Vector3.ZERO
+var _tyre_twist := Vector3.ZERO
+## What RL's Car::_UpdateWheels set last tick, which this tick's tyre forces
+## use (RocketSim works out the forces first): front wheel angle (rad, + =
+## right), engine and brake limit per wheel (m/s²), and each wheel's sideways
+## and lengthways friction.
+var _wheel_steer := 0.0
+var _wheel_engine := 0.0
+var _wheel_brake := 0.0
+var _wheel_lat_friction := PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
+var _wheel_long_friction := PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
+## Each wheel's raycast hit this tick ({} when it touches nothing).
+var _wheel_hits: Array[Dictionary] = [{}, {}, {}, {}]
 var _slide_sign := 1.0
 var _jump_surface_normal := Vector3.UP
 var _post_jump_time_left := 0.0
@@ -448,6 +529,7 @@ var _queued_stroke := 0.0
 @onready var _bubbles: CPUParticles3D = $Bubbles
 @onready var _collision: CollisionShape3D = $Collision
 var _hitbox_view := MeshInstance3D.new()
+var _world_hull := CollisionShape3D.new()
 var _wheel_collisions: Array[CollisionShape3D] = [CollisionShape3D.new(), CollisionShape3D.new()]
 var _belly_view := MeshInstance3D.new()
 var _belly_hitbox_view := MeshInstance3D.new()
@@ -460,6 +542,12 @@ func _ready() -> void:
 	physics_material_override = PhysicsMaterial.new()
 	_apply_physics_material()
 	_collision.shape = _collision.shape.duplicate()  # sized per fish
+	# The arena meets a bevelled copy of the hitbox (see _apply_hitbox); the box
+	# itself stays the hitbox the ball is checked against (Ball._fish_contact).
+	_collision.disabled = true
+	_world_hull.name = "WorldHull"
+	_world_hull.shape = ConvexPolygonShape3D.new()
+	add_child(_world_hull)
 	var material := StandardMaterial3D.new()
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -501,6 +589,19 @@ func _apply_hitbox() -> void:
 	inertia = Vector3(size.y * size.y + size.z * size.z, size.x * size.x + size.z * size.z,
 			size.x * size.x + size.y * size.y) * mass / 12.0
 	(_collision.shape as BoxShape3D).size = size
+	# The hitbox with its lower front and rear edges bevelled, for meeting the
+	# arena: driving onto a wall the suspension tips the fish up, and a square
+	# corner would snag on the curve (Jolt's contacts are harder than the Bullet
+	# ones RL uses, where the car rides through it).
+	var half := size / 2.0
+	var bevel := Vector2(minf(HULL_BEVEL.x, half.y), minf(HULL_BEVEL.y, half.z))
+	var hull := PackedVector3Array()
+	for x: float in [-half.x, half.x]:
+		for z: float in [-half.z, half.z]:
+			hull.append(Vector3(x, half.y, z))  # top corners
+			hull.append(Vector3(x, -half.y + bevel.x, z))  # end faces stop short of the bottom
+			hull.append(Vector3(x, -half.y, z - signf(z) * bevel.y))  # bottom stops short of the ends
+	(_world_hull.shape as ConvexPolygonShape3D).points = hull
 	(_hitbox_view.mesh as BoxMesh).size = size
 	_hitbox_view.visible = show_hitbox
 
@@ -510,7 +611,7 @@ func _apply_hitbox() -> void:
 	var wheel_radius := belly_height / 2.0
 	var axles := [RL_COM_FROM_HITBOX.z - RL_FRONT_AXLE, RL_COM_FROM_HITBOX.z + RL_REAR_AXLE]
 	for i in _wheel_collisions.size():
-		_wheel_collisions[i].disabled = not has_belly
+		_wheel_collisions[i].disabled = not has_belly or rl_suspension
 		if has_belly:
 			var cylinder := _wheel_collisions[i].shape as CylinderShape3D
 			cylinder.radius = wheel_radius
@@ -577,8 +678,14 @@ func is_option_active(property: String) -> bool:
 		"car_steering_pitch", "min_turn_radius", "max_turn_radius", "steer_response":
 			return car_steering and not rl_air_control
 		"ground_max_speed", "ground_accel", "ground_brake", "ground_coast_decel", "ground_boost_accel", \
-				"ground_max_boost_speed", "ground_grip", "surface_stick", "surface_align_rate":
+				"ground_max_boost_speed", "surface_stick", "rl_suspension":
 			return rl_surface_mechanics
+		"ground_grip", "ground_turn_drag", "ground_lateral_friction":  # the tyres grip instead
+			return rl_surface_mechanics and not _uses_tyres()
+		"surface_align_rate":  # the suspension sits the fish on the surface instead
+			return rl_surface_mechanics and not rl_suspension
+		"rl_tyres":
+			return rl_surface_mechanics and rl_suspension
 		"boost_drain", "boost_regen":
 			return not boost_unlimited
 		"strokes_need_lock", "stroke_impulse", "stroke_max_speed", "stroke_threshold", \
@@ -735,7 +842,11 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	_was_locked = direction_lock_held
 	_lock_local = body_basis.transposed() * _lock_direction
 
+	var start_velocity := velocity
+	var start_spin := state.angular_velocity
 	_detect_surface(state, body_basis, dt)
+	velocity += _suspension_push + _tyre_push
+	state.angular_velocity += _suspension_twist + _tyre_twist
 	# Before this tick's gravity and thrust, as RL damps the velocity the step starts with.
 	velocity = _apply_flip_z_damp(velocity, dt)
 	if on_surface:
@@ -744,6 +855,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		velocity = _apply_thrust(velocity, forward, dt)
 		velocity = _apply_strokes(velocity, forward)
 		velocity = _apply_water(velocity, forward, dt)
+	if _uses_tyres():
+		_update_tyre_settings(start_velocity, start_spin, state, body_basis)
 	velocity = _start_autoflip(velocity, body_basis)
 	velocity = _apply_jump(velocity, body_basis, state.get_contact_count() > 0, dt)
 
@@ -849,6 +962,10 @@ func _detect_surface(state: PhysicsDirectBodyState3D, body_basis: Basis, dt: flo
 		# Not the ball: an air dribble keeps its air control.
 		if normal.dot(body_basis.y) < ROOF_CONTACT_DOT and state.get_contact_collider_object(i) is StaticBody3D:
 			_resting_on_roof = true
+	_tyre_push = Vector3.ZERO
+	_tyre_twist = Vector3.ZERO
+	if rl_suspension and rl_surface_mechanics:
+		normal_sum = _update_suspension(state, body_basis, dt)
 	if not rl_surface_mechanics or _surface_grace > 0.0 or _flip_time >= 0.0 or is_dodging:
 		normal_sum = Vector3.ZERO
 	var was_on_surface := on_surface
@@ -860,6 +977,186 @@ func _detect_surface(state: PhysicsDirectBodyState3D, body_basis: Basis, dt: flo
 		_flip_spin_out = false
 
 
+## RL's suspension, as RocketSim's btVehicleRL: each wheel casts a ray down
+## its suspension; where it meets a surface, the spring pushes along that
+## surface's normal at the contact point (harder the more slanted the surface
+## is to the suspension, up to 10x, so a wheel meeting a ramp tips the car onto
+## it), damped, never pulling. A wheel pressed past its rest length also gets a
+## solid push back out, so the hitbox never meets the floor. Every wheel works
+## from the motion the tick started with. Sets _suspension_push/_twist,
+## _wheel_hits and wheels_touching, adds the tyre forces, and returns the sum
+## of the touched surfaces' normals (zero when no wheel touches).
+func _update_suspension(state: PhysicsDirectBodyState3D, body_basis: Basis, dt: float) -> Vector3:
+	_suspension_push = Vector3.ZERO
+	_suspension_twist = Vector3.ZERO
+	wheels_touching = 0
+	var normal_sum := Vector3.ZERO
+	var up := body_basis.y
+	var com := state.transform.origin + body_basis * center_of_mass
+	var inverse_inertia := state.inverse_inertia_tensor
+	var space := state.get_space_state()
+	for i in RL_WHEELS.size():
+		var wheel: Dictionary = RL_WHEELS[i]
+		_wheel_hits[i] = {}
+		var rest: float = wheel.rest - RL_SUSPENSION_TRAVEL
+		var radius: float = wheel.radius
+		var mount: Vector3 = state.transform.origin + body_basis * wheel.mount
+		var reach: float = rest + RL_SUSPENSION_TRAVEL + radius - RL_SUSPENSION_SUBTRACTION
+		var query := PhysicsRayQueryParameters3D.create(mount, mount - up * reach)
+		query.exclude = [get_rid()]
+		var hit := space.intersect_ray(query)
+		if hit.is_empty() or hit.collider is Ball:
+			continue
+		_wheel_hits[i] = hit
+		wheels_touching += 1
+		if _uses_tyres():
+			_add_tyre_impulse(state, body_basis, i, hit, com, dt)
+		var normal: Vector3 = hit.normal
+		normal_sum += normal
+		var contact: Vector3 = hit.position
+		var trace := (mount - contact).dot(up)
+		var length := clampf(trace - radius, rest - RL_SUSPENSION_TRAVEL, rest + RL_SUSPENSION_TRAVEL)
+		var r := contact - com
+		var contact_velocity := state.linear_velocity + state.angular_velocity.cross(r)
+		var facing := normal.dot(up)
+		var slant := 10.0
+		var along := 0.0  # + = moving away from the surface
+		if facing > 0.1:
+			slant = 1.0 / facing
+			along = normal.dot(contact_velocity) * slant
+		var damping := RL_SUSPENSION_DAMPING_COMPRESS if along < 0.0 else RL_SUSPENSION_DAMPING_EXTEND
+		var scale := RL_SUSPENSION_FORCE_SCALE_FRONT if i < 2 else RL_SUSPENSION_FORCE_SCALE_BACK
+		var accel := maxf(((rest - length) * RL_SUSPENSION_STIFFNESS * slant - damping * along) * scale / RL_CAR_MASS_BT, 0.0)
+		var impulse := normal * accel * mass * dt
+		var pushback_at := rest + radius - RL_SUSPENSION_SUBTRACTION
+		if trace < pushback_at and hit.collider is StaticBody3D:
+			var effective := 1.0 / mass + normal.dot((inverse_inertia * r.cross(normal)).cross(r))
+			var stop := RL_SUSPENSION_PUSHBACK_ERP * (pushback_at - trace) / dt - normal.dot(contact_velocity)
+			impulse += normal * maxf(stop / effective, 0.0) / RL_WHEELS.size()
+		_suspension_push += impulse / mass
+		_suspension_twist += inverse_inertia * r.cross(impulse)
+	return normal_sum
+
+
+## Forget last tick's tyre settings, as a freshly spawned RL car starts.
+func reset_tyres() -> void:
+	_wheel_steer = 0.0
+	_wheel_engine = 0.0
+	_wheel_brake = 0.0
+	_wheel_lat_friction.fill(1.0)
+	_wheel_long_friction.fill(1.0)
+
+
+func _uses_tyres() -> bool:
+	return rl_tyres and rl_suspension and rl_surface_mechanics
+
+
+## A wheel's directions (x across, -z along), turned by the steering on the
+## front wheels (RL_WHEELS 0 and 1).
+func _wheel_basis(body_basis: Basis, i: int) -> Basis:
+	if i < 2 and _wheel_steer != 0.0:
+		return body_basis.rotated(body_basis.y, -_wheel_steer)
+	return body_basis
+
+
+## One wheel's tyre force this tick (RocketSim btVehicleRL::calcFrictionImpulses
+## and applyFrictionImpulses): sideways grip at the contact point, plus engine
+## or brake along the wheel, each scaled by the wheel's friction. It's applied
+## level with the centre of mass, so it turns the fish but never rolls it.
+func _add_tyre_impulse(state: PhysicsDirectBodyState3D, body_basis: Basis, i: int, hit: Dictionary, com: Vector3, dt: float) -> void:
+	var normal: Vector3 = hit.normal
+	var wheel := _wheel_basis(body_basis, i)
+	var axle := wheel.x - normal * wheel.x.dot(normal)
+	if axle.length_squared() < 0.0001:
+		return
+	axle = axle.normalized()
+	var along := normal.cross(axle).normalized()  # the wheel's forward, on the surface
+	var r: Vector3 = hit.position - com
+	var contact_velocity := state.linear_velocity + state.angular_velocity.cross(r)
+	var inverse_inertia := state.inverse_inertia_tensor
+	var r_axle := r.cross(axle)
+	var effective := 1.0 / mass + r_axle.dot(inverse_inertia * r_axle)
+	var side := -RL_TYRE_CONTACT_DAMPING * contact_velocity.dot(axle) / effective
+	var rolling := 0.0  # m/s² along the wheel
+	if _wheel_engine != 0.0:
+		rolling = _wheel_engine
+	elif _wheel_brake > 0.0:
+		rolling = clampf(-contact_velocity.dot(along) * RL_ROLLING_FRICTION_SLOPE, -_wheel_brake, _wheel_brake)
+	var impulse := (along * rolling * mass * _wheel_long_friction[i]
+			+ axle * side * RL_TYRE_FRICTION_SCALE * _wheel_lat_friction[i]) * dt
+	var up := body_basis.y
+	var level := r - up * r.dot(up)
+	_tyre_push += impulse / mass
+	_tyre_twist += inverse_inertia * level.cross(impulse)
+
+
+## RL's Car::_UpdateWheels, for next tick's tyre forces: throttle, brake and
+## coasting brake, the front wheels' steering angle, and each touching wheel's
+## friction: full grip across a wheel rolling straight, down to a fifth of it
+## sliding sideways, a tenth of that powersliding, and less on steep surfaces
+## off the throttle. From the velocity the tick started with.
+func _update_tyre_settings(velocity: Vector3, spin: Vector3, state: PhysicsDirectBodyState3D, body_basis: Basis) -> void:
+	var forward := -body_basis.z
+	var forward_speed := velocity.dot(forward)
+	var abs_forward := absf(forward_speed)
+	var throttle := 1.0 if is_boosting else input_forward - input_reverse
+	var engine_throttle := throttle
+	var brake := 0.0
+	if not powerslide_held:  # the handbrake leaves the throttle as it is
+		if absf(throttle) >= 0.001:
+			if abs_forward > RL_STOPPING_FORWARD_VEL and signf(throttle) != signf(forward_speed):
+				brake = 1.0  # driving against the motion brakes instead
+				engine_throttle = 0.0
+		else:
+			engine_throttle = 0.0
+			brake = 1.0 if abs_forward < RL_STOPPING_FORWARD_VEL else ground_coast_decel / maxf(ground_brake, 0.001)
+	var drive_scale := _ground_torque_factor(abs_forward)
+	if wheels_touching < 3:
+		drive_scale /= 4.0
+	_wheel_engine = engine_throttle * ground_accel / 4.0 * drive_scale
+	_wheel_brake = brake * ground_brake / 4.0
+
+	var com := state.transform.origin + body_basis * center_of_mass
+	for i in RL_WHEELS.size():
+		var hit := _wheel_hits[i]
+		if hit.is_empty():
+			continue
+		var normal: Vector3 = hit.normal
+		var mount: Vector3 = state.transform.origin + body_basis * RL_WHEELS[i].mount
+		var v := velocity + spin.cross(mount - com)
+		var wheel_axle := _wheel_basis(body_basis, i).x
+		var sliding := absf(v.dot(wheel_axle))
+		var slip := 0.0  # 0 = rolling straight, 1 = sliding sideways
+		if sliding > RL_FRICTION_SLIP_MIN:
+			slip = sliding / (absf(v.dot(wheel_axle.cross(normal))) + sliding)
+		var lat := lerpf(1.0, 0.2, slip)
+		var lon := 1.0
+		if _handbrake > 0.0:
+			lat *= (0.1 - 1.0) * _handbrake + 1.0
+			lon *= (lerpf(0.5, 0.9, slip) - 1.0) * _handbrake + 1.0
+		if throttle == 0.0:
+			var non_sticky := _rl_non_sticky_friction(normal.y)
+			lat *= non_sticky
+			lon *= non_sticky
+		_wheel_lat_friction[i] = lat
+		_wheel_long_friction[i] = lon
+
+	# After the friction, which (as in RocketSim) sees the wheels as last tick steered them.
+	var steer := _rl_steer_angle(abs_forward)
+	if _handbrake > 0.0:
+		steer += (_rl_curve(RL_POWERSLIDE_STEER_ANGLE_CURVE, abs_forward * UU_PER_SPEED) - steer) * _handbrake
+	_wheel_steer = steer * input_stick.x
+
+
+func _rl_curve(points: Array, x: float) -> float:
+	for i in range(1, points.size()):
+		var a: Vector2 = points[i - 1]
+		var b: Vector2 = points[i]
+		if x <= b.x:
+			return lerpf(a.y, b.y, clampf((x - a.x) / (b.x - a.x), 0.0, 1.0))
+	return points[-1].y
+
+
 ## Rocket League driving on whatever surface the fish is on (RocketSim
 ## Car::_UpdateWheels, simplified to the whole body): throttle on RL's torque
 ## curve, braking, coasting, boost, tyre grip across the nose, and the sticky
@@ -869,6 +1166,15 @@ func _apply_ground(velocity: Vector3, body_basis: Basis, dt: float) -> Vector3:
 	var along := velocity.dot(forward)
 	_update_boost(dt)
 	var throttle := 1.0 if is_boosting else input_forward - input_reverse  # RL: boost implies full throttle
+	# Off the throttle, RL's tyres lose grip the steeper the surface (RocketSim
+	# NON_STICKY_FRICTION_FACTOR_CURVE), so a car let go on a wall rolls back
+	# down almost freely and slides off sideways.
+	var friction := 1.0 if throttle != 0.0 else _rl_non_sticky_friction(surface_normal.y)
+	if _uses_tyres():
+		# The tyres drive, brake and grip (_add_tyre_impulse); only boost here.
+		if is_boosting and along < ground_max_boost_speed:
+			velocity += forward * ground_boost_accel * dt
+		return _apply_stick(velocity, body_basis, throttle, along, dt)
 	var accel := 0.0
 	if throttle != 0.0:
 		if along * throttle < -0.5:
@@ -876,7 +1182,7 @@ func _apply_ground(velocity: Vector3, body_basis: Basis, dt: float) -> Vector3:
 		else:
 			accel = throttle * ground_accel * _ground_torque_factor(absf(along))
 	else:
-		accel = -signf(along) * minf(ground_coast_decel, absf(along) / dt)
+		accel = -signf(along) * minf(ground_coast_decel * friction, absf(along) / dt)
 	if is_boosting and along < ground_max_boost_speed:
 		accel += ground_boost_accel
 	velocity += forward * accel * dt
@@ -884,19 +1190,36 @@ func _apply_ground(velocity: Vector3, body_basis: Basis, dt: float) -> Vector3:
 	var side := body_basis.x * velocity.dot(body_basis.x)
 	var grip := lerpf(ground_grip, powerslide_lateral_drag, _handbrake)
 	var gripped := side * (1.0 - exp(-grip * dt))
+	if friction < 1.0:
+		gripped = gripped.limit_length(ground_lateral_friction * friction / (1.0 - friction) * dt)
 	velocity -= gripped
 	# Cornering costs speed: RL's steered front wheels point into the turn, so
 	# part of their sideways grip pulls back on the car.
 	var steer_angle := absf(input_stick.x) * _rl_steer_angle(absf(along))
 	velocity -= forward * signf(along) * ground_turn_drag * (gripped.length() / dt) * sin(steer_angle) * dt
 
-	# RL sticky force: half strength always, plus up to full strength more the
-	# further the surface is from level while driving, so walls hold.
+	return _apply_stick(velocity, body_basis, throttle, along, dt)
+
+
+## RL sticky force: half strength always, plus up to full strength more the
+## further the surface is from level while driving, so walls hold.
+func _apply_stick(velocity: Vector3, body_basis: Basis, throttle: float, along: float, dt: float) -> Vector3:
 	var driving := throttle != 0.0 or absf(along) > 0.5
 	var stick := 0.5 + (1.0 - absf(body_basis.y.y) if driving else 0.0)
 	velocity -= surface_normal * surface_stick * stick * dt
 	velocity.y += buoyancy * dt
 	return velocity
+
+
+## How much of its grip a tyre keeps off the throttle on a surface whose
+## normal points `normal_up` up (RocketSim NON_STICKY_FRICTION_FACTOR_CURVE):
+## all of it on the floor, half at 45 degrees, a tenth on a wall or the ceiling.
+func _rl_non_sticky_friction(normal_up: float) -> float:
+	if normal_up <= 0.0:
+		return 0.1
+	if normal_up < 0.7075:
+		return lerpf(0.1, 0.5, normal_up / 0.7075)
+	return lerpf(0.5, 1.0, minf((normal_up - 0.7075) / (1.0 - 0.7075), 1.0))
 
 
 ## RL's throttle torque factor: full at a standstill, 10% just under
@@ -911,6 +1234,8 @@ func _ground_torque_factor(ground_speed: float) -> float:
 ## Steering on a surface: RL's speed-dependent steering angle, no pitch or roll
 ## control, and the fish turning to sit flat on the surface.
 func _apply_ground_rotation(local_spin: Vector3, body_basis: Basis, velocity: Vector3, dt: float) -> Vector3:
+	if _uses_tyres():
+		return local_spin  # the front wheels' grip turns the fish
 	var along := velocity.dot(-body_basis.z)
 	var turn := powerslide_turn_multiplier if is_powersliding else 1.0
 	# Signed by the direction of travel, so reversing steers like a car.
@@ -928,6 +1253,8 @@ func _apply_ground_rotation(local_spin: Vector3, body_basis: Basis, velocity: Ve
 	turn = lerpf(1.0, powerslide_turn_multiplier, _handbrake)
 	var target := input_stick.x * turn * speed * _rl_curvature(absf(speed))
 	var yaw_rate := lerpf(-local_spin.y, target, 1.0 - exp(-GROUND_STEER_RESPONSE * dt))
+	if rl_suspension:
+		return Vector3(local_spin.x, -yaw_rate, local_spin.z)  # pitch and roll from the springs
 	var align := body_basis.transposed() * (body_basis.y.cross(surface_normal) * surface_align_rate)
 	return Vector3(align.x, -yaw_rate, align.z)
 
@@ -1328,6 +1655,7 @@ func _apply_reset(state: PhysicsDirectBodyState3D) -> void:
 	_jump_hold_elapsed = -1.0
 	_jump_wheel_contact_left = 0.0
 	_handbrake = 0.0
+	reset_tyres()
 	boost_amount = 100.0
 	reset_physics_interpolation.call_deferred()
 
@@ -1335,11 +1663,13 @@ func _apply_reset(state: PhysicsDirectBodyState3D) -> void:
 func _apply_physics_material() -> void:
 	if physics_material_override == null:
 		return
-	# Driving, the body neither scrapes nor bounces: an RL car rides on its
-	# wheels (the suspension soaks up bumps such as meeting a ramp), and the
-	# ground model already handles grip. (The ball grips a fish it rests on itself.)
-	physics_material_override.bounce = 0.0 if on_surface else wall_bounce
-	physics_material_override.friction = 0.0 if on_surface else wall_friction
+	# On RL's tyres the hitbox keeps RL's own scrape and bounce while driving,
+	# as when it clips a ramp at speed. Otherwise, driving, the body neither
+	# scrapes nor bounces: the ground model handles grip. (The ball grips a
+	# fish it rests on itself.)
+	var driving := on_surface and not _uses_tyres()
+	physics_material_override.bounce = 0.0 if driving else wall_bounce
+	physics_material_override.friction = 0.0 if driving else wall_friction
 
 
 ## Placeholder animation: driven by movement state, never the other way round.

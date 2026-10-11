@@ -26,7 +26,8 @@ recommended; keyboard works for quick checks.
 | Boost | B | Shift |
 | Jump; press again within 1.25 s to double jump, or with the stick pushed to dodge | A | Space |
 | Air roll (stick yaws → rolls) | X (hold) | C (hold) |
-| Powerslide (drift sideways, turn harder) | Y (hold) | Ctrl (hold) |
+| Powerslide (drift sideways, turn harder) | L3 (hold) | Ctrl (hold) |
+| Ball cam | Y | Y |
 | Roll left / right | LB / RB | Q / E |
 | Look around | Right stick | I J K L |
 | Reset fish and course | Start | R |
@@ -36,10 +37,15 @@ The table shows the **Default** controller profile. Pick another in the tuning p
 *Controller profile* dropdown; the choice is remembered on that PC only. Sticks, triggers and
 keyboard keys are the same in every profile. Profiles live in `PROFILES` in `scripts/controls.gd`.
 
-| Profile | A | B | X | Y | LB | RB | R3 |
-|---|---|---|---|---|---|---|---|
-| Default | Jump | Boost | Air roll | Powerslide | Roll left | Roll right | Direction lock |
-| Personal | Jump | Roll right | Roll left | — | Powerslide | Boost | — |
+| Profile | A | B | X | Y | LB | RB | L3 | R3 |
+|---|---|---|---|---|---|---|---|---|
+| Default | Jump | Boost | Air roll | Ball cam | Roll left | Roll right | Powerslide | Direction lock |
+| BeastMode | Jump | Boost | Powerslide / Air roll | Ball cam | Roll left | — | — | — |
+| Personal | Jump | Roll right | Roll left | Ball cam | Powerslide / Air roll | Boost | — | — |
+
+*Powerslide / Air roll* is one button doing both jobs, as RL's shared bind: on a surface it
+powerslides and the stick steers; off it (in the air or water) the stick's left/right rolls the
+fish instead of turning it (free air roll).
 
 **Swim strokes:** sweep the left stick side to side (or up and down) in a steady rhythm. The first
 two beats set the tempo; every on-tempo beat after that adds a small speed boost. An off-tempo

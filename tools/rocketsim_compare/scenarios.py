@@ -13,6 +13,8 @@ yaw are independent.
 or "soccar" (needs RocketSim's collision meshes, so it's skipped without them).
 """
 
+import math
+
 TICK_RATE = 120
 HIGH = 1000.0  # start height for airborne scenarios (uu)
 
@@ -22,10 +24,15 @@ def s(ticks: int) -> int:
     return round(ticks * TICK_RATE)
 
 
-def car(pos=(0.0, 0.0, HIGH), vel=(0.0, 0.0, 0.0), ang_vel=(0.0, 0.0, 0.0), boost=100.0, can_flip=False):
-    """A level car at `pos` (its centre of mass) facing +Y.
+def car(pos=(0.0, 0.0, HIGH), vel=(0.0, 0.0, 0.0), ang_vel=(0.0, 0.0, 0.0), boost=100.0, can_flip=False, yaw=None):
+    """A level car at `pos` (its centre of mass) facing +Y, or `yaw` (radians, RL's: 0 = +X, pi/2 = +Y).
     can_flip: already jumped and in the air, so the next jump press is a double jump or dodge."""
-    return {"pos": list(pos), "vel": list(vel), "ang_vel": list(ang_vel), "boost": boost, "can_flip": can_flip}
+    return {"pos": list(pos), "vel": list(vel), "ang_vel": list(ang_vel), "boost": boost, "can_flip": can_flip, "yaw": yaw}
+
+
+def heading(yaw, speed):
+    """Velocity `speed` uu/s along RL yaw `yaw`."""
+    return (speed * math.cos(yaw), speed * math.sin(yaw), 0.0)
 
 
 def scenario(name, duration, controls, arena="void", car_state=None, ball=None, notes=""):
@@ -135,6 +142,20 @@ SCENARIOS = [
              car_state=car(pos=(2000.0, 3000.0, 17.0), vel=(0.0, 1400.0, 0.0)), notes="up the wall, then steer along it"),
     scenario("wall_slow_fall", 3.0, [(0, {})], arena="soccar",
              car_state=car(pos=(2000.0, 4300.0, 17.0), vel=(0.0, 900.0, 0.0)), notes="coasting up the wall until it falls off"),
+    scenario("wall_letgo_slow", 5.0, [(0, {"throttle": 1.0}), (s(1.0), {})], arena="soccar",
+             car_state=car(pos=(2000.0, 4000.0, 17.0), vel=(0.0, 700.0, 0.0)), notes="slowly up the wall, then let go"),
+    scenario("wall_letgo", 5.0, [(0, {"throttle": 1.0}), (s(1.5), {})], arena="soccar",
+             car_state=car(pos=(2000.0, 3000.0, 17.0), vel=(0.0, 1400.0, 0.0)), notes="up the wall, then let go"),
+    scenario("wall_letgo_boost", 5.0, [(0, {"boost": True}), (s(1.2), {})], arena="soccar",
+             car_state=car(pos=(2000.0, 3000.0, 17.0), vel=(0.0, 1400.0, 0.0)), notes="boost up the wall, then let go"),
+    scenario("wall_letgo_angled", 5.0, [(0, {"throttle": 1.0}), (s(1.5), {})], arena="soccar",
+             car_state=car(pos=(2500.0, -2000.0, 17.0), vel=heading(math.pi / 4, 1400.0), yaw=math.pi / 4),
+             notes="up the side wall at 45 degrees, then let go"),
+    scenario("wall_letgo_angled_slow", 5.0, [(0, {"throttle": 1.0}), (s(1.5), {})], arena="soccar",
+             car_state=car(pos=(3300.0, -1200.0, 17.0), vel=heading(math.pi / 4, 800.0), yaw=math.pi / 4),
+             notes="slowly up the side wall at 45 degrees, then let go"),
+    scenario("wall_hold_long", 6.0, [(0, {"throttle": 1.0})], arena="soccar",
+             car_state=car(pos=(2000.0, 3000.0, 17.0), vel=(0.0, 1400.0, 0.0)), notes="throttle up the wall and keep holding"),
     # --- Ball against the arena (car parked far away) -----------------------------
     *[scenario(name, duration, [(0, {})], arena="soccar", car_state=car(pos=(-3000.0, 4000.0, 17.0)),
                ball={"pos": list(pos), "vel": list(vel), "ang_vel": list(spin)}, notes=notes)

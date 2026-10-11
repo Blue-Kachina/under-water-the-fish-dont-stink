@@ -17,6 +17,11 @@ Results go to `out/`:
 - `rocketsim.json` and `game.json`: per-tick states from each side.
 - `scenarios.json`: the inputs and start states that were run.
 
+`uv run timeline.py NAME [step_seconds]` prints one scenario from the last run side by side:
+height, speed, how upright the car is, which way it faces, and surface contact.
+`uv run turnline.py NAME [step_seconds]` does the same for turns and powerslides: speed, yaw
+rate, heading and slip angle (between the nose and the direction of travel).
+
 ## How it works
 - **`scenarios.py`** defines each scenario: a start state, then controls as segments of RL inputs
   (throttle, steer, pitch, yaw, roll, jump, boost, handbrake). Everything is in RL units and axes.

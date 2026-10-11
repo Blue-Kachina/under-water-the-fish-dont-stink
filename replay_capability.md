@@ -90,7 +90,7 @@
   - ground: 14.1 max, 16 accel, 35 brake, 5.25 coast, boost 9.92, max boost 23, sticky force 6.5.
 - **Constants:** `UU_PER_SPEED` 100, `GROUND_WHEELBASE` 0.85, `RL_AUTOFLIP_IMPULSE` 2.0.
 - **Ball:** mass 0.167 (1/6 of the fish), bounciness 0.6, friction 0.35, max speed 60, spin cap 6 rad/s, gravity 6.5, no spin drag. `HIT_CURVE` is now in RL m/s (0/5/23/46).
-- **Camera:** RL defaults: 2.7 m back, 1.0 m up, aim tilted about 3° down, FOV 110.
+- **Camera:** BeastMode's settings are the defaults for everyone (since 2026-10-11): 2.7 m back, 0.9 m up, aim tilted 4° down, FOV 109, stiffness 0.45, swivel 7, transition 1.2. RL's own defaults were 1.0 m up, 3° down, FOV 110.
 - **Presets:** the debug panel has a **Preset** row. "Rocket League (defaults)" restores the defaults. **Water** (`presets/water.cfg`) is the original underwater tuning, applied over the defaults. Applying values no longer snaps to slider steps.
 - **Probes:** the movement and momentum probes test underwater mechanics, so they apply the Water preset. The aquarium, surface and hitbox probes were retimed for RL speeds and gravity.
 
@@ -334,6 +334,122 @@ Re-run `uv run run.py` after each fix. The goal is every void scenario at ≤ 0.
 6. **Edge-of-hitbox ball hits: unchanged** (0.72 m after 1 s; centre hits are 0.11 m). The remaining difference is the spin split at the box edge. Friction-model variants weren't tried; this is lower priority.
 
 - **No regressions:** the full harness (58 scenarios) and all 18 probes pass, and a new build was made.
+
+### 2.11 Update 2026-10-11: belly suspension, back-wall ramp, car cam roll, air turning check
+1. **Belly suspension (`fish_controller.gd`, `rl_suspension`, on by default).**
+   - **Wheels:** four raycast wheels at the Octane's mounts (`RL_WHEELS`), measured in the fish's frame from the hitbox centre. Front: (±0.259, 0, −0.3737), radius 0.125, rest length 0.38755. Rear: (±0.295, 0, 0.4763), radius 0.15, rest length 0.37055.
+   - **Springs:** stiffness is set so the springs carry `RL_SUSPENSION_LOAD` (gravity plus half the resting sticky push), split front and rear by axle distance, at RL's ride height.
+   - **Damping:** `suspension_damping_compress` 3 and `suspension_damping_extend` 5.
+   - **Push:** along the up axis, amplified by `1/max(n·up, 0.1)` on slanted surfaces, as Bullet does.
+   - **Bump stop:** compression beyond the settled value plus `RL_SUSPENSION_TRAVEL` (0.12 m) acts as a rigid contact.
+   - **Surface detection:** the wheels decide `on_surface` (`wheels_touching`). On the ground, pitch and roll come from the springs; steering still sets the yaw.
+   - **Collision changes:** the rigid axle cylinders from §2.10 are off while the suspension is on. The engine collides with a bevelled hull (`WorldHull`, `HULL_BEVEL` 0.15 × 0.3 m) instead of the box, so corners don't snag on ramps. The ball still uses the exact box (`Ball._fish_contact`).
+2. **Back-wall floor ramp:** the goal-end walls now have a radius-160 uu ramp (`BACK_EDGE_RADIUS` 1.6, measured from the meshes). Side walls and corners keep 256 uu. Each footprint entry has its own profile, and the two radii blend across the corner joins. The goal notch's near line uses the back radius.
+3. **Results** (full harness, everything else unchanged):
+
+   | Scenario | Before | Now |
+   |---|---|---|
+   | Ride height | — | 17.0 uu, exact |
+   | Landing touch-down | 0.025–0.04 s late | within 0.009 s |
+   | `wall_drive` | 0.47 m / 15.7° | 0.45 m / 7.6° |
+   | `wall_drive_boost` | 3.8 m | 2.23 m / 8.3° |
+   | `wall_drive_turn` | 1.0 m | 0.56 m / 10.5° |
+   | `wall_slow_fall` | 0.70 m / 16.5° | 0.15 m / 14.9° |
+   | `jump_tap` / `jump_full` | — | 0.07 / 0.12 m |
+   | Ground turns, powerslide, ball hits | — | unchanged (powerslide still 9–33°; `ball_hit_offset` 0.72 m) |
+
+   `ball_into_goal` (1.17 m) is not affected by the back ramp: it is the same with the old radius. It comes from RL's net floor, which rises slightly and has 96 uu side roundings, neither modelled.
+4. **Car cam: rolls with the fish on walls and the ceiling (`follow_camera.gd`, `roll_with_surface`, on by default).**
+   - RL's camera turns with the car while it drives on a wall, so the surface shows as the floor. Players [ask for a way to turn this off](https://steamcommunity.com/app/252950/discussions/0/1744469130478834843/?ctp=1).
+   - Ours kept the horizon level everywhere. In particular, driving along a side wall left the fish sideways on screen.
+   - Now, while `on_surface`, the camera's up follows the fish's up. After leaving the surface it eases back to level at `level_return_rate` (3/s). In the air it behaves as before: the horizon stays level through air rolls.
+   - `camera_wall_probe` checks both: on the wall, camera up · fish up = 1.00; 1.5 s after leaving, the horizon is level.
+   - **Swivel speed:** guides agree it is the right-stick look rate, as mapped. Epic's help page words it as "how fast the camera turns along with your car".
+   - **Possible next knob:** `rotation_stiffness` 9 gives about 15° of yaw lag in a full-speed ground turn. RL's car cam may be closer to rigid. It was not changed without evidence.
+5. **Air turning:** confirmed. The air pitch, yaw and roll scenarios match RocketSim tick for tick (0.0° error). Any felt difference comes from input settings (aerial sensitivity, deadzone).
+
+- **No regressions:** the full harness and all 18 probes pass, and a new build was made.
+
+### 2.12 Update 2026-10-11: camera shake on walls, and letting go on a wall
+The user reported the view shaking while driving up walls (sometimes still after coming back down), and the fish getting caught on a wall, sliding down slower than normal. There were two separate causes.
+
+1. **Camera shake (`follow_camera.gd`): fixed.**
+   - **Bug:** `Vector3.signed_angle_to(to, axis)` gives the full 3D angle, not the angle about `axis`. Easing the camera's roll toward a target that leans along the view axis therefore never reaches zero, and overshoots back and forth every frame (±3°).
+   - **Why it showed now:** the old targets were levelled, so always across the view. The §2.11 surface roll targets the fish's up, which isn't across the view while the camera lags the fish's pitch. The same thing happens on any ramp, and while parked on one.
+   - **Fix:** `_roll_to` measures the roll in the plane across the view.
+   - **Second, older problem:** near straight up or down, the level-horizon reference came from a tiny, noisy vector and switched suddenly to the fish's up at about 78°. On a surface the camera's frame now uses the fish's up throughout. In the air, near vertical, it fades to holding the camera's own roll.
+   - **Check:** the new `wall_jitter_probe` drives up a wall, back down, along the floor and parks. The camera reversed direction 62–145 times per phase before; it now reverses 0 times (PASS ≤ 5).
+2. **Letting go on a wall (`fish_controller.gd`): fixed against RocketSim.** RL scales tyre friction off the throttle by how steep the surface is (RocketSim `NON_STICKY_FRICTION_FACTOR_CURVE`: 1 on the floor, 0.5 at 45°, 0.1 on walls and the ceiling; `_rl_non_sticky_friction`).
+   - **Measured in RocketSim:** coasting decelerates at 525 uu/s² on the floor but 52.5 on a wall. Sideways friction on a wall, sliding, is a roughly constant 330 uu/s².
+   - **Ours before:** the full floor coasting brake applied on walls. It nearly cancelled gravity, so the fish crept down at about 1.2 m/s² (RL: about 6). Sideways grip was velocity-proportional, so the fish settled at a steady 1.7 m/s sideways slide and hung on the wall.
+   - **Now:** the coasting brake is scaled by the curve. Off the throttle on a slope, sideways grip is capped at `ground_lateral_friction` (30 m/s² at 45°) × f/(1−f), which is 3.3 m/s² on a wall and no cap on the floor or with the throttle held, so ground turns are untouched.
+   - **Harness:** `run.py` takes a start `yaw`, and `timeline.py` shows one scenario side by side. Six new scenarios (64 total):
+
+     | Scenario | Before | Now |
+     |---|---|---|
+     | `wall_letgo` | 3.70 m | 0.36 m |
+     | `wall_letgo_slow` | 4.24 m | 0.57 m |
+     | `wall_letgo_angled` (45° up the side wall) | 8.79 m | 5.84 m |
+     | `wall_letgo_angled_slow` | 6.20 m | 3.60 m |
+     | `wall_letgo_boost` | 5.06 m | 4.24 m (the known boosted-climb speed gap) |
+     | `wall_hold_long` | 2.44 m | 2.44 m (onto the ceiling and off it like RL, 0.15 s later) |
+
+   - **Still off:** on a diagonal, RL's car swings its nose round to follow its curving path (yaw rate about 0.4 rad/s), and it doesn't lose speed to sideways grip. Ours keeps its heading. This needs per-axle tyre forces, the same missing piece as powerslide.
+3. **Hull caught in the arena: not the cause.** The new `wall_stuck_probe` sweeps wall approaches (slow to boosted; square, 45° and 70°).
+   - While driving on walls the hull sinks at most 2 cm.
+   - The only deep moments (11–21 cm) are single ticks of a 14–15 m/s roof landing while spinning. The fish bounces straight out.
+   - The fish's centre never leaves the arena (the probe fails if it does). Every run now comes off the wall; before, a 45° run ended still hanging 4.5 m up.
+
+- **No regressions:** the 58 earlier harness scenarios are unchanged, all 20 probes pass (the 18 plus `wall_jitter_probe` and `wall_stuck_probe`), and a new build was made.
+
+### 2.13 Update 2026-10-11: RL's tyres and suspension, exactly; LB and camera
+Three requests: per-tyre driving (the open item from §2.12), free air roll on the Personal profile's powerslide button, and BeastMode's camera for everyone.
+
+1. **Per-tyre driving (`rl_tyres`, default on; `_add_tyre_impulse`, `_update_tyre_settings`).** This is RocketSim's own model, read from its source (`btVehicleRL::calcFrictionImpulses` and `applyFrictionImpulses`, `Car::_UpdateWheels`), not fitted. Each touching wheel pushes on the fish at its contact point every tick:
+   - **Sideways:** a fifth of the impulse that would stop that point sliding across the wheel (Bullet's `resolveSingleBilateral`, damping 0.2), times RocketSim's friction scale (chassis mass / 3 = 60).
+   - **Along the wheel:** engine force (`ground_accel` / 4 per wheel on RL's torque curve, a quarter of it with fewer than 3 wheels down). Off the throttle: a brake ramping at 37.9/s with the contact point's speed, up to `ground_brake` / 4 per wheel (full brake below 25 uu/s, and a 0.15 coasting brake above that). Nothing while the handbrake is held.
+   - **Friction per wheel:** 1 when rolling straight, down to 0.2 sliding sideways, measured as the share of the wheel's speed that is sideways. The handbrake scales the sideways friction to 0.1 and the lengthways friction to 0.5–0.9. Off the throttle, both scale by the steepness curve (§2.12).
+   - **Applied level with the centre of mass**, so it turns the fish but never rolls it.
+   - **Steering** turns the front wheels by RL's angle-by-speed curve, blending to the powerslide curve with the handbrake. Yaw now comes only from the tyres; the old turning-circle target is gone on this path.
+   - **Timing:** the settings lag a tick, as in RocketSim, which computes the forces before updating throttle, brake, steering and friction. They clear on reset; the harness also clears them at each scenario's start.
+   - **One mix-up to avoid:** RocketSim calls `setCoordinateSystem(1, 2, 0)`, so wheel basis column 1 is the axle. The friction curve's input is the sideways share. Reading it as the forward share made grip 3× too weak in turns.
+2. **Exact suspension (replaces the fitted soft springs and the `suspension_damping_*` exports).** RocketSim's constants convert to our metres with no fitting. Per wheel, the acceleration is (500 × compression × slant − damping × speed) × scale / 180 m/s², where:
+   - **Damping:** 25 compressing, 40 extending.
+   - **Scale:** 35.75 at the front, 54.265 at the back.
+   - **Spring travel:** ±12 uu around a rest length 12 uu shorter than CarConfig's.
+   - **Ray reach:** rest + 12 + radius − 2.5 uu.
+   - **Force:** applied at the contact point along the surface normal.
+   - **Pushback:** a wheel pressed 2.5 uu past rest also gets RocketSim's solid pushback, Bullet `resolveSingleCollision` with ERP 0.2, divided by 4. It's computed from the motion at the start of the tick.
+
+   The fish now settles about 2 uu compressed on stiff springs, as RL's car does. The old soft springs sat 13.5 cm compressed.
+   - **Bug found on the way:** the old bottom-out impulse was solved wheel by wheel on top of the impulses already applied. The left front wheel took the whole hit when both front wheels met the back-wall ramp together, kicking the fish into a 1.7 rad/s roll and a yaw. That was the "boosted climb speed gap". Every wheel now works from the same starting motion.
+   - **Hull:** with the exact suspension the hull is a plain box again (`HULL_BEVEL` is 0). On tyres it keeps RL's car-world friction and bounce (0.3 / 0.3) while driving, so scraping a ramp at boost speed costs speed as in RL.
+3. **Results (full harness, 64 scenarios; before = start of this session):**
+
+   | Scenario | Before | Now |
+   |---|---|---|
+   | `ground_turn` / `_slow` / `_half` / `_boost` | 0.39 / 0.60 / 0.37 / 0.53 m | 0.01 / 0.00 / 0.00 / 0.01 m |
+   | `ground_powerslide` | 4.43 m, 9.4° | 0.01 m, 0.1° |
+   | `ground_powerslide_slow` | 1.87 m, 33.5° | 0.01 m, 0.3° |
+   | `ground_powerslide_release` | 2.35 m, 18.4° | 0.02 m, 0.2° |
+   | `ground_throttle` / `_brake` / `_coast` | 0.05 / 0.15 / 0.09 m | 0.00 m (all three) |
+   | `jump_tap` / `jump_full` | 0.07 / 0.12 m | 0.00 / 0.00 m |
+   | `wall_drive` | 0.45 m | 0.02 m |
+   | `wall_drive_boost` | 2.23 m | 0.99 m |
+   | `wall_letgo_angled` / `_slow` | 5.84 / 3.60 m | 0.93 / 0.42 m (RL's weathervane now happens) |
+   | `wall_letgo_boost` | 4.24 m | 1.52 m |
+   | `wall_hold_long` | 2.44 m | 0.46 m |
+   | `wall_letgo` | 0.36 m | 0.18 m |
+   | `wall_letgo_slow` | 0.57 m | 0.70 m (landing back on the floor is a few ticks off) |
+   | `wall_drive_turn` | 0.56 m, 10.5° | 0.59 m, 14.5° |
+
+   Air, flip and ball scenarios are unchanged. What's left on walls is speed lost crossing the arena's curves: 20–100 uu/s at the floor-to-wall and wall-to-ceiling curves, which is arena shape and hull contact, not tyres.
+   - **New tool:** `tools/rocketsim_compare/turnline.py NAME [step]` shows speed, yaw rate, heading and slip angle side by side.
+   - **Old path:** `rl_tyres` off keeps the whole-body model (`ground_grip`, `ground_turn_drag`, `ground_lateral_friction`), and the panel hides those when tyres are on. It now rides on the exact suspension, so it no longer matches §2.9's fit exactly (`ground_turn` 0.39 m, `ground_powerslide` 4.43 m, as before).
+4. **Personal profile LB = powerslide and free air roll.** LB is bound to both actions, like BeastMode's X. On a surface only powerslide is read and the stick steers. Off it, air roll turns stick left/right into roll. In water a held LB also lowers sideways drag, as BeastMode's X always has. `controls_probe` now presses the real LB button and checks both cases. README's profile table is corrected (Y is ball cam; BeastMode added).
+5. **BeastMode's camera is the default for everyone:** FOV 109, distance 270, height 90, angle −4, stiffness 0.45, swivel 7, transition 1.2 (`follow_camera.gd` defaults, same as `presets/beast_mode.cfg`). A saved `user://tuning.cfg` overrides the defaults, so the development machine's copy was updated to match.
+
+- **Checks:** all 20 probes run clean. `wall_stuck_probe` shows less shaking (0–2 spin reversals per run, was up to 11), and no run sinks more than 3.4 cm into the arena (was 21 cm). `wall_jitter_probe` and `camera_wall_probe` are unchanged.
 
 ---
 

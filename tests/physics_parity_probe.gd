@@ -129,6 +129,7 @@ func _apply_start(scenario: Dictionary, state: PhysicsDirectBodyState3D) -> void
 	state.linear_velocity = _pos(start.com_vel)  # a body's velocity is its centre of mass's
 	state.angular_velocity = _ang_vel(start.ang_vel)
 	fish.boost_amount = start.boost
+	fish.reset_tyres()  # RocketSim's car starts each scenario with no throttle, brake or steering
 	fish.jump_state = FishController.JumpState.READY
 	if start.can_flip:
 		fish.jump_state = FishController.JumpState.SECOND_JUMP
@@ -196,7 +197,7 @@ func _snapshot(scenario: Dictionary, state: PhysicsDirectBodyState3D) -> Diction
 		"vel": _rl(state.linear_velocity),
 		"ang_vel": _rl_ang_vel(state.angular_velocity),
 		"fwd": _rl_dir(-b.z), "right": _rl_dir(b.x), "up": _rl_dir(b.y),
-		"boost": fish.boost_amount, "flipping": fish.is_flipping(), "on_ground": fish.on_surface,
+		"boost": fish.boost_amount, "flipping": fish.is_flipping(), "on_ground": fish.on_surface, "wheels": fish.wheels_touching,
 	}
 	if scenario.ball:
 		# The physics server's state, not the node's, so it's the same step as the fish's.

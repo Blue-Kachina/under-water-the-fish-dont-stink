@@ -64,6 +64,8 @@ def run_rocketsim(scenario: dict) -> list[dict]:
     state.vel = rs.Vec(*spec["vel"])
     state.ang_vel = rs.Vec(*spec["ang_vel"])
     state.boost = spec["boost"]
+    if spec.get("yaw") is not None:
+        state.rot_mat = rs.Angle(spec["yaw"], 0.0, 0.0).as_rot_mat()
     if spec["can_flip"]:
         state.is_on_ground = False
         state.has_jumped = True

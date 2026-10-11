@@ -25,29 +25,35 @@ var ball_cam := false
 
 @export_group("Follow")
 ## Rocket League's camera settings, with the same meanings (RL's uu are cm).
-## Defaults: RL's default camera with the usual 110 FOV.
+## Defaults: pro player BeastMode's camera (presets/beast_mode.cfg has the same).
 @export_range(1.0, 20.0, 0.01) var distance := 2.7
-@export_range(-5.0, 10.0, 0.01) var height := 1.0
+@export_range(-5.0, 10.0, 0.01) var height := 0.9
 ## Camera tilt in degrees; negative looks down. RL: Angle.
-@export_range(-15.0, 15.0, 0.1) var angle := -3.0
+@export_range(-15.0, 15.0, 0.1) var angle := -4.0
 ## How firmly the camera keeps its distance as the fish speeds up: 1 = fixed,
 ## lower falls further behind at speed. RL: Stiffness (approximate).
-@export_range(0.0, 1.0, 0.01) var stiffness := 0.5
+@export_range(0.0, 1.0, 0.01) var stiffness := 0.45
 ## How quickly the camera swings around to match the fish's rotation.
 @export_range(0.5, 40.0, 0.5) var rotation_stiffness := 9.0
-## How much the camera leans with the fish's roll. 0 = horizon stays level.
-## The lean peaks when the fish is on its side and eases back to level as it
-## goes fully inverted, so an air roll never flips the view.
+## On (Rocket League style): while the fish drives on a wall or the ceiling,
+## the camera rolls with it so the surface shows as the floor, and eases back
+## to the level horizon once it leaves.
+@export var roll_with_surface := true
+## How much the camera leans with the fish's roll in the air. 0 = horizon
+## stays level. The lean peaks when the fish is on its side and eases back to
+## level as it goes fully inverted, so an air roll never flips the view.
 @export_range(0.0, 1.0, 0.05) var roll_follow := 0.0
 ## Roll exactly with the fish instead (ignores roll_follow).
 @export var lock_roll_to_fish := false
 ## How quickly the camera's roll catches up to its target.
 @export_range(1.0, 40.0, 0.5) var roll_stiffness := 10.0
+## How quickly the camera rolls back to level after leaving a surface.
+@export_range(0.5, 40.0, 0.5) var level_return_rate := 3.0
 ## Off (Rocket League style): the camera holds its orientation while a dodge
 ## flips the fish, and only follows its position.
 @export var follow_dodge_spin := false
 ## Horizontal, as in Rocket League (16:9). RL: FOV.
-@export_range(60.0, 130.0, 1.0) var field_of_view := 110.0:
+@export_range(60.0, 130.0, 1.0) var field_of_view := 109.0:
 	set(value):
 		field_of_view = value
 		fov = value
@@ -58,7 +64,7 @@ var ball_cam := false
 @export_range(0.0, 3.2, 0.05) var look_yaw_range := PI
 @export_range(0.0, 1.5, 0.05) var look_pitch_range := 0.9
 ## How quickly the right stick turns the view. RL: Swivel Speed (approximate).
-@export_range(1.0, 10.0, 0.1) var swivel_speed := 2.5
+@export_range(1.0, 10.0, 0.1) var swivel_speed := 7.0
 
 @export_group("Collision")
 @export_range(0.0, 1.0, 0.05) var collision_margin := 0.5
@@ -71,6 +77,8 @@ var _look_pitch := 0.0
 ## How far the camera has fallen behind (see stiffness).
 var _lag := Vector3.ZERO
 var _transition_left := 0.0
+## Still rolling back to level after leaving a surface (see roll_with_surface).
+var _leaving_surface := false
 
 
 func _ready() -> void:
@@ -104,6 +112,9 @@ func _process(delta: float) -> void:
 	if ball_cam and is_instance_valid(ball) and ball.visible:
 		to_ball = ball.get_global_transform_interpolated().origin - fish_xform.origin
 	var tracking_ball := to_ball.length_squared() > 0.01
+	# On a wall or the ceiling the fish's up is the camera's up (RL style),
+	# and always well defined there, even driving straight up a wall.
+	var surface_roll := roll_with_surface and not lock_roll_to_fish and fish.on_surface
 	# Hold still for the whole flip, cancelled or not: the fish is still spinning.
 	# Ball cam keeps tracking the ball through flips, as in Rocket League.
 	if tracking_ball or follow_dodge_spin or not fish.is_flipping():
@@ -112,7 +123,8 @@ func _process(delta: float) -> void:
 		# after a half flip is then a level swing around, not a tumble over the
 		# top, which would flip the view as it passed straight up.
 		var target_forward := to_ball.normalized() if tracking_ball else -fish_xform.basis.z
-		var target_frame := Basis.looking_at(target_forward, _target_up(target_forward, fish_up, tracking_ball))
+		var frame_up := fish_up if surface_roll and absf(target_forward.dot(fish_up)) < 0.95 else _target_up(target_forward, fish_up, tracking_ball, _up)
+		var target_frame := Basis.looking_at(target_forward, frame_up)
 		# A ball cam toggle swings over at the transition speed instead.
 		var rate := 3.0 / (TRANSITION_TIME / transition_speed) if _transition_left > 0.0 else rotation_stiffness
 		_rotation = _rotation.slerp(target_frame.get_rotation_quaternion(), 1.0 - exp(-rate * delta))
@@ -122,8 +134,17 @@ func _process(delta: float) -> void:
 	# Carry last frame's up onto the new view plane, then turn it toward the target.
 	var up := _up - forward * _up.dot(forward)
 	up = follow.y if up.length_squared() < 0.0001 else up.normalized()
-	var target_up := _target_up(forward, fish_up, tracking_ball)
-	up = up.rotated(forward, up.signed_angle_to(target_up, forward) * (1.0 - exp(-roll_stiffness * delta)))
+	var target_up := _target_up(forward, fish_up, tracking_ball, up)
+	var roll_rate := roll_stiffness
+	if roll_with_surface and not lock_roll_to_fish:
+		if surface_roll and absf(forward.dot(fish_up)) < 0.95:
+			target_up = fish_up
+			_leaving_surface = true
+		elif _leaving_surface:
+			# Off a wall: ease back to level, slower than an air lean.
+			roll_rate = minf(roll_stiffness, level_return_rate)
+			_leaving_surface = absf(_roll_to(up, target_up, forward)) > 0.03
+	up = up.rotated(forward, _roll_to(up, target_up, forward) * (1.0 - exp(-roll_rate * delta)))
 	_up = up
 
 	var look_input := Input.get_vector("camera_left", "camera_right", "camera_up", "camera_down")
@@ -186,16 +207,38 @@ func _sweep(from: Vector3, to: Vector3, radius: float) -> Vector3:
 	return from + motion * allowed
 
 
-## The up direction the camera's roll eases toward. `level_only` keeps the horizon level (ball cam).
-func _target_up(forward: Vector3, fish_up: Vector3, level_only: bool) -> Vector3:
+## The up direction the camera's roll eases toward. `level_only` keeps the
+## horizon level (ball cam). Looking (nearly) straight up or down there's no
+## horizon to level against, so it fades to holding `current_up`, the
+## camera's own roll: the horizon's direction there swings wildly with the
+## slightest wobble of the aim.
+func _target_up(forward: Vector3, fish_up: Vector3, level_only: bool, current_up: Vector3) -> Vector3:
 	if lock_roll_to_fish and not level_only:
 		return fish_up
+	var hold := current_up - forward * current_up.dot(forward)
+	if hold.length_squared() < 0.0001:
+		hold = fish_up - forward * fish_up.dot(forward)
+	hold = hold.normalized()
 	var level := Vector3.UP - forward * forward.dot(Vector3.UP)
-	if level.length_squared() < 0.04:
-		return fish_up  # nose (nearly) straight up or down: there's no horizon to level against
+	var horizon := clampf((level.length() - 0.1) / 0.25, 0.0, 1.0)  # 0 within ~6 deg of vertical, 1 beyond ~21
+	if horizon == 0.0:
+		return hold
 	level = level.normalized()
 	# Follow the roll up to sideways, then ease back to level toward inverted.
 	# Unlike blending the two up vectors, this never has a point where it flips.
-	var fish_roll := level.signed_angle_to(fish_up, forward)
+	var fish_roll := _roll_to(level, fish_up, forward)
 	var lean := fish_roll if absf(fish_roll) <= PI / 2.0 else signf(fish_roll) * (PI - absf(fish_roll))
-	return level if level_only else level.rotated(forward, lean * roll_follow)
+	var target := level if level_only else level.rotated(forward, lean * roll_follow)
+	return hold.rotated(forward, _roll_to(hold, target, forward) * horizon)
+
+
+## The roll about `axis` that turns `from` to `to`, both seen in the plane
+## across `axis`. (Vector3.signed_angle_to measures the full 3D angle, which
+## never reaches zero for a `to` leaning along the axis, so easing toward it
+## overshoots back and forth every frame.)
+func _roll_to(from: Vector3, to: Vector3, axis: Vector3) -> float:
+	var a := from - axis * from.dot(axis)
+	var b := to - axis * to.dot(axis)
+	if a.length_squared() < 1e-8 or b.length_squared() < 1e-8:
+		return 0.0
+	return a.signed_angle_to(b, axis)

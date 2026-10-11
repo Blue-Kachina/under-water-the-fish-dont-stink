@@ -15,8 +15,10 @@ signal goal_scored(team: int)
 const SIZE := Vector3(81.92, 20.48, 102.4)  # floor at y = 0, centred on x/z
 ## The vertical corners are cut at 45 degrees: the tank is inside |x| + |z| <= CORNER_PLANE.
 const CORNER_PLANE := 80.64
-## Radius of the ramp from the floor up the walls (RL: 256 uu).
+## Radius of the ramp from the floor up the side walls and corners (RL: 256 uu).
 const EDGE_RADIUS := 2.56
+## The back walls' (goal ends') floor ramp is tighter (RL: 160 uu).
+const BACK_EDGE_RADIUS := 1.6
 ## Radius of the curve from the walls onto the ceiling (RL: 512 uu).
 const CEILING_RADIUS := 5.12
 ## Radius of the joins between the 45-degree corners and the walls (RL: about 880 uu).
@@ -127,36 +129,41 @@ func _build_shell() -> void:
 	var half := SIZE / 2.0
 	var mouth_x := GOAL_SIZE.x / 2.0
 	var ring := _footprint_ring([-mouth_x, 0.0, mouth_x])  # 0: matches the notch floor's middle vertex
-	var profile := _wall_profile([GOAL_SIZE.y])
+	# Each footprint entry's own cross-section: its floor ramp is tighter on
+	# the back walls, blended round the corner joins.
+	var profiles: Array = []
+	for entry: Dictionary in ring:
+		profiles.append(_wall_profile([GOAL_SIZE.y], _floor_radius(entry.normal)))
+	var back_profile := _wall_profile([GOAL_SIZE.y], BACK_EDGE_RADIUS)
 
 	for i in ring.size() - 1:
 		var a: Dictionary = ring[i]
 		var b: Dictionary = ring[i + 1]
 		var on_end_wall: bool = absf(a.normal.y) > 0.999 and a.normal == b.normal
-		for j in profile.size() - 1:
-			var lo := profile[j]
-			var hi := profile[j + 1]
-			if on_end_wall and absf((a.point.x + b.point.x) / 2.0) < mouth_x and (lo.y + hi.y) / 2.0 < GOAL_SIZE.y:
+		var pa: Array[Vector4] = profiles[i]
+		var pb: Array[Vector4] = profiles[i + 1]
+		for j in pa.size() - 1:
+			if on_end_wall and absf((a.point.x + b.point.x) / 2.0) < mouth_x and (pa[j].y + pa[j + 1].y) / 2.0 < GOAL_SIZE.y:
 				continue  # inside a goal mouth or its notch
-			var corners: Array[Vector3] = [_swept(a, lo), _swept(b, lo), _swept(b, hi), _swept(a, hi)]
-			var normals: Array[Vector3] = [_swept_normal(a, lo), _swept_normal(b, lo), _swept_normal(b, hi), _swept_normal(a, hi)]
+			var corners: Array[Vector3] = [_swept(a, pa[j]), _swept(b, pb[j]), _swept(b, pb[j + 1]), _swept(a, pa[j + 1])]
+			var normals: Array[Vector3] = [_swept_normal(a, pa[j]), _swept_normal(b, pb[j]), _swept_normal(b, pb[j + 1]), _swept_normal(a, pa[j + 1])]
 			_append_triangle(wall_tris, [corners[0], corners[1], corners[2]], [normals[0], normals[1], normals[2]])
 			_append_triangle(wall_tris, [corners[0], corners[2], corners[3]], [normals[0], normals[2], normals[3]])
 
 	# Floor and ceiling: fans across the wall line pulled in by each edge's
 	# radius, meeting the swept edges.
 	for i in ring.size() - 1:
-		var floor_a := _swept(ring[i], profile[0])
-		var floor_b := _swept(ring[i + 1], profile[0])
-		var ceiling_a := _swept(ring[i], profile[-1])
-		var ceiling_b := _swept(ring[i + 1], profile[-1])
+		var floor_a := _swept(ring[i], profiles[i][0])
+		var floor_b := _swept(ring[i + 1], profiles[i + 1][0])
+		var ceiling_a := _swept(ring[i], profiles[i][-1])
+		var ceiling_b := _swept(ring[i + 1], profiles[i + 1][-1])
 		_add_flat_triangle(floor_tris, Vector3.ZERO, floor_a, floor_b, Vector3.UP)
 		_add_flat_triangle(wall_tris, Vector3(0.0, SIZE.y, 0.0), ceiling_a, ceiling_b, Vector3.DOWN)
 
 	for end: float in [-1.0, 1.0]:
 		# Flat floor across the notch, up to the goal line, in two halves so its
 		# goal-line vertices match the net floor's (which fans from the middle).
-		var near := end * (half.z - EDGE_RADIUS)
+		var near := end * (half.z - BACK_EDGE_RADIUS)
 		var line := end * half.z
 		for side: Array in [[-mouth_x, 0.0], [0.0, mouth_x]]:
 			var a := Vector3(side[0], 0.0, near)
@@ -171,7 +178,7 @@ func _build_shell() -> void:
 			var foot := Vector3(x, 0.0, line)
 			var inward := Vector3(-signf(x), 0.0, 0.0)
 			for k in EDGE_STEPS:
-				_add_flat_triangle(wall_tris, foot, _swept(edge, profile[k]), _swept(edge, profile[k + 1]), inward)
+				_add_flat_triangle(wall_tris, foot, _swept(edge, back_profile[k]), _swept(edge, back_profile[k + 1]), inward)
 
 	var mesh := ArrayMesh.new()
 	for part: Array in [floor_tris, wall_tris]:
@@ -239,13 +246,20 @@ func _footprint_ring(end_wall_cuts: Array) -> Array[Dictionary]:
 	return ring
 
 
+## The floor ramp's radius for a footprint entry facing `normal`: the back
+## walls' tighter one, blending to the side walls' across the corner joins.
+func _floor_radius(normal: Vector2) -> float:
+	var toward_back := clampf((absf(normal.y) - cos(PI / 4.0)) / (1.0 - cos(PI / 4.0)), 0.0, 1.0)
+	return lerpf(EDGE_RADIUS, BACK_EDGE_RADIUS, toward_back)
+
+
 ## The wall's cross-section from the floor to the ceiling, as Vector4(outward
 ## offset from the wall line (0 on the wall, negative inside), height, outward
-## normal's horizontal and vertical parts): a quarter circle of EDGE_RADIUS up
-## from the floor, the straight wall (with extra points at the `wall_cuts`
+## normal's horizontal and vertical parts): a quarter circle of `floor_radius`
+## up from the floor, the straight wall (with extra points at the `wall_cuts`
 ## heights) and a quarter circle of CEILING_RADIUS onto the ceiling.
-func _wall_profile(wall_cuts: Array) -> Array[Vector4]:
-	var r := EDGE_RADIUS
+func _wall_profile(wall_cuts: Array, floor_radius := EDGE_RADIUS) -> Array[Vector4]:
+	var r := floor_radius
 	var rc := CEILING_RADIUS
 	var top := SIZE.y - rc
 	var profile: Array[Vector4] = []

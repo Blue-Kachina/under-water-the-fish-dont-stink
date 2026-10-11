@@ -40,12 +40,14 @@ const PROFILES := {
 		"ball_cam": JOY_BUTTON_Y,
 		"roll_left": JOY_BUTTON_LEFT_SHOULDER,
 	},
-	# Directional air roll on face buttons, powerslide on LB, boost on RB.
+	# Directional air roll on face buttons, boost on RB, and LB as RL's shared
+	# "Powerslide / Air Roll": powerslide on a surface, free air roll off it.
 	"Personal": {
 		"jump": JOY_BUTTON_A,
 		"roll_right": JOY_BUTTON_B,
 		"roll_left": JOY_BUTTON_X,
 		"powerslide": JOY_BUTTON_LEFT_SHOULDER,
+		"air_roll": JOY_BUTTON_LEFT_SHOULDER,
 		"boost": JOY_BUTTON_RIGHT_SHOULDER,
 		"ball_cam": JOY_BUTTON_Y,
 	},

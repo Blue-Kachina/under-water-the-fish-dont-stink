@@ -230,7 +230,9 @@ func _fish_contact(centre: Vector3) -> Dictionary:
 	var best := {}
 	for child in fish.get_children():
 		var shape_node := child as CollisionShape3D
-		if shape_node == null or shape_node.disabled or not shape_node.shape is BoxShape3D:
+		# The fish's box hitbox: disabled for the engine (the arena meets a
+		# bevelled hull), but it's the shape the ball is checked against.
+		if shape_node == null or not shape_node.shape is BoxShape3D:
 			continue
 		var xform := shape_node.global_transform
 		var half: Vector3 = (shape_node.shape as BoxShape3D).size / 2.0
