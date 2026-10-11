@@ -27,12 +27,19 @@ signal touched(by: Node3D, hit_speed: float)
 
 var popped := false
 var speed := 0.0
+## True from respawn() until the teleport happens on the next physics step.
+## Until then global_position is still the old spot (e.g. inside a goal), so
+## goal checks should skip the ball.
+var respawn_pending: bool:
+	get:
+		return _reset_queued
 
 var _shape := SphereShape3D.new()
 var _collision := CollisionShape3D.new()
 var _visual := MeshInstance3D.new()
 var _material := ShaderMaterial.new()
 var _trail := CPUParticles3D.new()
+var _indicators := BallIndicators.new()
 var _radius := -1.0
 var _reset_queued := false
 var _spawn_position := Vector3.ZERO
@@ -69,9 +76,12 @@ func _ready() -> void:
 	_visual.mesh = sphere
 	_visual.material_override = _material
 	_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_visual.layers = BallIndicators.BALL_LAYER  # the indicator rings don't paint the ball
 	add_child(_visual)
 
 	_build_trail()
+	_indicators.ball = self
+	add_child(_indicators)
 	_apply_settings()
 
 
@@ -94,8 +104,9 @@ func pop() -> void:
 	_collision.set_deferred("disabled", true)
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	_apply_settings()
+	_indicators.update(delta)
 
 
 func _process(_delta: float) -> void:

@@ -71,6 +71,9 @@ const FLIP_SPIN_OUT_MIN_RATE := 0.2
 ## Tolerance for comparing summed tick times to RL durations (78 ticks of 1/120 s
 ## add up to a hair over 0.65 in floating point).
 const TIME_EPSILON := 0.0001
+## The fish model's body (width, height, length) in fish.tscn; Visual is scaled
+## so the body fills the hitbox.
+const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 
 @export_group("Thrust")
 @export_range(0.0, 60.0, 0.5) var forward_accel := 12.5
@@ -245,17 +248,17 @@ const TIME_EPSILON := 0.0001
 
 @export_group("Hitbox")
 ## A box, like Rocket League's car hitboxes: flat on the floor, flat on top to
-## carry the ball. Defaults keep the Octane's length-to-width ratio
-## (118 x 84 uu) and are tall enough to cover the fish's body.
-@export_range(0.5, 4.0, 0.01) var hitbox_length := 1.5:
+## carry the ball. Defaults are the Octane's (RocketSim: 120.5 x 86.7 x 38.7 uu,
+## 1 uu = 1 cm). The fish's body is stretched to fill it.
+@export_range(0.5, 4.0, 0.001) var hitbox_length := 1.205:
 	set(value):
 		hitbox_length = value
 		_apply_hitbox()
-@export_range(0.3, 3.0, 0.01) var hitbox_width := 1.07:
+@export_range(0.3, 3.0, 0.001) var hitbox_width := 0.867:
 	set(value):
 		hitbox_width = value
 		_apply_hitbox()
-@export_range(0.2, 2.0, 0.01) var hitbox_height := 0.7:
+@export_range(0.2, 2.0, 0.001) var hitbox_height := 0.387:
 	set(value):
 		hitbox_height = value
 		_apply_hitbox()
@@ -330,6 +333,7 @@ var _last_stroke_time := -INF
 var _last_stroke_interval := 0.0
 var _queued_stroke := 0.0
 
+@onready var _visual: Node3D = $Visual
 @onready var _tail: Node3D = $Visual/TailPivot
 @onready var _fin_left: Node3D = $Visual/FinLeftPivot
 @onready var _fin_right: Node3D = $Visual/FinRightPivot
@@ -362,6 +366,8 @@ func _apply_hitbox() -> void:
 	(_collision.shape as BoxShape3D).size = size
 	(_hitbox_view.mesh as BoxMesh).size = size
 	_hitbox_view.visible = show_hitbox
+	_visual.scale = size / VISUAL_BODY_SIZE
+	_bubbles.position.z = size.z * 0.6  # just behind the tail
 
 
 func request_reset() -> void:

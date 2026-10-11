@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/fish_controller.gd" id="1_fish"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hitbox"]
-size = Vector3(1.07, 0.7, 1.5)
+size = Vector3(0.867, 0.387, 1.205)
 
 [sub_resource type="StandardMaterial3D" id="Material_body"]
 albedo_color = Color(1, 0.55, 0.12, 1)

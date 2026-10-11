@@ -12,7 +12,7 @@
 5. [Coordinate & scale mapping](#5-coordinate--scale-mapping)
 6. [Converter pipeline](#6-converter-pipeline)
 7. [Playback runtime](#7-playback-runtime)
-8. [Input decoupling & take-over](#8-input-decoupling--take-over)
+8. [Input decoupling, re-simulation & take-over](#8-input-decoupling-re-simulation--take-over)
 9. ["Play like Rocket League" preset](#9-play-like-rocket-league-preset)
 10. [Phased roadmap](#10-phased-roadmap)
 11. [Risks & open questions](#11-risks--open-questions)
@@ -27,11 +27,11 @@
 | Parsing `.replay` | **Don't write a GDScript parser.** Convert offline with **subtr-actor-py** (Python, MIT, v1.4.0, 2026-10-02) into our own versioned intermediate format, `*.rlreplay.json` (schema v1). A godot-rust GDExtension is a later, drop-in option. |
 | Intermediate format | Columnar JSON in **RL native units and axes** (uu, left-handed Z-up), with presence and teleport masks, events and segments. A packed float32 binary v2 comes later if size or load time demand it. |
 | Units | 1 uu = 1 cm. One `RLSpace` utility converts to Godot: `pos = Vector3(x, z, y) * 0.01 * k`. |
-| World scale **k** | RL lengths, speeds and accelerations are multiplied by k; times and angular rates are unchanged. **The project's existing "2× RL" tuning is exactly k = 2**, so k = 2 is the default; k = 1 gives true RL metres. |
-| Where replays play | A new **RL Stadium** environment at true RL proportions × k. We will *not* remap onto the Aquarium: its 90×50×130 m proportions would distort arcs, contacts and goals. |
-| Ghosts | A lightweight `ReplayCar` (`Node3D` plus a shared fish visual and a hitbox overlay), not a frozen `FishController`. |
+| World scale **k** | **Decided: k = 1, true RL size (1 uu = 1 cm).** Sizes were switched on 2026-10-10 (see §2.1). Speeds and accelerations are still on the old 2× tuning and must come down to RL's (§9) before our physics can match replays. The k machinery stays only as an optional knob. |
+| Where replays play | **In the Aquarium Arena itself**, which is now the RL Soccar arena: 81.92 × 20.44 × 102.4 m, 45° corners, RL goals. No separate "RL Stadium" is needed. |
+| Ghosts | A lightweight `ReplayCar` (`Node3D` plus a shared fish visual and a hitbox overlay), not a frozen `FishController`. Used for kinematic playback and as the reference when re-simulating. |
 | Interpolation | Cubic Hermite on position using replicated velocities, slerp on rotation, no interpolation across teleports. |
-| Re-simulation | Not possible: replays don't contain pitch/yaw/roll/jump/boost button inputs. Instead we offer **take over from here**, which spawns a live fish and ball from the replay state at time t. |
+| Re-simulation | **Yes, without recorded button presses.** Once our sizes and physics match RL, we recover each player's inputs from the motion itself (inverse dynamics, constrained by the replay's boost/jump/dodge flags and throttle/steer bytes). We then drive our physics with those inputs, plus closed-loop correction and re-syncs at touches and kickoffs. Validation is tiered: RocketSim, then replays, then side-by-side video. See §8. |
 | RL feel | A **preset system** in the debug panel, plus an `RLPreset` table that generates every export's RL value at scale k. Missing mechanics (boost pads, supersonic/demos, match flow, multiple players) are added in later phases. |
 
 ---
@@ -54,6 +54,37 @@
 - **Camera** (`follow_camera.gd`): chase cam and ball cam. `fish` is typed `FishController` (`hud.gd` has the same typing).
 - **Tests:** headless probe scenes in `tests/`, run as `Godot_console.exe --headless --path . res://tests/X.tscn`. They drive input via `Input.action_press`.
 - **Missing:** no JSON or binary parsing, recording, replay, networking, or multi-player code.
+
+### 2.1 Update 2026-10-10: true Rocket League sizes
+
+**What changed:**
+- **Aquarium Arena** (`scripts/aquarium_arena.gd`):
+  - Rebuilt to RL Soccar dimensions:
+    - walls at x = ±40.96 and z = ±51.2, ceiling at 20.44;
+    - 45° vertical corners (`CORNER_PLANE` \|x\|+\|z\| = 80.64);
+    - 2.56 m rounded floor and ceiling ramps (`EDGE_RADIUS`).
+  - The shell is now swept around the octagonal footprint (`_footprint_ring`, `_wall_profile`).
+  - Goals are 17.8551 × 6.42775 × 8.8 m.
+  - The fish spawns at RL's back kickoff spot (z = 46.08).
+  - New `AquariumArena.distance_outside(p)` helper.
+- **Goal** (`scripts/goal.gd`): RL goal size by default. The posts now sit just outside the mouth, so the opening is the full RL width.
+- **Ball:** default radius 0.9125 m (`scripts/ball_settings.gd`).
+- **Fish:**
+  - Hitbox defaults to the Octane: 1.205 × 0.387 × 0.867 m (L × H × W).
+  - `Visual` is scaled from `VISUAL_BODY_SIZE` so the fish's body fills whatever the hitbox is (`scripts/fish_controller.gd`, `scenes/fish.tscn`).
+- **Probes:** `aquarium_probe` and `surface_probe` were updated for the new geometry.
+
+**Probe results:**
+- `hitbox_probe` passes: the fish rests at y = 0.193.
+- `surface_probe` passes: the fish drives floor → wall → ceiling and carries the ball.
+- `aquarium_probe` keeps the fish inside the shell (0.00 m outside), but its boosted kickoff hit no longer scores.
+
+**Known mismatches, still to fix:**
+- **Speeds are still 2× RL** (fish 28.2 / 46 m/s, ball gravity 15, max 200). At RL size, `aquarium_probe`'s boosted kickoff hit sends the ball over the 6.43 m crossbar instead of into the goal.
+- **Ball mass and bounciness** are not yet RL's either.
+- ~~**The ball keeps rescoring.**~~ **Fixed:** the arena now skips goal checks while `Ball.respawn_pending` is true.
+- **Two `aquarium_probe` scenarios still assume the old sizes:** "hit from below" now strikes the top of the smaller, sinking water ball, and the notch-cheek run bounces away. Retune them during the RL-physics pass.
+- **Camera distance and height** are still tuned for the old 1.5 m fish. RL's defaults are about 2.7 m distance, 1.0 m height, FOV 110.
 
 ---
 
@@ -256,7 +287,7 @@ The impulse fires at most once per two ticks and is not applied back to the car.
 ```gdscript
 class_name RLSpace
 ## Rocket League (uu, left-handed, Z up) <-> Godot (m, right-handed, Y up).
-static var k := 2.0                                   # world scale; 2.0 == existing "2x RL" tuning
+static var k := 1.0                                   # world scale; 1.0 == true RL size (decided 2026-10-10)
 const M_PER_UU := 0.01
 const FISH_FROM_CAR := Basis(Vector3.UP, -PI / 2.0)   # car local +X (forward) -> fish nose (-Z)
 
@@ -277,7 +308,9 @@ static func fish_basis(q: Quaternion) -> Basis: return car_basis(q) * FISH_FROM_
   - Positive pitch raises the nose.
 
 ### 5.2 World scale k
-- Add `scripts/world_settings.gd` (`WorldSettings` Resource, `rl_scale` default 2.0). It writes `RLSpace.k` and saves as a new `[world]` debug-panel section.
+> **Decided 2026-10-10: k = 1.** Arena, ball and hitbox are already true RL size. The remaining job is to bring every speed and acceleration down from the old 2× tuning to RL's: use the **k = 1 column** of §9.2, and replace the hard-coded 2× constants listed below with their RL values. Keeping k as a runtime knob is optional, and is only worth it if a bigger-than-RL mode is ever wanted.
+
+- Optional: add `scripts/world_settings.gd` (`WorldSettings` Resource, `rl_scale` default 1.0). It writes `RLSpace.k` and saves as a new `[world]` debug-panel section.
 - **What scales by k:** quantities with length in them (m, m/s, m/s², impulses as Δv).
 - **What doesn't scale:** times, angles, angular velocities and accelerations, ratios (bounciness, friction, hit-curve factors), boost amounts, mass ratios.
 - **Derive these existing constants from k:**
@@ -287,10 +320,10 @@ static func fish_basis(q: Quaternion) -> Basis: return car_basis(q) * FISH_FROM_
 
   At k = 2 these equal today's values, so behaviour doesn't change.
 
-### 5.3 Why an RL Stadium rather than remapping onto the Aquarium
-At k = 2 the RL Stadium is 163.8 m wide × 204.8 m long × 40.9 m tall. Goals are 35.7 × 12.9 × 17.6 m, the ball radius is 1.825 m and an Octane is 2.41 m long.
+### 5.3 Why the arena had to become RL's shape (resolved: the Aquarium now is RL's arena)
+The question is settled, because the Aquarium has been rebuilt to RL dimensions (§2.1). One convention to keep in mind: the Aquarium has Blue defending **+Z**, but RL's blue defends −Y, which `RLSpace` maps to **Godot −Z**. Replay playback must either rotate the arena's team assignment 180° (swap which goal is Blue) or apply a 180° yaw about Y to everything at load. Pick one and test it with the kickoff sanity check.
 
-Per-axis remapping onto the Aquarium (scales x 1.10, y 2.45, z 1.27 at k = 1) would:
+For the record, the old 90 × 50 × 130 m Aquarium could not have been used with per-axis remapping (scales x 1.10, y 2.45, z 1.27). That would have:
 - **Distort arcs and gravity.** The vertical axis would be stretched 2.45× against about 1.2× horizontally, so balls float and aerials look slow-motion.
 - **Break orientation vs velocity.** A non-uniform scale isn't a rotation, so cars flying at angles would visibly slide sideways relative to their nose.
 - **Break contacts.** Dribbles, ball-on-roof, and wall play would hover or interpenetrate.
@@ -437,7 +470,7 @@ For t in [t0, t1], with dt = t1 − t0 and s = (t − t0) / dt:
 
 ---
 
-## 8. Input decoupling & take-over
+## 8. Input decoupling, re-simulation & take-over
 
 ### 8.1 Pluggable input sources (`scripts/input/`)
 ```gdscript
@@ -449,7 +482,7 @@ class_name FishInputSource extends RefCounted
 func sample(fish: FishController, delta: float, out: FishInputFrame) -> void: pass
 # HumanInputSource    – today's Input.* calls, verbatim (default)
 # ScriptedInputSource – keyframed frames / Callable(t); deterministic probes
-# ReplayInputSource   – approximate (throttle/steer/handbrake/flags) – animation & overlay only
+# ReplayInputSource   – per-tick inputs inferred from the replay (see 8.2) – drives re-simulation
 # NullInputSource     – all released (countdown freeze, ghosts)
 # AIInputSource       – later, for bots
 ```
@@ -457,17 +490,70 @@ func sample(fish: FishController, delta: float, out: FishInputFrame) -> void: pa
 - Jump edge detection and stroke detection stay in the controller, so every source gets identical press semantics.
 - **Existing probes keep passing unchanged**, because the default source reads `Input` exactly as before.
 
-### 8.2 Why replays can't be re-simulated
-Replays carry only cosmetic inputs (throttle/steer bytes and handbrake) plus component "active" flags, and our physics isn't bit-identical to RL. Driving a live fish from replay inputs would drift within a second or two.
+### 8.2 Re-simulating replays with our physics (no recorded button presses needed)
+
+> Revised 2026-10-10. An earlier draft said re-simulation was impossible because replays don't record pitch, yaw, roll, jump or boost presses. That was too pessimistic.
+
+With matching sizes and RL-matching physics, the inputs can be **recovered from the motion**. RL's car is a simple, well-documented controller: a few inputs mapped to known accelerations, at 120 Hz. Replays record each car's full rigid-body state (position, rotation, linear and angular velocity) at about 30 Hz. They also record a lot of the controls directly:
+
+| Control | What the replay gives us |
+|---|---|
+| Throttle | `ReplicatedThrottle` byte |
+| Steer | `ReplicatedSteer` byte |
+| Handbrake / powerslide | `bReplicatedHandbrake` |
+| Boost on/off | boost component `ReplicatedActive` (odd = on) |
+| Jump, double jump, dodge timing | jump, double-jump and dodge components `ReplicatedActive` |
+| Dodge direction | `DodgeTorque` / `DodgeImpulse` vectors (gives −pitch, yaw + roll at the dodge) |
+| Pitch / yaw / roll stick in the air | **not replicated, but it can be solved for** (below) |
+| Air roll button vs. yaw | not replicated; folds into the solved roll/yaw (equivalent physics) |
+
+#### Step 1: get the physics to match RL first
+Re-simulation is only meaningful once our model *is* RL's model:
+- **Sizes:** arena, ball and Octane hitbox. Done (§2.1).
+- **Speeds and accelerations:** move every value to RL's (the §9.2 k = 1 column). That covers ground throttle curve, boost, jump, dodge impulses, gravity, ball max speed, drag, restitution, and the hit-impulse curve in uu/s.
+- **Car mass ratio:** 6:1 car to ball.
+- **Hitbox offset** relative to the centre of mass, and **ride height on wheels**. RL's hitbox floats about 18 uu above the ground on suspension; ours sits on the floor (§9.3 G1).
+- **Ground model:** RL's actual model is RocketSim's raycast wheels, lateral friction curve and sticky force (§9.3).
+- **Water-only behaviour off:** drag, buoyancy and swim strokes.
+
+#### Step 2: infer inputs per replay sample (inverse dynamics)
+For each player and each replay interval [t_i, t_{i+1}] (about 33 ms, 4 physics ticks), find the inputs u that take state s_i to s_{i+1} under our physics:
+- **In the air:** RL air control is linear in the stick, `Δω_local = (T·u − D(u)·ω_local)·scale·dt`, with D depending on |u| for pitch and yaw. So pitch, yaw and roll have a **closed-form solution** from the change in angular velocity (expressed in the car frame), clamped to [−1, 1]. Boost comes from its flag (and is confirmed by the change in velocity along the nose).
+- **On a surface:** throttle and steer come straight from the replicated bytes, with handbrake and boost from flags. Verify them against the change in speed and in yaw rate (the steer-angle curve).
+- **Jumps, double jumps and dodges:** the timing comes from component flags, refined to the exact tick by the vertical-velocity step. The dodge direction comes from `DodgeTorque`. Jump hold duration (0.025–0.2 s) comes from how long the upward acceleration lasts.
+- **Discrete search where needed:** when the closed form is ambiguous (contacts, landings, flip cancels), search the small discrete action set (RLGym-style lookup table, about 90 actions) by simulating each candidate over the interval and picking the best match. This is the approach used by bot-training pipelines that learn from human replays. **rlgym-tools** has replay-to-action inference built on RocketSim; check the current API at implementation time.
+- **Output:** a per-tick (120 Hz) input track per player, stored in the intermediate file as `cars[i].inferred_input` (a new schema field) and played back through a `ReplayInputSource`.
+
+#### Step 3: drive our physics, and keep it on track
+Small errors compound: car-ball collisions are chaotic, so open-loop playback will drift.
+- **Closed-loop tracking.** Feed inferred inputs as feedforward plus a small corrective feedback term (PD on position, velocity and orientation error against the replay). The fish then follows the recorded path using only physically possible inputs.
+- **Re-sync points.** At kickoffs, demo respawns, goal resets, and optionally every ball touch, snap the cars and ball to the replay state, then simulate forward again. This bounds drift to one segment.
+- **Modes:**
+  - **Kinematic:** today's plan, exact.
+  - **Ball-only sim:** cars kinematic, the ball fully simulated by our physics from their contacts. This is the cleanest test of ball physics and the hit impulse.
+  - **Full re-sim:** cars driven by inferred inputs, the ball simulated.
+  - **Take-over:** from any frame, a human drives one car live (§8.3).
+
+#### Step 4: measure the divergence (this is how we tune the physics to match RL)
+Use three tiers of reference, from cheapest and most exact to most "real":
+1. **RocketSim** (ZealanL; a headless, deterministic C++ reimplementation of RL physics, validated against the game). Drive RocketSim and our game with the *same* scripted inputs and compare state tick by tick. This isolates our physics errors from replay noise. Python bindings exist (`rocketsim` / RLGym v2), which run via `uv`. **This is the main tuning loop.**
+2. **Real replays.** Run the inverse-dynamics re-sim and report, per segment: position and rotation error over 0.5 / 1 / 2 s horizons, ball-trajectory error after each touch, touch-outcome error (exit speed and direction), and the fraction of time each car needs feedback correction. These become regression probes.
+3. **Side-by-side video.** Record the same replay from RL's replay viewer (fixed or ball cam; optionally BakkesMod for camera control and exact state dumps) next to our playback of the same frames. This catches what numbers miss: visual hitbox alignment, wall and ramp transitions, camera feel, and timing of jumps and flips. Sync the videos on a goal or kickoff event. Video is for qualitative checks; the numbers come from tiers 1–2.
+
+#### Known limits
+- **Undetermined stick inputs.** On the ground with wheels down, the air stick has no effect, so its value is unknown. That doesn't matter, because it changes nothing.
+- **Replay sampling.** At about 30 Hz with jitter, an input that changes within a 4-tick interval is approximated. Use the 120 Hz tick search for jump and dodge starts.
+- **Server vs. client view.** Replays are the server's view, including network corrections, which occasionally show up as teleports.
+- **Exact bit-for-bit match isn't the goal.** "Indistinguishable to the eye, with bounded error between re-syncs" is.
 
 ### 8.3 Take over from here: `ReplayPlayer.take_over(i)`
-1. Pause at t. Ensure the RL Stadium is loaded, and offer to apply the RL preset at the current k.
+1. Pause at t. RL physics must be active; it will be the default once §9 is done.
 2. Add a new `FishController.set_state(xform, lin_vel, ang_vel, boost, jump_state, airborne)`, queued and applied in `_integrate_forces` like `_apply_reset`, followed by `reset_physics_interpolation`. Jump state:
    - on the ground → READY
-   - airborne with the jump flag and no dodge → SECOND_JUMP (full window, since the remaining window is unknown)
+   - airborne with the jump flag and no dodge → SECOND_JUMP (the remaining window is known from the jump time)
    - otherwise → COOLDOWN
 3. Add a new `Ball.set_state(pos, vel, spin)`, applied the same way.
-4. Other players are hidden, or continue as non-colliding ghosts (collidable `AnimatableBody3D` later).
+4. The other players continue on their **inferred inputs** (full re-sim), or as kinematic ghosts.
 5. Switch `input_source` back to `HumanInputSource`. "Rewind" repeats the take-over at t, giving a training loop.
 
 ---
@@ -577,19 +663,22 @@ All existing probes must keep passing after every phase. Probes run as `Godot_co
 
 | Phase | Add / modify | Acceptance probes |
 |---|---|---|
-| **0: Scale foundation** | Add `scripts/rl/rl_space.gd`, `rl_consts.gd`, `scripts/world_settings.gd`. Change `fish_controller.gd` (`UU_PER_SPEED`, `GROUND_WHEELBASE` from k), `ball.gd` (`HIT_CURVE_UU`), `debug_panel.gd` (`[world]` section) and `main.tscn` | `rl_space_probe`: position, quaternion and ω round-trips; yaw ½π puts the nose at +Z; kickoff transforms; the hit curve at k = 2 matches the old table |
-| **1: Converter + loader** | Add `tools/rl_replay/*`, the schema, the `tests/fixtures/replay_min.rlreplay.json` fixture (2 cars, 90 frames, teleport, demo, goal) and `scripts/replay/replay_data.gd` | pytest schema validation. `replay_data_probe`: counts, exact samples, the Hermite midpoint on an analytic parabola, no interpolation across a teleport, presence handling, events. Manual check on a real replay: ball max \|ω\| in [5.5, 6.1], kickoff ball at y ≈ 0.927k, blue car facing +Z |
-| **2: RL Stadium + playback** | Add `scripts/rl_stadium.gd`, the `replay_*.gd` files, `scenes/fish_visual.tscn` and `scripts/fish_visual.gd`. Change `fish.tscn`, `fish_controller.gd`, `follow_camera.gd`, `hud.gd`, `main.gd`, `debug_panel.gd` and `controls.gd` | `replay_playback_probe`: ghosts match the `RLSpace` conversion; scrubbing is deterministic; at `seek_to_goal` the ball is inside the goal volume; demoed cars are hidden; the camera follows; goal replays are skipped. `rl_stadium_probe`: the ball rests at 0.9125k; walls contain the fish; the goal line is correct |
-| **3: Input sources** | Add the `scripts/input/*` files. Change `fish_controller.gd` | All existing probes unchanged. `scripted_input_probe` matches the `Input.action_press` run to 1e-4 |
-| **4: Preset system** | Add `scripts/rl/rl_preset.gd` and `presets/`. Change `debug_panel.gd` (preset row, no-snap setter), widen export ranges, add new exports (`spawn_boost`, hitbox offset/family) | `rl_preset_probe`: values match the table exactly; 100 boost lasts 3.0 s; throttle-only speed tops out at 14.1k; the ball falls 10k m in 1.754 s; **k-invariance**: the same scripted inputs at k = 1 and k = 2 give exactly 2:1 positions with identical timings |
-| **5: Take-over** | Change `fish_controller.gd` (`set_state`), `ball.gd` (`set_state`) and `replay_player.gd` (`take_over`, rewind) | `takeover_probe`: the state is exact on the next tick; the first 0.25 s of ball flight roughly matches the replay |
-| **6: Missing mechanics** | Add `boost_pad.gd`, `match_flow.gd`, and supersonic/demo rules | `boost_pad_probe`, `kickoff_probe`, `supersonic_probe` |
-| **7: Performance and tooling** | v2 binary format, PyInstaller exe, gdext parser | Load-time benchmark |
+| **✓ Sizes (done 2026-10-10)** | Aquarium → RL Soccar arena; RL goals; ball r 0.9125; Octane hitbox with the visual fitted to it (§2.1) | `hitbox_probe` ✓, `surface_probe` ✓, `aquarium_probe` shell containment ✓ (kickoff goal now fails until speeds are RL's) |
+| **0: RL constants + space** | Add `scripts/rl/rl_space.gd` (k = 1) and `rl_consts.gd`. Replace the 2× constants in `fish_controller.gd` (`UU_PER_SPEED` → 100, `GROUND_WHEELBASE` → 0.85) and `ball.gd` (`HIT_CURVE` in uu/s × 0.01) | `rl_space_probe`: position, quaternion and ω round-trips; yaw ½π puts the nose at the correct goal; kickoff transforms |
+| **1: RL physics values** | Move every speed and acceleration export to its k = 1 RL value (§9.2); water off; ball mass 1/6 and bounciness 0.6; camera about 2.7 / 1.0 / FOV 110. Also the preset system (`rl_preset.gd`, panel preset row, no-snap setter) so the water tuning stays available as a preset. Fix the goal-rescore race | `rl_preset_probe`: 100 boost lasts 3.0 s; throttle-only top speed 14.1 m/s; ball falls 10 m in 1.754 s; kickoff boost hit scores again in `aquarium_probe` |
+| **2: RocketSim parity harness** | `tools/rocketsim_compare/` (Python via `uv`, RocketSim bindings): scripted input sequences giving reference state CSVs. Headless `physics_parity_probe` replays the same inputs through our physics and diffs | Per-scenario error budgets: jump apex, dodge, half-flip, air roll, powerslide turn, wall drive, ball bounce, kickoff hit (e.g. < 2 cm / 1° after 1 s) |
+| **3: Converter + loader** | Add `tools/rl_replay/*` (via `uv`), the schema, the fixture and `scripts/replay/replay_data.gd` | Schema tests; `replay_data_probe` (as before); manual real-replay checks (ball \|ω\| ≈ 6, kickoff ball y ≈ 0.93, blue car facing its goal) |
+| **4: Kinematic playback** | The `replay_*.gd` files, `fish_visual.tscn`, `follow_camera.gd` target generalisation, HUD, controls | `replay_playback_probe`: ghosts match the conversion; scrubbing is deterministic; ball inside the goal at goal time; demos hidden |
+| **5: Input sources** | `scripts/input/*`; `fish_controller.gd` `input_source` | Existing probes unchanged; `scripted_input_probe` matches the `Input.action_press` run |
+| **6: Input inference + re-sim** | Converter or runtime step that writes `inferred_input` (closed-form air control, flags, bytes, discrete search). `ReplayInputSource`, tracking controller, re-sync points. Ball-only and full re-sim modes | `resim_probe` on fixture and real replays: per-segment position/rotation error at 0.5 / 1 / 2 s, touch-outcome error, % of ticks needing correction, all within budgets |
+| **7: Video comparison** | Workflow doc and helper: record RL replay viewer plus our playback, synced on a kickoff or goal, shown side by side | Qualitative sign-off on hitbox alignment, ramps and walls, flips, camera |
+| **8: Take-over** | `set_state` on fish and ball; `take_over`, rewind; other cars on inferred inputs | `takeover_probe` |
+| **9: Missing mechanics** | Boost pads, match flow, supersonic and demos, multiple players | `boost_pad_probe`, `kickoff_probe`, `supersonic_probe` |
+| **10: Performance and tooling** | v2 binary format, PyInstaller exe, gdext parser | Load-time benchmark |
 
-**Ordering:** Phase 0 comes first. Phases 1 and 3 can run in parallel. Phase 2 needs 0 and 1. Phase 4 needs 0. Phase 5 needs 2, 3 and 4. Phase 6 needs 4.
+**Ordering:** 0, then 1, then 2 (the physics must match before replays can be judged). Phases 3–5 can run in parallel with 2. Phase 6 needs 1–5. Phase 7 needs 4 (and 6 for re-sim comparisons). Phase 8 needs 6.
 
 ---
-
 ## 11. Risks & open questions
 
 | # | Risk / question | Mitigation |
@@ -605,13 +694,13 @@ All existing probes must keep passing after every phase. Probes run as `Godot_co
 | R9 | Jolt material combine may not give RL's ball-world bounce of 0.6 | Drop-test probe (apex ≈ 0.36h); tune the stadium collider material |
 | R10 | Unverified constants: car-world restitution/friction, ball spin drag, supersonic hysteresis, kickoff ball z | Marked "verify" in `rl_consts.gd`; check against RocketSim before Phase 4 sign-off |
 | R11 | Tunnelling: at k = 2 the ball can move 1 m per tick; at k = 1 the hitbox is very small | CCD on the ball (already on) and on the fish; run probes at both k values |
-| R12 | Team convention: Blue defends −Z in RL Stadium but +Z in the Aquarium | Make HUD and spawn logic per environment |
-| R13 | At k = 2 the arena is large (164 × 205 × 41 m) | Per-k camera presets; set the stadium's fog and far plane |
+| R12 | Team convention: RL blue maps to Godot −Z, but the Aquarium's Blue defends +Z | Swap goal team assignment for replays, or yaw the replay 180°; check with the kickoff sanity probe |
+| R13 | Inverse dynamics is ambiguous at contacts, landings and flip cancels; chaos makes long open-loop re-sims drift | Discrete action search over the interval; closed-loop correction; re-sync at kickoffs, respawns and touches; judge by bounded per-segment error |
 | R14 | Sources disagree on several values: ceiling 2044 vs 2048, ball radius 91.25 vs 92.75, boost-pad pickup heights; kickoff and goal-reset durations are unsourced | Use RocketSim values; measure durations from replay metadata |
 | L1 | **Licensing / privacy:** subtr-actor and boxcars are MIT; replays contain player names | Keep license notices; never commit third-party replays (`samples/` is gitignored); `--anonymize`; no platform ids; no RL assets (ghosts use our fish visuals) |
-| Q1 | Default k: 2 (matches current feel) or 1 (true metres)? | Recommend 2; k = 1 stays selectable, guarded by the k-invariance probe |
-| Q2 | Should the live fish's visual scale to fit the RL hitbox (2.41 m at k = 2 vs. today's 1.5 m)? | Suggest scaling the `Visual` node uniformly when the RL preset is active |
-| Q3 | Should the RL preset force the RL Stadium? | Suggest keeping it environment-agnostic, with a prompt offering to switch |
+| Q1 | ~~Default k~~ | **Resolved: k = 1, true RL size** (2026-10-10) |
+| Q2 | ~~Fit the visual to the hitbox?~~ | **Done:** `Visual` scales to fill the hitbox (non-uniformly) |
+| Q3 | ~~RL Stadium?~~ | **Resolved:** the Aquarium is the RL arena now |
 
 ---
 

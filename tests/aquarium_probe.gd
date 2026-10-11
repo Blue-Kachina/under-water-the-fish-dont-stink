@@ -45,14 +45,12 @@ func once(key: String, at: float) -> bool:
 		return true
 	return false
 
-## How far a point is past the tank's rounded inner surface (0 when inside).
+## How far a point is past the tank's inner surface (0 when inside).
 func outside(p: Vector3) -> float:
 	var half := AquariumArena.SIZE / 2.0
-	if absf(p.x) < AquariumArena.GOAL_SIZE.x / 2.0 and p.y < AquariumArena.GOAL_SIZE.y and absf(p.z) > half.z - AquariumArena.CORNER_RADIUS:
+	if absf(p.x) < AquariumArena.GOAL_SIZE.x / 2.0 and p.y < AquariumArena.GOAL_SIZE.y and absf(p.z) > half.z - AquariumArena.EDGE_RADIUS:
 		return 0.0  # in a goal mouth or the notch in front of it
-	var limit := half - Vector3.ONE * AquariumArena.CORNER_RADIUS
-	var local := p - aquarium.centre
-	return maxf((local - local.clamp(-limit, limit)).length() - AquariumArena.CORNER_RADIUS, 0.0)
+	return maxf(AquariumArena.distance_outside(p), 0.0)
 
 func boost(on: bool) -> void:
 	if on:
@@ -99,9 +97,9 @@ func _physics_process(delta: float) -> void:
 
 	# Dropped Surface ball falls under gravity.
 	if once("drop", 10.0):
-		ball.respawn(Vector3(0, 20, 0))
+		ball.respawn(Vector3(0, 18, 0))
 	if once("drop read", 11.0):
-		print("surface ball dropped from 20 m: after 1 s at y=%.2f, vy=%.2f (no-drag estimate %.2f and %.2f)" % [ball.global_position.y, ball.linear_velocity.y, 20.0 - settings.gravity / 2.0, -settings.gravity])
+		print("surface ball dropped from 18 m: after 1 s at y=%.2f, vy=%.2f (no-drag estimate %.2f and %.2f)" % [ball.global_position.y, ball.linear_velocity.y, 18.0 - settings.gravity / 2.0, -settings.gravity])
 
 	# Water ball: inherited drag (fish linear_drag) vs custom zero drag.
 	if once("water", 12.0):
@@ -134,7 +132,7 @@ func _physics_process(delta: float) -> void:
 	if once("notch", 21.0):
 		print("corner: fish at %s, max outside so far %.2f m" % [fish.global_position, max_outside])
 		# Diagonally down into the notch's side cheek in front of the blue goal.
-		fish.set_spawn(Transform3D(Basis.looking_at(Vector3(1, -0.3, 1).normalized()), Vector3(0, 6, 45)))
+		fish.set_spawn(Transform3D(Basis.looking_at(Vector3(1, -0.3, 1).normalized()), Vector3(0, 4, 40)))
 	if once("notch read", 24.0):
 		print("notch cheek: fish at %s, max outside so far %.2f m" % [fish.global_position, max_outside])
 		boost(false)
@@ -162,7 +160,7 @@ func _physics_process(delta: float) -> void:
 		if once("up hit %d" % run, at):
 			settings.hit_up_scale = [0.35, 1.0][run]
 			aquarium.reset_kickoff()
-			fish.set_spawn(Transform3D(Basis.looking_at(Vector3(0, 1, -1).normalized()), aquarium.centre + Vector3(0, -12, 12)))
+			fish.set_spawn(Transform3D(Basis.looking_at(Vector3(0, 1, -1).normalized()), aquarium.centre + Vector3(0, -8, 8)))
 			boost(true)
 		if once("up hit read %d" % run, at + 1.5):
 			boost(false)

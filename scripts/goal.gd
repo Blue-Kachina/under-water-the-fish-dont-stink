@@ -5,14 +5,15 @@ extends Node3D
 ## Like Rocket League, a goal counts once the whole ball is past the goal line.
 
 const NET_SHADER := preload("res://shaders/net.gdshader")
-const POST_RADIUS := 0.45
+const POST_RADIUS := 0.3
 const WALL := 1.0  # thickness of the solid net panels
 
 @export var team := 0
 @export var color := Color(1.0, 0.5, 0.1)
-@export var width := 28.0
-@export var height := 16.0
-@export var depth := 12.0
+## Mouth size and depth; defaults are Rocket League's goal.
+@export var width := 17.8551
+@export var height := 6.42775
+@export var depth := 8.8
 ## Off for a goal standing on the floor, so the ball can roll straight in.
 @export var bottom_post := true
 
@@ -36,12 +37,13 @@ func _ready() -> void:
 	frame.emission_enabled = true
 	frame.emission = color
 	frame.emission_energy_multiplier = 1.2
-	# Rounded posts around the mouth so the ball glances off the frame.
-	_add_post(Vector3(half_w, 0, 0), Vector3.UP, height, frame)
-	_add_post(Vector3(-half_w, 0, 0), Vector3.UP, height, frame)
-	_add_post(Vector3(0, half_h, 0), Vector3.RIGHT, width, frame)
+	# Rounded posts just outside the mouth (so it stays width x height) so the
+	# ball glances off the frame.
+	_add_post(Vector3(half_w + POST_RADIUS, 0, 0), Vector3.UP, height, frame)
+	_add_post(Vector3(-half_w - POST_RADIUS, 0, 0), Vector3.UP, height, frame)
+	_add_post(Vector3(0, half_h + POST_RADIUS, 0), Vector3.RIGHT, width + POST_RADIUS * 2.0, frame)
 	if bottom_post:
-		_add_post(Vector3(0, -half_h, 0), Vector3.RIGHT, width, frame)
+		_add_post(Vector3(0, -half_h - POST_RADIUS, 0), Vector3.RIGHT, width + POST_RADIUS * 2.0, frame)
 
 	var glow := OmniLight3D.new()
 	glow.light_color = color
