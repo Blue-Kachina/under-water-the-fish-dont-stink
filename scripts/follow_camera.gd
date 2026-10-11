@@ -17,8 +17,16 @@ const LAG_RATE := 6.0
 const SWIVEL_RATE := 2.0
 ## Seconds a ball cam toggle takes at transition speed 1 (approximate).
 const TRANSITION_TIME := 0.5
+## The camera's turning (and roll) never speeds up or slows down faster than
+## this (rad/s^2), so a big swing, like turning round after a half flip, starts
+## and ends gently instead of with a lurch.
+const MAX_TURN_ACCEL := 40.0
 
 @export var fish: FishController
+## Followed instead of the fish while set, e.g. a replay's ghost (ReplayCar),
+## which offers the fish's fields the camera reads: on_surface,
+## linear_velocity and is_flipping().
+var target: Node3D
 ## Set by the environment; null when there's no ball.
 var ball: Node3D
 var ball_cam := false
@@ -69,13 +77,20 @@ var ball_cam := false
 @export_group("Collision")
 @export_range(0.0, 1.0, 0.05) var collision_margin := 0.5
 
+## The camera's own orientation, and how fast it's turning (world-space angular
+## velocity). It turns on a critically damped spring toward where it wants to
+## look, so its turning never jumps from one frame to the next: not when a
+## dodge ends, a ball cam toggle finishes or the fish lands.
 var _rotation := Quaternion.IDENTITY
+var _spin := Vector3.ZERO
 ## Camera up, carried from frame to frame so its roll can only turn, never jump.
 var _up := Vector3.UP
 var _look_yaw := 0.0
 var _look_pitch := 0.0
 ## How far the camera has fallen behind (see stiffness).
 var _lag := Vector3.ZERO
+var _lag_speed := Vector3.ZERO
+var _roll_speed := 0.0
 var _transition_left := 0.0
 ## Still rolling back to level after leaving a surface (see roll_with_surface).
 var _leaving_surface := false
@@ -97,8 +112,33 @@ func is_option_active(property: String) -> bool:
 	return property != "roll_follow" or not lock_roll_to_fish
 
 
+## Jump straight to the view behind the target, with no easing (after a cut).
+func snap() -> void:
+	var subject: Variant = _subject()
+	if subject == null:
+		return
+	var xform: Transform3D = subject.global_transform
+	_up = xform.basis.y if subject.on_surface else Vector3.UP
+	var forward := -xform.basis.z
+	if absf(forward.dot(_up)) > 0.99:
+		_up = xform.basis.y
+	_rotation = Basis.looking_at(forward, _up).get_rotation_quaternion()
+	_spin = Vector3.ZERO
+	_lag = Vector3.ZERO
+	_lag_speed = Vector3.ZERO
+	_roll_speed = 0.0
+	_leaving_surface = false
+
+
+## What the camera follows: the target if set, otherwise the fish. Untyped:
+## the target only has to look like the fish.
+func _subject() -> Variant:
+	return target if is_instance_valid(target) else fish
+
+
 func _process(delta: float) -> void:
-	if fish == null:
+	var subject: Variant = _subject()
+	if subject == null:
 		return
 
 	if Input.is_action_just_pressed("ball_cam"):
@@ -106,7 +146,7 @@ func _process(delta: float) -> void:
 		_transition_left = TRANSITION_TIME / transition_speed
 	_transition_left = maxf(_transition_left - delta, 0.0)
 
-	var fish_xform := fish.get_global_transform_interpolated()
+	var fish_xform: Transform3D = subject.get_global_transform_interpolated()
 	var fish_up := fish_xform.basis.y
 	var to_ball := Vector3.ZERO
 	if ball_cam and is_instance_valid(ball) and ball.visible:
@@ -114,20 +154,24 @@ func _process(delta: float) -> void:
 	var tracking_ball := to_ball.length_squared() > 0.01
 	# On a wall or the ceiling the fish's up is the camera's up (RL style),
 	# and always well defined there, even driving straight up a wall.
-	var surface_roll := roll_with_surface and not lock_roll_to_fish and fish.on_surface
+	var surface_roll: bool = roll_with_surface and not lock_roll_to_fish and subject.on_surface
 	# Hold still for the whole flip, cancelled or not: the fish is still spinning.
 	# Ball cam keeps tracking the ball through flips, as in Rocket League.
-	if tracking_ball or follow_dodge_spin or not fish.is_flipping():
+	# (Holding, the camera's own turning eases to a stop.)
+	var target_rotation := _rotation
+	var rate := rotation_stiffness
+	if tracking_ball or follow_dodge_spin or not subject.is_flipping():
 		# Aim where the fish faces, but with the camera's own (levelled) up
 		# rather than the fish's full orientation. Turning to face backwards
 		# after a half flip is then a level swing around, not a tumble over the
 		# top, which would flip the view as it passed straight up.
 		var target_forward := to_ball.normalized() if tracking_ball else -fish_xform.basis.z
 		var frame_up := fish_up if surface_roll and absf(target_forward.dot(fish_up)) < 0.95 else _target_up(target_forward, fish_up, tracking_ball, _up)
-		var target_frame := Basis.looking_at(target_forward, frame_up)
+		target_rotation = Basis.looking_at(target_forward, frame_up).get_rotation_quaternion()
 		# A ball cam toggle swings over at the transition speed instead.
-		var rate := 3.0 / (TRANSITION_TIME / transition_speed) if _transition_left > 0.0 else rotation_stiffness
-		_rotation = _rotation.slerp(target_frame.get_rotation_quaternion(), 1.0 - exp(-rate * delta))
+		if _transition_left > 0.0:
+			rate = 3.0 / (TRANSITION_TIME / transition_speed)
+	_turn_toward(target_rotation, rate, delta)
 	var follow := Basis(_rotation)
 	var forward := -follow.z
 
@@ -144,7 +188,11 @@ func _process(delta: float) -> void:
 			# Off a wall: ease back to level, slower than an air lean.
 			roll_rate = minf(roll_stiffness, level_return_rate)
 			_leaving_surface = absf(_roll_to(up, target_up, forward)) > 0.03
-	up = up.rotated(forward, _roll_to(up, target_up, forward) * (1.0 - exp(-roll_rate * delta)))
+	# Roll on a spring too (see _rotation), in the angle between up and its target.
+	var roll_error := -_roll_to(up, target_up, forward)
+	var rolled := _spring_step(roll_error, _roll_speed, 2.0 * roll_rate, delta, MAX_TURN_ACCEL)
+	_roll_speed = rolled.y
+	up = up.rotated(forward, rolled.x - roll_error)
 	_up = up
 
 	var look_input := Input.get_vector("camera_left", "camera_right", "camera_up", "camera_down")
@@ -156,8 +204,12 @@ func _process(delta: float) -> void:
 			* Basis(Vector3.UP, _look_yaw) \
 			* Basis(Vector3.RIGHT, _look_pitch)
 	# Falls behind at speed, by how loose the stiffness is.
-	var lag_target := -fish.linear_velocity * MAX_LAG_TIME * (1.0 - stiffness)
-	_lag = _lag.lerp(lag_target, 1.0 - exp(-LAG_RATE * delta))
+	var lag_target: Vector3 = -subject.linear_velocity * MAX_LAG_TIME * (1.0 - stiffness)
+	var lag_error := _lag - lag_target
+	for axis in 3:
+		var lagged := _spring_step(lag_error[axis], _lag_speed[axis], 2.0 * LAG_RATE, delta)
+		_lag[axis] = lag_target[axis] + lagged.x
+		_lag_speed[axis] = lagged.y
 	var anchor := fish_xform.origin + view.y * height
 	var eye := fish_xform.origin + view * Vector3(0.0, height, distance) + _lag
 	var look_basis := view * Basis(Vector3.RIGHT, deg_to_rad(angle))
@@ -173,6 +225,60 @@ func _process(delta: float) -> void:
 	global_transform = Transform3D(look_basis.orthonormalized(), eye)
 
 
+## Turns the camera toward `target` on a critically damped spring. `rate` is the
+## old first-order follow rate (1/s): the spring runs at twice it, which lags a
+## steady turn by the same amount (2 / omega = 1 / rate) but never jumps.
+func _turn_toward(target: Quaternion, rate: float, delta: float) -> void:
+	var error := _rotation_vector(_rotation * target.inverse())  # where it is, relative to the target
+	var turned := Vector3.ZERO
+	var spin := Vector3.ZERO
+	var speed := error.length() + _spin.length()
+	if speed < 1e-9:
+		_spin = Vector3.ZERO
+		return
+	# The spring acts along the error, with the spin split along and across it.
+	var along := error.normalized() if error.length_squared() > 1e-12 else _spin.normalized()
+	var spin_along := _spin.dot(along)
+	var stepped := _spring_step(error.length() if error.length_squared() > 1e-12 else 0.0, spin_along, 2.0 * rate, delta, MAX_TURN_ACCEL)
+	var across := _spin - along * spin_along
+	var across_step := _spring_step(0.0, across.length(), 2.0 * rate, delta, MAX_TURN_ACCEL)
+	turned = along * stepped.x + (across.normalized() * across_step.x if across.length_squared() > 1e-12 else Vector3.ZERO)
+	spin = along * stepped.y + (across.normalized() * across_step.y if across.length_squared() > 1e-12 else Vector3.ZERO)
+	_spin = spin
+	_rotation = (_quaternion_from(turned) * target).normalized()
+
+
+## One frame of a critically damped spring (exact): `x` is the distance from the
+## target, `v` its rate of change, `omega` the spring's frequency. Returns the
+## new (x, v). With `max_accel`, the rate changes no faster than that.
+static func _spring_step(x: float, v: float, omega: float, dt: float, max_accel := INF) -> Vector2:
+	var decay := exp(-omega * dt)
+	var c := v + omega * x
+	var new_v := (v - omega * c * dt) * decay
+	if absf(new_v - v) > max_accel * dt:
+		new_v = v + signf(new_v - v) * max_accel * dt
+		return Vector2(x + (v + new_v) * 0.5 * dt, new_v)
+	return Vector2((x + c * dt) * decay, new_v)
+
+
+## A rotation as a vector: its axis, times its angle (the shorter way round).
+static func _rotation_vector(q: Quaternion) -> Vector3:
+	if q.w < 0.0:
+		q = -q
+	var s := Vector3(q.x, q.y, q.z)
+	var half := atan2(s.length(), q.w)
+	if s.length_squared() < 1e-14:
+		return s * 2.0
+	return s.normalized() * half * 2.0
+
+
+static func _quaternion_from(rotation_vector: Vector3) -> Quaternion:
+	var angle := rotation_vector.length()
+	if angle < 1e-9:
+		return Quaternion.IDENTITY
+	return Quaternion(rotation_vector / angle, angle)
+
+
 ## How far a sphere of `radius` gets from `from` toward `to` before touching
 ## anything solid (the fish and ball don't count). A ray along the same line
 ## backs it up: a sphere that starts out already touching a surface can be
@@ -183,7 +289,10 @@ func _sweep(from: Vector3, to: Vector3, radius: float) -> Vector3:
 	if length < 0.0001:
 		return from
 	var space := get_world_3d().direct_space_state
-	var exclude: Array[RID] = [fish.get_rid()]
+	var exclude: Array[RID] = []
+	for body: Variant in [fish, target]:
+		if is_instance_valid(body) and body is CollisionObject3D:
+			exclude.append((body as CollisionObject3D).get_rid())
 	if is_instance_valid(ball) and ball is CollisionObject3D:
 		exclude.append((ball as CollisionObject3D).get_rid())
 

@@ -108,6 +108,9 @@ func _spawn(scenario: Dictionary) -> void:
 			main.add_child(own_ball)
 		ball = own_ball
 	var start: Dictionary = scenario.start
+	var character := FishCharacter.from_key(scenario.get("hitbox", "octane"))
+	if fish.character != character:
+		fish.set_deferred("character", character)  # not mid physics callback; lands before the start tick
 	for setting: String in scenario.get("settings", {}):
 		fish.set(setting, scenario.settings[setting])
 	fish.set_spawn(Transform3D(_basis(start), _pos(start.centre)))

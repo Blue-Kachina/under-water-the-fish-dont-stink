@@ -2,7 +2,9 @@ extends CanvasLayer
 ## Live tuning panel. Lists every @export_range float, @export bool and @export
 ## enum on the fish, the camera and the ball settings, writes changes to them
 ## immediately, and saves/loads them. Add a new export to any of them and it
-## appears here. A target can hide options that don't apply with is_option_active().
+## appears here, in a collapsible panel for its @export_group (all start
+## collapsed). A target can hide options that don't apply with is_option_active().
+## Also picks the environment and the fish's character (FishCharacter).
 ##
 ## Controls are mouse-only (no keyboard/gamepad focus) so the controller keeps
 ## flying the fish while you drag sliders.
@@ -16,6 +18,8 @@ const DEFAULT_PRESET := "Rocket League (defaults)"
 ## Saved tuning carries this; older saves (the underwater tuning from before the
 ## switch to Rocket League physics) aren't loaded automatically at startup.
 const TUNING_VERSION := 2
+## Where the replay picker remembers its folder (shared with main.gd's settings).
+const REPLAY_SETTINGS_PATH := "user://playground.cfg"
 
 @export var fish: FishController
 @export var follow_camera: Camera3D
@@ -26,12 +30,16 @@ var _defaults := {}
 var _editors := {}  # "section/property" -> HSlider, CheckBox or OptionButton
 var _value_labels := {}  # "section/property" -> a slider's value Label
 var _rows := {}  # "section/property" -> the control to hide when the option doesn't apply
-var _group_labels := {}  # group heading Label -> its "section/property" keys
+var _group_panels := {}  # group's FoldableContainer -> its "section/property" keys
 var _panel: PanelContainer
 var _status: Label
 var _environment_row: HBoxContainer
+var _character_picker: OptionButton
 
 signal environment_selected(env_name: String)
+signal character_selected(character: FishCharacter.Family)
+## A replay file was picked (.replay or .rlreplay.json).
+signal replay_requested(path: String)
 
 
 func _ready() -> void:
@@ -114,6 +122,27 @@ func _build_ui() -> void:
 	_environment_row = HBoxContainer.new()  # filled in by set_environments()
 	root.add_child(_environment_row)
 
+	var character_row := HBoxContainer.new()
+	root.add_child(character_row)
+	var character_label := Label.new()
+	character_label.text = "Character"
+	character_row.add_child(character_label)
+	_character_picker = OptionButton.new()
+	_character_picker.focus_mode = Control.FOCUS_NONE
+	for family: FishCharacter.Family in FishCharacter.CARS:
+		_character_picker.add_item(FishCharacter.display_name(family), family)
+	_character_picker.item_selected.connect(func(index: int) -> void:
+		character_selected.emit(_character_picker.get_item_id(index))
+		_status.text = "Character: %s (remembered on this PC)" % _character_picker.get_item_text(index))
+	character_row.add_child(_character_picker)
+
+	var replay_row := HBoxContainer.new()
+	root.add_child(replay_row)
+	var replay_label := Label.new()
+	replay_label.text = "Rocket League replay"
+	replay_row.add_child(replay_label)
+	replay_row.add_child(_button("Watch a replay...", _pick_replay))
+
 	_status = Label.new()
 	_status.modulate = Color(1, 1, 1, 0.6)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -129,6 +158,51 @@ func _build_ui() -> void:
 
 	for section: String in _targets:
 		_build_section(list, section, _targets[section])
+
+
+func show_status(text: String) -> void:
+	_status.text = text
+
+
+## Opens a file picker in the folder last picked from; the first time, in the
+## project's private_content/replays (gitignored) or else Rocket League's own
+## replay folder.
+func _pick_replay() -> void:
+	var dialog := FileDialog.new()
+	dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	dialog.access = FileDialog.ACCESS_FILESYSTEM
+	dialog.use_native_dialog = true
+	dialog.title = "Watch a Rocket League replay"
+	dialog.filters = PackedStringArray(["*.replay, *.rlreplay.json ; Rocket League replays"])
+	var settings := ConfigFile.new()
+	settings.load(REPLAY_SETTINGS_PATH)
+	for dir: String in [settings.get_value("replay", "last_dir", ""),
+			ProjectSettings.globalize_path("res://private_content/replays"),
+			OS.get_executable_path().get_base_dir().path_join("../../private_content/replays").simplify_path(),
+			OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS).path_join("My Games/Rocket League/TAGame/Demos")]:
+		if not dir.is_empty() and DirAccess.dir_exists_absolute(dir):
+			dialog.current_dir = dir
+			break
+	dialog.file_selected.connect(func(path: String) -> void:
+		settings.set_value("replay", "last_dir", path.get_base_dir())
+		settings.save(REPLAY_SETTINGS_PATH)
+		replay_requested.emit(path)
+		dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered_ratio(0.6)
+
+
+## Shows `character` as picked in the Character row (selections are reported
+## via character_selected).
+func set_character(character: FishCharacter.Family) -> void:
+	_character_picker.select(_character_picker.get_item_index(character))
+
+
+## The character can only be changed while playing, not during a replay.
+func set_character_enabled(enabled: bool) -> void:
+	_character_picker.disabled = not enabled
+	_character_picker.tooltip_text = "" if enabled else "Close the replay to change character"
 
 
 ## Adds the environment picker; selections are reported via environment_selected.
@@ -155,18 +229,23 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 	list.add_child(header)
 
 	var shown_group := ""
-	var group_label: Label
+	var group_panel: FoldableContainer
+	var group_list: VBoxContainer
 	for property in _tunable_properties(target):
 		var prop: String = property.name
 		var key := "%s/%s" % [section, prop]
-		if property.group != shown_group:
+		if group_panel == null or property.group != shown_group:
 			shown_group = property.group
-			group_label = Label.new()
-			group_label.text = shown_group
-			group_label.modulate = Color(0.55, 0.85, 1.0)
-			list.add_child(group_label)
-			_group_labels[group_label] = []
-		_group_labels[group_label].append(key)
+			group_panel = FoldableContainer.new()
+			group_panel.title = shown_group if shown_group else "General"
+			group_panel.folded = true
+			group_panel.focus_mode = Control.FOCUS_NONE
+			group_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			list.add_child(group_panel)
+			group_list = VBoxContainer.new()
+			group_panel.add_child(group_list)
+			_group_panels[group_panel] = []
+		_group_panels[group_panel].append(key)
 
 		var editor: Control
 		if property.type == TYPE_BOOL:
@@ -177,7 +256,7 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 				target.set(prop, on)
 				_refresh_visibility())
 			editor = check
-			list.add_child(check)
+			group_list.add_child(check)
 			_rows[key] = check
 		elif property.type == TYPE_INT:  # enum
 			var row := HBoxContainer.new()
@@ -197,7 +276,7 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 				_refresh_visibility())
 			row.add_child(picker)
 			editor = picker
-			list.add_child(row)
+			group_list.add_child(row)
 			_rows[key] = row
 		else:
 			var row := HBoxContainer.new()
@@ -228,7 +307,7 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 				value_label.text = "%.2f" % value)
 			editor = slider
 			_value_labels[key] = value_label
-			list.add_child(row)
+			group_list.add_child(row)
 			_rows[key] = row
 
 		editor.focus_mode = Control.FOCUS_NONE
@@ -239,14 +318,14 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 
 
 ## Hides options a target says don't apply right now (via an optional
-## is_option_active(property) method), and group headings left empty.
+## is_option_active(property) method), and group panels left empty.
 func _refresh_visibility() -> void:
 	for key: String in _rows:
 		var parts := key.split("/")
 		var target: Object = _targets[parts[0]]
 		_rows[key].visible = not target.has_method("is_option_active") or target.is_option_active(parts[1])
-	for label: Label in _group_labels:
-		label.visible = _group_labels[label].any(func(key: String) -> bool: return _rows[key].visible)
+	for group_panel: FoldableContainer in _group_panels:
+		group_panel.visible = _group_panels[group_panel].any(func(key: String) -> bool: return _rows[key].visible)
 
 
 ## Script variables exported as a float range, a bool or an enum, tagged with their @export_group.

@@ -85,6 +85,20 @@ func _enter_tree() -> void:
 	_button("reset", JOY_BUTTON_START, [KEY_R])
 	_button("toggle_panel", JOY_BUTTON_BACK, [KEY_F1, KEY_TAB])
 
+	# Replay playback (only while a replay plays; the jump button also plays and
+	# pauses, and boost switches the Camera between Player and Director).
+	_keys("replay_play_pause", [KEY_P])
+	_button("replay_back", JOY_BUTTON_DPAD_LEFT, [KEY_COMMA])
+	_button("replay_forward", JOY_BUTTON_DPAD_RIGHT, [KEY_PERIOD])
+	_button("replay_next_target", JOY_BUTTON_DPAD_UP, [KEY_T])
+	_button("replay_previous_target", JOY_BUTTON_DPAD_DOWN, [KEY_G])
+	_keys("replay_previous_goal", [KEY_BRACKETLEFT])
+	_keys("replay_next_goal", [KEY_BRACKETRIGHT])
+	_keys("replay_slower", [KEY_MINUS])
+	_keys("replay_faster", [KEY_EQUAL])
+	_keys("replay_hitboxes", [KEY_H])
+	_keys("replay_camera", [KEY_V])
+
 	var settings := ConfigFile.new()
 	if settings.load(SETTINGS_PATH) == OK:
 		current_profile = settings.get_value("controls", "profile", current_profile)
@@ -132,6 +146,11 @@ func _button(action: StringName, button: JoyButton, keys: Array) -> void:
 	event.device = -1
 	event.button_index = button
 	InputMap.action_add_event(action, event)
+	_add_keys(action, keys)
+
+
+func _keys(action: StringName, keys: Array) -> void:
+	_reset_action(action, DEADZONE_BUTTON)
 	_add_keys(action, keys)
 
 

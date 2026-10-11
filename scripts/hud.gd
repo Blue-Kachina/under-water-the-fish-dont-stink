@@ -1,5 +1,7 @@
 extends CanvasLayer
 ## Speed, orientation and course readouts plus a live controller-input display.
+## While a replay plays (set_replay), the scoreboard, clock and the followed
+## player's readouts instead.
 
 @export var fish: FishController
 @export var arena: Arena
@@ -11,6 +13,9 @@ var _boost_bar: ProgressBar
 var _course: Label
 var _banner: Label
 var _banner_time_left := 0.0
+var _viz: InputViz
+var _hint: Label
+var replay: ReplayPlayer
 
 
 func _ready() -> void:
@@ -39,26 +44,26 @@ func _ready() -> void:
 	_banner.modulate = Color(1.0, 0.9, 0.3)
 	add_child(_banner)
 
-	var viz := InputViz.new()
-	viz.fish = fish
-	viz.anchor_left = 1.0
-	viz.anchor_right = 1.0
-	viz.anchor_top = 1.0
-	viz.anchor_bottom = 1.0
-	viz.offset_left = -300.0
-	viz.offset_top = -130.0
-	viz.offset_right = -16.0
-	viz.offset_bottom = -16.0
-	add_child(viz)
+	_viz = InputViz.new()
+	_viz.fish = fish
+	_viz.anchor_left = 1.0
+	_viz.anchor_right = 1.0
+	_viz.anchor_top = 1.0
+	_viz.anchor_bottom = 1.0
+	_viz.offset_left = -300.0
+	_viz.offset_top = -130.0
+	_viz.offset_right = -16.0
+	_viz.offset_bottom = -16.0
+	add_child(_viz)
 
-	var hint := Label.new()
-	hint.text = "View/F1: tuning panel    Start/R: reset    Right stick/IJKL: look around    Y: ball cam"
-	hint.anchor_top = 1.0
-	hint.anchor_bottom = 1.0
-	hint.offset_left = 16.0
-	hint.offset_top = -36.0
-	hint.modulate = Color(1, 1, 1, 0.6)
-	add_child(hint)
+	_hint = Label.new()
+	_hint.anchor_top = 1.0
+	_hint.anchor_bottom = 1.0
+	_hint.offset_left = 16.0
+	_hint.offset_top = -36.0
+	_hint.modulate = Color(1, 1, 1, 0.6)
+	add_child(_hint)
+	_update_hint()
 
 	set_arena(arena)
 
@@ -83,7 +88,31 @@ func set_aquarium(new_aquarium: AquariumArena) -> void:
 		aquarium.goal_scored.connect(_on_goal_scored)
 
 
+## Show a replay's readouts instead of the fish's, or null to go back.
+func set_replay(new_replay: ReplayPlayer) -> void:
+	replay = new_replay
+	_banner.text = ""
+	_banner_time_left = 0.0
+	if replay:
+		replay.target_changed.connect(func(car: ReplayCar) -> void: _viz.fish = car)
+		replay.goal_reached.connect(_on_replay_goal)
+		_viz.fish = replay.target
+	else:
+		_viz.fish = fish
+	_update_hint()
+
+
+func _update_hint() -> void:
+	if replay:
+		_hint.text = "P/jump: play    , . / D-pad: 5 s    [ ]: goals    V/boost: camera    T G / D-pad: target    - =: speed    H: hitboxes    Y: ball cam"
+	else:
+		_hint.text = "View/F1: tuning panel    Start/R: reset    Right stick/IJKL: look around    Y: ball cam"
+
+
 func _process(delta: float) -> void:
+	if is_instance_valid(replay):
+		_replay_readouts(delta)
+		return
 	if fish == null:
 		return
 
@@ -128,6 +157,58 @@ func _process(delta: float) -> void:
 
 func _on_course_finished(time: float, is_best: bool) -> void:
 	_banner.text = "Course complete: %.2f s%s" % [time, "  NEW BEST!" if is_best else ""]
+	_banner_time_left = 3.0
+
+
+func _replay_readouts(delta: float) -> void:
+	var data := replay.data
+	var t := replay.time
+	var score := data.score_at(t)
+	var frame := data.frame_at(t)
+	var seconds := data.seconds_remaining[frame]
+	var state := data.game_state[frame]
+	var clock := "%d:%02d" % [seconds / 60, seconds % 60]
+	if seconds == 0 and state == ReplayData.GAME_LIVE and t > 0.0:
+		clock = "OT"
+	var line := "BLUE  %d  -  %d  ORANGE    %s" % [score[0], score[1], clock]
+	if state == ReplayData.GAME_COUNTDOWN and data.kickoff_countdown[frame] > 0:
+		line += "    kickoff in %d" % data.kickoff_countdown[frame]
+	_course.text = line
+
+	var car := replay.target
+	if car:
+		var actions := PackedStringArray()
+		for pair: Array in [[ReplayData.FLAG_BOOST, "boost"], [ReplayData.FLAG_JUMP, "jump"],
+				[ReplayData.FLAG_DOUBLE_JUMP, "double jump"], [ReplayData.FLAG_DODGE, "dodge"],
+				[ReplayData.FLAG_POWERSLIDE, "powerslide"], [ReplayData.FLAG_SUPERSONIC, "supersonic"]]:
+			if car.flags & pair[0]:
+				actions.append(pair[1])
+		_stats.text = "
+".join([
+			"%s  (%s)" % [car.player.name, AquariumArena.TEAM_NAMES[car.team]],
+			"Car       %s hitbox" % car.player.hitbox_family.capitalize(),
+			"Speed     %4.0f uu/s  %4.1f m/s" % [car.speed / RLSpace.M_PER_UU, car.speed],
+			"Boost     %3.0f" % car.boost_amount,
+			"Surface   %s" % ("yes" if car.on_surface else "-"),
+			"Doing     %s" % (", ".join(actions) if not actions.is_empty() else "-"),
+			"Replay    %s" % data.path.get_file().get_basename().get_basename(),
+		])
+		_speed_bar.max_value = 23.0  # RL's top speed, 2300 uu/s
+		_speed_bar.value = car.speed if car.visible else 0.0
+		_boost_bar.value = car.boost_amount
+
+	_banner_time_left -= delta
+	if _banner_time_left <= 0.0:
+		_banner.text = ""
+
+
+func _on_replay_goal(event: Dictionary) -> void:
+	var team: int = event.team
+	var scorer = event.get("player")
+	if scorer != null and scorer < replay.data.players.size():
+		_banner.text = "%s SCORES FOR %s!" % [replay.data.players[scorer].name, AquariumArena.TEAM_NAMES[team].to_upper()]
+	else:
+		_banner.text = "%s SCORES!" % AquariumArena.TEAM_NAMES[team].to_upper()
 	_banner_time_left = 3.0
 
 
@@ -187,7 +268,8 @@ func _centred_label(top: float, font_size: int) -> Label:
 ## Draws the left stick, triggers and held buttons so you can see exactly what
 ## the fish is receiving while tuning.
 class InputViz extends Control:
-	var fish: FishController
+	## The live fish, or anything with its input fields (a replay's ReplayCar).
+	var fish  # untyped: read by field name
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE

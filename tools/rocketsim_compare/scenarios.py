@@ -11,6 +11,10 @@ yaw are independent.
 
 `arena` is "void" (RocketSim's THE_VOID / the game's Ocean: no floor or walls)
 or "soccar" (needs RocketSim's collision meshes, so it's skipped without them).
+
+`hitbox` is the car ("octane", "dominus", "plank", "breakout", "hybrid",
+"merc"): RocketSim's car preset, and the fish character the game plays as.
+Scenarios named NAME@CAR rerun NAME with another car (PER_CAR below).
 """
 
 import math
@@ -35,8 +39,8 @@ def heading(yaw, speed):
     return (speed * math.cos(yaw), speed * math.sin(yaw), 0.0)
 
 
-def scenario(name, duration, controls, arena="void", car_state=None, ball=None, notes=""):
-    return {"name": name, "arena": arena, "ticks": s(duration), "notes": notes,
+def scenario(name, duration, controls, arena="void", car_state=None, ball=None, notes="", hitbox="octane"):
+    return {"name": name, "arena": arena, "ticks": s(duration), "notes": notes, "hitbox": hitbox,
             "car": car_state if car_state is not None else car(),
             "ball": ball, "controls": [[tick, values] for tick, values in controls]}
 
@@ -164,6 +168,8 @@ SCENARIOS = [
           ("ball_bounce_moving", 3.0, (0, -2000, 800), (0, 1500, 0), (0, 0, 0), "dropped while moving: bounce friction"),
           ("ball_bounce_spin", 3.0, (0, -2000, 800), (0, 1000, 0), (-8.0, 0, 0), "backspin into the floor"),
           ("ball_slide_to_roll", 2.5, (0, -2000, 93.15), (0, 1500, 0), (0, 0, 0), "sliding along the floor, no spin"),
+          ("ball_roll_slow", 6.0, (-2500, -4000, 93.15), (0, 450, 0), (-450 / 91.25, 0, 0), "rolling under the spin cap: drag only"),
+          ("ball_roll_fast", 5.0, (-2500, -4500, 93.15), (0, 1800, 0), (-6.0, 0, 0), "rolling over the spin cap: how far it carries"),
           ("ball_side_wall", 2.0, (2500, 0, 600), (2500, 300, 300), (0, 0, 0), "thrown at the side wall"),
           ("ball_side_wall_spin", 2.0, (2500, 0, 600), (2500, 0, 300), (0, 0, 6.0), "side wall with sidespin"),
           ("ball_back_wall", 2.0, (2000, 3000, 900), (0, 2500, 200), (0, 0, 0), "thrown at the back wall beside the goal"),
@@ -172,8 +178,34 @@ SCENARIOS = [
           ("ball_corner", 2.0, (2500, 3500, 600), (1500, 1500, 0), (0, 0, 0), "into a 45 degree corner"),
           ("ball_into_goal", 3.0, (0, 4000, 93.15), (0, 2000, 0), (21.9, 0, 0), "rolling into the net"),
       ]],
+    # --- Ground hits: car driving on the floor into a ball on the floor -------------
+    *[scenario(name, 2.0, [(0, controls)], arena="soccar", car_state=car(pos=(0.0, -1500.0, 17.0), vel=(0.0, speed, 0.0)),
+               ball={"pos": [x, 0.0, 93.15], "vel": [0.0, ball_vy, 0.0], "ang_vel": [-ball_vy / 91.25, 0.0, 0.0]}, notes=notes)
+      for name, controls, speed, x, ball_vy, notes in [
+          ("ground_hit_still", {"throttle": 1.0}, 1400.0, 0.0, 0.0, "driving into a still ball"),
+          ("ground_hit_boost", {"boost": True}, 1800.0, 0.0, 0.0, "boosting into a still ball"),
+          ("ground_hit_slow", {"throttle": 1.0}, 600.0, 0.0, 0.0, "slow push into a still ball"),
+          ("ground_hit_toward", {"throttle": 1.0}, 1400.0, 0.0, -800.0, "ball rolling toward the car"),
+          ("ground_hit_away", {"boost": True}, 1800.0, 0.0, 600.0, "chasing a ball rolling away"),
+          ("ground_hit_offset", {"throttle": 1.0}, 1400.0, 70.0, 0.0, "ball off to one side of the nose"),
+      ]],
+    # --- Ball dropped onto the roof of a car on the floor --------------------------
+    *[scenario(name, 2.5, [(0, {"throttle": throttle})], arena="soccar", car_state=car(pos=(0.0, -1000.0, 17.0), vel=(0.0, vy, 0.0)),
+               ball={"pos": [0.0, -1000.0 + vy * 0.0, 140.0 + drop], "vel": [0.0, vy, 0.0], "ang_vel": [0.0, 0.0, 0.0]}, notes=notes)
+      for name, throttle, vy, drop, notes in [
+          ("roof_drop_still", 0.0, 0.0, 300.0, "ball dropped 3 m onto a still car"),
+          ("roof_drop_low", 0.0, 0.0, 50.0, "ball dropped 0.5 m onto a still car"),
+          ("roof_drop_moving", 0.0, 800.0, 300.0, "ball dropped 3 m onto a car coasting at 800 uu/s"),
+      ]],
     scenario("jump_tap", 1.5, [(0, {}), (s(0.1), {"jump": True}), (s(0.1) + JUMP_TAP, {})], arena="soccar",
              car_state=car(pos=(0.0, 0.0, 17.0))),
     scenario("jump_full", 2.0, [(0, {}), (s(0.1), {"jump": True}), (s(0.4), {})], arena="soccar",
              car_state=car(pos=(0.0, 0.0, 17.0))),
 ]
+
+# Each car's own hitbox, centre of mass and wheels: these rerun with every other car.
+OTHER_CARS = ["dominus", "plank", "breakout", "hybrid", "merc"]
+PER_CAR = ["ground_throttle", "ground_coast", "ground_turn", "ground_powerslide", "jump_full", "front_flip",
+           "side_flip_right", "wall_drive", "ground_hit_still", "ground_hit_offset", "roof_drop_low"]
+_by_name = {sc["name"]: sc for sc in SCENARIOS}
+SCENARIOS += [dict(_by_name[name], name=f"{name}@{car}", hitbox=car) for name in PER_CAR for car in OTHER_CARS]

@@ -31,7 +31,7 @@ REPO = HERE.parent.parent
 OUT = HERE / "out"
 DEFAULT_GODOT = r"C:\Users\Admin\Downloads\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stable_win64_console.exe"
 UU_PER_M = 100.0
-CHECKPOINTS = (0.25, 0.5, 1.0, 1.5, 2.0, 3.0)
+CHECKPOINTS = (0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0)
 
 
 # --- RocketSim ------------------------------------------------------------------
@@ -56,7 +56,7 @@ def meshes_available() -> bool:
 def run_rocketsim(scenario: dict) -> list[dict]:
     mode = rs.GameMode.THE_VOID if scenario["arena"] == "void" else rs.GameMode.SOCCAR
     arena = rs.Arena(mode, tick_rate=TICK_RATE)
-    car = arena.add_car(0, rs.CarConfig.OCTANE)
+    car = arena.add_car(0, car_config(scenario))
 
     spec = scenario["car"]
     state = car.get_state()  # level, facing +Y
@@ -113,8 +113,13 @@ def run_rocketsim(scenario: dict) -> list[dict]:
 
 # --- Geometry --------------------------------------------------------------------
 
-def octane_offset() -> np.ndarray:
-    cfg = rs.Arena(rs.GameMode.THE_VOID).add_car(0, rs.CarConfig.OCTANE).get_config()
+def car_config(scenario: dict):
+    """The scenario's car (RocketSim's preset for its hitbox; Octane unless it says)."""
+    return getattr(rs.CarConfig, scenario.get("hitbox", "octane").upper())
+
+
+def car_offset(scenario: dict) -> np.ndarray:
+    cfg = rs.Arena(rs.GameMode.THE_VOID).add_car(0, car_config(scenario)).get_config()
     return np.array(vec(cfg.hitbox_pos_offset))  # (forward, right, up) from the centre of mass
 
 
@@ -219,13 +224,12 @@ def main() -> None:
     runnable = [sc for sc in chosen if sc["name"] not in skipped]
 
     OUT.mkdir(exist_ok=True)
-    offset = octane_offset()
     reference = {}
     overrides = {k: float(v) for k, v in (item.split("=", 1) for item in args.set)}
     for sc in runnable:
         sc["settings"] = overrides
         reference[sc["name"]] = run_rocketsim(sc)
-        sc["start"] = game_start(sc, reference[sc["name"]][0], offset)
+        sc["start"] = game_start(sc, reference[sc["name"]][0], car_offset(sc))
     (OUT / "rocketsim.json").write_text(json.dumps(reference))
     (OUT / "scenarios.json").write_text(json.dumps({"tick_rate": TICK_RATE, "scenarios": runnable}, indent=1))
 
@@ -241,7 +245,7 @@ def main() -> None:
         sys.exit("the game didn't write its results")
     game = json.loads(game_out.read_text())["scenarios"]
 
-    results = {sc["name"]: compare(sc, reference[sc["name"]], game[sc["name"]], offset) for sc in runnable}
+    results = {sc["name"]: compare(sc, reference[sc["name"]], game[sc["name"]], car_offset(sc)) for sc in runnable}
     text = report(results, skipped)
     (OUT / "report.txt").write_text(text, encoding="utf-8")
     print(text.split("Columns:")[0] if args.quiet else text)

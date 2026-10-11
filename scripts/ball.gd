@@ -285,6 +285,11 @@ func _resolve_fish_contact(state: PhysicsDirectBodyState3D, contact: Dictionary,
 
 	# Speculative: a ball still just apart may close the gap this tick, but no more.
 	var allowed := maxf(-depth, 0.0) / state.step
+	var closing := -((velocity + spin.cross(r_ball)) - (fish_velocity + fish_spin.cross(r_fish))).dot(normal)
+	if closing > allowed:
+		# They'd meet within this tick: resolve it as a full touch now (as RL
+		# does on the tick contact starts), not only the part that closes the gap.
+		allowed = 0.0
 	var normal_mass := _inverse_effective_mass(normal, r_ball, r_fish, inv_mass_ball, inv_mass_fish, inv_inertia_ball, inv_inertia_fish)
 	# Sequential impulses, as Bullet's solver: the push and the grip each change
 	# how the bodies move and turn at the contact, which changes what the other
@@ -315,8 +320,13 @@ func _resolve_fish_contact(state: PhysicsDirectBodyState3D, contact: Dictionary,
 	if depth > PENETRATION_SLOP:
 		state.transform = Transform3D(state.transform.basis, centre + normal * (depth - PENETRATION_SLOP))
 
-	var fresh := not _touching_fish and depth > 0.0
-	if depth > 0.0:
+	# A touch starts on the first tick the fish pushes the ball, even while the
+	# two are still just apart (the speculative push above). Waiting for overlap
+	# would measure the hit speed after that push had already taken most of it,
+	# leaving RL's extra impulse almost nothing to work with.
+	var touching := depth > 0.0 or pushed > 0.0
+	var fresh := not _touching_fish and touching
+	if touching:
 		_touching_fish = true
 	if not fresh:
 		return [velocity, spin]

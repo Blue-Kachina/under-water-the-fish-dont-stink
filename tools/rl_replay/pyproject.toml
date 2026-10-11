@@ -1,0 +1,9 @@
+[project]
+name = "rl-replay"
+version = "1.0.0"
+description = "Convert Rocket League .replay files into the game's .rlreplay.json playback format"
+requires-python = ">=3.12"
+dependencies = ["subtr-actor-py==1.4.0", "numpy>=2", "imageio-ffmpeg>=0.6"]
+
+[tool.uv]
+package = false

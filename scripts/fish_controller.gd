@@ -99,24 +99,6 @@ const RL_DODGE_BACKWARD_MAX_SPEED_SCALE := 2.5
 const RL_DODGE_BACKWARD_SCALE := 16.0 / 15.0
 ## Below this forward speed (100 uu/s) a dodge counts as backwards by stick alone.
 const RL_DODGE_BACKWARDS_MIN_SPEED := 1.0
-## Where an RL Octane's centre of mass is, from its hitbox centre (RocketSim
-## hitbox offset 13.88 uu forward, 20.76 up): behind and below, in the fish's
-## frame (nose -Z). Rotations pivot about it, as in RL.
-const RL_COM_FROM_HITBOX := Vector3(0.0, -0.20755, 0.138757)
-## The Octane's axles from its centre of mass (RocketSim wheel offsets 51.25 uu
-## forward, 33.75 back).
-const RL_FRONT_AXLE := 0.5125
-const RL_REAR_AXLE := 0.3375
-## The Octane's four wheels (RocketSim CarConfig): where each suspension is
-## mounted, in the fish's frame from the hitbox centre (front 51.25 uu ahead of
-## the centre of mass and 25.9 out, rear 33.75 behind and 29.5 out, 20.755 up),
-## wheel radius and suspension rest length.
-const RL_WHEELS := [
-	{"mount": Vector3(-0.259, 0.0, -0.3737), "radius": 0.125, "rest": 0.38755},
-	{"mount": Vector3(0.259, 0.0, -0.3737), "radius": 0.125, "rest": 0.38755},
-	{"mount": Vector3(-0.295, 0.0, 0.4763), "radius": 0.15, "rest": 0.37055},
-	{"mount": Vector3(0.295, 0.0, 0.4763), "radius": 0.15, "rest": 0.37055},
-]
 ## RocketSim's suspension (RLConst::BTVehicle): each wheel's spring moves 12
 ## uu either side of its rest length (the CarConfig one less those 12 uu), its
 ## ray reaches that far plus the wheel's radius less 2.5 uu, and it pushes with
@@ -162,9 +144,6 @@ const FLIP_SPIN_OUT_MIN_RATE := 0.2
 ## Tolerance for comparing summed tick times to RL durations (78 ticks of 1/120 s
 ## add up to a hair over 0.65 in floating point).
 const TIME_EPSILON := 0.0001
-## The fish model's body (width, height, length) in fish.tscn; Visual is scaled
-## so the body fills the hitbox.
-const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 
 @export_group("Thrust")
 ## RL: air throttle, 66.7 uu/s^2.
@@ -368,36 +347,43 @@ const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 @export var rl_tyres := true
 
 @export_group("Hitbox")
+## Which fish this is, one per Rocket League hitbox (FishCharacter): sets the
+## hitbox, belly, centre of mass, wheels and model below to that car's. Picked
+## in the tuning panel's Character row, not tuned like the rest.
+var character := FishCharacter.Family.OCTANE:
+	set(value):
+		character = value
+		_apply_character()
 ## A box, like Rocket League's car hitboxes: flat on the floor, flat on top to
-## carry the ball. Defaults are the Octane's (RocketSim: 120.5 x 86.7 x 38.7 uu,
-## 1 uu = 1 cm). The fish's body is stretched to fill it.
-@export_range(0.5, 4.0, 0.001) var hitbox_length := 1.205:
+## carry the ball. Set by the character (Octane: 120.5 x 86.7 x 38.7 uu, 1 uu =
+## 1 cm). The fish's model is built to fill it.
+var hitbox_length := 1.205:
 	set(value):
 		hitbox_length = value
 		_apply_hitbox()
-@export_range(0.3, 3.0, 0.001) var hitbox_width := 0.867:
+var hitbox_width := 0.867:
 	set(value):
 		hitbox_width = value
 		_apply_hitbox()
-@export_range(0.2, 2.0, 0.001) var hitbox_height := 0.387:
+var hitbox_height := 0.387:
 	set(value):
 		hitbox_height = value
 		_apply_hitbox()
 ## A belly under the box, where a Rocket League car's wheels are, so the fish
-## rides as high as a car does. Octane (RocketSim): the body sits 18.4 uu off
-## the ground, and the wheels cover about 112 x 70 uu. 0 height = no belly.
-## It collides as two round "axles" (front and rear, at the Octane's wheel
-## positions, as wide as the belly), so it rolls up a curving ramp the way
-## wheels do instead of catching on it.
-@export_range(0.0, 0.5, 0.001) var belly_height := 0.184:
+## rides as high as a car does. Set by the character (Octane: the body sits
+## 18.4 uu off the ground, and the wheels cover 112.5 x 70 uu). 0 height = no
+## belly. Without rl_suspension it collides as two round "axles" (front and
+## rear, at the car's wheel positions, as wide as the belly), so it rolls up a
+## curving ramp the way wheels do instead of catching on it.
+var belly_height := 0.184:
 	set(value):
 		belly_height = value
 		_apply_hitbox()
-@export_range(0.1, 4.0, 0.001) var belly_length := 1.125:
+var belly_length := 1.125:
 	set(value):
 		belly_length = value
 		_apply_hitbox()
-@export_range(0.1, 3.0, 0.001) var belly_width := 0.70:
+var belly_width := 0.70:
 	set(value):
 		belly_width = value
 		_apply_hitbox()
@@ -522,10 +508,15 @@ var _last_stroke_time := -INF
 var _last_stroke_interval := 0.0
 var _queued_stroke := 0.0
 
-@onready var _visual: Node3D = $Visual
-@onready var _tail: Node3D = $Visual/TailPivot
-@onready var _fin_left: Node3D = $Visual/FinLeftPivot
-@onready var _fin_right: Node3D = $Visual/FinRightPivot
+## The character's model (built in _apply_character) and the parts the swim
+## animation moves.
+var _visual: FishModel
+var _tail: Node3D
+var _fin_left: Node3D
+var _fin_right: Node3D
+## The character's wheels (FishCharacter.wheels): front left, front right, back
+## left, back right.
+var _wheels: Array[Dictionary] = FishCharacter.wheels(FishCharacter.Family.OCTANE)
 @onready var _bubbles: CPUParticles3D = $Bubbles
 @onready var _collision: CollisionShape3D = $Collision
 var _hitbox_view := MeshInstance3D.new()
@@ -537,8 +528,7 @@ var _belly_hitbox_view := MeshInstance3D.new()
 
 func _ready() -> void:
 	_spawn_transform = global_transform
-	center_of_mass_mode = CENTER_OF_MASS_MODE_CUSTOM
-	center_of_mass = RL_COM_FROM_HITBOX
+	center_of_mass_mode = CENTER_OF_MASS_MODE_CUSTOM  # the character's car's (_apply_character)
 	physics_material_override = PhysicsMaterial.new()
 	_apply_physics_material()
 	_collision.shape = _collision.shape.duplicate()  # sized per fish
@@ -577,11 +567,37 @@ func _ready() -> void:
 	belly_mesh.material = belly_material
 	_belly_view.mesh = belly_mesh
 	add_child(_belly_view)
-	_apply_hitbox()
+	_apply_character()
+
+
+## Become `character`: its car's hitbox, belly, centre of mass (rotations pivot
+## about it, as in RL) and wheels, and its fish model.
+func _apply_character() -> void:
+	if _collision == null:  # set before _ready; applied there
+		return
+	center_of_mass = FishCharacter.com_from_hitbox(character)
+	_wheels = FishCharacter.wheels(character)
+	if _visual:
+		remove_child(_visual)
+		_visual.queue_free()
+	_visual = FishModel.build(character)
+	add_child(_visual)
+	_tail = _visual.tail
+	_fin_left = _visual.fin_left
+	_fin_right = _visual.fin_right
+	# Each setter re-applies the hitbox; the last one sees all of them.
+	var size := FishCharacter.hitbox_size(character)
+	var belly := FishCharacter.belly(character)
+	hitbox_width = size.x
+	hitbox_height = size.y
+	hitbox_length = size.z
+	belly_width = belly.x
+	belly_height = belly.y
+	belly_length = belly.z
 
 
 func _apply_hitbox() -> void:
-	if _collision == null:  # set before _ready; applied there
+	if _visual == null:  # set before _ready; applied there
 		return
 	var size := Vector3(hitbox_width, hitbox_height, hitbox_length)
 	# Spin inertia of the hitbox as a solid box, as RL's car (RocketSim sizes its
@@ -609,7 +625,8 @@ func _apply_hitbox() -> void:
 	var belly_centre := Vector3(0.0, -(hitbox_height + belly_height) / 2.0, 0.0)
 	var has_belly := belly_height > 0.0
 	var wheel_radius := belly_height / 2.0
-	var axles := [RL_COM_FROM_HITBOX.z - RL_FRONT_AXLE, RL_COM_FROM_HITBOX.z + RL_REAR_AXLE]
+	var axle_offsets := FishCharacter.axles(character)
+	var axles := [center_of_mass.z - axle_offsets.x, center_of_mass.z + axle_offsets.y]
 	for i in _wheel_collisions.size():
 		_wheel_collisions[i].disabled = not has_belly or rl_suspension
 		if has_belly:
@@ -625,7 +642,7 @@ func _apply_hitbox() -> void:
 	_belly_view.position = Vector3(0.0, -hitbox_height / 2.0, 0.0)
 	_belly_view.visible = has_belly
 
-	_visual.scale = size / VISUAL_BODY_SIZE
+	_visual.scale = size / FishCharacter.hitbox_size(character)  # 1 unless the hitbox was changed by hand
 	_bubbles.position.z = size.z * 0.6  # just behind the tail
 
 
@@ -995,8 +1012,8 @@ func _update_suspension(state: PhysicsDirectBodyState3D, body_basis: Basis, dt: 
 	var com := state.transform.origin + body_basis * center_of_mass
 	var inverse_inertia := state.inverse_inertia_tensor
 	var space := state.get_space_state()
-	for i in RL_WHEELS.size():
-		var wheel: Dictionary = RL_WHEELS[i]
+	for i in _wheels.size():
+		var wheel: Dictionary = _wheels[i]
 		_wheel_hits[i] = {}
 		var rest: float = wheel.rest - RL_SUSPENSION_TRAVEL
 		var radius: float = wheel.radius
@@ -1032,7 +1049,7 @@ func _update_suspension(state: PhysicsDirectBodyState3D, body_basis: Basis, dt: 
 		if trace < pushback_at and hit.collider is StaticBody3D:
 			var effective := 1.0 / mass + normal.dot((inverse_inertia * r.cross(normal)).cross(r))
 			var stop := RL_SUSPENSION_PUSHBACK_ERP * (pushback_at - trace) / dt - normal.dot(contact_velocity)
-			impulse += normal * maxf(stop / effective, 0.0) / RL_WHEELS.size()
+			impulse += normal * maxf(stop / effective, 0.0) / _wheels.size()
 		_suspension_push += impulse / mass
 		_suspension_twist += inverse_inertia * r.cross(impulse)
 	return normal_sum
@@ -1052,7 +1069,7 @@ func _uses_tyres() -> bool:
 
 
 ## A wheel's directions (x across, -z along), turned by the steering on the
-## front wheels (RL_WHEELS 0 and 1).
+## front wheels (_wheels 0 and 1).
 func _wheel_basis(body_basis: Basis, i: int) -> Basis:
 	if i < 2 and _wheel_steer != 0.0:
 		return body_basis.rotated(body_basis.y, -_wheel_steer)
@@ -1117,12 +1134,12 @@ func _update_tyre_settings(velocity: Vector3, spin: Vector3, state: PhysicsDirec
 	_wheel_brake = brake * ground_brake / 4.0
 
 	var com := state.transform.origin + body_basis * center_of_mass
-	for i in RL_WHEELS.size():
+	for i in _wheels.size():
 		var hit := _wheel_hits[i]
 		if hit.is_empty():
 			continue
 		var normal: Vector3 = hit.normal
-		var mount: Vector3 = state.transform.origin + body_basis * RL_WHEELS[i].mount
+		var mount: Vector3 = state.transform.origin + body_basis * _wheels[i].mount
 		var v := velocity + spin.cross(mount - com)
 		var wheel_axle := _wheel_basis(body_basis, i).x
 		var sliding := absf(v.dot(wheel_axle))

@@ -1,6 +1,6 @@
 # Rocket League Replay Capability: Research & Plan
 
-> Status: research and design only. Nothing here is implemented yet.
+> Status: roadmap phases 1–4 are done, plus phase 0's `RLSpace` (§2 has each update; replay playback is §2.14). Phases 5–10 are still the plan.
 > Compiled 2026-10-10 from three research passes (codebase survey, `.replay` format, RL geometry/physics) and an architecture/planning pass.
 > Paths are relative to the repo root.
 
@@ -450,6 +450,90 @@ Three requests: per-tyre driving (the open item from §2.12), free air roll on t
 5. **BeastMode's camera is the default for everyone:** FOV 109, distance 270, height 90, angle −4, stiffness 0.45, swivel 7, transition 1.2 (`follow_camera.gd` defaults, same as `presets/beast_mode.cfg`). A saved `user://tuning.cfg` overrides the defaults, so the development machine's copy was updated to match.
 
 - **Checks:** all 20 probes run clean. `wall_stuck_probe` shows less shaking (0–2 spin reversals per run, was up to 11), and no run sinks more than 3.4 cm into the arena (was 21 cm). `wall_jitter_probe` and `camera_wall_probe` are unchanged.
+
+### 2.14 Update 2026-10-11: replay converter and playback (roadmap phases 3 and 4)
+Real Rocket League replays now play in the Aquarium. Pick one with **Watch a replay...** in the tuning panel, drop a file on the window, or start the game with `-- --replay=PATH`. A `.replay` is converted on the fly (through `uv`, about 2 s; the result is kept in `user://replays/`), and a `.rlreplay.json` loads directly (about 0.15 s for a 10 MB, 6-minute 3v3).
+
+1. **Converter (`tools/rl_replay/`, see its README).** It uses subtr-actor-py 1.4.0's `get_replay_frames_data` (native sample times, no resampling); §6.1's ndarray API wasn't needed. What real replays taught us, beyond §3.6:
+   - **Angular velocity is ×100** in every replay tried (2018–2026), as R1 feared. It's auto-detected from the ball's 6 rad/s cap.
+   - **Boost** is RL's raw byte (0–255, 85 at kickoff), so it's scaled to 0–100.
+   - **The replicated game state is a name-table index that differs per replay** (28 in one, 82 in another). States are inferred from the kickoff countdown timer instead: countdown, live, or after a goal.
+   - **Goal replays are already cut out of the recording**, leaving gaps of up to 12 s. These are closed up to one frame and marked as teleports.
+   - **Touch events carry only the team.** The toucher is that team's nearest car. Unattributable touches during goal resets are recording artifacts and are dropped.
+   - **A car's first frames can come before its team is known.** Teams come from the end-of-match roster, or else a majority vote. Without this, two of six replays put almost everyone on Orange.
+   - **Mid-match joiners** (a replacement for a player who left) get their own track. Their car may be missing from the roster, in which case it falls back to Octane's hitbox.
+
+   Checked on the user's own recent matches (6) and a sample of pro replays from RLCS S5–9 and ELEAGUE 2018 (24, game versions from 2018-02 to 2020-03). All convert, scores match the headers, and every kickoff has the ball on its spot and each car on RL's kickoff spots facing the ball. Schema: §6.2 as planned, plus `dodge_torque` per car (for phase 6), `boost_pads`, `source.game_state_codes`, `match.source_start_time` and `match.gaps_closed`. Not included: `is_overtime` (not in the data; the HUD shows OT when the clock reads 0 during play) and a goal-replay segment type (they're already gone).
+2. **Loader (`scripts/rl/rl_space.gd`, `scripts/replay/replay_data.gd`).**
+   - **`RLSpace`** is §5.1's mapping. The car's basis is built from the quaternion's rotated axes rather than a remapped quaternion: the same thing, harder to get wrong.
+   - **R12 (teams):** the whole replay is turned half round about the arena's centre (a rotation, not a mirror), so Blue defends the Aquarium's Blue goal at +Z. `RLSpace` stays canonical.
+   - **Interpolation** is §7.3: Hermite position, slerped rotation, holds across teleports, gaps over 0.25 s and implied speeds over 90 m/s.
+   - **The spin conversion's sign is verified on real data.** In frames where RL's ball truly rolls on the floor, the contact point is still (3–8% slip; the wrong sign would give 200%). RL's ball mostly slides, with spin about a third of rolling speed.
+3. **Playback (`scripts/replay/`).**
+   - **`ReplayPlayer`:** the timeline (play, pause, 0.1–4× speed, seek, frame step, ±5 s, previous/next goal, skip pauses, loop) and who to follow. Signals: `time_changed`, `target_changed`, `goal_reached`, `cut`.
+   - **`ReplayCar`:** a fish tinted in its team's colour and scaled to its car's hitbox, with a name tag, boost bubbles, an optional hitbox box and a demolition burst. It exposes the fish's read-only fields, so the camera and the HUD's input display follow it unchanged.
+   - **`ReplayBall`:** the bubble ball at RL's size.
+   - **`ReplayControls`:** the transport bar, with goal and kickoff marks on the scrub bar.
+   - **Keys:** P or jump plays and pauses. `,` `.` or D-pad left/right skips 5 s. `[` `]` goes to the previous/next goal. T/G or D-pad up/down changes who's followed. `-` `=` changes speed. H shows hitboxes. Y is ball cam, as always.
+   - **The fish's look** moved into `scenes/fish_visual.tscn` and `scenes/fish_bubbles.tscn` (§7.1), and `fish.tscn` instances them under the same node names. Ghosts instance the same scenes: instancing `fish.tscn` for its look leaked the controller's own meshes.
+   - **Camera:** `follow_camera.gd` takes an optional `target` and a `snap()`, used on seeks, target changes and kickoff teleports.
+   - **HUD:** shows score, clock, kickoff countdown and the followed player's speed (uu/s), boost and actions.
+   - **While a replay plays,** the live fish and ball are set aside (frozen, hidden, no scoring). Closing it restores them and the environment from before.
+4. **Checks:** `replay_data_probe` (fixture; optionally `-- REAL.rlreplay.json` adds RL's facts: spin cap, rolling-spin sign, kickoff spots and facings) and `replay_playback_probe` (fixture through the real game: takeover and restore, exact repeatable seeking, ball in the net at the goal, demolished car hidden and back, HUD, following; optionally `-- REAL.replay` adds converting from the game). Converter: `uv run python -m unittest discover tests` (14 tests on the synthetic fixture, `make_fixture.py`).
+5. **Jitter fix (same day, converter 1.2).** Playback looked jittery, and the recording was the cause:
+   - **Filler.** Frames with no network update for a body get subtr-actor's filler: the last state coasted on at its velocity, identical to the bit. That's 54% of car frames in an RLCS S9 replay and about 25% in the user's own matches (the ball 2–13%). The real state then lands elsewhere, so the car snaps. Fillers are now rebuilt on the playback curve through the genuine samples either side, up to 8 frames apart.
+   - **Timing.** Genuine states come from whichever physics tick last replicated each body, 0–3 ticks (up to 25 ms) either side of the frame's time, independently per body. The distance moved per frame ranged from 0.5× to 1.5× what the velocity implies. Each body's sample times are now fitted from its own motion (`time_offset`): a least-squares fit of each step's elapsed time, dp · v̄ / |v̄|², pulled gently toward 0. Steps with a sudden velocity change are skipped.
+   - **Result.** The speed shown between rendered frames (144 Hz) against the car's real speed: median error 13% → under 1%, 75th percentile 33% → 2%, 95th percentile 73% → 17% (user's match; RLCS: 52% → 15%). What remains is mostly frames holding a hit, landing, jump or dodge, where the speed really changes within the frame.
+   - **Where it's checked.** `replay_data_probe` measures this on any real replay. Converter tests plant tick offsets and filler and check both are undone. The game's conversion cache moved to `user://replays/converter-1.2/`, so older conversions are redone.
+6. **Not done yet:** kickoff `seconds_remaining` is coarse (whole seconds, as replicated). No free or broadcast camera (§7.4). Boost pads aren't drawn (their positions are in the file, for phase 9). Large files aren't gzipped or binary yet (v2, phase 10). Dropping a non-replay file just reports it.
+
+### 2.15 Update 2026-10-11: soundtracks from the broadcast
+- **Why.** To watch a famous game (RLCS S5 World Championship grand final, bracket reset game 7, NRG vs Dignitas, JSTN's zero-second goal) with the real casters and crowd.
+- **Timeline.** A broadcast is longer than its replay: the goal replays the converter cuts out, plus cuts and reactions. Between those it runs in real time. So the replay splits into *blocks* (kickoff countdown → live → post-goal pause), contiguous in replay time, and each needs one offset into the video. That game: 7 blocks, replay 397.5 s, video 518 s.
+- **Sync, automatically** (`tools/rl_replay/broadcast_audio.py align`). The scoreboard clock changes once a second during play, at the replay's `seconds_remaining` changes. Matching the two fits each block to a frame (residual sd about 20 ms, slope 1.000 ± 0.001, so the video is real time). Ticks only fix the offset modulo 1 s. The goal explosion (whole-frame brightness jump) settles it: in that game, block 6 (0:04 → 0:00, only 4 ticks) first landed 1 s off; with the explosion term, all 7 goals' explosions fall within 0.04 s of the replay's goal times.
+- **Stitch** (`broadcast_audio.py stitch`): each block's stretch of the video's audio, at its replay time, 15 ms fades at the joins, Ogg Vorbis, exactly the replay's length.
+- **In the game.** `ReplayAudio` (an `AudioStreamPlayer` under `ReplayPlayer`) follows the replay's clock. It plays and stops with it, jumps back into step if it drifts 0.1 s or more (seeks, skipped pauses, loops), pitches with the speed, and goes quiet past its end. A soundtrack named like the replay next to it (`7.replay` → `7.ogg`/`.mp3`/`.wav`) loads by itself. **Audio...** on the controls picks another, as does dropping an audio file on the window during a replay. **Sound** turns it off. Checked by `replay_audio_probe`, plus 3 converter tests (blocks, ticks, stitching).
+- **Not done:** no offset nudge in the game (edit the `.sync.json` and re-stitch). The clock position is a parameter (`--clock`), with the 2018 RLCS layout as the default; other broadcasts need it measured once.
+
+### 2.16 Update 2026-10-11: a smoother car cam, and the replay director
+1. **Car cam: no lurch at the end of a dodge.** The camera's rotation, roll and speed lag were first-order follows: each frame moved a fixed share of the remaining gap. So their speed jumped whenever the follow switched on. The camera holds still through a dodge (as RL's does), and the moment the dodge ended its turning jumped to full rate in one frame: 70–300°/s after front, side, diagonal and back flips, and 1,520°/s after a half flip, an instant swing to face the new way. All three are now critically damped springs (`follow_camera.gd`).
+   - **Rotation:** turns on a spring at twice the old follow rate, which lags a steady turn by the same amount, so ordinary driving feels the same. Its turning acceleration is capped (`MAX_TURN_ACCEL`, 40 rad/s²), so even a 180° swing starts and ends gently. During a dodge its own turning eases to a stop instead of freezing.
+   - **Roll and the speed lag:** springs too. A dodge's impulse no longer jolts the distance lag.
+   - **Measured** by the new `car_cam_probe` (dodges on the Aquarium floor, RL physics, at a fixed 120 fps). The worst change of turn rate in a frame is now 16–23°/s, against 70–1,520°/s before. The fish's position on screen changes speed by at most 0.2–0.4 m/s in a frame, against 1.3–2.3 m/s before.
+   - **Existing probes:** the half flip's biggest single-frame turn halved (15.2° → 7.7°). Wall clearance and surface roll are unchanged; levelling after leaving a wall starts a little softer (camera up · world up 0.60 against 0.72 at 0.25 s) and is level by 1.5 s as before.
+   - **What RL itself does** isn't published (Psyonix documents only what the settings mean). The hold through a dodge and the levelled horizon in the air match how RL's camera visibly behaves; the springs are ours.
+2. **The replay director (`scripts/replay/director_camera.gd`).** It's the camera when a replay opens. **V** or **boost** toggles it, there's a **Director** checkbox, and picking a player by hand switches to following them.
+   - **Who.** A replay knows the future, so it watches whoever touches the ball next (up to 2.5 s ahead; during a kickoff countdown, the kickoff taker). Failing that, the car that would reach the ball first. It only switches if the next toucher isn't already in shot, and holds a player at least 4 s unless their car is gone or play restarts. After a goal it shows the scorer with the goal in view.
+   - **Framing.** From behind the player, on the far side from the ball, 7.5 m back and 2.4 m up, aimed between them. Near a wall or the ceiling, "up" means away from that surface.
+   - **Motion.** The camera rides a smoothed copy of the player: a spring that knows their velocity, so it keeps up at any speed but spreads out a dodge or bump. Its place around them swings at a limited speed as the ball goes past, and moves round to the side early when its usual spot is against a wall. A soft cushion eases it off walls, the floor and the ceiling, using a smooth model of the arena (corners blended), so it slides along a wall instead of stopping dead. It glides to a new player within 10 m and in view, and cuts otherwise; a teleport or seek also cuts.
+   - **Measured** by the new `director_probe` (the fixture, or `-- REAL.rlreplay.json START SECONDS`, at a fixed 120 fps), over 3 minutes each of an RLCS S9 replay and one of the user's matches:
+
+     | | RLCS S9 | User's match |
+     |---|---|---|
+     | Toucher on screen at the touch | 87 of 89 | 66 of 69 |
+     | Watched player and ball both in view | 87% | 90% |
+     | Camera outside the arena | never | never |
+     | Cuts / changes of player a minute | 15 / 13 | 14 / 13 |
+     | Frames with a jolt | 0.5% (worst 6.7 m/s) | 0.2% (worst 1.9 m/s) |
+
+     On the way, the probe caught snaps of 190–1,500 units: from riding a fast car rigidly, hard wall clamps, the arena's sharp corners, and a cut decided after the ride had moved. The remaining jolts are brief bumps where the camera's squeezed against a wall or crowded close to the play. The probe's limits record this level, so it catches regressions.
+   - **Tried and dropped:** pulling back to fit a far-off ball. The pull-back distance tracks the ball, so the shot moved whenever it did: more jolts, no better framing.
+3. **Fixes on the way.** `main.stop_replay` hands the screen back to the follow camera at once (the replay is freed only at the end of the frame).
+4. **Not done:** the director doesn't yet favour a wider shot for aerials or kickoffs.
+
+### 2.17 Update 2026-10-11: Target and Camera
+The replay's view is two choices on the transport bar, replacing Follow and the Director checkbox, so you can stay on one player:
+
+| Target ↓ / Camera → | **Player** | **Director** |
+|---|---|---|
+| **A player** | Their car cam, for good. | The director's framing of them (ball in view), never switching. |
+| **Auto** (the default) | The car cam, switched by the director's pick: the next toucher, even when they're already in shot. Minimum hold 4 s; each switch is a cut. | The director as in §2.16. The default. |
+| **Free** | Stays exactly where the view was. | Stays where the view was, turning to follow the ball. |
+
+- **Controls.** **T / G** (D-pad up and down) step the Target through Auto, the players in the game, Free. **V** or **boost** switches the Camera. While on Auto, the Target list names who the director is watching ("Auto: name").
+- **Code.** `ReplayPlayer.watch` (a player's index, `AUTO` or `FREE`; `set_watch`, `cycle_watch`) and `ReplayPlayer.view` (`View.PLAYER`, `View.DIRECTOR`), with `view_changed`. `set_target` is now only the director's pick. The free camera is the director's camera: `DirectorCamera.hold` stands it where the current camera is, and `_free_look` turns it to the ball on a spring that knows the ball's velocity. The director's "already in shot" test uses whichever camera is showing.
+- **Measured** by `director_probe`'s new checks (RLCS S9 / user's match, first 3 minutes): a Target player stays watched through 130 / 105 touches by others; Auto + Player has the car cam on the next toucher at 119 of 155 / 105 of 129 touches (the misses are quick exchanges, where a touch just made keeps priority for 0.6 s); Free holds still on Player and turns to the ball on Director (to within 6–7°, from 133° / 97° off). The director's own numbers are unchanged.
+- **Not done:** a free camera you can fly around.
 
 ---
 
@@ -1033,8 +1117,8 @@ All existing probes must keep passing after every phase. Probes run as `Godot_co
 | **0: RL constants + space** | Add `scripts/rl/rl_space.gd` (k = 1) and `rl_consts.gd`. Replace the 2× constants in `fish_controller.gd` (`UU_PER_SPEED` → 100, `GROUND_WHEELBASE` → 0.85) and `ball.gd` (`HIT_CURVE` in uu/s × 0.01) | `rl_space_probe`: position, quaternion and ω round-trips; yaw ½π puts the nose at the correct goal; kickoff transforms |
 | **1: RL physics values** | Move every speed and acceleration export to its k = 1 RL value (§9.2); water off; ball mass 1/6 and bounciness 0.6; camera about 2.7 / 1.0 / FOV 110. Also the preset system (`rl_preset.gd`, panel preset row, no-snap setter) so the water tuning stays available as a preset. Fix the goal-rescore race | `rl_preset_probe`: 100 boost lasts 3.0 s; throttle-only top speed 14.1 m/s; ball falls 10 m in 1.754 s; kickoff boost hit scores again in `aquarium_probe` |
 | **2: RocketSim parity harness** (✓ built 2026-10-10, void scenarios; see §2.4) | `tools/rocketsim_compare/` (Python via `uv`, RocketSim bindings): scripted input sequences giving reference state CSVs. Headless `physics_parity_probe` replays the same inputs through our physics and diffs | Per-scenario error budgets: jump apex, dodge, half-flip, air roll, powerslide turn, wall drive, ball bounce, kickoff hit (e.g. < 2 cm / 1° after 1 s) |
-| **3: Converter + loader** | Add `tools/rl_replay/*` (via `uv`), the schema, the fixture and `scripts/replay/replay_data.gd` | Schema tests; `replay_data_probe` (as before); manual real-replay checks (ball \|ω\| ≈ 6, kickoff ball y ≈ 0.93, blue car facing its goal) |
-| **4: Kinematic playback** | The `replay_*.gd` files, `fish_visual.tscn`, `follow_camera.gd` target generalisation, HUD, controls | `replay_playback_probe`: ghosts match the conversion; scrubbing is deterministic; ball inside the goal at goal time; demos hidden |
+| **✓ 3: Converter + loader (done 2026-10-11, §2.14)** | Add `tools/rl_replay/*` (via `uv`), the schema, the fixture and `scripts/replay/replay_data.gd` | Schema tests; `replay_data_probe` (as before); manual real-replay checks (ball \|ω\| ≈ 6, kickoff ball y ≈ 0.93, blue car facing its goal) |
+| **✓ 4: Kinematic playback (done 2026-10-11, §2.14)** | The `replay_*.gd` files, `fish_visual.tscn`, `follow_camera.gd` target generalisation, HUD, controls | `replay_playback_probe`: ghosts match the conversion; scrubbing is deterministic; ball inside the goal at goal time; demos hidden |
 | **5: Input sources** | `scripts/input/*`; `fish_controller.gd` `input_source` | Existing probes unchanged; `scripted_input_probe` matches the `Input.action_press` run |
 | **6: Input inference + re-sim** | Converter or runtime step that writes `inferred_input` (closed-form air control, flags, bytes, discrete search). `ReplayInputSource`, tracking controller, re-sync points. Ball-only and full re-sim modes | `resim_probe` on fixture and real replays: per-segment position/rotation error at 0.5 / 1 / 2 s, touch-outcome error, % of ticks needing correction, all within budgets |
 | **7: Video comparison** | Workflow doc and helper: record RL replay viewer plus our playback, synced on a kickoff or goal, shown side by side | Qualitative sign-off on hitbox alignment, ramps and walls, flips, camera |
