@@ -84,12 +84,12 @@ func _physics_process(delta: float) -> void:
 		boost(true)
 	if touch_time >= 0.0 and once("fish after touch", touch_time + 0.1):
 		print("fish speed 0.1 s after the touch: %.1f m/s (ball mass %.2f, fish mass %.2f)" % [fish.speed, settings.mass, fish.mass])
-	if once("hit report", 2.5):
+	if touch_time >= 0.0 and once("hit report", touch_time + 0.5):
 		fish.buoyancy = saved_buoyancy
 		print("ball after hit: peak %.1f m/s, now %.1f m/s at (%.1f, %.1f, %.1f)" % [
 			peak_ball_speed, ball.speed, ball.global_position.x, ball.global_position.y, ball.global_position.z])
 		boost(false)
-	if once("goal check", 5.0):
+	if touch_time >= 0.0 and once("goal check", touch_time + 3.0):
 		print("goal scored: %s (t=%.2f), ball popped: %s, score %s" % [goal_time >= 0.0, goal_time, ball.popped, aquarium.scores])
 	if goal_time >= 0.0 and once("respawn check", goal_time + settings.goal_reset_delay + 1.0):
 		print("after reset delay: popped %s, surface ball at %s (resting on floor = %s)" % [

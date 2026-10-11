@@ -7,16 +7,21 @@ extends Camera3D
 ## camera behind the fish on the line from the ball, so the ball stays in view,
 ## with a level horizon. It falls back to the normal view while there's no ball.
 
+## Clearance kept between walls and the point the camera aims at.
+const ANCHOR_CLEARANCE := 0.1
+
 @export var fish: FishController
 ## Set by the environment; null when there's no ball.
 var ball: Node3D
 var ball_cam := false
 
 @export_group("Follow")
-@export_range(1.0, 20.0, 0.1) var distance := 2.1
-@export_range(-5.0, 10.0, 0.1) var height := 1.1
+## Defaults are Rocket League's default camera: 270 uu back, 100 up, FOV 110,
+## tilted 3 degrees down.
+@export_range(1.0, 20.0, 0.1) var distance := 2.7
+@export_range(-5.0, 10.0, 0.1) var height := 1.0
 ## Height above the fish's centre that the camera aims at.
-@export_range(-3.0, 5.0, 0.1) var look_height := 1.2
+@export_range(-3.0, 5.0, 0.01) var look_height := 0.86
 ## How quickly the camera swings around to match the fish's rotation.
 @export_range(0.5, 40.0, 0.5) var rotation_stiffness := 9.0
 ## How much the camera leans with the fish's roll. 0 = horizon stays level.
@@ -30,7 +35,7 @@ var ball_cam := false
 ## Off (Rocket League style): the camera holds its orientation while a dodge
 ## flips the fish, and only follows its position.
 @export var follow_dodge_spin := false
-@export_range(60.0, 120.0, 1.0) var field_of_view := 95.0:
+@export_range(60.0, 120.0, 1.0) var field_of_view := 110.0:
 	set(value):
 		field_of_view = value
 		fov = value
@@ -108,15 +113,51 @@ func _process(delta: float) -> void:
 			* Basis(Vector3.RIGHT, _look_pitch)
 	var anchor := fish_xform.origin + view.y * look_height
 	var eye := fish_xform.origin + view * Vector3(0.0, height, distance)
+	var look := anchor - eye
 
-	# Pull in toward the fish if a wall is in the way.
-	var query := PhysicsRayQueryParameters3D.create(anchor, eye)
-	query.exclude = [fish.get_rid()]
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	# Keep clear of walls: sweep a sphere from the fish up to the anchor (which
+	# can be inside a wall or ceiling the fish is up against), then from there
+	# back to the eye, and stop each short of anything solid. A sphere rather
+	# than a ray, so the wide view can't poke through a wall the camera runs
+	# alongside. The look direction stays the same while pulled in.
+	anchor = _sweep(fish_xform.origin, anchor, ANCHOR_CLEARANCE)
+	eye = _sweep(anchor, eye, collision_margin)
+
+	global_transform = Transform3D(Basis.looking_at(look, view.y), eye)
+
+
+## How far a sphere of `radius` gets from `from` toward `to` before touching
+## anything solid (the fish and ball don't count). A ray along the same line
+## backs it up: a sphere that starts out already touching a surface can be
+## reported as free to move straight through it.
+func _sweep(from: Vector3, to: Vector3, radius: float) -> Vector3:
+	var motion := to - from
+	var length := motion.length()
+	if length < 0.0001:
+		return from
+	var space := get_world_3d().direct_space_state
+	var exclude: Array[RID] = [fish.get_rid()]
+	if is_instance_valid(ball) and ball is CollisionObject3D:
+		exclude.append((ball as CollisionObject3D).get_rid())
+
+	var allowed := 1.0
+	var ray := PhysicsRayQueryParameters3D.create(from, to)
+	ray.exclude = exclude
+	var hit := space.intersect_ray(ray)
 	if not hit.is_empty():
-		eye = hit.position + hit.normal * collision_margin
+		allowed = maxf((hit.position - from).length() - radius, 0.0) / length
 
-	global_transform = Transform3D(Basis.looking_at(anchor - eye, view.y), eye)
+	var sphere := SphereShape3D.new()
+	sphere.radius = radius
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = sphere
+	query.transform = Transform3D(Basis.IDENTITY, from)
+	query.motion = motion
+	query.exclude = exclude
+	var result := space.cast_motion(query)
+	if result[0] > 0.0 or result[1] > 0.0:  # [0, 0]: started overlapping; the ray decides
+		allowed = minf(allowed, result[0])
+	return from + motion * allowed
 
 
 ## The up direction the camera's roll eases toward. `level_only` keeps the horizon level (ball cam).

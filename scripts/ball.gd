@@ -9,8 +9,8 @@ const BUBBLE_SHADER := preload("res://shaders/bubble.gdshader")
 
 ## Rocket League's extra hit impulse factor by relative speed (RocketSim
 ## BALL_CAR_EXTRA_IMPULSE_FACTOR_CURVE: 0-500 uu/s 0.65, 2300 0.55, 4600 0.30),
-## with speeds doubled to match the fish. Relative speed is capped at the last point.
-const HIT_CURVE := [Vector2(0.0, 0.65), Vector2(10.0, 0.65), Vector2(46.0, 0.55), Vector2(92.0, 0.30)]
+## in m/s (1 uu = 1 cm). Relative speed is capped at the last point.
+const HIT_CURVE := [Vector2(0.0, 0.65), Vector2(5.0, 0.65), Vector2(23.0, 0.55), Vector2(46.0, 0.30)]
 ## A fish that stays in contact only gets the extra impulse once per touch, and
 ## at most this often while bumping repeatedly.
 const HIT_COOLDOWN := 0.1

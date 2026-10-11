@@ -51,21 +51,28 @@ const LOCK_ALIGN_RATE := 12.0
 # Rocket League jump (RocketSim RLConst.h, Car::_UpdateJump): an instant push,
 # then extra push while jump is held, for at least JUMP_MIN_TIME even on a tap.
 const RL_JUMP_MIN_HOLD := 0.025
-# Rocket League driving (RocketSim RLConst.h), speeds doubled. Throttle torque
+# Rocket League driving (RocketSim RLConst.h). Throttle torque
 # fades from full at a standstill to 10% just under max driving speed (1400 of
 # 1410 uu/s), then to nothing. Steering angle shrinks with speed; the turn rate
-# is speed * tan(angle) / wheelbase (the Octane's 0.85 m, doubled with speed so
-# turn rates match RL's).
+# is speed * tan(angle) / wheelbase (the Octane's 0.85 m).
 const RL_THROTTLE_FADE_AT := 1400.0 / 1410.0
 const RL_STEER_ANGLE_CURVE := [Vector2(0.0, 0.53356), Vector2(500.0, 0.31930), Vector2(1000.0, 0.18203),
 		Vector2(1500.0, 0.10570), Vector2(1750.0, 0.08507), Vector2(3000.0, 0.03454)]  # uu/s -> rad
-const UU_PER_SPEED := 50.0  # our m/s -> RL uu/s (halve, then x100)
-const GROUND_WHEELBASE := 1.7
+const UU_PER_SPEED := 100.0  # our m/s -> RL uu/s (1 uu = 1 cm)
+const GROUND_WHEELBASE := 0.85
 const GROUND_STEER_RESPONSE := 20.0
 ## A contact counts as a surface under the fish when its normal is within ~45° of the fish's up.
 const SURFACE_MIN_DOT := 0.7
 ## After a jump, surfaces are ignored this long so the fish leaves cleanly.
 const SURFACE_JUMP_GRACE := 0.1
+# Rocket League's auto-flip (RocketSim RLConst.h, Car::_UpdateAutoFlip): jump
+# while lying on your roof gives a small hop off the surface plus a strong roll
+# back onto your wheels, for up to 0.4 s scaled by how far over you are. Only
+# when nearly upside down (rolled over 2.8 rad).
+const RL_AUTOFLIP_IMPULSE := 2.0
+const RL_AUTOFLIP_TORQUE := 50.0
+const RL_AUTOFLIP_TIME := 0.4
+const RL_AUTOFLIP_ROLL_THRESH := 2.8
 ## An uncompleted flip counts as over once its spin has wound down below this (rad/s).
 const FLIP_SPIN_OUT_MIN_RATE := 0.2
 ## Tolerance for comparing summed tick times to RL durations (78 ticks of 1/120 s
@@ -76,42 +83,47 @@ const TIME_EPSILON := 0.0001
 const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 
 @export_group("Thrust")
-@export_range(0.0, 60.0, 0.5) var forward_accel := 12.5
-@export_range(0.0, 60.0, 0.5) var reverse_accel := 20.0
+## RL: air throttle, 66.7 uu/s^2.
+@export_range(0.0, 60.0, 0.01) var forward_accel := 0.67
+@export_range(0.0, 60.0, 0.01) var reverse_accel := 0.67
 ## Deceleration when holding reverse while still swimming forward.
-@export_range(0.0, 120.0, 1.0) var brake_accel := 31.0
+@export_range(0.0, 120.0, 0.01) var brake_accel := 0.67
 ## Keep below max_boost_speed so boosting raises top speed. Throttle alone can
 ## never pass forward_accel / linear_drag (drag balances thrust there).
-@export_range(0.0, 60.0, 0.5) var max_speed := 35.0
-@export_range(0.0, 30.0, 0.5) var max_reverse_speed := 6.0
+@export_range(0.0, 60.0, 0.5) var max_speed := 23.0
+@export_range(0.0, 30.0, 0.5) var max_reverse_speed := 23.0
 
 @export_group("Boost")
-@export_range(0.0, 60.0, 0.5) var boost_accel := 10.0
-## Absolute speed cap, also applied to jumps and dodges.
-@export_range(0.0, 120.0, 0.5) var max_boost_speed := 75.0
+## RL: 1058.3 uu/s^2 in the air.
+@export_range(0.0, 60.0, 0.01) var boost_accel := 10.58
+## Absolute speed cap, also applied to jumps and dodges. RL: 2300 uu/s.
+@export_range(0.0, 120.0, 0.5) var max_boost_speed := 23.0
 @export var boost_unlimited := false
 ## Percent of the tank used per second (Rocket League: 33.3).
-@export_range(0.0, 100.0, 0.5) var boost_drain := 50.0
-@export_range(0.0, 100.0, 0.5) var boost_regen := 25.0
+@export_range(0.0, 100.0, 0.01) var boost_drain := 33.33
+## RL has none (boost comes from pads, which this game doesn't have yet), so a
+## slow refill stands in for them.
+@export_range(0.0, 100.0, 0.5) var boost_regen := 10.0
 
 @export_group("Water")
 ## Fraction of speed lost per second.
-@export_range(0.0, 3.0, 0.01) var linear_drag := 0.29
+@export_range(0.0, 3.0, 0.01) var linear_drag := 0.0
 ## Momentum above max_speed (from dodges, swim strokes or boost) fades at this
 ## rate while you keep swimming (throttle, boost or a stroke rhythm), like
 ## holding throttle above top speed in Rocket League. Applies to the extra speed
 ## only: 0.5 halves it in about 1.4 s. Coasting uses linear_drag as normal.
-@export_range(0.0, 3.0, 0.01) var overspeed_drag := 0.5
+@export_range(0.0, 3.0, 0.01) var overspeed_drag := 0.0
 ## Extra drag on sideways/vertical slip. 0 = free drift, high = carves like it's on rails.
-@export_range(0.0, 10.0, 0.05) var lateral_drag := 1.0
-@export_range(0.0, 5.0, 0.05) var angular_drag := 1.0
-## Upward acceleration. 0 = neutral buoyancy, negative sinks.
-@export_range(-10.0, 10.0, 0.1) var buoyancy := -7.5
-@export_range(0.0, 1.0, 0.05) var wall_bounce := 0.2:
+@export_range(0.0, 10.0, 0.05) var lateral_drag := 0.0
+@export_range(0.0, 5.0, 0.05) var angular_drag := 0.0
+## Upward acceleration. 0 = neutral buoyancy, negative sinks. RL: gravity, -650 uu/s^2.
+@export_range(-30.0, 10.0, 0.01) var buoyancy := -6.5
+## RL (RocketSim): car-world restitution 0.3, friction 0.3.
+@export_range(0.0, 1.0, 0.05) var wall_bounce := 0.3:
 	set(value):
 		wall_bounce = value
 		_apply_physics_material()
-@export_range(0.0, 1.0, 0.05) var wall_friction := 0.2:
+@export_range(0.0, 1.0, 0.05) var wall_friction := 0.3:
 	set(value):
 		wall_friction = value
 		_apply_physics_material()
@@ -171,18 +183,21 @@ const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 
 @export_group("Jump & Dodge")
 ## Instant push along the fish's up axis on pressing jump. A double jump is this alone.
-@export_range(0.0, 40.0, 0.1) var jump_impulse := 10.2
+## RL: 291.7 uu/s.
+@export_range(0.0, 40.0, 0.001) var jump_impulse := 2.917
 ## Holding jump pushes higher, as in Rocket League: the first jump keeps
 ## accelerating while held, up to jump_hold_time. Off = every jump is a tap.
 @export var variable_jump := true
 ## Push while held. RL's full hold adds as much again as the instant push
 ## (jump_impulse / jump_hold_time), so a full hold is twice a tap.
-@export_range(0.0, 150.0, 0.5) var jump_hold_accel := 51.0
+## RL: 1458.3 uu/s^2.
+@export_range(0.0, 150.0, 0.01) var jump_hold_accel := 14.58
 ## Longest the hold keeps pushing. RL: 0.2 s.
 @export_range(0.05, 1.0, 0.01) var jump_hold_time := 0.2
-@export_range(0.0, 60.0, 0.1) var dodge_impulse := 7.0
-## Time after the first jump during which a second press double-jumps or dodges.
-@export_range(0.0, 3.0, 0.05) var double_jump_window := 1.2
+## RL: 500 uu/s.
+@export_range(0.0, 60.0, 0.1) var dodge_impulse := 5.0
+## Time after the first jump (after its hold ends) during which a second press double-jumps or dodges. RL: 1.25 s.
+@export_range(0.0, 3.0, 0.05) var double_jump_window := 1.25
 ## Wait after the second jump (or an unused window) before jumping again.
 @export_range(0.0, 5.0, 0.05) var jump_cooldown := 0.0
 ## Stick deflection needed for a dodge; below it the second press is a double jump.
@@ -222,27 +237,27 @@ const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 ## While the fish's underside touches a surface (floor, walls, ceiling, the
 ## ball), drive like a Rocket League car: ground throttle, steering, grip and
 ## sticky force, sitting flat on the surface. Off = swim everywhere.
-## Defaults are RocketSim's values with speeds doubled, like the rest of the game.
+## Defaults are RocketSim's values (1 uu = 1 cm).
 @export var rl_surface_mechanics := true
 ## Top driving speed. RL: 1410 uu/s.
-@export_range(5.0, 80.0, 0.1) var ground_max_speed := 28.2
+@export_range(5.0, 80.0, 0.1) var ground_max_speed := 14.1
 ## Throttle acceleration from a standstill, fading to nothing at
 ## ground_max_speed on RL's curve. RL: 1600 uu/s².
-@export_range(0.0, 100.0, 0.5) var ground_accel := 32.0
+@export_range(0.0, 100.0, 0.5) var ground_accel := 16.0
 ## Throttle against the direction of travel. RL: 3500 uu/s².
-@export_range(0.0, 150.0, 0.5) var ground_brake := 70.0
+@export_range(0.0, 150.0, 0.5) var ground_brake := 35.0
 ## Slowing with no throttle. RL: 525 uu/s².
-@export_range(0.0, 50.0, 0.5) var ground_coast_decel := 10.5
+@export_range(0.0, 50.0, 0.01) var ground_coast_decel := 5.25
 ## RL: 991.7 uu/s² on the ground.
-@export_range(0.0, 80.0, 0.1) var ground_boost_accel := 19.8
+@export_range(0.0, 80.0, 0.01) var ground_boost_accel := 9.92
 ## Top speed with boost. RL: 2300 uu/s.
-@export_range(5.0, 120.0, 0.5) var ground_max_boost_speed := 46.0
+@export_range(5.0, 120.0, 0.5) var ground_max_boost_speed := 23.0
 ## Tyre grip: how quickly sliding sideways is stopped (per second).
 ## Powersliding uses powerslide_lateral_drag instead.
 @export_range(0.0, 40.0, 0.5) var ground_grip := 15.0
 ## Push into the surface, like RL's sticky force: half of this at rest, and
 ## while driving up to 1.5x on a wall. RL: its gravity, 650 uu/s².
-@export_range(0.0, 40.0, 0.5) var surface_stick := 13.0
+@export_range(0.0, 40.0, 0.5) var surface_stick := 6.5
 ## How quickly the fish turns to sit flat on the surface it's on.
 @export_range(1.0, 40.0, 0.5) var surface_align_rate := 15.0
 
@@ -262,7 +277,22 @@ const VISUAL_BODY_SIZE := Vector3(0.7, 0.7, 1.5)
 	set(value):
 		hitbox_height = value
 		_apply_hitbox()
-## Draw the hitbox as a see-through box.
+## A belly under the box, where a Rocket League car's wheels are, so the fish
+## rides as high as a car does. Octane (RocketSim): the body sits 18.4 uu off
+## the ground, and the wheels cover about 112 x 70 uu. 0 height = no belly.
+@export_range(0.0, 0.5, 0.001) var belly_height := 0.184:
+	set(value):
+		belly_height = value
+		_apply_hitbox()
+@export_range(0.1, 4.0, 0.001) var belly_length := 1.125:
+	set(value):
+		belly_length = value
+		_apply_hitbox()
+@export_range(0.1, 3.0, 0.001) var belly_width := 0.70:
+	set(value):
+		belly_width = value
+		_apply_hitbox()
+## Draw the hitbox (and belly) as see-through boxes.
 @export var show_hitbox := false:
 	set(value):
 		show_hitbox = value
@@ -323,6 +353,10 @@ var _flip_time_left := 0.0
 var _flip_axis := Vector3.ZERO
 var _reset_queued := false
 var _surface_grace := 0.0
+## Normal of a surface touching the fish's roof while it's nearly upside down (else zero).
+var _roof_normal := Vector3.ZERO
+var _autoflip_left := 0.0
+var _autoflip_dir := 1.0
 var _spawn_transform: Transform3D
 var _swim_phase := 0.0
 
@@ -340,6 +374,9 @@ var _queued_stroke := 0.0
 @onready var _bubbles: CPUParticles3D = $Bubbles
 @onready var _collision: CollisionShape3D = $Collision
 var _hitbox_view := MeshInstance3D.new()
+var _belly_collision := CollisionShape3D.new()
+var _belly_view := MeshInstance3D.new()
+var _belly_hitbox_view := MeshInstance3D.new()
 
 
 func _ready() -> void:
@@ -356,6 +393,24 @@ func _ready() -> void:
 	_hitbox_view.material_override = material
 	_hitbox_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_hitbox_view)
+
+	_belly_collision.name = "Belly"
+	_belly_collision.shape = BoxShape3D.new()
+	add_child(_belly_collision)
+	_belly_hitbox_view.mesh = BoxMesh.new()
+	_belly_hitbox_view.material_override = material
+	_belly_hitbox_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_belly_hitbox_view)
+	# A pale, rounded belly: the bottom half of a squashed sphere peeking out under the body.
+	var belly_mesh := SphereMesh.new()
+	belly_mesh.radius = 0.5
+	belly_mesh.height = 1.0
+	var belly_material := StandardMaterial3D.new()
+	belly_material.albedo_color = Color(1.0, 0.85, 0.6)
+	belly_material.roughness = 0.6
+	belly_mesh.material = belly_material
+	_belly_view.mesh = belly_mesh
+	add_child(_belly_view)
 	_apply_hitbox()
 
 
@@ -366,6 +421,22 @@ func _apply_hitbox() -> void:
 	(_collision.shape as BoxShape3D).size = size
 	(_hitbox_view.mesh as BoxMesh).size = size
 	_hitbox_view.visible = show_hitbox
+
+	var belly := Vector3(belly_width, belly_height, belly_length)
+	var belly_centre := Vector3(0.0, -(hitbox_height + belly_height) / 2.0, 0.0)
+	var has_belly := belly_height > 0.0
+	_belly_collision.disabled = not has_belly
+	if has_belly:
+		(_belly_collision.shape as BoxShape3D).size = belly
+	_belly_collision.position = belly_centre
+	(_belly_hitbox_view.mesh as BoxMesh).size = belly
+	_belly_hitbox_view.position = belly_centre
+	_belly_hitbox_view.visible = show_hitbox and has_belly
+	# Ellipsoid centred on the body's underside, so its lower half fills the belly.
+	_belly_view.scale = Vector3(belly_width, belly_height * 2.0, belly_length)
+	_belly_view.position = Vector3(0.0, -hitbox_height / 2.0, 0.0)
+	_belly_view.visible = has_belly
+
 	_visual.scale = size / VISUAL_BODY_SIZE
 	_bubbles.position.z = size.z * 0.6  # just behind the tail
 
@@ -529,6 +600,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		velocity = _apply_thrust(velocity, forward, dt)
 		velocity = _apply_strokes(velocity, forward)
 		velocity = _apply_water(velocity, forward, dt)
+	velocity = _start_autoflip(velocity, body_basis)
 	velocity = _apply_jump(velocity, body_basis, state.get_contact_count() > 0, dt)
 	velocity = _apply_flip_z_damp(velocity, dt)
 	velocity = velocity.limit_length(max_boost_speed)
@@ -547,6 +619,11 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		local_spin = _apply_ground_rotation(local_spin, body_basis, velocity, dt)
 	else:
 		local_spin = _apply_rotation(local_spin, dt)
+	if _autoflip_left > 0.0:
+		_autoflip_left -= dt
+		# Roll about the nose (local -Z), capped like all RL spin.
+		local_spin.z -= _autoflip_dir * RL_AUTOFLIP_TORQUE * dt
+		local_spin = local_spin.limit_length(RL_MAX_ANGULAR_SPEED)
 
 	state.linear_velocity = velocity
 	state.angular_velocity = body_basis * local_spin
@@ -580,6 +657,20 @@ func _apply_thrust(velocity: Vector3, forward: Vector3, dt: float) -> Vector3:
 	return velocity + forward * accel * dt
 
 
+## Jump while lying on your roof: RL's auto-flip instead of a jump.
+func _start_autoflip(velocity: Vector3, body_basis: Basis) -> Vector3:
+	if not _jump_queued or _roof_normal == Vector3.ZERO or _autoflip_left > 0.0:
+		return velocity
+	_jump_queued = false
+	var forward := -body_basis.z
+	var over := body_basis.y.angle_to(_roof_normal)
+	_autoflip_left = RL_AUTOFLIP_TIME * over / PI
+	# Roll whichever way brings the fish's up round to the surface normal soonest.
+	var side := body_basis.y.cross(_roof_normal).dot(forward)
+	_autoflip_dir = 1.0 if side >= 0.0 else -1.0
+	return velocity - body_basis.y * RL_AUTOFLIP_IMPULSE  # up points into the surface: hop off it
+
+
 func _update_boost(dt: float) -> void:
 	is_boosting = boost_held and (boost_unlimited or boost_amount > 0.0)
 	if boost_unlimited:
@@ -596,11 +687,15 @@ func _update_boost(dt: float) -> void:
 func _detect_surface(state: PhysicsDirectBodyState3D, body_basis: Basis, dt: float) -> void:
 	_surface_grace -= dt
 	var normal_sum := Vector3.ZERO
-	if rl_surface_mechanics and _surface_grace <= 0.0 and _flip_time < 0.0 and not is_dodging:
-		for i in state.get_contact_count():
-			var normal := state.get_contact_local_normal(i)
-			if normal.dot(body_basis.y) > SURFACE_MIN_DOT:
-				normal_sum += normal
+	_roof_normal = Vector3.ZERO
+	for i in state.get_contact_count():
+		var normal := state.get_contact_local_normal(i)
+		if body_basis.y.angle_to(normal) > RL_AUTOFLIP_ROLL_THRESH:
+			_roof_normal = normal
+		elif normal.dot(body_basis.y) > SURFACE_MIN_DOT:
+			normal_sum += normal
+	if not rl_surface_mechanics or _surface_grace > 0.0 or _flip_time >= 0.0 or is_dodging:
+		normal_sum = Vector3.ZERO
 	var was_on_surface := on_surface
 	on_surface = normal_sum != Vector3.ZERO
 	if on_surface != was_on_surface:
@@ -984,6 +1079,7 @@ func _apply_reset(state: PhysicsDirectBodyState3D) -> void:
 	_flip_spin_out = false
 	on_surface = false
 	_surface_grace = 0.0
+	_autoflip_left = 0.0
 	_post_jump_time_left = 0.0
 	_queued_stroke = 0.0
 	stroke_chain = 0

@@ -42,15 +42,15 @@ func _physics_process(delta: float) -> void:
 	for p in rings._pulse:
 		max_pulse = maxf(max_pulse, p)
 	if once("start", 0.05):
-		aquarium.ball.respawn(Vector3(0, 6, 0))  # drop so it lands and pulses
-	if once("rest", 1.5):
+		aquarium.ball.respawn(Vector3(0, 2.5, 0))  # drop so it lands and pulses
+	if once("rest", 4.5):
 		report("resting on the floor")
 		print("   a ring pulsed on landing: %s" % (max_pulse > 0.5))
 		aquarium.ball.respawn(Vector3(AquariumArena.SIZE.x / 2.0 - 2.0, 8, 0))  # near the +X wall, falling
-	if once("wall", 1.7):
+	if once("wall", 4.7):
 		report("near the +X wall, mid-air")
 		aquarium.respawn_time_left = 5.0  # as after a goal
 		aquarium.ball.pop()
-	if once("popped", 1.9):
+	if once("popped", 4.9):
 		report("popped")
 		get_tree().quit()

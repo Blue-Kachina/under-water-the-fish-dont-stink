@@ -21,12 +21,13 @@ var _touching: Array[bool] = []
 
 
 func _ready() -> void:
-	var texture := _ring_texture()
+	var ring_and_fill := _ring_texture(true)
+	var ring_only := _ring_texture(false)
 	for i in DIRECTIONS.size():
 		var decal := Decal.new()
 		decal.top_level = true
-		decal.texture_albedo = texture
-		decal.texture_emission = texture
+		decal.texture_albedo = ring_and_fill
+		decal.texture_emission = ring_only  # only the ring flashes on contact
 		decal.modulate = COLOR
 		decal.cull_mask = 0xFFFFF & ~BALL_LAYER
 		decal.visible = false
@@ -70,7 +71,7 @@ func update(delta: float) -> void:
 		decal.size = Vector3(size, 1.0, size)  # 1 m deep: enough to wrap the tank's rounded corners
 		decal.global_transform = Transform3D(_basis_facing(hit.normal), hit.position)
 		decal.albedo_mix = clampf(0.25 + 0.6 * near * near + 0.4 * pulse, 0.0, 1.0)
-		decal.emission_energy = 0.3 + 2.5 * pulse
+		decal.emission_energy = 3.0 * pulse  # dark at rest, so a resting ball doesn't keep it lit
 		decal.visible = true
 		if not was_visible:
 			decal.reset_physics_interpolation()
@@ -83,8 +84,10 @@ func _basis_facing(normal: Vector3) -> Basis:
 	return Basis(x, normal, x.cross(normal))
 
 
-## A crisp ring with a faint fill, white on transparent.
-func _ring_texture() -> ImageTexture:
+## A crisp ring, optionally with a faint fill. Colour is premultiplied (black
+## where transparent) because decal emission ignores alpha: a white texture
+## would light up the decal's whole square.
+func _ring_texture(with_fill: bool) -> ImageTexture:
 	var size := 128
 	var image := Image.create(size, size, false, Image.FORMAT_RGBA8)
 	var centre := (size - 1) / 2.0
@@ -92,6 +95,7 @@ func _ring_texture() -> ImageTexture:
 		for x in size:
 			var r := Vector2(x - centre, y - centre).length() / centre
 			var ring := clampf(1.0 - absf(r - 0.9) / 0.07, 0.0, 1.0)
-			var fill := 0.12 if r < 0.9 else 0.0
-			image.set_pixel(x, y, Color(1, 1, 1, maxf(ring, fill)))
+			var fill := 0.12 if with_fill and r < 0.9 else 0.0
+			var a := maxf(ring, fill)
+			image.set_pixel(x, y, Color(a, a, a, a))
 	return ImageTexture.create_from_image(image)

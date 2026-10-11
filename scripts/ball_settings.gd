@@ -4,8 +4,8 @@ extends Resource
 ## world, so values survive environment switches and save with the fish tuning.
 ##
 ## Defaults follow Rocket League's ball (RocketSim RLConst.h). Its size is RL's
-## (1 uu = 1 cm, like the arena and the fish's hitbox); speeds and accelerations
-## are still 2x RL's, like the fish's (times stay the same).
+## (1 uu = 1 cm, like the arena and the fish's hitbox), and so are its speeds
+## and accelerations.
 
 ## WATER: an air bubble drifting in the water, with water drag and buoyancy.
 ## SURFACE: ignores the water and flies like Rocket League's ball, with gravity.
@@ -15,20 +15,21 @@ enum BallType { WATER, SURFACE }
 @export var ball_type := BallType.SURFACE
 ## RL: 0.9125 m (91.25 uu).
 @export_range(0.25, 6.0, 0.0025) var radius := 0.9125
-## Relative to the fish (mass 1). RL's ball is 1/6 of a car.
-@export_range(0.05, 5.0, 0.01) var mass := 0.75
+## Relative to the fish (mass 1). RL's ball is 1/6 of a car (30 vs 180).
+@export_range(0.05, 5.0, 0.001) var mass := 0.167
 ## Restitution. RL: 0.6; mutators "low"/"high"/"super high" bounciness.
-@export_range(0.0, 1.0, 0.05) var bounciness := 0.75
-@export_range(0.0, 2.0, 0.05) var friction := 0.2
-## RL: 60 m/s (x2). Mutators "slow"/"fast"/"super fast" max ball speed.
-@export_range(5.0, 300.0, 1.0) var max_speed := 200.0
+@export_range(0.0, 1.0, 0.05) var bounciness := 0.6
+## RL: 0.35 against the arena.
+@export_range(0.0, 2.0, 0.05) var friction := 0.35
+## RL: 60 m/s. Mutators "slow"/"fast"/"super fast" max ball speed.
+@export_range(5.0, 300.0, 1.0) var max_speed := 60.0
 ## RL: 6 rad/s.
-@export_range(0.0, 30.0, 0.5) var max_angular_speed := 10.0
+@export_range(0.0, 30.0, 0.5) var max_angular_speed := 6.0
 ## Rocket League's ball indicator: a ring on each surface near the ball,
 ## pulsing when the ball touches it.
 @export var surface_indicator := true
 ## How far from a surface the ball still shows its ring there (m).
-@export_range(2.0, 80.0, 1.0) var indicator_range := 30.0
+@export_range(1.0, 80.0, 0.5) var indicator_range := 4.0
 
 @export_group("Water Ball")
 ## Use the fish's linear_drag, angular_drag and buoyancy instead of the values below.
@@ -41,12 +42,12 @@ enum BallType { WATER, SURFACE }
 @export_range(-20.0, 20.0, 0.1) var buoyancy := 0.0
 
 @export_group("Surface Ball")
-## Downward acceleration. RL: 6.5 m/s² (x2); mutators "low"/"high"/"super high" gravity.
-@export_range(0.0, 60.0, 0.5) var gravity := 15.0
+## Downward acceleration. RL: 6.5 m/s²; mutators "low"/"high"/"super high" gravity.
+@export_range(0.0, 60.0, 0.5) var gravity := 6.5
 ## Fraction of speed lost per second in the air. RL: 0.03.
 @export_range(0.0, 1.0, 0.01) var air_drag := 0.03
 ## Fraction of spin lost per second. RL: none.
-@export_range(0.0, 5.0, 0.05) var spin_drag := 1.7
+@export_range(0.0, 5.0, 0.05) var spin_drag := 0.0
 
 @export_group("Hits")
 ## Rocket League's extra hit impulse: on top of the collision, the ball gets a

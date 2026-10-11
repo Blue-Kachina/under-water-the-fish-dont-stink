@@ -10,7 +10,7 @@ var aquarium: AquariumArena
 var t := 0.0
 var events := {}
 var phase_start := 0.0
-var time_to_20 := -1.0
+var time_to_10 := -1.0
 var surfaces_seen := {}
 var on_ball := false
 
@@ -48,49 +48,49 @@ func _physics_process(delta: float) -> void:
 			on_ball = true
 
 	if once("spawn", 0.1):
-		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(-20, 1.0, 45)))
+		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(-20, 0.6, 45)))
 	if once("rest", 1.0):
 		print("resting: on_surface %s, normal %s, y %.3f, up . world up %.4f" % [fish.on_surface, fish.surface_normal.snapped(Vector3.ONE * 0.01), fish.global_position.y, fish.global_basis.y.dot(Vector3.UP)])
 		Input.action_press("thrust_forward")
 		phase_start = t
-	if time_to_20 < 0.0 and phase_start > 0.0 and fish.speed >= 20.0:
-		time_to_20 = t - phase_start
+	if time_to_10 < 0.0 and phase_start > 0.0 and fish.speed >= 10.0:
+		time_to_10 = t - phase_start
 	if once("throttle read", 4.0):
-		print("throttle 3 s: speed %.2f m/s (RL x2 max 28.2), 0 -> 20 m/s in %.2f s, on %s at z %.0f" % [fish.speed, time_to_20, _surface_label(), fish.global_position.z])
+		print("throttle 3 s: speed %.2f m/s (RL max 14.1), 0 -> 10 m/s in %.2f s, on %s at z %.0f" % [fish.speed, time_to_10, _surface_label(), fish.global_position.z])
 		release_all()
-		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(-20, 1.0, 45)))
+		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(-20, 0.6, 45)))
 	if once("boost start", 4.3):
-		fish.linear_velocity = Vector3(0, 0, -28.2)
+		fish.linear_velocity = Vector3(0, 0, -14.1)
 		Input.action_press("boost")
 	if once("boost read", 5.5):
-		print("boost 1.2 s from 28.2: speed %.2f m/s (RL x2 max 46), on %s at z %.0f" % [fish.speed, _surface_label(), fish.global_position.z])
+		print("boost 1.2 s from 14.1: speed %.2f m/s (RL max 23), on %s at z %.0f" % [fish.speed, _surface_label(), fish.global_position.z])
 		release_all()
-		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(-20, 1.0, 40)))
+		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(-20, 0.6, 40)))
 	if once("turn start", 5.8):
-		fish.linear_velocity = Vector3(0, 0, -28.2)
+		fish.linear_velocity = Vector3(0, 0, -14.1)
 		Input.action_press("thrust_forward")
 		Input.action_press("stick_right")
 	if once("turn read", 6.3):
 		var local_spin := fish.global_basis.orthonormalized().transposed() * fish.angular_velocity
-		print("full right at %.1f m/s: yaw %.2f rad/s (RL about 2), drift %.0f deg, on %s" % [fish.speed, -local_spin.y, fish.drift_angle, _surface_label()])
+		print("full right at %.1f m/s: yaw %.2f rad/s (RL about 2.2 at 14.1 m/s), drift %.0f deg, on %s" % [fish.speed, -local_spin.y, fish.drift_angle, _surface_label()])
 		release_all()
 
 	# Drive at the side wall (x = -40.96) and up it.
 	if once("wall", 7.0):
-		fish.set_spawn(Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3(-10, 1.0, 0)))  # facing -X
+		fish.set_spawn(Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3(-20, 0.6, 0)))  # facing -X
 	if once("wall go", 7.5):
 		Input.action_press("thrust_forward")
 		Input.action_press("boost")
-	for i in 4:
+	for i in 5:
 		if once("wall log %d" % i, 8.0 + i * 0.5):
 			print("  wall drive t=%.1f: pos (%.1f, %.1f, %.1f) up %s surface %s speed %.1f" % [t - 7.5, fish.global_position.x, fish.global_position.y, fish.global_position.z, fish.global_basis.y.snapped(Vector3.ONE * 0.01), _surface_label(), fish.speed])
-	if once("wall read", 10.0):
+	if once("wall read", 10.1):
 		print("surfaces driven on so far: %s" % [surfaces_seen.keys()])
 		release_all()
 
 	# Jump off the floor.
 	if once("jump spawn", 10.5):
-		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(-20, 1.0, 40)))
+		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(-20, 0.6, 40)))
 	if once("jump", 11.5):
 		print("before jump: on_surface %s" % fish.on_surface)
 		Input.action_press("jump")
@@ -105,13 +105,13 @@ func _physics_process(delta: float) -> void:
 		fish.set_spawn(Transform3D(Basis.IDENTITY, aquarium.ball.global_position + Vector3(0, aquarium.ball.settings.radius + 1.5, 0)))
 	if once("ball read", 15.0):
 		print("landed on the ball as a surface: %s" % on_ball)
-		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(-20, 1.0, 45)))
+		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(-20, 0.6, 45)))
 	if once("carry drop", 15.5):
-		aquarium.ball.respawn(fish.global_position + Vector3(0, 4, 0))
-	if once("carry go", 18.0):
+		aquarium.ball.respawn(fish.global_position + Vector3(0, 2, 0))
+	if once("carry go", 20.0):
 		print("ball resting on the fish: %.2f m above it" % (aquarium.ball.global_position.y - fish.global_position.y))
 		Input.action_press("thrust_forward", 0.3)
-	if once("carry read", 20.0):
+	if once("carry read", 22.0):
 		var offset := aquarium.ball.global_position - fish.global_position
 		print("carrying at 30%% throttle for 2 s: fish speed %.1f m/s, ball %.2f m above, %.2f m behind the fish centre (still on top: %s)" % [fish.speed, offset.y, offset.dot(fish.global_basis.z), offset.y > fish.hitbox_height / 2.0 + aquarium.ball.settings.radius * 0.8])
 		release_all()

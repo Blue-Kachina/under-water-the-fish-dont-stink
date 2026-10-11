@@ -9,6 +9,10 @@ extends CanvasLayer
 
 const SAVE_PATH_EDITOR := "res://tuning.cfg"  # tracked in git while developing
 const SAVE_PATH_USER := "user://tuning.cfg"   # exported builds can't write res://
+## Each .cfg here is a preset: the values it lists are applied over the defaults
+## (which are Rocket League's).
+const PRESET_DIR := "res://presets"
+const DEFAULT_PRESET := "Rocket League (defaults)"
 
 @export var fish: FishController
 @export var follow_camera: Camera3D
@@ -17,6 +21,7 @@ const SAVE_PATH_USER := "user://tuning.cfg"   # exported builds can't write res:
 var _targets := {}
 var _defaults := {}
 var _editors := {}  # "section/property" -> HSlider, CheckBox or OptionButton
+var _value_labels := {}  # "section/property" -> a slider's value Label
 var _rows := {}  # "section/property" -> the control to hide when the option doesn't apply
 var _group_labels := {}  # group heading Label -> its "section/property" keys
 var _panel: PanelContainer
@@ -83,6 +88,20 @@ func _build_ui() -> void:
 		Controls.apply_profile(profiles.get_item_text(index))
 		_status.text = "Controller profile: %s (remembered on this PC)" % Controls.current_profile)
 	profile_row.add_child(profiles)
+
+	var preset_row := HBoxContainer.new()
+	root.add_child(preset_row)
+	var preset_label := Label.new()
+	preset_label.text = "Preset"
+	preset_row.add_child(preset_label)
+	var presets := OptionButton.new()
+	presets.focus_mode = Control.FOCUS_NONE
+	presets.add_item(DEFAULT_PRESET)
+	for preset_name: String in _preset_names():
+		presets.add_item(preset_name)
+	presets.item_selected.connect(func(index: int) -> void:
+		_apply_preset(presets.get_item_text(index)))
+	preset_row.add_child(presets)
 
 	_environment_row = HBoxContainer.new()  # filled in by set_environments()
 	root.add_child(_environment_row)
@@ -200,6 +219,7 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 				target.set(prop, value)
 				value_label.text = "%.2f" % value)
 			editor = slider
+			_value_labels[key] = value_label
 			list.add_child(row)
 			_rows[key] = row
 
@@ -249,9 +269,13 @@ func _snapshot(target: Object) -> Dictionary:
 
 func _apply(section: String, values: Dictionary) -> void:
 	for prop: String in values:
-		var editor: Control = _editors.get("%s/%s" % [section, prop])
+		var key := "%s/%s" % [section, prop]
+		var editor: Control = _editors.get(key)
 		if editor is HSlider:
-			(editor as HSlider).value = values[prop]  # emits value_changed, which updates the target
+			# Set the target directly: the slider would round to its step (33.33 -> 33.5).
+			_targets[section].set(prop, values[prop])
+			(editor as HSlider).set_value_no_signal(values[prop])
+			_value_labels[key].text = "%.2f" % values[prop]
 		elif editor is CheckBox:
 			(editor as CheckBox).button_pressed = values[prop]
 		elif editor is OptionButton:
@@ -296,6 +320,35 @@ func _load(quiet := false) -> void:
 			values[prop] = config.get_value(section, prop)
 		_apply(section, values)
 	_status.text = "Loaded %s" % path
+
+
+func _preset_names() -> PackedStringArray:
+	var names := PackedStringArray()
+	for file in DirAccess.get_files_at(PRESET_DIR):
+		if file.get_extension() == "cfg":
+			names.append(file.get_basename().capitalize())
+	return names
+
+
+## Defaults first, then the preset file's values on top, so a preset only needs
+## to list what it changes.
+func _apply_preset(preset_name: String) -> void:
+	for section: String in _targets:
+		_apply(section, _defaults[section])
+	if preset_name != DEFAULT_PRESET:
+		var config := ConfigFile.new()
+		var path := "%s/%s.cfg" % [PRESET_DIR, preset_name.to_snake_case()]
+		if config.load(path) != OK:
+			_status.text = "Couldn't load preset %s" % path
+			return
+		for section: String in _targets:
+			if config.has_section(section):
+				var values := {}
+				for prop in config.get_section_keys(section):
+					values[prop] = config.get_value(section, prop)
+				_apply(section, values)
+	_refresh_visibility()
+	_status.text = "Preset: %s (not saved)" % preset_name
 
 
 func _restore_defaults() -> void:

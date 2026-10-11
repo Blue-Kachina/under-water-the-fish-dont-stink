@@ -79,12 +79,54 @@
 - `surface_probe` passes: the fish drives floor → wall → ceiling and carries the ball.
 - `aquarium_probe` keeps the fish inside the shell (0.00 m outside), but its boosted kickoff hit no longer scores.
 
-**Known mismatches, still to fix:**
-- **Speeds are still 2× RL** (fish 28.2 / 46 m/s, ball gravity 15, max 200). At RL size, `aquarium_probe`'s boosted kickoff hit sends the ball over the 6.43 m crossbar instead of into the goal.
-- **Ball mass and bounciness** are not yet RL's either.
+### 2.2 Update 2026-10-10: Rocket League physics values (roadmap phases 0 and 1)
+
+**What changed:**
+- **Fish defaults:** all now RocketSim values at 1×:
+  - air throttle 0.67 m/s², air boost 10.58, speed cap 23;
+  - boost drain 33.33 %/s (regen 10 %/s stands in for boost pads until they exist);
+  - no water drag, gravity −6.5 (`buoyancy`), wall bounce and friction 0.3;
+  - jump 2.917 + hold 14.58 m/s², dodge 5.0, double-jump window 1.25 s;
+  - ground: 14.1 max, 16 accel, 35 brake, 5.25 coast, boost 9.92, max boost 23, sticky force 6.5.
+- **Constants:** `UU_PER_SPEED` 100, `GROUND_WHEELBASE` 0.85, `RL_AUTOFLIP_IMPULSE` 2.0.
+- **Ball:** mass 0.167 (1/6 of the fish), bounciness 0.6, friction 0.35, max speed 60, spin cap 6 rad/s, gravity 6.5, no spin drag. `HIT_CURVE` is now in RL m/s (0/5/23/46).
+- **Camera:** RL defaults: 2.7 m back, 1.0 m up, aim tilted about 3° down, FOV 110.
+- **Presets:** the debug panel has a **Preset** row. "Rocket League (defaults)" restores the defaults. **Water** (`presets/water.cfg`) is the original underwater tuning, applied over the defaults. Applying values no longer snaps to slider steps.
+- **Probes:** the movement and momentum probes test underwater mechanics, so they apply the Water preset. The aquarium, surface and hitbox probes were retimed for RL speeds and gravity.
+
+**Measured against RL in the probes:**
+
+| Check | Result |
+|---|---|
+| Throttle-only top speed | 14.10 m/s (RL 1410 uu/s) |
+| Boost top speed | 23.0 m/s |
+| 0 → 10 m/s on throttle | 1.00 s |
+| Turn rate | 2.05 rad/s at 13.6 m/s (RL curvature table gives about 2.2) |
+| Vertical speed 0.25 s after a full-hold jump | 4.18 m/s (hand calculation 4.21) |
+| Ball fall after 1 s | 6.35 m/s, height matches drag-adjusted gravity |
+| Roll and flip timings, half-flip, flip cancel, Z-damp | identical to the RL reference, tick for tick |
+| Back-spot boosted kickoff | reaches the ball after about 3.0 s, scores at 4.29 s |
+| Driving | floor → wall works; ball carries on the roof |
+
+**Still approximate:** dodge-impulse speed scaling, the 0.62 jump scale in the first 0.025 s, the lateral-friction curve, boost pads, supersonic, demos. With the Water preset, ground steering and the hit curve now use RL's 1× tables, so the old feel isn't byte-identical.
+
+**Known mismatches from the resize, now resolved:**
+- ~~**Speeds still 2× RL**~~ (§2.2)
+- ~~**Ball mass and bounciness**~~ (§2.2)
 - ~~**The ball keeps rescoring.**~~ **Fixed:** the arena now skips goal checks while `Ball.respawn_pending` is true.
 - **Two `aquarium_probe` scenarios still assume the old sizes:** "hit from below" now strikes the top of the smaller, sinking water ball, and the notch-cheek run bounces away. Retune them during the RL-physics pass.
-- **Camera distance and height** are still tuned for the old 1.5 m fish. RL's defaults are about 2.7 m distance, 1.0 m height, FOV 110.
+- ~~**Camera distance and height**~~ now RL's defaults (§2.2).
+
+
+### 2.3 Update 2026-10-10: ride height (belly collider, done by the parallel session)
+- **Settings** (Hitbox group in `fish_controller.gd`):
+  - `belly_height` 0.184 m: the Octane body rides 18.4 uu off the ground. Setting 0 disables the belly.
+  - `belly_length` 1.125 and `belly_width` 0.70: the wheel footprint, about 112 × 70 uu.
+- **Collider:** a "Belly" `CollisionShape3D` is created in code under the hitbox box. `show_hitbox` draws it as well.
+- **Effect:**
+  - The fish now rests with its centre at 0.377 m (0.184 + 0.193), so the hitbox sits at RL's height.
+  - Ball-touch heights on the ground now line up with RL's.
+- **Probes:** `surface_probe` spawn heights were raised to 0.6 m.
 
 ---
 
@@ -512,7 +554,7 @@ Re-simulation is only meaningful once our model *is* RL's model:
 - **Sizes:** arena, ball and Octane hitbox. Done (§2.1).
 - **Speeds and accelerations:** move every value to RL's (the §9.2 k = 1 column). That covers ground throttle curve, boost, jump, dodge impulses, gravity, ball max speed, drag, restitution, and the hit-impulse curve in uu/s.
 - **Car mass ratio:** 6:1 car to ball.
-- **Hitbox offset** relative to the centre of mass, and **ride height on wheels**. RL's hitbox floats about 18 uu above the ground on suspension; ours sits on the floor (§9.3 G1).
+- **Hitbox offset** relative to the centre of mass, and **ride height on wheels**. RL's hitbox floats about 18 uu above the ground on suspension. **Covered by the belly collider** (§2.3); suspension *dynamics* (springs, wheel contact) remain approximate.
 - **Ground model:** RL's actual model is RocketSim's raycast wheels, lateral friction curve and sticky force (§9.3).
 - **Water-only behaviour off:** drag, buoyancy and swim strokes.
 
@@ -593,7 +635,7 @@ Use three tiers of reference, from cheapest and most exact to most "real":
 
 **Fish: rotation.** `rl_roll_timing` and RL air control stay on; they are already RL-faithful.
 
-**Fish: swim strokes.** `swim_strokes = false`.
+**Fish: swim strokes.** Stay **on** by default (the user's call, 2026-10-10). They're the game's own mechanic, not something to strip for RL parity. For strict RL comparisons (RocketSim parity, re-simulation), scripted inputs simply don't sweep the stick rhythmically, or the harness turns them off for its run only.
 
 **Fish: jump and dodge**
 | Export | RL | k=1 | k=2 | Current |
@@ -644,7 +686,7 @@ Use three tiers of reference, from cheapest and most exact to most "real":
 
 ### 9.3 Missing or approximate mechanics, in priority order
 1. **Surface-driving parity** (refining what's in progress):
-   - ride height / suspension (an RL hitbox rides about 18 uu above the ground)
+   - ~~ride height~~ covered by the belly collider (§2.3); suspension springs are still not modelled
    - lateral-friction and handbrake curves
    - jump refresh only on surface contact (`jump_refresh_needs_surface`)
    - the 0.62 jump-hold scale, and jumping along the surface normal
@@ -664,6 +706,7 @@ All existing probes must keep passing after every phase. Probes run as `Godot_co
 | Phase | Add / modify | Acceptance probes |
 |---|---|---|
 | **✓ Sizes (done 2026-10-10)** | Aquarium → RL Soccar arena; RL goals; ball r 0.9125; Octane hitbox with the visual fitted to it (§2.1) | `hitbox_probe` ✓, `surface_probe` ✓, `aquarium_probe` shell containment ✓ (kickoff goal now fails until speeds are RL's) |
+| **✓ RL physics values (done 2026-10-10)** | Phase 1 below, apart from `rl_space.gd`/`rl_consts.gd` and the `rl_preset_probe` (§2.2) | All 15 probes run; RL-matching checks listed in §2.2 |
 | **0: RL constants + space** | Add `scripts/rl/rl_space.gd` (k = 1) and `rl_consts.gd`. Replace the 2× constants in `fish_controller.gd` (`UU_PER_SPEED` → 100, `GROUND_WHEELBASE` → 0.85) and `ball.gd` (`HIT_CURVE` in uu/s × 0.01) | `rl_space_probe`: position, quaternion and ω round-trips; yaw ½π puts the nose at the correct goal; kickoff transforms |
 | **1: RL physics values** | Move every speed and acceleration export to its k = 1 RL value (§9.2); water off; ball mass 1/6 and bounciness 0.6; camera about 2.7 / 1.0 / FOV 110. Also the preset system (`rl_preset.gd`, panel preset row, no-snap setter) so the water tuning stays available as a preset. Fix the goal-rescore race | `rl_preset_probe`: 100 boost lasts 3.0 s; throttle-only top speed 14.1 m/s; ball falls 10 m in 1.754 s; kickoff boost hit scores again in `aquarium_probe` |
 | **2: RocketSim parity harness** | `tools/rocketsim_compare/` (Python via `uv`, RocketSim bindings): scripted input sequences giving reference state CSVs. Headless `physics_parity_probe` replays the same inputs through our physics and diffs | Per-scenario error budgets: jump apex, dodge, half-flip, air roll, powerslide turn, wall drive, ball bounce, kickoff hit (e.g. < 2 cm / 1° after 1 s) |
