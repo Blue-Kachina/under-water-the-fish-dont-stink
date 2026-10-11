@@ -47,7 +47,7 @@ const CARS := {
 		"ride": 19.342,
 	},
 	Family.MERC: {
-		"key": "merc", "car": "Merc", "fish": "Boxfish",
+		"key": "merc", "car": "Merc", "fish": "Cushion Star",
 		"hitbox": Vector3(123.22, 79.2103, 44.1591), "offset": Vector3(11.3757, 0.0, 21.505),
 		"front": {"radius": 15.0, "rest": 39.505, "at": Vector3(51.25, 25.9, 21.505)},
 		"back": {"radius": 15.0, "rest": 39.105, "at": Vector3(-33.75, 29.5, 21.505)},

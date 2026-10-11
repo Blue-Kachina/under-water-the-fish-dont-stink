@@ -1693,4 +1693,5 @@ func _process(delta: float) -> void:
 	var flutter := sin(Time.get_ticks_msec() * 0.05) * 0.7 * input_reverse
 	_fin_left.rotation.z = flutter
 	_fin_right.rotation.z = -flutter
+	_visual.react(delta, linear_velocity)
 	_bubbles.emitting = is_boosting

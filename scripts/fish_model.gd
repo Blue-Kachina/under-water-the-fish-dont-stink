@@ -8,7 +8,8 @@ extends Node3D
 ## Every model has the nodes the swim animation moves (TailPivot, FinLeftPivot,
 ## FinRightPivot) and a Body whose colour set_body_color() changes (replays
 ## tint each fish in its team's colour). Parts sharing the body's material
-## (a manta's wings) change with it.
+## (a manta's wings, a starfish's arms) change with it. A model with a
+## `squash` node squashes and stretches it with the fish's acceleration (react).
 
 const BLACK := Color(0.04, 0.04, 0.06)
 const WHITE := Color(0.97, 0.97, 0.95)
@@ -19,8 +20,16 @@ var tail: Node3D
 var fin_left: Node3D
 var fin_right: Node3D
 
+## Scaled by react() to squash and stretch, if the model has one.
+var squash: Node3D
+
 var _size := Vector3.ONE  # the hitbox (m): width, height, length
 var _body_material: StandardMaterial3D
+var _squash_base := Vector3.ONE  # squash's scale at rest
+var _last_velocity := Vector3.ZERO
+var _acceleration := Vector3.ZERO  # smoothed, world space
+var _stretch := Vector2.ZERO  # current (along, up): + longer / taller
+var _stretch_speed := Vector2.ZERO
 
 
 static func build(character: FishCharacter.Family) -> FishModel:
@@ -40,8 +49,28 @@ static func build(character: FishCharacter.Family) -> FishModel:
 		FishCharacter.Family.HYBRID:
 			model._build_goldfish()
 		FishCharacter.Family.MERC:
-			model._build_boxfish()
+			model._build_starfish()
 	return model
+
+
+## Squash and stretch with the fish's acceleration (from `velocity`, world
+## space, given every frame), on a springy wobble. Speeding up stretches it
+## along its length and braking squashes it; falling stretches it tall and
+## landing squashes it flat. Volume is kept, so it bulges the other way.
+func react(delta: float, velocity: Vector3) -> void:
+	if squash == null or delta <= 0.0:
+		return
+	var raw := (velocity - _last_velocity) / delta
+	_last_velocity = velocity
+	# Physics ticks and frames don't line up: smooth the per-frame acceleration.
+	_acceleration = _acceleration.lerp(raw, 1.0 - exp(-15.0 * delta))
+	var local := global_basis.orthonormalized().inverse() * _acceleration
+	var target := Vector2(clampf(-local.z / 35.0, -0.3, 0.35), clampf(-local.y / 45.0, -0.35, 0.2))
+	_stretch_speed += ((target - _stretch) * 160.0 - _stretch_speed * 11.0) * delta
+	_stretch += _stretch_speed * delta
+	var along := 1.0 + _stretch.x
+	var up := 1.0 + _stretch.y
+	squash.scale = _squash_base * Vector3(1.0 / sqrt(along * up), up, along)
 
 
 func set_body_color(color: Color) -> void:
@@ -196,43 +225,84 @@ func _build_goldfish() -> void:
 	_mouth(Vector3(0.0, -h * 0.02, body_centre.z - semi.z * 0.985), Vector3(w * 0.07, h * 0.09, 0.03))
 
 
-## Merc: a boxy yellow boxfish with polka dots, tiny fins and pouty lips.
-func _build_boxfish() -> void:
+## Merc: a puffy cushion starfish lying flat, one arm forward, with a domed
+## middle, cream bumps and a face on top. It squashes and stretches with its
+## acceleration (react): long and thin speeding up, short and wide braking,
+## tall falling and flat landing, with a jiggle. Its side arms are the "fins".
+func _build_starfish() -> void:
 	var w := _size.x
 	var h := _size.y
 	var l := _size.z
-	var body_centre := Vector3(0.0, 0.0, -l * 0.04)
-	var half := Vector3(w * 0.47, h * 0.48, l * 0.37)
-	_body(Color(1.0, 0.84, 0.1), body_centre, half * 2.0, _box())
-	# Polka dots on the sides and the top.
-	var dot := _material(BLACK.lightened(0.1))
-	for row: Vector2 in [Vector2(-0.22, 0.2), Vector2(0.0, 0.25), Vector2(0.24, 0.18), Vector2(-0.1, -0.2), Vector2(0.14, -0.22)]:
-		for side: float in [-1.0, 1.0]:
-			_part(self, _sphere(), dot, body_centre + Vector3(side * half.x, row.y * h, row.x * l), Vector3(0.02, h * 0.12, h * 0.12))
-	for spot: Vector2 in [Vector2(-0.2, -0.15), Vector2(0.0, 0.18), Vector2(0.2, -0.1), Vector2(0.12, 0.15)]:
-		_part(self, _sphere(), dot, body_centre + Vector3(spot.y * w, half.y, spot.x * l), Vector3(h * 0.12, 0.02, h * 0.12))
-	# Pouty pink lips on the front face.
-	var lips := _part(self, TorusMesh.new(), _material(Color(1.0, 0.45, 0.6), 0.4), body_centre + Vector3(0.0, -h * 0.12, -half.z - 0.02),
-			Vector3(w * 0.13, w * 0.13, h * 0.13), Vector3(PI / 2.0, 0.0, 0.0))
-	lips.name = "Lips"
+	var color := Color(0.95, 0.32, 0.35)
+	# Built in a unit box (-0.5..0.5 each way) scaled to the hitbox, so the star
+	# squashes and stretches as one.
+	squash = Node3D.new()
+	squash.name = "Squash"
+	_squash_base = _size
+	squash.scale = _squash_base
+	add_child(squash)
+	_body_material = _material(color, 0.75)
+	var dome := _part(squash, _sphere(), _body_material, Vector3.ZERO, Vector3(0.62, 1.0, 0.62))
+	dome.name = "Body"
+	for i in 5:
+		var angle := TAU * i / 5.0
+		var along := Vector3(sin(angle), 0.0, -cos(angle))
+		var arm := _part(squash, _sphere(), _body_material, along * 0.25 + Vector3(0.0, -0.2, 0.0), Vector3(0.36, 0.55, 0.5),
+				Vector3(0.0, PI - angle, 0.0))
+		arm.name = "Arm%d" % i
+	# Everything else in metres, riding along with the squash.
+	var top := Node3D.new()
+	top.name = "Top"
+	top.scale = Vector3.ONE / _squash_base
+	squash.add_child(top)
+	var bump := _material(Color(1.0, 0.88, 0.7), 0.6)
+	var tip := _material(Color(1.0, 0.6, 0.4), 0.7)
+	for i in 5:
+		var angle := TAU * i / 5.0
+		var along := Vector3(sin(angle), 0.0, -cos(angle))
+		for d: float in [0.14, 0.24, 0.33, 0.41]:
+			var at := along * d
+			_part(top, _sphere(), bump, Vector3(at.x * w, _star_top(at) * h, at.z * l), Vector3(h * 0.09, h * 0.05, h * 0.09))
+		var end := along * 0.47
+		_part(top, _sphere(), tip, Vector3(end.x * w, (_star_top(end) - 0.04) * h, end.z * l), Vector3(h * 0.16, h * 0.1, h * 0.16))
+	for i in 5:
+		var angle := TAU * (i + 0.5) / 5.0
+		var at := Vector3(sin(angle), 0.0, -cos(angle)) * 0.08
+		_part(top, _sphere(), bump, Vector3(at.x * w, _star_top(at) * h, at.z * l), Vector3(h * 0.08, h * 0.05, h * 0.08))
+	# A face on top: eyes on the dome looking ahead and up, the mouth on the front arm.
 	for side: float in [-1.0, 1.0]:
-		_eye(body_centre + Vector3(side * half.x * 0.78, h * 0.22, -half.z * 0.92), h * 0.17, Vector3(side * 0.5, 0.1, -1.0))
-		_part(self, _sphere(), _material(BLUSH), body_centre + Vector3(side * half.x * 0.62, -h * 0.08, -half.z - 0.005),
-				Vector3(w * 0.14, h * 0.1, 0.02))
-	var fin_material := _material(Color(1.0, 0.92, 0.5), 0.5, 0.9)
-	_tail_pivot(Vector3(0.0, 0.0, body_centre.z + half.z))
-	_part(tail, _sphere(), fin_material, Vector3(0.0, 0.0, l * 0.07), Vector3(0.03, h * 0.6, l * 0.16))
-	_fin_pivots(Vector3(half.x, -h * 0.05, -l * 0.08))
-	for side: float in [-1.0, 1.0]:
-		var pivot := fin_left if side < 0.0 else fin_right
-		_part(pivot, _sphere(), fin_material, Vector3(side * w * 0.05, 0.0, 0.0), Vector3(w * 0.12, 0.025, l * 0.08))
+		var at := Vector3(side * 0.09, 0.0, -0.12)
+		_eye(Vector3(at.x * w, _star_top(at) * h, at.z * l), h * 0.15, Vector3(side * 0.25, 0.7, -1.0), 0.6, top)
+		var cheek := Vector3(side * 0.15, 0.0, -0.2)
+		_part(top, _sphere(), _material(BLUSH), Vector3(cheek.x * w, _star_top(cheek) * h, cheek.z * l), Vector3(w * 0.09, 0.02, h * 0.12))
+	var mouth := Vector3(0.0, 0.0, -0.27)
+	_part(top, _sphere(), _material(Color(0.25, 0.05, 0.08), 0.4), Vector3(0.0, _star_top(mouth) * h, mouth.z * l),
+			Vector3(w * 0.08, 0.02, h * 0.06)).name = "Mouth"
+	_tail_pivot(Vector3.ZERO)  # nothing to wag: the squash is its motion
+	_fin_pivots(Vector3(w * 0.4, 0.0, 0.0))
+
+
+## How high (unit box) the starfish's top is above unit point `at` (x, z): the
+## dome or the arm under it, whichever is higher.
+func _star_top(at: Vector3) -> float:
+	var top := 0.5 * sqrt(maxf(1.0 - pow(at.x / 0.31, 2.0) - pow(at.z / 0.31, 2.0), 0.0))
+	for i in 5:
+		var angle := TAU * i / 5.0
+		var along := Vector3(sin(angle), 0.0, -cos(angle))
+		var across := Vector3(-along.z, 0.0, along.x)
+		var a := (at.dot(along) - 0.25) / 0.25
+		var b := at.dot(across) / 0.18
+		var inside := 1.0 - a * a - b * b
+		if inside > 0.0:
+			top = maxf(top, -0.2 + 0.275 * sqrt(inside))
+	return top
 
 
 # --- Parts ----------------------------------------------------------------------
 
-func _body(color: Color, centre: Vector3, size: Vector3, mesh: Mesh = null) -> void:
+func _body(color: Color, centre: Vector3, size: Vector3) -> void:
 	_body_material = _material(color)
-	var body := _part(self, mesh if mesh else _sphere(), _body_material, centre, size)
+	var body := _part(self, _sphere(), _body_material, centre, size)
 	body.name = "Body"
 
 
@@ -295,15 +365,17 @@ func _face(semi: Vector3, z: float, y: float, radius: float, pupil := 0.6, centr
 
 
 ## A big round eye: white, a dark pupil looking along `look`, and a sparkle.
-func _eye(at: Vector3, radius: float, look: Vector3, pupil := 0.6) -> void:
+func _eye(at: Vector3, radius: float, look: Vector3, pupil := 0.6, parent: Node3D = null) -> void:
+	if parent == null:
+		parent = self
 	var direction := look.normalized()
-	var eye := _part(self, _sphere(), _material(WHITE, 0.2), at, Vector3.ONE * radius * 2.0)
+	var eye := _part(parent, _sphere(), _material(WHITE, 0.2), at, Vector3.ONE * radius * 2.0)
 	eye.name = "Eye"
 	var pupil_at := at + direction * radius * (1.0 - pupil * 0.45)
-	_part(self, _sphere(), _material(BLACK, 0.15), pupil_at, Vector3.ONE * radius * 2.0 * pupil)
+	_part(parent, _sphere(), _material(BLACK, 0.15), pupil_at, Vector3.ONE * radius * 2.0 * pupil)
 	var sparkle := _material(Color.WHITE)
 	sparkle.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_part(self, _sphere(), sparkle, pupil_at + (direction + Vector3(0.3, 0.6, 0.0)).normalized() * radius * pupil * 0.75,
+	_part(parent, _sphere(), sparkle, pupil_at + (direction + Vector3(0.3, 0.6, 0.0)).normalized() * radius * pupil * 0.75,
 			Vector3.ONE * radius * 0.45)
 
 
