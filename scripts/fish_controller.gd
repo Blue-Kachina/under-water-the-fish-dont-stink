@@ -374,7 +374,8 @@ var hitbox_height := 0.387:
 ## 18.4 uu off the ground, and the wheels cover 112.5 x 70 uu). 0 height = no
 ## belly. Without rl_suspension it collides as two round "axles" (front and
 ## rear, at the car's wheel positions, as wide as the belly), so it rolls up a
-## curving ramp the way wheels do instead of catching on it.
+## curving ramp the way wheels do instead of catching on it. Not drawn: it
+## only shows as a see-through box with show_hitbox.
 var belly_height := 0.184:
 	set(value):
 		belly_height = value
@@ -522,7 +523,6 @@ var _wheels: Array[Dictionary] = FishCharacter.wheels(FishCharacter.Family.OCTAN
 var _hitbox_view := MeshInstance3D.new()
 var _world_hull := CollisionShape3D.new()
 var _wheel_collisions: Array[CollisionShape3D] = [CollisionShape3D.new(), CollisionShape3D.new()]
-var _belly_view := MeshInstance3D.new()
 var _belly_hitbox_view := MeshInstance3D.new()
 
 
@@ -557,16 +557,6 @@ func _ready() -> void:
 	_belly_hitbox_view.material_override = material
 	_belly_hitbox_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_belly_hitbox_view)
-	# A pale, rounded belly: the bottom half of a squashed sphere peeking out under the body.
-	var belly_mesh := SphereMesh.new()
-	belly_mesh.radius = 0.5
-	belly_mesh.height = 1.0
-	var belly_material := StandardMaterial3D.new()
-	belly_material.albedo_color = Color(1.0, 0.85, 0.6)
-	belly_material.roughness = 0.6
-	belly_mesh.material = belly_material
-	_belly_view.mesh = belly_mesh
-	add_child(_belly_view)
 	_apply_character()
 
 
@@ -637,10 +627,6 @@ func _apply_hitbox() -> void:
 	(_belly_hitbox_view.mesh as BoxMesh).size = belly
 	_belly_hitbox_view.position = belly_centre
 	_belly_hitbox_view.visible = show_hitbox and has_belly
-	# Ellipsoid centred on the body's underside, so its lower half fills the belly.
-	_belly_view.scale = Vector3(belly_width, belly_height * 2.0, belly_length)
-	_belly_view.position = Vector3(0.0, -hitbox_height / 2.0, 0.0)
-	_belly_view.visible = has_belly
 
 	_visual.scale = size / FishCharacter.hitbox_size(character)  # 1 unless the hitbox was changed by hand
 	_bubbles.position.z = size.z * 0.6  # just behind the tail

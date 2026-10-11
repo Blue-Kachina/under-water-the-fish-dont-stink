@@ -83,20 +83,6 @@ func _ready() -> void:
 	_visual.set_body_color(color)
 	_bubbles.emitting = false
 
-	# The pale belly under the body, as the live fish has (its wheels' place).
-	var belly := MeshInstance3D.new()
-	var belly_mesh := SphereMesh.new()
-	belly_mesh.radius = 0.5
-	belly_mesh.height = 1.0
-	var belly_material := StandardMaterial3D.new()
-	belly_material.albedo_color = Color(1.0, 0.85, 0.6)
-	belly_material.roughness = 0.6
-	belly_mesh.material = belly_material
-	belly.mesh = belly_mesh
-	belly.scale = Vector3(hitbox_size.x * 0.8, 0.368, hitbox_size.z * 0.93)
-	belly.position = Vector3(0.0, -hitbox_size.y / 2.0, 0.0)
-	add_child(belly)
-
 	var box := BoxMesh.new()
 	box.size = hitbox_size
 	var hitbox_material := StandardMaterial3D.new()
