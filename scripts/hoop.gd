@@ -13,6 +13,7 @@ const STATE_COLORS := [Color(0.2, 0.45, 0.85), Color(1.0, 0.85, 0.2), Color(0.3,
 
 var index := 0
 var _material := StandardMaterial3D.new()
+var _outline := XRayOutline.material(STATE_COLORS[State.NEXT])
 
 
 func _ready() -> void:
@@ -56,3 +57,5 @@ func set_state(state: State) -> void:
 	_material.albedo_color = color
 	_material.emission = color
 	_material.emission_energy_multiplier = 1.5 if state == State.NEXT else 0.3
+	# The next hoop's outline shows through whatever hides it.
+	_material.next_pass = _outline if state == State.NEXT else null

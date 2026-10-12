@@ -77,6 +77,8 @@ func set_arena(new_arena: Arena) -> void:
 		arena.course_finished.connect(_on_course_finished)
 	if _course:
 		_course.text = ""
+	if _hint:
+		_update_hint()
 
 
 ## Point the score readout at a new aquarium, or null for environments without one.
@@ -106,7 +108,7 @@ func _update_hint() -> void:
 	if replay:
 		_hint.text = "P/jump: play    , . / D-pad: 5 s    [ ]: goals    V/boost: camera    T G / D-pad: target    - =: speed    H: hitboxes    Y: ball cam"
 	else:
-		_hint.text = "View/F1: tuning panel    Start/R: reset    Right stick/IJKL: look around    Y: ball cam"
+		_hint.text = "View/F1: tuning panel    Start/R: reset    Right stick/IJKL: look around    Y: %s cam" % ("ring" if arena else "ball")
 
 
 func _process(delta: float) -> void:

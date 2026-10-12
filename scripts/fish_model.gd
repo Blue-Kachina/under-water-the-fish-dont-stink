@@ -30,6 +30,10 @@ var _last_velocity := Vector3.ZERO
 var _acceleration := Vector3.ZERO  # smoothed, world space
 var _stretch := Vector2.ZERO  # current (along, up): + longer / taller
 var _stretch_speed := Vector2.ZERO
+## Face features that ride the squash without squashing: each anchor's spot
+## on the body at rest, moved with the squash in react().
+var _face_anchors: Array[Node3D] = []
+var _face_rest: Array[Vector3] = []
 
 
 static func build(character: FishCharacter.Family) -> FishModel:
@@ -56,7 +60,9 @@ static func build(character: FishCharacter.Family) -> FishModel:
 ## Squash and stretch with the fish's acceleration (from `velocity`, world
 ## space, given every frame), on a springy wobble. Speeding up stretches it
 ## along its length and braking squashes it; falling stretches it tall and
-## landing squashes it flat. Volume is kept, so it bulges the other way.
+## landing squashes it flat. Volume is kept, so it bulges the other way. The
+## edge it's moving toward stays put and the trailing side does the stretching
+## (the bottom, when it isn't moving up or down, so it squashes onto the floor).
 func react(delta: float, velocity: Vector3) -> void:
 	if squash == null or delta <= 0.0:
 		return
@@ -64,13 +70,24 @@ func react(delta: float, velocity: Vector3) -> void:
 	_last_velocity = velocity
 	# Physics ticks and frames don't line up: smooth the per-frame acceleration.
 	_acceleration = _acceleration.lerp(raw, 1.0 - exp(-15.0 * delta))
-	var local := global_basis.orthonormalized().inverse() * _acceleration
+	var to_local := global_basis.orthonormalized().inverse()
+	var local := to_local * _acceleration
 	var target := Vector2(clampf(-local.z / 35.0, -0.3, 0.35), clampf(-local.y / 45.0, -0.35, 0.2))
 	_stretch_speed += ((target - _stretch) * 160.0 - _stretch_speed * 11.0) * delta
 	_stretch += _stretch_speed * delta
 	var along := 1.0 + _stretch.x
 	var up := 1.0 + _stretch.y
-	squash.scale = _squash_base * Vector3(1.0 / sqrt(along * up), up, along)
+	var shape := Vector3(1.0 / sqrt(along * up), up, along)
+	# Which end leads, blended over 1 m/s so it never snaps: -1 = the front (-Z)
+	# or the bottom, +1 = the back or the top.
+	var moving := to_local * velocity
+	var lead_z := clampf(moving.z, -1.0, 1.0)
+	var lead_y := lerpf(-1.0, signf(moving.y), clampf(absf(moving.y), 0.0, 1.0))
+	var shift := -Vector3(0.0, lead_y * (up - 1.0), lead_z * (along - 1.0)) * _squash_base / 2.0
+	squash.scale = _squash_base * shape
+	squash.position = shift
+	for i in _face_anchors.size():
+		_face_anchors[i].position = _face_rest[i] * shape + shift
 
 
 func set_body_color(color: Color) -> void:
@@ -269,17 +286,31 @@ func _build_starfish() -> void:
 		var angle := TAU * (i + 0.5) / 5.0
 		var at := Vector3(sin(angle), 0.0, -cos(angle)) * 0.08
 		_part(top, _sphere(), bump, Vector3(at.x * w, _star_top(at) * h, at.z * l), Vector3(h * 0.08, h * 0.05, h * 0.08))
-	# A face on top: eyes on the dome looking ahead and up, the mouth on the front arm.
+	# A face on top: eyes on the dome looking ahead and up, the mouth on the front
+	# arm. It rides on the squashing body without squashing (_face_anchor).
 	for side: float in [-1.0, 1.0]:
 		var at := Vector3(side * 0.09, 0.0, -0.12)
-		_eye(Vector3(at.x * w, _star_top(at) * h, at.z * l), h * 0.15, Vector3(side * 0.25, 0.7, -1.0), 0.6, top)
+		_eye(Vector3.ZERO, h * 0.15, Vector3(side * 0.25, 0.7, -1.0), 0.6, _face_anchor(Vector3(at.x * w, _star_top(at) * h, at.z * l)))
 		var cheek := Vector3(side * 0.15, 0.0, -0.2)
-		_part(top, _sphere(), _material(BLUSH), Vector3(cheek.x * w, _star_top(cheek) * h, cheek.z * l), Vector3(w * 0.09, 0.02, h * 0.12))
+		_part(_face_anchor(Vector3(cheek.x * w, _star_top(cheek) * h, cheek.z * l)), _sphere(), _material(BLUSH), Vector3.ZERO,
+				Vector3(w * 0.09, 0.02, h * 0.12))
 	var mouth := Vector3(0.0, 0.0, -0.27)
-	_part(top, _sphere(), _material(Color(0.25, 0.05, 0.08), 0.4), Vector3(0.0, _star_top(mouth) * h, mouth.z * l),
-			Vector3(w * 0.08, 0.02, h * 0.06)).name = "Mouth"
+	_part(_face_anchor(Vector3(0.0, _star_top(mouth) * h, mouth.z * l)), _sphere(), _material(Color(0.25, 0.05, 0.08), 0.4),
+			Vector3.ZERO, Vector3(w * 0.08, 0.02, h * 0.06)).name = "Mouth"
 	_tail_pivot(Vector3.ZERO)  # nothing to wag: the squash is its motion
 	_fin_pivots(Vector3(w * 0.4, 0.0, 0.0))
+
+
+## A spot on a squashing body (`at`, m, at rest) for a face feature: it moves
+## with the squash, but what's on it keeps its shape.
+func _face_anchor(at: Vector3) -> Node3D:
+	var anchor := Node3D.new()
+	anchor.name = "Face"
+	anchor.position = at
+	add_child(anchor)
+	_face_anchors.append(anchor)
+	_face_rest.append(at)
+	return anchor
 
 
 ## How high (unit box) the starfish's top is above unit point `at` (x, z): the

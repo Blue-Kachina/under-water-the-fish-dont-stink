@@ -88,6 +88,7 @@ func _ready() -> void:
 	sphere.radial_segments = 48
 	sphere.rings = 24
 	_material.shader = BUBBLE_SHADER
+	_material.next_pass = XRayOutline.material(BallIndicators.COLOR)  # seen through whatever hides it
 	_visual.mesh = sphere
 	_visual.material_override = _material
 	_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -131,8 +132,9 @@ func _process(_delta: float) -> void:
 	# Stretch a little along the direction of travel, like a bubble in a current.
 	var velocity := linear_velocity
 	var stretch := clampf(velocity.length() / maxf(settings.max_speed, 1.0), 0.0, 1.0) * 0.25
-	_material.set_shader_parameter("stretch_dir", velocity.normalized() if velocity.length() > 0.1 else Vector3.UP)
-	_material.set_shader_parameter("stretch", stretch)
+	for material: ShaderMaterial in [_material, _material.next_pass]:  # the outline stretches with it
+		material.set_shader_parameter("stretch_dir", velocity.normalized() if velocity.length() > 0.1 else Vector3.UP)
+		material.set_shader_parameter("stretch", stretch)
 	_trail.emitting = not popped and speed > 12.0
 
 

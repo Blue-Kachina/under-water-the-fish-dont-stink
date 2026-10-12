@@ -1,11 +1,13 @@
 extends Camera3D
 ## Third-person chase camera. Follows the fish's facing (not its velocity), with
 ## limited roll and a right-stick look-around that springs back when released.
-## Camera input never affects where the fish swims.
+## Camera input never affects where the fish swims. In the air it holds its
+## direction and only follows the fish's position, as in Rocket League.
 ##
 ## Ball cam (toggled with the ball_cam action, like Rocket League) swings the
 ## camera behind the fish on the line from the ball, so the ball stays in view,
 ## with a level horizon. It falls back to the normal view while there's no ball.
+## On the obstacle course the same toggle is ring cam: it aims at the next hoop.
 
 ## Clearance kept between walls and the point the camera aims at.
 const ANCHOR_CLEARANCE := 0.1
@@ -29,6 +31,10 @@ const MAX_TURN_ACCEL := 40.0
 var target: Node3D
 ## Set by the environment; null when there's no ball.
 var ball: Node3D
+## Set by the environment; null away from the obstacle course. Ring cam aims
+## at its next hoop.
+var course: Arena
+## Ball cam, or ring cam on the course.
 var ball_cam := false
 
 @export_group("Follow")
@@ -60,6 +66,10 @@ var ball_cam := false
 ## Off (Rocket League style): the camera holds its orientation while a dodge
 ## flips the fish, and only follows its position.
 @export var follow_dodge_spin := false
+## Off (Rocket League style): in the air the camera holds the direction it had
+## at takeoff and only follows the fish's position; it turns to match the fish
+## again once it lands. (Ball cam keeps tracking the ball either way.)
+@export var follow_air_rotation := false
 ## Horizontal, as in Rocket League (16:9). RL: FOV.
 @export_range(60.0, 130.0, 1.0) var field_of_view := 109.0:
 	set(value):
@@ -149,8 +159,9 @@ func _process(delta: float) -> void:
 	var fish_xform: Transform3D = subject.get_global_transform_interpolated()
 	var fish_up := fish_xform.basis.y
 	var to_ball := Vector3.ZERO
-	if ball_cam and is_instance_valid(ball) and ball.visible:
-		to_ball = ball.get_global_transform_interpolated().origin - fish_xform.origin
+	var focus := _focus() if ball_cam else null
+	if focus:
+		to_ball = focus.get_global_transform_interpolated().origin - fish_xform.origin
 	var tracking_ball := to_ball.length_squared() > 0.01
 	# On a wall or the ceiling the fish's up is the camera's up (RL style),
 	# and always well defined there, even driving straight up a wall.
@@ -160,7 +171,7 @@ func _process(delta: float) -> void:
 	# (Holding, the camera's own turning eases to a stop.)
 	var target_rotation := _rotation
 	var rate := rotation_stiffness
-	if tracking_ball or follow_dodge_spin or not subject.is_flipping():
+	if tracking_ball or (_follows_rotation(subject) and (follow_dodge_spin or not subject.is_flipping())):
 		# Aim where the fish faces, but with the camera's own (levelled) up
 		# rather than the fish's full orientation. Turning to face backwards
 		# after a half flip is then a level swing around, not a tumble over the
@@ -223,6 +234,26 @@ func _process(delta: float) -> void:
 	eye = _sweep(anchor, eye, collision_margin)
 
 	global_transform = Transform3D(look_basis.orthonormalized(), eye)
+
+
+## What ball cam aims at: the ball, or on the course its next hoop (ring cam).
+## Null while there's nothing to aim at.
+func _focus() -> Node3D:
+	if is_instance_valid(ball) and ball.visible:
+		return ball
+	if is_instance_valid(course) and course.next_hoop < course.hoops.size():
+		return course.hoops[course.next_hoop]
+	return null
+
+
+## Whether the camera turns with the fish this frame (see follow_air_rotation).
+## Without RL surface mechanics the fish is never on a surface, so it always does.
+## (A replay's ghost has no such setting: it's always RL physics.)
+func _follows_rotation(subject: Variant) -> bool:
+	if follow_air_rotation or subject.on_surface:
+		return true
+	var mechanics: Variant = subject.get("rl_surface_mechanics")
+	return mechanics == false
 
 
 ## Turns the camera toward `target` on a critically damped spring. `rate` is the

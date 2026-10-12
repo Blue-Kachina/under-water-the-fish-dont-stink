@@ -21,6 +21,7 @@ func _ready() -> void:
 	sphere.radial_segments = 48
 	sphere.rings = 24
 	_material.shader = Ball.BUBBLE_SHADER
+	_material.next_pass = XRayOutline.material(BallIndicators.COLOR)  # seen through whatever hides it
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = sphere
 	mesh.material_override = _material
@@ -38,5 +39,6 @@ func apply(sample: ReplayData.Sample) -> void:
 	linear_velocity = sample.velocity
 	speed = sample.velocity.length()
 	# Stretch a little along the direction of travel, as the live ball does.
-	_material.set_shader_parameter("stretch_dir", linear_velocity.normalized() if speed > 0.1 else Vector3.UP)
-	_material.set_shader_parameter("stretch", clampf(speed / MAX_SPEED, 0.0, 1.0) * 0.25)
+	for material: ShaderMaterial in [_material, _material.next_pass]:  # the outline stretches with it
+		material.set_shader_parameter("stretch_dir", linear_velocity.normalized() if speed > 0.1 else Vector3.UP)
+		material.set_shader_parameter("stretch", clampf(speed / MAX_SPEED, 0.0, 1.0) * 0.25)
