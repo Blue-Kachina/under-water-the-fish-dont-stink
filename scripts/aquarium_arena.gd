@@ -32,6 +32,9 @@ const GOAL_DEPTH := 8.8
 ## RL's kickoff spot furthest back, the fish's start.
 const KICKOFF_DISTANCE := 46.08
 const GRID_SHADER := preload("res://shaders/grid.gdshader")
+## A goal explosion's reach (m), and how hard it shoves fish at its centre (m/s).
+const GOAL_EXPLOSION_RADIUS := 16.0
+const GOAL_BLAST := 18.0
 
 const TEAM_NAMES := ["Blue", "Orange"]
 const TEAM_COLORS := [Color(0.25, 0.55, 1.0), Color(1.0, 0.5, 0.1)]
@@ -49,15 +52,14 @@ var centre := Vector3(0.0, SIZE.y / 2.0, 0.0)
 var respawn_time_left := 0.0
 ## Off: goals don't score (tests that roll the ball into a net).
 var scoring_enabled := true
-
-var _pop := CPUParticles3D.new()
+## Off: the ball waits after a goal until reset_kickoff() (a match runs its own kickoffs).
+var auto_respawn := true
 
 
 func _ready() -> void:
 	_build_goals()
 	_build_shell()  # after the goals: their nets join the shell's collision mesh
 	_build_specks()
-	_build_pop()
 	ball = Ball.new()
 	ball.name = "Ball"
 	ball.settings = ball_settings
@@ -70,7 +72,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if ball.popped:
 		respawn_time_left -= delta
-		if respawn_time_left <= 0.0:
+		if respawn_time_left <= 0.0 and auto_respawn:
 			ball.respawn(ball_spawn(), true)
 		return
 	if ball.respawn_pending or not scoring_enabled:
@@ -109,9 +111,8 @@ func reset_kickoff() -> void:
 func _score(goal: Goal) -> void:
 	var scorer := 1 - goal.team
 	scores[scorer] += 1
-	_pop.global_position = ball.global_position
-	_pop.emission_sphere_radius = ball.settings.radius
-	_pop.restart()
+	# The goal explodes in the scorer's colour and blasts nearby fish away.
+	Explosion.spawn(self, ball.global_position, TEAM_COLORS[scorer], GOAL_EXPLOSION_RADIUS, GOAL_BLAST)
 	ball.pop()
 	respawn_time_left = ball.settings.goal_reset_delay
 	goal_scored.emit(scorer)
@@ -373,39 +374,6 @@ func _build_specks() -> void:
 	instance.multimesh = multimesh
 	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(instance)
-
-
-## Burst of bubbles where the ball pops after a goal.
-func _build_pop() -> void:
-	var bubble := SphereMesh.new()
-	bubble.radius = 0.12
-	bubble.height = 0.24
-	bubble.radial_segments = 8
-	bubble.rings = 4
-	var material := StandardMaterial3D.new()
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = Color(0.85, 0.97, 1.0, 0.6)
-	bubble.material = material
-
-	_pop.mesh = bubble
-	_pop.emitting = false
-	_pop.one_shot = true
-	_pop.explosiveness = 1.0
-	_pop.amount = 120
-	_pop.lifetime = 2.0
-	_pop.local_coords = false
-	_pop.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	_pop.direction = Vector3.UP
-	_pop.spread = 180.0
-	_pop.gravity = Vector3(0, 3.0, 0)
-	_pop.initial_velocity_min = 4.0
-	_pop.initial_velocity_max = 12.0
-	_pop.damping_min = 4.0
-	_pop.damping_max = 8.0
-	_pop.scale_amount_min = 0.4
-	_pop.scale_amount_max = 2.0
-	add_child(_pop)
 
 
 func _grid_material(color: Color) -> ShaderMaterial:

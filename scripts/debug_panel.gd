@@ -4,7 +4,8 @@ extends CanvasLayer
 ## immediately, and saves/loads them. Add a new export to any of them and it
 ## appears here, in a collapsible panel for its @export_group (all start
 ## collapsed). A target can hide options that don't apply with is_option_active().
-## Also picks the environment and the fish's character (FishCharacter).
+## Also picks the environment, the Aquarium Arena's mode (Free Play or 1v1) and
+## the fish's character (FishCharacter).
 ##
 ## Controls are mouse-only (no keyboard/gamepad focus) so the controller keeps
 ## flying the fish while you drag sliders.
@@ -34,9 +35,12 @@ var _group_panels := {}  # group's FoldableContainer -> its "section/property" k
 var _panel: PanelContainer
 var _status: Label
 var _environment_row: HBoxContainer
+var _mode_row: HBoxContainer
+var _mode_picker: OptionButton
 var _character_picker: OptionButton
 
 signal environment_selected(env_name: String)
+signal mode_selected(mode: String)
 signal character_selected(character: FishCharacter.Family)
 ## A replay file was picked (.replay or .rlreplay.json).
 signal replay_requested(path: String)
@@ -121,6 +125,8 @@ func _build_ui() -> void:
 
 	_environment_row = HBoxContainer.new()  # filled in by set_environments()
 	root.add_child(_environment_row)
+	_mode_row = HBoxContainer.new()  # filled in by set_modes()
+	root.add_child(_mode_row)
 
 	var character_row := HBoxContainer.new()
 	root.add_child(character_row)
@@ -220,6 +226,30 @@ func set_environments(names: Array, current: String) -> void:
 		environment_selected.emit(picker.get_item_text(index))
 		_status.text = "Environment: %s (remembered on this PC)" % picker.get_item_text(index))
 	_environment_row.add_child(picker)
+
+
+## Adds the mode picker; selections are reported via mode_selected.
+func set_modes(names: Array, current: String) -> void:
+	var label := Label.new()
+	label.text = "Mode"
+	_mode_row.add_child(label)
+	_mode_picker = OptionButton.new()
+	_mode_picker.focus_mode = Control.FOCUS_NONE
+	for mode: String in names:
+		_mode_picker.add_item(mode)
+		if mode == current:
+			_mode_picker.select(_mode_picker.item_count - 1)
+	_mode_picker.item_selected.connect(func(index: int) -> void:
+		mode_selected.emit(_mode_picker.get_item_text(index))
+		_status.text = "Mode: %s (remembered on this PC)" % _mode_picker.get_item_text(index))
+	_mode_row.add_child(_mode_picker)
+
+
+## Modes are for the Aquarium Arena only.
+func set_mode_enabled(enabled: bool) -> void:
+	if _mode_picker:
+		_mode_picker.disabled = not enabled
+		_mode_picker.tooltip_text = "" if enabled else "Modes are played in the Aquarium Arena"
 
 
 func _build_section(list: VBoxContainer, section: String, target: Object) -> void:

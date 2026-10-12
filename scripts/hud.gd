@@ -1,7 +1,8 @@
 extends CanvasLayer
 ## Speed, orientation and course readouts plus a live controller-input display.
 ## While a replay plays (set_replay), the scoreboard, clock and the followed
-## player's readouts instead.
+## player's readouts instead. In a 1v1 (set_match), the kickoff countdown and
+## demolitions too.
 
 @export var fish: FishController
 @export var arena: Arena
@@ -15,7 +16,9 @@ var _banner: Label
 var _banner_time_left := 0.0
 var _viz: InputViz
 var _hint: Label
+var _countdown: Label
 var replay: ReplayPlayer
+var match_1v1: Match1v1
 
 
 func _ready() -> void:
@@ -43,6 +46,12 @@ func _ready() -> void:
 	_banner = _centred_label(64.0, 36)
 	_banner.modulate = Color(1.0, 0.9, 0.3)
 	add_child(_banner)
+	_countdown = _centred_label(0.0, 120)
+	_countdown.anchor_top = 0.5
+	_countdown.anchor_bottom = 0.5
+	_countdown.offset_top = -210.0
+	_countdown.offset_bottom = -50.0
+	add_child(_countdown)
 
 	_viz = InputViz.new()
 	_viz.fish = fish
@@ -104,11 +113,33 @@ func set_replay(new_replay: ReplayPlayer) -> void:
 	_update_hint()
 
 
+## Show a 1v1's countdown and demolitions, or null when there's none.
+func set_match(new_match: Match1v1) -> void:
+	match_1v1 = new_match
+	if match_1v1:
+		match_1v1.demolished.connect(_on_demolished)
+	if _countdown:
+		_countdown.text = ""
+	if _hint:
+		_update_hint()
+
+
+func _on_demolished(attacker: FishController, victim: FishController) -> void:
+	if victim == fish:
+		_banner.text = "DEMOLISHED!  Respawning..."
+	elif attacker == fish:
+		_banner.text = "DEMOLITION!"
+	else:
+		return
+	_banner_time_left = 2.5
+
+
 func _update_hint() -> void:
 	if replay:
 		_hint.text = "P/jump: play    , . / D-pad: 5 s    [ ]: goals    V/boost: camera    T G / D-pad: target    - =: speed    H: hitboxes    Y: ball cam"
 	else:
-		_hint.text = "View/F1: tuning panel    Start/R: reset    Right stick/IJKL: look around    Y: %s cam" % ("ring" if arena else "ball")
+		_hint.text = "View/F1: tuning panel    Start/R: %s    Right stick/IJKL: look around    Y: %s cam" % [
+				"restart kickoff" if match_1v1 else "reset", "ring" if arena else "ball"]
 
 
 func _process(delta: float) -> void:
@@ -143,9 +174,15 @@ func _process(delta: float) -> void:
 			_course.text = "Swim through the yellow hoop to start    best %s" % best
 	elif is_instance_valid(aquarium):
 		var line := "BLUE  %d  -  %d  ORANGE    ball %4.1f m/s" % [aquarium.scores[0], aquarium.scores[1], aquarium.ball.speed]
-		if aquarium.ball.popped:
+		if aquarium.ball.popped and aquarium.auto_respawn:
 			line += "    next ball in %.1f s" % maxf(aquarium.respawn_time_left, 0.0)
 		_course.text = line
+
+	if is_instance_valid(match_1v1):
+		if match_1v1.phase == Match1v1.Phase.COUNTDOWN:
+			_countdown.text = str(ceili(match_1v1.countdown_left))
+		else:
+			_countdown.text = "GO!" if match_1v1.go_time_left > 0.0 else ""
 
 	_banner_time_left -= delta
 	if _banner_time_left <= 0.0:

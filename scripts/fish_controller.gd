@@ -23,6 +23,10 @@ signal physics_tick(state: PhysicsDirectBodyState3D)
 ## READY: on the first jump. SECOND_JUMP: a second press within double_jump_window
 ## gives a double jump (stick neutral) or a dodge (stick pushed). COOLDOWN: both used.
 enum JumpState { READY, SECOND_JUMP, COOLDOWN }
+## Every fish in play (the player's and bots') is in this group.
+const GROUP := &"fish"
+## RL's supersonic speed (2200 uu/s): demolitions need it.
+const SUPERSONIC_SPEED := 22.0
 ## Rocket League's deadzone shapes. CIRCLE: on the stick's distance from centre.
 ## CROSS: on each axis separately, so a nearly straight push stays exactly straight.
 enum DeadzoneShape { CIRCLE, CROSS }
@@ -422,6 +426,23 @@ var surface_normal := Vector3.UP
 var stroke_chain := 0
 var stroke_quality := 0.0
 
+## Where this fish's input comes from instead of the player's controller, e.g.
+## a bot's (FishBot); null for the player.
+var controls: FishInput
+## No input at all while set, e.g. during a kickoff countdown.
+var controls_locked := false
+## Boost after a reset (RL: 33.3 at a kickoff or a respawn in a match).
+var spawn_boost := 100.0
+## Tints the body in a team's colour; fully transparent for the character's own.
+var team_color := Color.TRANSPARENT:
+	set(value):
+		team_color = value
+		_apply_team_color()
+## Out of play (see demolish()).
+var demolished := false
+var _saved_layers := Vector2i.ONE
+var _idle_input := FishInput.new()  # what controls_locked reads
+
 # Latest input, sampled every physics tick.
 var input_forward := 0.0
 var input_reverse := 0.0
@@ -527,6 +548,7 @@ var _belly_hitbox_view := MeshInstance3D.new()
 
 
 func _ready() -> void:
+	add_to_group(GROUP)
 	_spawn_transform = global_transform
 	center_of_mass_mode = CENTER_OF_MASS_MODE_CUSTOM  # the character's car's (_apply_character)
 	physics_material_override = PhysicsMaterial.new()
@@ -575,6 +597,7 @@ func _apply_character() -> void:
 	_tail = _visual.tail
 	_fin_left = _visual.fin_left
 	_fin_right = _visual.fin_right
+	_apply_team_color()
 	# Each setter re-applies the hitbox; the last one sees all of them.
 	var size := FishCharacter.hitbox_size(character)
 	var belly := FishCharacter.belly(character)
@@ -584,6 +607,15 @@ func _apply_character() -> void:
 	belly_width = belly.x
 	belly_height = belly.y
 	belly_length = belly.z
+
+
+func _apply_team_color() -> void:
+	if _visual == null:
+		return
+	if team_color.a > 0.0:
+		_visual.set_body_color(team_color)
+	else:
+		_visual.reset_body_color()
 
 
 func _apply_hitbox() -> void:
@@ -713,21 +745,66 @@ func set_spawn(spawn: Transform3D) -> void:
 ## that callback before _physics_process, so sampling input there would apply
 ## it a tick (8.3 ms) late.
 func _sample_input(delta: float) -> void:
-	input_forward = Input.get_action_strength("thrust_forward")
-	input_reverse = Input.get_action_strength("thrust_reverse")
-	input_stick = _processed_stick()
-	input_roll = Input.get_action_strength("roll_right") - Input.get_action_strength("roll_left")
-	air_roll_held = Input.is_action_pressed("air_roll")
-	boost_held = Input.is_action_pressed("boost")
-	powerslide_held = Input.is_action_pressed("powerslide")
-	direction_lock_held = Input.is_action_pressed("direction_lock")
+	if controls_locked:
+		_read_controls(_idle_input)
+	elif controls:
+		_read_controls(controls)
+	else:
+		input_forward = Input.get_action_strength("thrust_forward")
+		input_reverse = Input.get_action_strength("thrust_reverse")
+		input_stick = _processed_stick()
+		input_roll = Input.get_action_strength("roll_right") - Input.get_action_strength("roll_left")
+		air_roll_held = Input.is_action_pressed("air_roll")
+		boost_held = Input.is_action_pressed("boost")
+		powerslide_held = Input.is_action_pressed("powerslide")
+		direction_lock_held = Input.is_action_pressed("direction_lock")
+		jump_held = Input.is_action_pressed("jump")
 	# Detect the press ourselves: "just pressed" is tracked per frame and isn't
 	# reliable this early in the physics tick.
-	jump_held = Input.is_action_pressed("jump")
 	if jump_held and not _jump_was_held:
 		_jump_queued = true
 	_jump_was_held = jump_held
 	_detect_strokes(delta)
+
+
+func _read_controls(source: FishInput) -> void:
+	input_forward = source.forward
+	input_reverse = source.reverse
+	input_stick = source.stick.clamp(-Vector2.ONE, Vector2.ONE)
+	input_roll = source.roll
+	air_roll_held = source.air_roll
+	boost_held = source.boost
+	powerslide_held = source.powerslide
+	direction_lock_held = source.direction_lock
+	jump_held = source.jump
+
+
+## Out of play after a demolition: hidden, frozen where it was and touching
+## nothing (not the ball, not other fish) until revive().
+func demolish() -> void:
+	demolished = true
+	visible = false
+	_saved_layers = Vector2i(collision_layer, collision_mask)
+	collision_layer = 0
+	collision_mask = 0
+	set_deferred("freeze", true)
+
+
+## Back in play after demolish(), at `spawn`.
+func revive(spawn: Transform3D) -> void:
+	if demolished:
+		collision_layer = _saved_layers.x
+		collision_mask = _saved_layers.y
+	demolished = false
+	visible = true
+	freeze = false
+	set_spawn(spawn)
+
+
+## A sudden change of velocity (m/s), e.g. a goal explosion's blast, applied at
+## the start of the next physics step.
+func apply_push(velocity_change: Vector3) -> void:
+	_ball_push += velocity_change
 
 
 ## The left stick after Rocket League's deadzone and sensitivity settings. Read
@@ -1659,7 +1736,7 @@ func _apply_reset(state: PhysicsDirectBodyState3D) -> void:
 	_jump_wheel_contact_left = 0.0
 	_handbrake = 0.0
 	reset_tyres()
-	boost_amount = 100.0
+	boost_amount = spawn_boost
 	reset_physics_interpolation.call_deferred()
 
 

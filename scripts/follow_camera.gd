@@ -321,7 +321,8 @@ func _sweep(from: Vector3, to: Vector3, radius: float) -> Vector3:
 		return from
 	var space := get_world_3d().direct_space_state
 	var exclude: Array[RID] = []
-	for body: Variant in [fish, target]:
+	# Other fish (a bot) don't push the camera in either.
+	for body: Variant in [fish, target] + get_tree().get_nodes_in_group(FishController.GROUP):
 		if is_instance_valid(body) and body is CollisionObject3D:
 			exclude.append((body as CollisionObject3D).get_rid())
 	if is_instance_valid(ball) and ball is CollisionObject3D:

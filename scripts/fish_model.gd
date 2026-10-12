@@ -25,6 +25,7 @@ var squash: Node3D
 
 var _size := Vector3.ONE  # the hitbox (m): width, height, length
 var _body_material: StandardMaterial3D
+var _own_body_color: Variant = null  # before set_body_color()
 var _squash_base := Vector3.ONE  # squash's scale at rest
 var _last_velocity := Vector3.ZERO
 var _acceleration := Vector3.ZERO  # smoothed, world space
@@ -91,7 +92,15 @@ func react(delta: float, velocity: Vector3) -> void:
 
 
 func set_body_color(color: Color) -> void:
+	if _own_body_color == null:
+		_own_body_color = _body_material.albedo_color
 	_body_material.albedo_color = color
+
+
+## Back to the character's own colour after set_body_color().
+func reset_body_color() -> void:
+	if _own_body_color != null:
+		_body_material.albedo_color = _own_body_color
 
 
 # --- The fish -------------------------------------------------------------------

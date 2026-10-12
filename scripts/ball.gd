@@ -29,6 +29,9 @@ signal touched(by: Node3D, hit_speed: float)
 @export var settings: BallSettings
 ## Source of the water settings when settings.inherit_water is on.
 @export var fish: FishController
+## Every fish that can touch the ball, e.g. both sides of a match (add_player);
+## empty for just `fish`.
+var players: Array[FishController] = []
 
 var popped := false
 var speed := 0.0
@@ -56,7 +59,8 @@ var _spawn_position := Vector3.ZERO
 var _step_velocity := Vector3.ZERO
 var _prev_step_velocity := Vector3.ZERO
 var _step_frame := -1
-var _touching_fish := false
+## Fish touching the ball last tick (a touch is fresh on the first tick of contact).
+var _touching_fish := {}
 var _hit_cooldown := 0.0
 
 
@@ -76,8 +80,8 @@ func _ready() -> void:
 	# bodies' bounciness and the fish's driving friction (none). RL's car-ball
 	# contact is resolved here instead (_resolve_fish_contact); the engine still
 	# handles the ball against the arena.
-	if fish:
-		add_collision_exception_with(fish)
+	for player in _players():
+		add_collision_exception_with(player)
 
 	_collision.shape = _shape
 	add_child(_collision)
@@ -162,15 +166,21 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		state.angular_velocity = Vector3.ZERO
 		_step_velocity = Vector3.ZERO
 		_prev_step_velocity = Vector3.ZERO
-		_touching_fish = false
+		_touching_fish.clear()
 		reset_physics_interpolation.call_deferred()
 		return
 
 	var velocity := state.linear_velocity
 	var spin := state.angular_velocity
-	var contact := _fish_contact(state.transform.origin)
+	var contacts: Array[Dictionary] = []
+	for player in _players():
+		var contact := _fish_contact(state.transform.origin, player)
+		if contact.is_empty():
+			_touching_fish.erase(player)
+		else:
+			contacts.append(contact)
 	if waiting_for_touch:
-		if contact.is_empty() or contact.depth <= 0.0:
+		if not contacts.any(func(contact: Dictionary) -> bool: return contact.depth > 0.0):
 			# Held in place: nothing but a fish wakes it (RL's kickoff ball).
 			state.linear_velocity = Vector3.ZERO
 			state.angular_velocity = Vector3.ZERO
@@ -196,9 +206,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		spin *= exp(-angular_drag * dt)
 
 	# After gravity, as a physics engine's contact solver runs after the forces.
-	if contact.is_empty():
-		_touching_fish = false
-	else:
+	for contact in contacts:
 		var result := _resolve_fish_contact(state, contact, velocity, spin, before)
 		velocity = result[0]
 		spin = result[1]
@@ -223,14 +231,41 @@ func _buoyancy() -> float:
 	return fish.buoyancy if settings.inherit_water and is_instance_valid(fish) else settings.buoyancy
 
 
-## The nearest point where the fish's collision boxes (hitbox and belly) touch
+## Every fish that can touch the ball: `players`, or just `fish` when that's empty.
+func _players() -> Array[FishController]:
+	if not players.is_empty():
+		return players
+	var only: Array[FishController] = []
+	if is_instance_valid(fish):
+		only.append(fish)
+	return only
+
+
+## Lets `player` touch the ball too (see players).
+func add_player(player: FishController) -> void:
+	if players.is_empty() and is_instance_valid(fish):
+		players.append(fish)
+	if player not in players:
+		players.append(player)
+		add_collision_exception_with(player)
+
+
+## Back to `fish` alone.
+func remove_player(player: FishController) -> void:
+	players.erase(player)
+	_touching_fish.erase(player)
+	if is_instance_valid(player):
+		remove_collision_exception_with(player)
+
+
+## The nearest point where `who`'s collision boxes (hitbox and belly) touch
 ## the ball at `centre`: {fish, normal (fish -> ball), depth (overlap, negative
-## while still just apart)}, or empty when the fish isn't touching.
-func _fish_contact(centre: Vector3) -> Dictionary:
-	if not is_instance_valid(fish) or popped:
+## while still just apart)}, or empty when it isn't touching (or is out of play).
+func _fish_contact(centre: Vector3, who: FishController) -> Dictionary:
+	if not is_instance_valid(who) or who.demolished or popped:
 		return {}
 	var best := {}
-	for child in fish.get_children():
+	for child in who.get_children():
 		var shape_node := child as CollisionShape3D
 		# The fish's box hitbox: disabled for the engine (the arena meets a
 		# bevelled hull), but it's the shape the ball is checked against.
@@ -256,7 +291,7 @@ func _fish_contact(centre: Vector3) -> Dictionary:
 			normal = offset / distance
 			depth = _radius - distance
 		if depth > -CONTACT_MARGIN and (best.is_empty() or depth > best.depth):
-			best = {"fish": fish, "normal": normal, "depth": depth}
+			best = {"fish": who, "normal": normal, "depth": depth}
 	return best
 
 
@@ -327,9 +362,9 @@ func _resolve_fish_contact(state: PhysicsDirectBodyState3D, contact: Dictionary,
 	# would measure the hit speed after that push had already taken most of it,
 	# leaving RL's extra impulse almost nothing to work with.
 	var touching := depth > 0.0 or pushed > 0.0
-	var fresh := not _touching_fish and touching
+	var fresh: bool = not _touching_fish.get(hitter, false) and touching
 	if touching:
-		_touching_fish = true
+		_touching_fish[hitter] = true
 	if not fresh:
 		return [velocity, spin]
 	var hit_speed := minf((before - fish_velocity).length(), HIT_CURVE[-1].x)

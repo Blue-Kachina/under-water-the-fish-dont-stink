@@ -1,5 +1,7 @@
 extends Node3D
 ## Movement playground root: owns the swappable environment and global shortcuts.
+## In the Aquarium Arena it also runs the mode: Free Play, or a 1v1 against a
+## bot (Match1v1).
 ##
 ## Also plays Rocket League replays in the Aquarium Arena (load_replay): pick
 ## one in the tuning panel, drop a file on the window, or start the game with
@@ -17,6 +19,10 @@ const ENVIRONMENTS := {
 }
 const SETTINGS_PATH := "user://playground.cfg"
 const REPLAY_ENVIRONMENT := "Aquarium Arena"
+## Modes in the Aquarium Arena (other environments are always Free Play).
+const FREE_PLAY := "Free Play"
+const ONE_V_ONE := "1v1"
+const MODES := [FREE_PLAY, ONE_V_ONE]
 ## Converted replays are kept here, so a .replay converts only once. Bump the
 ## folder when the converter's output changes, so old conversions are redone.
 const CONVERTED_DIR := "user://replays/converter-1.2"
@@ -25,7 +31,12 @@ const CONVERTED_DIR := "user://replays/converter-1.2"
 @export var ball_settings: BallSettings
 
 var current_environment := ""
+var current_mode := FREE_PLAY
 var replay: ReplayPlayer
+## The 1v1 being played, if any.
+var match_1v1: Match1v1
+## From a replay being picked until it's closed: no match then.
+var _in_replay := false
 var _environment: Node3D
 var _replay_controls: ReplayControls
 var _environment_before_replay := ""
@@ -45,12 +56,18 @@ func _ready() -> void:
 	if settings.load(SETTINGS_PATH) == OK:
 		saved = settings.get_value("playground", "environment", saved)
 		saved_character = FishCharacter.from_key(settings.get_value("playground", "character", "octane"))
+		current_mode = settings.get_value("playground", "mode", FREE_PLAY)
+		if current_mode not in MODES:
+			current_mode = FREE_PLAY
 	_fish.character = saved_character
 	set_environment(saved, false)
 	_panel.set_environments(ENVIRONMENTS.keys(), current_environment)
 	_panel.environment_selected.connect(func(env_name: String) -> void:
 		stop_replay()
 		set_environment(env_name))
+	_panel.set_modes(MODES, current_mode)
+	_panel.set_mode_enabled(_environment is AquariumArena)
+	_panel.mode_selected.connect(set_mode)
 	_panel.set_character(_fish.character)
 	_panel.character_selected.connect(set_character)
 	_panel.replay_requested.connect(load_replay)
@@ -73,6 +90,7 @@ func set_environment(env_name: String, remember := true) -> void:
 	if not ENVIRONMENTS.has(env_name):
 		env_name = "Obstacle Course"
 	current_environment = env_name
+	_end_match()
 	if _environment:
 		_environment.queue_free()
 	_environment = ENVIRONMENTS[env_name].new()
@@ -89,6 +107,9 @@ func set_environment(env_name: String, remember := true) -> void:
 	_camera.ball = (_environment as AquariumArena).ball if _environment is AquariumArena else null
 	_camera.course = _environment as Arena
 	_fish.set_spawn(_environment.spawn_transform())
+	if _panel.is_node_ready():
+		_panel.set_mode_enabled(_environment is AquariumArena)
+	_apply_mode()
 
 	if remember:
 		var settings := ConfigFile.new()
@@ -103,7 +124,10 @@ func set_character(character: FishCharacter.Family) -> void:
 	if replay:
 		return
 	_fish.character = character
-	_fish.set_spawn(_environment.spawn_transform())
+	if match_1v1:
+		match_1v1.kickoff()  # back to a kickoff as the new character
+	else:
+		_fish.set_spawn(_environment.spawn_transform())
 	_panel.set_character(character)
 	var settings := ConfigFile.new()
 	settings.load(SETTINGS_PATH)
@@ -115,6 +139,9 @@ func _process(_delta: float) -> void:
 	if replay:
 		return  # the replay's own controls are in charge
 	if Input.is_action_just_pressed("reset"):
+		if match_1v1:
+			match_1v1.kickoff()
+			return
 		_fish.set_spawn(_environment.spawn_transform())  # re-read: the aquarium's depends on the ball type
 		if _environment is Arena:
 			(_environment as Arena).reset_course()
@@ -197,6 +224,8 @@ func _replay_failed(problem: String) -> void:
 ## may hold a soundtrack.
 func _start_replay(data: ReplayData, source: String) -> void:
 	stop_replay()
+	_in_replay = true
+	_end_match()
 	_environment_before_replay = current_environment
 	if current_environment != REPLAY_ENVIRONMENT:
 		set_environment(REPLAY_ENVIRONMENT, false)
@@ -250,6 +279,7 @@ func stop_replay() -> void:
 		return
 	replay.queue_free()
 	replay = null
+	_in_replay = false
 	_camera.make_current()  # now, not when the replay's freed at the end of the frame
 	_replay_controls.queue_free()
 	_replay_controls = null
@@ -267,7 +297,50 @@ func stop_replay() -> void:
 		aquarium.reset_kickoff()
 		_camera.ball = aquarium.ball
 		_fish.set_spawn(_environment.spawn_transform())
+		_apply_mode()
 	_camera.snap()
+
+
+## Plays the Aquarium Arena in `mode` (one of MODES) from now on, and remembers it.
+func set_mode(mode: String) -> void:
+	if mode not in MODES or mode == current_mode:
+		return
+	current_mode = mode
+	var settings := ConfigFile.new()
+	settings.load(SETTINGS_PATH)
+	settings.set_value("playground", "mode", mode)
+	settings.save(SETTINGS_PATH)
+	_apply_mode()
+
+
+## Starts or ends the 1v1 to match the mode and environment.
+func _apply_mode() -> void:
+	var wanted := current_mode == ONE_V_ONE and _environment is AquariumArena and not _in_replay
+	if wanted == (match_1v1 != null):
+		return
+	if not wanted:
+		_end_match()
+		if _environment is AquariumArena and not _in_replay:
+			(_environment as AquariumArena).reset_kickoff()
+			_fish.set_spawn(_environment.spawn_transform())
+		return
+	match_1v1 = Match1v1.new()
+	match_1v1.name = "Match"
+	match_1v1.setup(_environment as AquariumArena, _fish)
+	match_1v1.fish_teleported.connect(func(fish: FishController) -> void:
+		if fish == _fish:
+			_camera.snap())
+	_environment.add_child(match_1v1)
+	_hud.set_match(match_1v1)
+
+
+func _end_match() -> void:
+	if match_1v1 == null:
+		return
+	match_1v1.end()
+	match_1v1.queue_free()
+	match_1v1 = null
+	_hud.set_match(null)
 
 
 func _exit_tree() -> void:
