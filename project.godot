@@ -17,11 +17,14 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 [autoload]
 
 Controls="*res://scripts/controls.gd"
+UISettings="*res://scripts/ui_settings.gd"
 
 [display]
 
 window/size/viewport_width=1600
 window/size/viewport_height=900
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 
 [editor_plugins]
 

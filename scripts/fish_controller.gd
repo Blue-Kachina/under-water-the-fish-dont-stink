@@ -454,6 +454,10 @@ var team_color := Color.TRANSPARENT:
 		_apply_team_color()
 ## Out of play (see demolish()).
 var demolished := false
+## The team it plays for in a match (0 Blue, 1 Orange), or -1 outside one.
+var team := -1
+## Its name on the scoreboard and goal announcements.
+var display_name := ""
 var _saved_layers := Vector2i.ONE
 var _idle_input := FishInput.new()  # what controls_locked reads
 

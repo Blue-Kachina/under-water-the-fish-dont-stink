@@ -34,6 +34,7 @@ func _run() -> void:
 	# Into 1v1.
 	main.set_mode(main.ONE_V_ONE)
 	var game: Match1v1 = main.match_1v1
+	game.goal_replays = false  # goal_replay_probe covers those
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	check(absf(fish.boost_amount - Match1v1.SPAWN_BOOST) < 0.5, "kickoff boost 33 (%.1f)" % fish.boost_amount)

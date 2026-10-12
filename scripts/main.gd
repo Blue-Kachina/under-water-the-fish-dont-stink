@@ -62,6 +62,12 @@ func _ready() -> void:
 	if get_tree().current_scene != self:
 		current_mode = FREE_PLAY  # inside a test probe: no bot, whatever was last played
 	_fish.character = saved_character
+	_fish.display_name = UISettings.display_name()
+	UISettings.changed.connect(func(key: String) -> void:
+		if key == "player_name":
+			_fish.display_name = UISettings.display_name()
+		elif key == "goal_replays" and match_1v1:
+			match_1v1.goal_replays = UISettings.goal_replays)
 	set_environment(saved, false)
 	_panel.set_environments(ENVIRONMENTS.keys(), current_environment)
 	_panel.environment_selected.connect(func(env_name: String) -> void:
@@ -329,6 +335,7 @@ func _apply_mode() -> void:
 	match_1v1 = Match1v1.new()
 	match_1v1.name = "Match"
 	match_1v1.setup(_environment as AquariumArena, _fish)
+	match_1v1.goal_replays = UISettings.goal_replays
 	match_1v1.fish_teleported.connect(func(fish: FishController) -> void:
 		if fish == _fish:
 			_camera.snap())

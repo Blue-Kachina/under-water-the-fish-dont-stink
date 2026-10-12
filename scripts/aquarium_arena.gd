@@ -10,6 +10,7 @@ extends Node3D
 ## vertical corners cut at 45 degrees and wide rounded joins into the walls,
 ## a 2.56 m ramp up from the floor and a 5.12 m curve onto the ceiling.
 
+## last_goal says who scored it.
 signal goal_scored(team: int)
 
 const SIZE := Vector3(81.92, 20.48, 102.4)  # floor at y = 0, centred on x/z
@@ -69,6 +70,14 @@ var respawn_time_left := 0.0
 var scoring_enabled := true
 ## Off: the ball waits after a goal until reset_kickoff() (a match runs its own kickoffs).
 var auto_respawn := true
+## The last goal: "team", "scorer" and "assister" (fish, or null) and "speed"
+## (the ball's, m/s). See goal_credit().
+var last_goal := {}
+## Seconds a teammate's touch before the scorer's counts as an assist.
+const ASSIST_WINDOW := 5.0
+## Ball touches since the last kickoff, oldest first, as [fish, time].
+var _touches: Array = []
+var _time := 0.0
 
 var _shell: StaticBody3D
 # The shell's collision triangles and their inward vertex normals, and the
@@ -93,9 +102,11 @@ func _ready() -> void:
 	ball.add_collision_exception_with(_shell)
 	add_child(ball)
 	ball.respawn(ball_spawn(), true)  # the opening kickoff
+	ball.touched.connect(func(by: Node3D, _hit_speed: float) -> void: _touches.append([by, _time]))
 
 
 func _physics_process(delta: float) -> void:
+	_time += delta
 	if not is_equal_approx(ball_settings.world_gap, _ball_surface_gap):
 		_update_ball_surface()
 	if ball.popped:
@@ -133,17 +144,52 @@ func configure_environment(env: Environment) -> void:
 ## Ball back to its kickoff spot. Scores are kept.
 func reset_kickoff() -> void:
 	respawn_time_left = 0.0
+	_touches.clear()
 	ball.respawn(ball_spawn(), true)
 
 
 func _score(goal: Goal) -> void:
 	var scorer := 1 - goal.team
 	scores[scorer] += 1
+	last_goal = goal_credit(_touches, scorer, _time)
+	last_goal.speed = ball.linear_velocity.length()
+	_touches.clear()
 	# The goal explodes in the scorer's colour and blasts nearby fish away.
 	Explosion.spawn(self, ball.global_position, TEAM_COLORS[scorer], GOAL_EXPLOSION_RADIUS, GOAL_BLAST)
 	ball.pop()
 	respawn_time_left = ball.settings.goal_reset_delay
 	goal_scored.emit(scorer)
+
+
+## Who gets the credit for `team`'s goal at time `now`, from `touches` ([fish,
+## time], oldest first): the scorer is the last fish on that team to touch the
+## ball (none: an own goal); the assister, the teammate who touched it last
+## before the scorer's final touches, within ASSIST_WINDOW of the goal. A fish
+## on no team (Free Play) plays for whoever it scores for, without assists.
+static func goal_credit(touches: Array, team: int, now: float) -> Dictionary:
+	var credit := {"team": team, "scorer": null, "assister": null}
+	var i := touches.size() - 1
+	while i >= 0 and not _plays_for(touches[i][0], team):
+		i -= 1
+	if i < 0:
+		return credit
+	var scorer: Node3D = touches[i][0]
+	credit.scorer = scorer
+	if not "team" in scorer or scorer.team != team:
+		return credit
+	while i >= 0 and touches[i][0] == scorer:
+		i -= 1
+	while i >= 0 and now - touches[i][1] <= ASSIST_WINDOW:
+		var fish: Node3D = touches[i][0]
+		if fish != scorer and is_instance_valid(fish) and "team" in fish and fish.team == team:
+			credit.assister = fish
+			break
+		i -= 1
+	return credit
+
+
+static func _plays_for(fish: Node3D, team: int) -> bool:
+	return is_instance_valid(fish) and (not "team" in fish or fish.team == team or fish.team == -1)
 
 
 ## The tank's inside surface as one mesh (sand floor + glass walls and ceiling)

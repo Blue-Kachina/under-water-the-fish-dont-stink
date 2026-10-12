@@ -136,7 +136,7 @@ func _check_seeking() -> void:
 	check(replay.ball.visible and orange_goal.contains_ball(replay.ball.global_position, ReplayBall.RADIUS),
 			"at Blue's goal the ball is in Orange's net: %s" % replay.ball.global_position)
 	hud._process(0.0)  # the HUD refreshes once a frame; read it now
-	check(hud._course.text.begins_with("BLUE  1  -  0"), "HUD shows the score at the goal: %s" % hud._course.text)
+	check(hud._scorebug.scores == [1, 0] and hud._scorebug.visible, "scoreboard shows the score at the goal: %s" % str(hud._scorebug.scores))
 	replay.seek(goal_time + 0.5)
 	check(not replay.ball.visible, "ball gone after the goal")
 
@@ -146,7 +146,7 @@ func _check_seeking() -> void:
 	check(replay.cars[1].visible, "and back after its respawn")
 	replay.seek(1.0)
 	hud._process(0.0)
-	check(hud._course.text.contains("kickoff in 3") and hud._course.text.begins_with("BLUE  0  -  0"), "countdown shown: %s" % hud._course.text)
+	check(hud._course.text == "Kickoff in 3" and hud._scorebug.scores == [0, 0], "countdown shown: %s, score %s" % [hud._course.text, str(hud._scorebug.scores)])
 
 	replay.step(1)
 	var after_step := replay.time

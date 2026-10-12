@@ -1,13 +1,21 @@
 extends CanvasLayer
-## Speed, orientation and course readouts plus a live controller-input display.
-## While a replay plays (set_replay), the scoreboard, clock and the followed
-## player's readouts instead. In a 1v1 (set_match), the kickoff countdown and
-## demolitions too.
+## The game's HUD, broadcast style (see BroadcastUI): in the Aquarium Arena a
+## scoreboard at the top, a boost gauge in the bottom right, and a splash when
+## someone scores; in a 1v1 (set_match) also the clock, the kickoff countdown,
+## demolitions, the goal replay's overlay and the result. While a Rocket League
+## replay plays (set_replay), the same for the replay and its followed player.
+##
+## Two tuning aids show only when switched on in the tuning panel's UI section
+## (UISettings): the speed / drift / ... readout and the controller-input display.
+
+## How long the goal splash shows.
+const SPLASH_TIME := 3.0
 
 @export var fish: FishController
 @export var arena: Arena
 @export var aquarium: AquariumArena
 
+var _stats_panel: PanelContainer
 var _stats: Label
 var _speed_bar: ProgressBar
 var _boost_bar: ProgressBar
@@ -17,33 +25,44 @@ var _banner_time_left := 0.0
 var _viz: InputViz
 var _hint: Label
 var _countdown: Label
+var _scorebug: BroadcastUI.ScoreBug
+var _boost: BroadcastUI.BoostGauge
+var _splash: BroadcastUI.Splash
+var _replay_overlay: BroadcastUI.ReplayOverlay
 var replay: ReplayPlayer
 var match_1v1: Match1v1
 
 
 func _ready() -> void:
-	var panel := _make_panel()
-	panel.anchor_left = 1.0
-	panel.anchor_right = 1.0
-	panel.offset_left = -290.0
-	panel.offset_right = -16.0
-	panel.offset_top = 16.0
-	add_child(panel)
+	_replay_overlay = BroadcastUI.ReplayOverlay.new()
+	add_child(_replay_overlay)
 
+	_stats_panel = _make_panel()
+	_stats_panel.anchor_left = 1.0
+	_stats_panel.anchor_right = 1.0
+	_stats_panel.offset_left = -290.0
+	_stats_panel.offset_right = -16.0
+	_stats_panel.offset_top = 16.0
+	add_child(_stats_panel)
 	var column := VBoxContainer.new()
-	panel.add_child(column)
+	_stats_panel.add_child(column)
 	_stats = Label.new()
 	column.add_child(_stats)
 	column.add_child(_caption("Speed"))
 	_speed_bar = _bar(Color(0.3, 0.8, 1.0))
 	column.add_child(_speed_bar)
 	column.add_child(_caption("Boost"))
-	_boost_bar = _bar(Color(1.0, 0.6, 0.15))
+	_boost_bar = _bar(BroadcastUI.BOOST_COLOR)
 	column.add_child(_boost_bar)
+
+	_scorebug = BroadcastUI.ScoreBug.new()
+	add_child(_scorebug)
+	_boost = BroadcastUI.BoostGauge.new()
+	add_child(_boost)
 
 	_course = _centred_label(16.0, 28)
 	add_child(_course)
-	_banner = _centred_label(64.0, 36)
+	_banner = _centred_label(124.0, 32)
 	_banner.modulate = Color(1.0, 0.9, 0.3)
 	add_child(_banner)
 	_countdown = _centred_label(0.0, 120)
@@ -51,18 +70,23 @@ func _ready() -> void:
 	_countdown.anchor_bottom = 0.5
 	_countdown.offset_top = -210.0
 	_countdown.offset_bottom = -50.0
+	_countdown.add_theme_font_override("font", BroadcastUI.font(800))
+	_countdown.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	_countdown.add_theme_constant_override("outline_size", 12)
 	add_child(_countdown)
+
+	_splash = BroadcastUI.Splash.new()
+	_splash.visible = false
+	add_child(_splash)
 
 	_viz = InputViz.new()
 	_viz.fish = fish
-	_viz.anchor_left = 1.0
-	_viz.anchor_right = 1.0
 	_viz.anchor_top = 1.0
 	_viz.anchor_bottom = 1.0
-	_viz.offset_left = -300.0
-	_viz.offset_top = -130.0
-	_viz.offset_right = -16.0
-	_viz.offset_bottom = -16.0
+	_viz.offset_left = 16.0
+	_viz.offset_top = -160.0
+	_viz.offset_right = 300.0
+	_viz.offset_bottom = -46.0
 	add_child(_viz)
 
 	_hint = Label.new()
@@ -74,7 +98,14 @@ func _ready() -> void:
 	add_child(_hint)
 	_update_hint()
 
+	UISettings.changed.connect(func(_key: String) -> void: _apply_ui_settings())
+	_apply_ui_settings()
 	set_arena(arena)
+
+
+func _apply_ui_settings() -> void:
+	_stats_panel.visible = UISettings.show_stats
+	_viz.visible = UISettings.show_input_overlay
 
 
 ## Point the course readout at a new arena, or null for environments without one.
@@ -90,7 +121,7 @@ func set_arena(new_arena: Arena) -> void:
 		_update_hint()
 
 
-## Point the score readout at a new aquarium, or null for environments without one.
+## Point the scoreboard at a new aquarium, or null for environments without one.
 func set_aquarium(new_aquarium: AquariumArena) -> void:
 	if is_instance_valid(aquarium) and aquarium.goal_scored.is_connected(_on_goal_scored):
 		aquarium.goal_scored.disconnect(_on_goal_scored)
@@ -104,6 +135,7 @@ func set_replay(new_replay: ReplayPlayer) -> void:
 	replay = new_replay
 	_banner.text = ""
 	_banner_time_left = 0.0
+	_splash.hide_now()
 	if replay:
 		replay.target_changed.connect(func(car: ReplayCar) -> void: _viz.fish = car)
 		replay.goal_reached.connect(_on_replay_goal)
@@ -113,11 +145,16 @@ func set_replay(new_replay: ReplayPlayer) -> void:
 	_update_hint()
 
 
-## Show a 1v1's countdown and demolitions, or null when there's none.
+## Show a 1v1's clock, countdown, demolitions and goal replays, or null when there's none.
 func set_match(new_match: Match1v1) -> void:
 	match_1v1 = new_match
+	_replay_overlay.stop()
+	_splash.hide_now()
 	if match_1v1:
 		match_1v1.demolished.connect(_on_demolished)
+		match_1v1.goal_replay_started.connect(_on_goal_replay_started)
+		match_1v1.goal_replay_ended.connect(_replay_overlay.stop)
+		match_1v1.match_over.connect(_on_match_over)
 	if _countdown:
 		_countdown.text = ""
 	if _hint:
@@ -138,7 +175,7 @@ func _update_hint() -> void:
 	if replay:
 		_hint.text = "P/jump: play    , . / D-pad: 5 s    [ ]: goals    V/boost: camera    T G / D-pad: target    - =: speed    H: hitboxes    Y: ball cam"
 	else:
-		_hint.text = "View/F1: tuning panel    Start/R: %s    Right stick/IJKL: look around    Y: %s cam" % [
+		_hint.text = "View/F1: tuning panel    Start/R: %s    Right stick/IJKL: look around    Y: %s cam    F11: fullscreen" % [
 				"restart kickoff" if match_1v1 else "reset", "ring" if arena else "ball"]
 
 
@@ -148,24 +185,37 @@ func _process(delta: float) -> void:
 		return
 	if fish == null:
 		return
+	var in_goal_replay := is_instance_valid(match_1v1) and match_1v1.phase == Match1v1.Phase.REPLAY
+	_hint.visible = not in_goal_replay
 
-	var jump_names := ["READY", "DOUBLE JUMP / DODGE", "cooldown"]
-	var pad := Input.get_connected_joypads()
-	_stats.text = "\n".join([
-		"Speed     %5.1f m/s" % fish.speed,
-		"Forward   %5.1f m/s" % fish.forward_speed,
-		"Drift     %5.0f°" % fish.drift_angle,
-		"Spin      %5.2f rad/s" % fish.angular_speed,
-		"Jump      %s" % jump_names[fish.jump_state],
-		"Surface   %s" % _surface_name(),
-		"Strokes   %s" % ("x%d  timing %3.0f%%" % [fish.stroke_chain, fish.stroke_quality * 100.0] if fish.stroke_chain > 0 else "-"),
-		"Pad       %s" % (Input.get_joy_name(pad[0]) if not pad.is_empty() else "none (keyboard)"),
-		"Controls  %s" % Controls.current_profile,
-	])
-	_speed_bar.max_value = fish.max_boost_speed
-	_speed_bar.value = fish.speed
-	_boost_bar.value = 100.0 if fish.boost_unlimited else fish.boost_amount
+	if _stats_panel.visible:
+		var jump_names := ["READY", "DOUBLE JUMP / DODGE", "cooldown"]
+		var pad := Input.get_connected_joypads()
+		var lines := [
+			"Speed     %5.1f m/s" % fish.speed,
+			"Forward   %5.1f m/s" % fish.forward_speed,
+			"Drift     %5.0f°" % fish.drift_angle,
+			"Spin      %5.2f rad/s" % fish.angular_speed,
+			"Jump      %s" % jump_names[fish.jump_state],
+			"Surface   %s" % _surface_name(),
+			"Strokes   %s" % ("x%d  timing %3.0f%%" % [fish.stroke_chain, fish.stroke_quality * 100.0] if fish.stroke_chain > 0 else "-"),
+			"Pad       %s" % (Input.get_joy_name(pad[0]) if not pad.is_empty() else "none (keyboard)"),
+			"Controls  %s" % Controls.current_profile,
+		]
+		if is_instance_valid(aquarium):
+			lines.append("Ball      %5.1f m/s" % aquarium.ball.speed)
+		_stats.text = "\n".join(lines)
+		_speed_bar.max_value = fish.max_boost_speed
+		_speed_bar.value = fish.speed
+		_boost_bar.value = 100.0 if fish.boost_unlimited else fish.boost_amount
 
+	_boost.visible = not in_goal_replay
+	_boost.amount = 100.0 if fish.boost_unlimited else fish.boost_amount
+	_boost.boosting = fish.is_boosting
+	_boost.color = fish.team_color if fish.team_color.a > 0.0 else BroadcastUI.BOOST_COLOR
+
+	_scorebug.visible = is_instance_valid(aquarium)
+	_course.offset_top = 16.0
 	if is_instance_valid(arena):
 		var best :="--" if is_inf(arena.best_time) else "%.2f" % arena.best_time
 		if arena.running:
@@ -173,10 +223,11 @@ func _process(delta: float) -> void:
 		else:
 			_course.text = "Swim through the yellow hoop to start    best %s" % best
 	elif is_instance_valid(aquarium):
-		var line := "BLUE  %d  -  %d  ORANGE    ball %4.1f m/s" % [aquarium.scores[0], aquarium.scores[1], aquarium.ball.speed]
+		_update_scorebug()
+		_course.offset_top = 104.0
+		_course.text = ""
 		if aquarium.ball.popped and aquarium.auto_respawn:
-			line += "    next ball in %.1f s" % maxf(aquarium.respawn_time_left, 0.0)
-		_course.text = line
+			_course.text = "Next ball in %.1f s" % maxf(aquarium.respawn_time_left, 0.0)
 
 	if is_instance_valid(match_1v1):
 		if match_1v1.phase == Match1v1.Phase.COUNTDOWN:
@@ -192,6 +243,31 @@ func _process(delta: float) -> void:
 			_banner.text = "IN THE RHYTHM  x%d" % fish.stroke_chain
 		else:
 			_banner.text = ""
+	_banner.visible = not in_goal_replay
+
+
+func _update_scorebug() -> void:
+	_scorebug.team_names = ["BLUE", "ORANGE"]
+	_scorebug.scores = aquarium.scores.duplicate()
+	_scorebug.clock_color = Color.WHITE
+	if is_instance_valid(match_1v1):
+		_scorebug.players = [match_1v1.player.display_name, match_1v1.bot_fish.display_name]
+		if match_1v1.overtime:
+			_scorebug.clock = BroadcastUI.clock_text(match_1v1.overtime_elapsed, true)
+			_scorebug.clock_color = BroadcastUI.GOLD
+		else:
+			_scorebug.clock = BroadcastUI.clock_text(match_1v1.clock_left)
+		match match_1v1.phase:
+			Match1v1.Phase.REPLAY:
+				_scorebug.caption = "REPLAY"
+			Match1v1.Phase.OVER:
+				_scorebug.caption = "FINAL"
+			_:
+				_scorebug.caption = "OVERTIME" if match_1v1.overtime else "1V1"
+	else:
+		_scorebug.players = [fish.display_name, ""]
+		_scorebug.clock = "--:--"
+		_scorebug.caption = "FREE PLAY"
 
 
 func _on_course_finished(time: float, is_best: bool) -> void:
@@ -206,24 +282,39 @@ func _replay_readouts(delta: float) -> void:
 	var frame := data.frame_at(t)
 	var seconds := data.seconds_remaining[frame]
 	var state := data.game_state[frame]
-	var clock := "%d:%02d" % [seconds / 60, seconds % 60]
+	_hint.visible = true
+	_banner.visible = true
+	_scorebug.visible = true
+	_scorebug.team_names = ["BLUE", "ORANGE"]
+	_scorebug.scores = score
+	_scorebug.clock = "%d:%02d" % [seconds / 60, seconds % 60]
+	_scorebug.clock_color = Color.WHITE
 	if seconds == 0 and state == ReplayData.GAME_LIVE and t > 0.0:
-		clock = "OT"
-	var line := "BLUE  %d  -  %d  ORANGE    %s" % [score[0], score[1], clock]
+		_scorebug.clock = "OT"
+		_scorebug.clock_color = BroadcastUI.GOLD
+	var names := [PackedStringArray(), PackedStringArray()]
+	for player in data.players:
+		names[player.team].append(player.name)
+	_scorebug.players = [", ".join(names[0]), ", ".join(names[1])]
+	_scorebug.caption = "REPLAY"
+	_course.offset_top = 104.0
+	_course.text = ""
 	if state == ReplayData.GAME_COUNTDOWN and data.kickoff_countdown[frame] > 0:
-		line += "    kickoff in %d" % data.kickoff_countdown[frame]
-	_course.text = line
+		_course.text = "Kickoff in %d" % data.kickoff_countdown[frame]
 
 	var car := replay.target
+	_boost.visible = car != null and car.visible
 	if car:
+		_boost.amount = car.boost_amount
+		_boost.boosting = car.is_boosting
+		_boost.color = AquariumArena.TEAM_COLORS[car.team]
 		var actions := PackedStringArray()
 		for pair: Array in [[ReplayData.FLAG_BOOST, "boost"], [ReplayData.FLAG_JUMP, "jump"],
 				[ReplayData.FLAG_DOUBLE_JUMP, "double jump"], [ReplayData.FLAG_DODGE, "dodge"],
 				[ReplayData.FLAG_POWERSLIDE, "powerslide"], [ReplayData.FLAG_SUPERSONIC, "supersonic"]]:
 			if car.flags & pair[0]:
 				actions.append(pair[1])
-		_stats.text = "
-".join([
+		_stats.text = "\n".join([
 			"%s  (%s)" % [car.player.name, AquariumArena.TEAM_NAMES[car.team]],
 			"Car       %s hitbox" % car.player.hitbox_family.capitalize(),
 			"Speed     %4.0f uu/s  %4.1f m/s" % [car.speed / RLSpace.M_PER_UU, car.speed],
@@ -244,16 +335,52 @@ func _replay_readouts(delta: float) -> void:
 func _on_replay_goal(event: Dictionary) -> void:
 	var team: int = event.team
 	var scorer = event.get("player")
+	var scorer_name := ""
 	if scorer != null and scorer < replay.data.players.size():
-		_banner.text = "%s SCORES FOR %s!" % [replay.data.players[scorer].name, AquariumArena.TEAM_NAMES[team].to_upper()]
-	else:
-		_banner.text = "%s SCORES!" % AquariumArena.TEAM_NAMES[team].to_upper()
-	_banner_time_left = 3.0
+		scorer_name = replay.data.players[scorer].name
+	_splash.play("GOAL!", scorer_name if scorer_name else "%s scores" % AquariumArena.TEAM_NAMES[team],
+			"", AquariumArena.TEAM_COLORS[team], SPLASH_TIME)
+	_scorebug.flash(team)
 
 
 func _on_goal_scored(team: int) -> void:
-	_banner.text = "%s SCORES!" % AquariumArena.TEAM_NAMES[team].to_upper()
-	_banner_time_left = 3.0
+	var credit := aquarium.last_goal
+	var scorer: Node3D = credit.get("scorer")
+	var headline := _name_of(scorer) if is_instance_valid(scorer) else "%s scores" % AquariumArena.TEAM_NAMES[team]
+	var details := PackedStringArray()
+	if is_instance_valid(credit.get("assister")):
+		details.append("Assist  %s" % _name_of(credit.assister))
+	details.append(_speed_text(credit.get("speed", 0.0)))
+	_splash.play("GOAL!", headline, "    ·    ".join(details), AquariumArena.TEAM_COLORS[team], SPLASH_TIME)
+	_scorebug.flash(team)
+
+
+func _on_goal_replay_started(goal_replay: GoalReplay) -> void:
+	var credit := aquarium.last_goal if is_instance_valid(aquarium) else {}
+	var team: int = credit.get("team", 0)
+	var scorer: Node3D = credit.get("scorer")
+	var assister: Node3D = credit.get("assister")
+	_splash.hide_now()
+	_replay_overlay.start(goal_replay, _name_of(scorer) if is_instance_valid(scorer) else AquariumArena.TEAM_NAMES[team],
+			_name_of(assister) if is_instance_valid(assister) else "", _speed_text(credit.get("speed", 0.0)),
+			AquariumArena.TEAM_COLORS[team])
+
+
+func _on_match_over(winner: int) -> void:
+	var winner_fish := match_1v1.player if winner == 0 else match_1v1.bot_fish
+	_splash.play("%s WINS" % AquariumArena.TEAM_NAMES[winner].to_upper(), _name_of(winner_fish),
+			"Final  %d - %d" % [aquarium.scores[0], aquarium.scores[1]], AquariumArena.TEAM_COLORS[winner], Match1v1.OVER_TIME - 0.5)
+
+
+func _name_of(node: Node3D) -> String:
+	if "display_name" in node and not str(node.display_name).is_empty():
+		return node.display_name
+	return UISettings.display_name()
+
+
+## A ball speed (m/s) as broadcasts show it.
+static func _speed_text(speed: float) -> String:
+	return "%d km/h" % roundi(speed * 3.6)
 
 
 func _surface_name() -> String:

@@ -162,8 +162,51 @@ func _build_ui() -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 
+	_build_ui_section(list)
 	for section: String in _targets:
 		_build_section(list, section, _targets[section])
+
+
+## Display preferences (UISettings): saved on this PC as they change, not
+## with the tuning.
+func _build_ui_section(list: VBoxContainer) -> void:
+	var header := Label.new()
+	header.text = "UI"
+	header.add_theme_font_size_override("font_size", 18)
+	list.add_child(header)
+	var checks := {}
+	for entry: Array in [["show_stats", "Show stats panel (speed, drift, ...)"],
+			["show_input_overlay", "Show controller overlay"],
+			["goal_replays", "Goal replays (1v1)"],
+			["fullscreen", "Fullscreen (F11)"]]:
+		var key: String = entry[0]
+		var check := CheckBox.new()
+		check.text = entry[1]
+		check.focus_mode = Control.FOCUS_NONE
+		check.button_pressed = UISettings.get(key)
+		check.toggled.connect(func(on: bool) -> void: UISettings.set_value(key, on))
+		list.add_child(check)
+		checks[key] = check
+	# Follow changes made elsewhere (F11).
+	UISettings.changed.connect(func(key: String) -> void:
+		if checks.has(key):
+			checks[key].set_pressed_no_signal(UISettings.get(key)))
+
+	var name_row := HBoxContainer.new()
+	list.add_child(name_row)
+	var name_label := Label.new()
+	name_label.text = "Player name"
+	name_label.custom_minimum_size.x = 170.0
+	name_row.add_child(name_label)
+	var name_edit := LineEdit.new()
+	name_edit.text = UISettings.player_name
+	name_edit.placeholder_text = UISettings.DEFAULT_NAME
+	name_edit.max_length = 20
+	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_edit.text_changed.connect(func(text: String) -> void: UISettings.set_value("player_name", text))
+	name_edit.text_submitted.connect(func(_text: String) -> void: name_edit.release_focus())
+	name_row.add_child(name_edit)
+	list.add_child(HSeparator.new())
 
 
 func show_status(text: String) -> void:
