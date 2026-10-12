@@ -59,6 +59,8 @@ func _ready() -> void:
 		current_mode = settings.get_value("playground", "mode", FREE_PLAY)
 		if current_mode not in MODES:
 			current_mode = FREE_PLAY
+	if get_tree().current_scene != self:
+		current_mode = FREE_PLAY  # inside a test probe: no bot, whatever was last played
 	_fish.character = saved_character
 	set_environment(saved, false)
 	_panel.set_environments(ENVIRONMENTS.keys(), current_environment)

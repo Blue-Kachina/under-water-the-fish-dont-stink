@@ -66,6 +66,9 @@ def run_rocketsim(scenario: dict) -> list[dict]:
     state.boost = spec["boost"]
     if spec.get("yaw") is not None:
         state.rot_mat = rs.Angle(spec["yaw"], 0.0, 0.0).as_rot_mat()
+    if spec.get("rot"):  # any orientation (replay segments)
+        rot = spec["rot"]
+        state.rot_mat = rs.RotMat(rs.Vec(*rot["fwd"]), rs.Vec(*rot["right"]), rs.Vec(*rot["up"]))
     if spec["can_flip"]:
         state.is_on_ground = False
         state.has_jumped = True
@@ -207,6 +210,145 @@ def report(results: dict, skipped: list[str]) -> str:
     return "\n".join(lines)
 
 
+# --- Real Rocket League (replay segments, replay_segments.py) -------------------------
+
+def state_at(ticks: list[dict], t: float) -> dict:
+    """A simulation's state at time `t` (s): centre of mass and velocity interpolated
+    between ticks, orientation from the nearer tick."""
+    f = min(max(t * TICK_RATE, 0.0), len(ticks) - 1.0)
+    k0 = int(math.floor(f))
+    k1 = min(k0 + 1, len(ticks) - 1)
+    w = f - k0
+    a, b = ticks[k0], ticks[k1]
+    near = b if w >= 0.5 else a
+    return {"com": ((1 - w) * np.array(a["com"]) + w * np.array(b["com"])).tolist(),
+            "vel": ((1 - w) * np.array(a["vel"]) + w * np.array(b["vel"])).tolist(),
+            "fwd": near["fwd"], "right": near["right"], "up": near["up"]}
+
+
+def against_truth(scenario: dict, ticks: list[dict]) -> list[dict]:
+    """A simulation's error against the replay's recorded samples: centre of mass (m),
+    velocity (m/s), orientation (deg), at each sample time."""
+    rows = []
+    for sample in scenario["truth"]:
+        sim = state_at(ticks, sample["t"])
+        rows.append({"t": sample["t"],
+                     "pos": float(np.linalg.norm(np.array(sim["com"]) - np.array(sample["com"])) / UU_PER_M),
+                     "vel": float(np.linalg.norm(np.array(sim["vel"]) - np.array(sample["vel"])) / UU_PER_M),
+                     "rot": rot_error_deg(sim, sample)})
+    return rows
+
+
+def error_at(rows: list[dict], t: float, key: str) -> float | None:
+    """`key` at the last sample no later than `t`, or None if the segment is shorter."""
+    best = None
+    for row in rows:
+        if row["t"] <= t + 1e-6:
+            best = row[key]
+    return best if rows and rows[-1]["t"] >= t - 0.05 else None
+
+
+def truth_report(scenarios: list[dict], reference: dict, game: dict, label: str) -> tuple[str, dict]:
+    """Medians and spreads, per kind of segment, of RocketSim's and the game's errors against
+    the replays; and the segments where the game is furthest off."""
+    rows = {}
+    for sc in scenarios:
+        rows[sc["name"]] = {"rs": against_truth(sc, reference[sc["name"]]), "game": against_truth(sc, game[sc["name"]])}
+    lines = [f"Real Rocket League (replays) vs RocketSim and the game{(' — ' + label) if label else ''}",
+             "Errors against the replay's own recorded states: centre of mass (m), velocity (m/s), orientation (deg).",
+             "p50 / p75 / p90 over segments; 'at' = time since the segment's start.", ""]
+    summary = {}
+    for kind in sorted({sc["kind"] for sc in scenarios}):
+        group = [sc for sc in scenarios if sc["kind"] == kind]
+        lines.append(f"{kind}: {len(group)} segments")
+        for at in (0.25, 0.5, 1.0):
+            for key, unit in (("pos", "m"), ("vel", "m/s"), ("rot", "deg")):
+                cols = []
+                for who in ("rs", "game"):
+                    values = [v for v in (error_at(rows[sc["name"]][who], at, key) for sc in group) if v is not None]
+                    if not values:
+                        cols = []
+                        break
+                    p = np.percentile(values, [50, 75, 90])
+                    summary[f"{kind}/{who}/{key}@{at}"] = float(p[0])
+                    cols.append(f"{p[0]:7.3f} {p[1]:7.3f} {p[2]:7.3f}")
+                if cols:
+                    lines.append(f"  at {at:4.2f}s {key:>3} ({unit:>3})  RocketSim {cols[0]}   game {cols[1]}")
+        lines.append("")
+    summary["segments"] = {}
+    for sc in scenarios:  # each segment's end state, for splitting results afterwards
+        end = sc["truth"][-1]["com"] if sc["truth"] else sc["car"]["pos"]
+        wall = "side" if abs(end[0]) > 3900.0 else ("back" if abs(end[1]) > 4900.0 else "")
+        summary["segments"][sc["name"]] = {
+            "kind": sc["kind"], "wall": wall, "speed": sc["source"]["start_speed"],
+            "rs": error_at(rows[sc["name"]]["rs"], 1.0, "pos"), "game": error_at(rows[sc["name"]]["game"], 1.0, "pos"),
+            "rs_max": max((r["pos"] for r in rows[sc["name"]]["rs"]), default=0.0),
+            "game_max": max((r["pos"] for r in rows[sc["name"]]["game"]), default=0.0)}
+    worst = sorted(scenarios, key=lambda sc: -max((r["pos"] for r in rows[sc["name"]]["game"]), default=0.0))[:12]
+    lines.append("Segments where the game is furthest from the replay (worst centre-of-mass error, m):")
+    for sc in worst:
+        g = max((r["pos"] for r in rows[sc["name"]]["game"]), default=0.0)
+        r = max((x["pos"] for x in rows[sc["name"]]["rs"]), default=0.0)
+        lines.append(f"  {sc['name']:<34} game {g:6.2f}  RocketSim {r:6.2f}   {sc['notes']}")
+    return "\n".join(lines), summary
+
+
+def run_game(args, quiet: bool, timeout: int = 900) -> dict:
+    """Runs out/scenarios.json through the game (headless) and returns its per-tick states."""
+    game_out = OUT / "game.json"
+    game_out.unlink(missing_ok=True)
+    cmd = [args.godot, "--headless", "--path", str(REPO), "res://tests/physics_parity_probe.tscn",
+           "--", str(OUT / "scenarios.json"), str(game_out)]
+    if not quiet:
+        print("running the game:", " ".join(cmd[1:4]), "...")
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    if not game_out.exists():
+        print(proc.stdout[-4000:], proc.stderr[-4000:])
+        sys.exit("the game didn't write its results")
+    return json.loads(game_out.read_text())["scenarios"]
+
+
+def run_replays(args, meshes: bool) -> None:
+    if not meshes:
+        sys.exit("replay segments are on RL's arena: they need RocketSim's collision meshes")
+    scenarios = json.loads(args.replays.read_text())["scenarios"]
+    if args.names:
+        scenarios = [sc for sc in scenarios if sc["name"] in args.names or sc["kind"] in args.names]
+    if args.steady:  # inputs that never change: no error from when between samples they changed
+        scenarios = [sc for sc in scenarios if len(sc["controls"]) == 1]
+    if args.sample:
+        rng = np.random.default_rng(args.seed)
+        picked = []
+        for kind in sorted({sc["kind"] for sc in scenarios}):
+            group = [sc for sc in scenarios if sc["kind"] == kind]
+            idx = rng.choice(len(group), size=min(args.sample, len(group)), replace=False)
+            picked += [group[i] for i in sorted(idx)]
+        scenarios = picked
+    overrides = {k: parse_setting(v) for k, v in (item.split("=", 1) for item in args.set)}
+    OUT.mkdir(exist_ok=True)
+    reference = {}
+    for sc in scenarios:
+        sc["settings"] = overrides
+        reference[sc["name"]] = run_rocketsim(sc)
+        sc["start"] = game_start(sc, reference[sc["name"]][0], car_offset(sc))
+    (OUT / "rocketsim.json").write_text(json.dumps(reference))
+    (OUT / "scenarios.json").write_text(json.dumps({"tick_rate": TICK_RATE, "scenarios": scenarios}))
+    print(f"{len(scenarios)} replay segments; running the game ...", flush=True)
+    game = run_game(args, quiet=True, timeout=3600)
+    text, summary = truth_report(scenarios, reference, game, args.label)
+    name = "replay_report" + (f"_{args.label}" if args.label else "")
+    (OUT / f"{name}.txt").write_text(text, encoding="utf-8")
+    (OUT / f"{name}.json").write_text(json.dumps(summary, indent=1))
+    print(text)
+
+
+def parse_setting(text: str):
+    """A --set value: true/false for a switch, otherwise a number."""
+    if text.lower() in ("true", "false"):
+        return text.lower() == "true"
+    return float(text)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("names", nargs="*")
@@ -214,18 +356,27 @@ def main() -> None:
     parser.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
                         help="override a FishController setting for the game run (repeatable), for tuning")
     parser.add_argument("--quiet", action="store_true", help="print only the worst-error table")
+    parser.add_argument("--replays", type=Path, metavar="SEGMENTS.json",
+                        help="run real-RL replay segments (replay_segments.py) instead, scored against the replays")
+    parser.add_argument("--sample", type=int, default=0, help="with --replays: at most this many segments of each kind")
+    parser.add_argument("--seed", type=int, default=1, help="with --sample: which random sample")
+    parser.add_argument("--label", default="", help="with --replays: a name for this run in the report")
+    parser.add_argument("--steady", action="store_true", help="with --replays: only segments whose inputs never change")
     args = parser.parse_args()
 
     meshes = meshes_available()
     if meshes:
         rs.init(str(Path(os.getenv("RS_COLLISION_MESHES", HERE / "collision_meshes"))))
+    if args.replays:
+        run_replays(args, meshes)
+        return
     chosen = [sc for sc in SCENARIOS if not args.names or sc["name"] in args.names]
     skipped = [sc["name"] for sc in chosen if sc["arena"] == "soccar" and not meshes]
     runnable = [sc for sc in chosen if sc["name"] not in skipped]
 
     OUT.mkdir(exist_ok=True)
     reference = {}
-    overrides = {k: float(v) for k, v in (item.split("=", 1) for item in args.set)}
+    overrides = {k: parse_setting(v) for k, v in (item.split("=", 1) for item in args.set)}
     for sc in runnable:
         sc["settings"] = overrides
         reference[sc["name"]] = run_rocketsim(sc)
@@ -233,17 +384,7 @@ def main() -> None:
     (OUT / "rocketsim.json").write_text(json.dumps(reference))
     (OUT / "scenarios.json").write_text(json.dumps({"tick_rate": TICK_RATE, "scenarios": runnable}, indent=1))
 
-    game_out = OUT / "game.json"
-    game_out.unlink(missing_ok=True)
-    cmd = [args.godot, "--headless", "--path", str(REPO), "res://tests/physics_parity_probe.tscn",
-           "--", str(OUT / "scenarios.json"), str(game_out)]
-    if not args.quiet:
-        print("running the game:", " ".join(cmd[1:4]), "...")
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
-    if not game_out.exists():
-        print(proc.stdout[-4000:], proc.stderr[-4000:])
-        sys.exit("the game didn't write its results")
-    game = json.loads(game_out.read_text())["scenarios"]
+    game = run_game(args, quiet=args.quiet)
 
     results = {sc["name"]: compare(sc, reference[sc["name"]], game[sc["name"]], car_offset(sc)) for sc in runnable}
     text = report(results, skipped)

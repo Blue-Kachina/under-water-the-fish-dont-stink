@@ -329,7 +329,7 @@ func _sweep(from: Vector3, to: Vector3, radius: float) -> Vector3:
 		exclude.append((ball as CollisionObject3D).get_rid())
 
 	var allowed := 1.0
-	var ray := PhysicsRayQueryParameters3D.create(from, to)
+	var ray := PhysicsRayQueryParameters3D.create(from, to, AquariumArena.WORLD_QUERY_MASK)
 	ray.exclude = exclude
 	var hit := space.intersect_ray(ray)
 	if not hit.is_empty():
@@ -342,6 +342,7 @@ func _sweep(from: Vector3, to: Vector3, radius: float) -> Vector3:
 	query.transform = Transform3D(Basis.IDENTITY, from)
 	query.motion = motion
 	query.exclude = exclude
+	query.collision_mask = AquariumArena.WORLD_QUERY_MASK
 	var result := space.cast_motion(query)
 	if result[0] > 0.0 or result[1] > 0.0:  # [0, 0]: started overlapping; the ray decides
 		allowed = minf(allowed, result[0])

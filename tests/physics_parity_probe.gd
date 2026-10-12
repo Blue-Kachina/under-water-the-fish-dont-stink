@@ -100,6 +100,10 @@ func _spawn(scenario: Dictionary) -> void:
 	if scenario.arena == "soccar":
 		ball = main._environment.ball
 		main._environment.scoring_enabled = false  # a ball rolled into a net mustn't be popped
+		if own_ball:
+			# The void scenarios' ball is main's child, so it outlives the switch to
+			# the arena: left in play it would lie on the floor in the arena ball's way.
+			own_ball.pop()
 	else:
 		if own_ball == null:
 			own_ball = Ball.new()
@@ -117,9 +121,11 @@ func _spawn(scenario: Dictionary) -> void:
 	if scenario.ball:
 		ball.respawn(_pos(scenario.ball.pos), scenario.ball.get("kickoff_float", false))
 	elif scenario.arena == "soccar":
-		# Parked in a far corner. (Popping it would make the arena respawn it at
-		# kickoff, right where the ground scenarios start.)
+		# Gone, as RocketSim's is (out of the arena, no car contact). The arena
+		# mustn't bring it back at kickoff, where the ground scenarios start.
+		main._environment.auto_respawn = false
 		ball.respawn(Vector3(-30.0, ball.settings.radius, 40.0))
+		ball.pop()
 	else:
 		ball.respawn(Vector3(300, 300, 300))  # out of the way
 		ball.pop()

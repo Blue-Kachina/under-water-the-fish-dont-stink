@@ -49,7 +49,8 @@ func update(delta: float) -> void:
 		_pulse[i] = maxf(_pulse[i] - delta / PULSE_TIME, 0.0)
 		var hit := {}
 		if show:
-			var query := PhysicsRayQueryParameters3D.create(origin, origin + DIRECTIONS[i] * (settings.indicator_range + radius))
+			var query := PhysicsRayQueryParameters3D.create(origin, origin + DIRECTIONS[i] * (settings.indicator_range + radius),
+					AquariumArena.WORLD_QUERY_MASK)  # the real surfaces, not the ball's inset copy
 			query.exclude = [ball.get_rid()]
 			hit = space.intersect_ray(query)
 		# Only the arena's own surfaces, not fish passing between ball and wall.

@@ -38,6 +38,35 @@ rate, heading and slip angle (between the nose and the direction of travel).
   `Input.get_vector`, which normalises diagonals, while RL's pitch and yaw are independent.
 - **Rocket League-only rules are switched off for the run:** no boost refill, no swim strokes.
 
+## Real Rocket League: replay segments
+RocketSim is a re-implementation; replays are the real thing. `replay_segments.py` mines short
+segments from converted replays, and `run.py --replays` runs RocketSim and the game from each
+segment's first recorded state with its recorded inputs, scoring both against the replay.
+
+```
+cd tools/rl_replay
+uv run convert_many.py "%USERPROFILE%/Documents/My Games/Rocket League/TAGame/Demos" ../../private_content/replays/converted/own
+cd ../rocketsim_compare
+uv run replay_segments.py                       # -> out/replay_scenarios.json
+uv run run.py --replays out/replay_scenarios.json --steady --label NAME
+uv run run.py --replays out/replay_scenarios.json wall_climb --sample 400 --seed 3 --label NAME
+```
+
+- **Segments:** one car alone, live play. No car within 5 m, ball 4.5 m away, no touches, no boost
+  pickups (the game has no pads yet), no jumps or dodges, no teleports. Two kinds:
+  - `floor_drive`: one second on the flat floor. The control group, since RocketSim and the game agree there.
+  - `wall_climb`: from the floor up onto a standard Soccar side or back wall. A segment is kept
+    only if the car ends flush on that wall, so non-standard arenas drop out.
+- **Inputs:** replays record throttle, steer, boost and powerslide about 30 times a second. They're
+  held between samples, so a segment whose inputs change carries timing error. `--steady` keeps
+  only segments whose inputs never change; that's where the comparison is sharpest. On steady
+  floor drives RocketSim stays within about 8 cm of real RL after a second.
+- **Output:** `out/replay_report_NAME.txt` holds p50/p75/p90 errors per kind (centre of mass, velocity,
+  orientation) and the segments where the game is furthest off. `out/replay_report_NAME.json`
+  holds the medians and each segment's 1 s error, with which wall it ends on.
+- **Data:** converted replays and the mined segments stay under `private_content/` and `out/`. They
+  contain gameplay from real matches; never commit them.
+
 ## Columns
 | Column | Meaning |
 |---|---|

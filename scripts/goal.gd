@@ -38,6 +38,8 @@ const CORNER_STEPS := 6  # segments per rounded side-to-back corner
 @export var own_collision := true
 ## The net's collision triangles in the goal's local space, set in _ready.
 var net_faces := PackedVector3Array()
+## Each net_faces vertex's normal, facing into the net.
+var net_normals := PackedVector3Array()
 
 
 func _ready() -> void:
@@ -139,6 +141,7 @@ func _build_net(material: Material) -> void:
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
 	net_faces = PackedVector3Array(tris[0])
+	net_normals = PackedVector3Array(tris[1])
 	var body := StaticBody3D.new()
 	body.name = "Net"
 	if own_collision:

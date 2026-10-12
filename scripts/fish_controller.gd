@@ -349,6 +349,20 @@ const TIME_EPSILON := 0.0001
 ## the whole body (ground_grip, ground_turn_drag, powerslide_lateral_drag) and
 ## turning-circle steering. Needs rl_suspension.
 @export var rl_tyres := true
+## Sideways tyre grip along the axle laid flat on the surface, as RocketSim
+## does. Off = along the wheel's own axle, as RL's shipped code does (it skips
+## the flattening; see private_content/rea/rl_physics_evidence.md §1.2), which
+## differs only where the surface isn't level with the car: ramps and curves.
+@export var tyre_axle_on_surface := true
+## How far below the centre of mass the tyres' forces act (m), so they also
+## pitch and roll the car. RL's code has this offset (a per-wheel value read
+## from data, unknown); RocketSim and the default apply them level with it.
+@export_range(-0.5, 0.5, 0.005) var tyre_force_drop := 0.0
+## A wheel pressed past its rest length gets a solid push back out. On: as
+## RocketSim and RL's code do it, that push is applied with the spring's (so
+## not while the spring is slack) and is kept until the wheel next bottoms out
+## or leaves the ground. Off: fresh each tick, only while bottomed out.
+@export var rl_pushback_holds := false
 
 @export_group("Hitbox")
 ## Which fish this is, one per Rocket League hitbox (FishCharacter): sets the
@@ -481,6 +495,8 @@ var _wheel_lat_friction := PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
 var _wheel_long_friction := PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
 ## Each wheel's raycast hit this tick ({} when it touches nothing).
 var _wheel_hits: Array[Dictionary] = [{}, {}, {}, {}]
+## Each wheel's bottoming-out push (an impulse, kg·m/s; _update_suspension).
+var _wheel_pushback := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _slide_sign := 1.0
 var _jump_surface_normal := Vector3.UP
 var _post_jump_time_left := 0.0
@@ -720,6 +736,10 @@ func is_option_active(property: String) -> bool:
 		"surface_align_rate":  # the suspension sits the fish on the surface instead
 			return rl_surface_mechanics and not rl_suspension
 		"rl_tyres":
+			return rl_surface_mechanics and rl_suspension
+		"tyre_axle_on_surface", "tyre_force_drop":
+			return _uses_tyres()
+		"rl_pushback_holds":
 			return rl_surface_mechanics and rl_suspension
 		"boost_drain", "boost_regen":
 			return not boost_unlimited
@@ -1082,10 +1102,11 @@ func _update_suspension(state: PhysicsDirectBodyState3D, body_basis: Basis, dt: 
 		var radius: float = wheel.radius
 		var mount: Vector3 = state.transform.origin + body_basis * wheel.mount
 		var reach: float = rest + RL_SUSPENSION_TRAVEL + radius - RL_SUSPENSION_SUBTRACTION
-		var query := PhysicsRayQueryParameters3D.create(mount, mount - up * reach)
+		var query := PhysicsRayQueryParameters3D.create(mount, mount - up * reach, AquariumArena.WORLD_QUERY_MASK)
 		query.exclude = [get_rid()]
 		var hit := space.intersect_ray(query)
 		if hit.is_empty() or hit.collider is Ball:
+			_wheel_pushback[i] = 0.0
 			continue
 		_wheel_hits[i] = hit
 		wheels_touching += 1
@@ -1112,7 +1133,18 @@ func _update_suspension(state: PhysicsDirectBodyState3D, body_basis: Basis, dt: 
 		if trace < pushback_at and hit.collider is StaticBody3D:
 			var effective := 1.0 / mass + normal.dot((inverse_inertia * r.cross(normal)).cross(r))
 			var stop := RL_SUSPENSION_PUSHBACK_ERP * (pushback_at - trace) / dt - normal.dot(contact_velocity)
-			impulse += normal * maxf(stop / effective, 0.0) / _wheels.size()
+			_wheel_pushback[i] = maxf(stop / effective, 0.0) / _wheels.size()
+		elif not rl_pushback_holds:
+			_wheel_pushback[i] = 0.0
+		if rl_pushback_holds:
+			# As RocketSim's btVehicleRL (m_extraPushback) and RL's suspension
+			# loop: the push is part of the spring's impulse, applied only while
+			# the spring pushes, and it holds until the wheel next bottoms out or
+			# leaves the ground.
+			if accel > 0.0:
+				impulse += normal * _wheel_pushback[i]
+		else:
+			impulse += normal * _wheel_pushback[i]
 		_suspension_push += impulse / mass
 		_suspension_twist += inverse_inertia * r.cross(impulse)
 	return normal_sum
@@ -1125,6 +1157,7 @@ func reset_tyres() -> void:
 	_wheel_brake = 0.0
 	_wheel_lat_friction.fill(1.0)
 	_wheel_long_friction.fill(1.0)
+	_wheel_pushback.fill(0.0)
 
 
 func _uses_tyres() -> bool:
@@ -1146,11 +1179,16 @@ func _wheel_basis(body_basis: Basis, i: int) -> Basis:
 func _add_tyre_impulse(state: PhysicsDirectBodyState3D, body_basis: Basis, i: int, hit: Dictionary, com: Vector3, dt: float) -> void:
 	var normal: Vector3 = hit.normal
 	var wheel := _wheel_basis(body_basis, i)
-	var axle := wheel.x - normal * wheel.x.dot(normal)
-	if axle.length_squared() < 0.0001:
+	var axle := wheel.x
+	if tyre_axle_on_surface:
+		axle -= normal * wheel.x.dot(normal)
+		if axle.length_squared() < 0.0001:
+			return
+		axle = axle.normalized()
+	var along := normal.cross(axle)  # the wheel's forward, on the surface
+	if along.length_squared() < 0.0001:
 		return
-	axle = axle.normalized()
-	var along := normal.cross(axle).normalized()  # the wheel's forward, on the surface
+	along = along.normalized()
 	var r: Vector3 = hit.position - com
 	var contact_velocity := state.linear_velocity + state.angular_velocity.cross(r)
 	var inverse_inertia := state.inverse_inertia_tensor
@@ -1165,7 +1203,7 @@ func _add_tyre_impulse(state: PhysicsDirectBodyState3D, body_basis: Basis, i: in
 	var impulse := (along * rolling * mass * _wheel_long_friction[i]
 			+ axle * side * RL_TYRE_FRICTION_SCALE * _wheel_lat_friction[i]) * dt
 	var up := body_basis.y
-	var level := r - up * r.dot(up)
+	var level := r - up * (r.dot(up) + tyre_force_drop)
 	_tyre_push += impulse / mass
 	_tyre_twist += inverse_inertia * level.cross(impulse)
 

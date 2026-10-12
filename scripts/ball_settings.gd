@@ -15,6 +15,12 @@ enum BallType { WATER, SURFACE }
 @export var ball_type := BallType.SURFACE
 ## RL: 0.9125 m (91.25 uu).
 @export_range(0.25, 6.0, 0.0025) var radius := 0.9125
+## How far the ball stays off the Aquarium Arena's surfaces, beyond its radius.
+## RL's ball rests with its centre at 93.15 uu on a floor at 0 (RocketSim), 1.9
+## uu more than its radius: Bullet's collision margin on the arena mesh. So the
+## ball has its own copy of the arena's surfaces, this far in from the real
+## ones; fish drive on the real ones, and the ball still rolls on its radius.
+@export_range(0.0, 0.1, 0.001) var world_gap := 0.019
 ## Relative to the fish (mass 1). RL's ball is 1/6 of a car (30 vs 180).
 @export_range(0.05, 5.0, 0.001) var mass := 0.167
 ## Restitution. RL: 0.6; mutators "low"/"high"/"super high" bounciness.

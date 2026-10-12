@@ -23,7 +23,17 @@ const BACK_EDGE_RADIUS := 1.6
 const CEILING_RADIUS := 5.12
 ## Radius of the joins between the 45-degree corners and the walls (RL: about 880 uu).
 const CORNER_JOIN_RADIUS := 8.8
-const EDGE_STEPS := 6  # segments per rounded floor/ceiling edge
+## Flat facets in each rounded edge, as RL's collision mesh has them: the side
+## walls' floor ramp and the ceiling curve have 8 (measured from the dumped
+## Soccar meshes). For the back walls' ramp the meshes didn't settle it; 6
+## matches real RL's cars better in replays (private_content/rea/
+## rl_physics_evidence.md §3.2).
+const SIDE_RAMP_FACETS := 8
+const BACK_RAMP_FACETS := 6
+const EDGE_STEPS := 8  # ceiling curve
+## Points along every floor ramp profile, so side and back profiles join up
+## point for point: a multiple of both facet counts.
+const RAMP_POINTS := 24
 const JOIN_STEPS := 6  # segments per rounded wall-to-wall join
 ## Goal mouth width x height, standing on the floor (RL: 1792 x 640 uu). Taller
 ## than EDGE_RADIUS so its top edge is on the flat part of the end wall.
@@ -35,6 +45,11 @@ const GRID_SHADER := preload("res://shaders/grid.gdshader")
 ## A goal explosion's reach (m), and how hard it shoves fish at its centre (m/s).
 const GOAL_EXPLOSION_RADIUS := 16.0
 const GOAL_BLAST := 18.0
+## Physics layer 5: the arena's surfaces as only the ball sees them,
+## BallSettings.world_gap in from the real ones (see _build_shell).
+const BALL_SURFACE_LAYER := 1 << 4
+## For queries that should find the real surfaces (wheels, camera): everything but BALL_SURFACE_LAYER.
+const WORLD_QUERY_MASK := 0xFFFFFFFF & ~BALL_SURFACE_LAYER
 
 const TEAM_NAMES := ["Blue", "Orange"]
 const TEAM_COLORS := [Color(0.25, 0.55, 1.0), Color(1.0, 0.5, 0.1)]
@@ -55,6 +70,14 @@ var scoring_enabled := true
 ## Off: the ball waits after a goal until reset_kickoff() (a match runs its own kickoffs).
 var auto_respawn := true
 
+var _shell: StaticBody3D
+# The shell's collision triangles and their inward vertex normals, and the
+# ball's inset copy of them (_build_shell).
+var _surface_faces := PackedVector3Array()
+var _surface_normals := PackedVector3Array()
+var _ball_surface_shape := ConcavePolygonShape3D.new()
+var _ball_surface_gap := -1.0
+
 
 func _ready() -> void:
 	_build_goals()
@@ -65,11 +88,16 @@ func _ready() -> void:
 	ball.settings = ball_settings
 	ball.fish = fish
 	ball.position = ball_spawn()
+	# The ball meets its own inset copy of the shell, not the shell itself.
+	ball.collision_mask |= BALL_SURFACE_LAYER
+	ball.add_collision_exception_with(_shell)
 	add_child(ball)
 	ball.respawn(ball_spawn(), true)  # the opening kickoff
 
 
 func _physics_process(delta: float) -> void:
+	if not is_equal_approx(ball_settings.world_gap, _ball_surface_gap):
+		_update_ball_surface()
 	if ball.popped:
 		respawn_time_left -= delta
 		if respawn_time_left <= 0.0 and auto_respawn:
@@ -86,7 +114,7 @@ func _physics_process(delta: float) -> void:
 ## Kickoff spot: a Water ball floats mid-tank; a Surface ball rests on the floor, as in RL.
 func ball_spawn() -> Vector3:
 	if ball_settings.ball_type == BallSettings.BallType.SURFACE:
-		return Vector3(0.0, ball_settings.radius, 0.0)
+		return Vector3(0.0, ball_settings.radius + ball_settings.world_gap, 0.0)  # RL's rest height, 93.15 uu
 	return centre
 
 
@@ -134,8 +162,8 @@ func _build_shell() -> void:
 	# the back walls, blended round the corner joins.
 	var profiles: Array = []
 	for entry: Dictionary in ring:
-		profiles.append(_wall_profile([GOAL_SIZE.y], _floor_radius(entry.normal)))
-	var back_profile := _wall_profile([GOAL_SIZE.y], BACK_EDGE_RADIUS)
+		profiles.append(_wall_profile([GOAL_SIZE.y], _toward_back(entry.normal)))
+	var back_profile := _wall_profile([GOAL_SIZE.y], 1.0)
 
 	for i in ring.size() - 1:
 		var a: Dictionary = ring[i]
@@ -178,7 +206,7 @@ func _build_shell() -> void:
 			var edge := {"point": Vector2(x, line), "normal": Vector2(0.0, end)}
 			var foot := Vector3(x, 0.0, line)
 			var inward := Vector3(-signf(x), 0.0, 0.0)
-			for k in EDGE_STEPS:
+			for k in RAMP_POINTS:
 				_add_flat_triangle(wall_tris, foot, _swept(edge, back_profile[k]), _swept(edge, back_profile[k + 1]), inward)
 
 	var mesh := ArrayMesh.new()
@@ -191,25 +219,52 @@ func _build_shell() -> void:
 	mesh.surface_set_material(0, _grid_material(COLOR_SAND))
 	mesh.surface_set_material(1, _grid_material(COLOR_GLASS))
 
-	var faces := PackedVector3Array(floor_tris[0] + wall_tris[0])
+	_surface_faces = PackedVector3Array(floor_tris[0] + wall_tris[0])
+	_surface_normals = PackedVector3Array(floor_tris[1] + wall_tris[1])
 	for goal in goals:
-		for vertex in goal.net_faces:
-			faces.append(goal.transform * vertex)
+		for k in goal.net_faces.size():
+			_surface_faces.append(goal.transform * goal.net_faces[k])
+			_surface_normals.append(goal.transform.basis * goal.net_normals[k])
 	var shape := ConcavePolygonShape3D.new()
 	shape.backface_collision = true
-	shape.set_faces(faces)
+	shape.set_faces(_surface_faces)
 
-	var body := StaticBody3D.new()
-	body.name = "Shell"
+	_shell = StaticBody3D.new()
+	_shell.name = "Shell"
 	var collision := CollisionShape3D.new()
 	collision.shape = shape
-	body.add_child(collision)
+	_shell.add_child(collision)
 	var visual := MeshInstance3D.new()
 	visual.mesh = mesh
 	# Let the sun in from above like a glass tank; only the fish casts shadows.
 	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	body.add_child(visual)
-	add_child(body)
+	_shell.add_child(visual)
+	add_child(_shell)
+
+	# The ball's own copy, every vertex moved in along its normal by world_gap:
+	# RL's ball rests on Bullet's collision margin round the arena mesh, while
+	# cars' wheels (raycasts) and hitboxes meet the mesh itself. Curves stay
+	# concentric; only the sharp edges of the goal notch open by the gap.
+	var ball_surface := StaticBody3D.new()
+	ball_surface.name = "BallSurface"
+	ball_surface.collision_layer = BALL_SURFACE_LAYER
+	ball_surface.collision_mask = 0
+	_ball_surface_shape.backface_collision = true
+	var ball_collision := CollisionShape3D.new()
+	ball_collision.shape = _ball_surface_shape
+	ball_surface.add_child(ball_collision)
+	add_child(ball_surface)
+	_update_ball_surface()
+
+
+## Rebuilds the ball's inset surface for the current world_gap.
+func _update_ball_surface() -> void:
+	_ball_surface_gap = ball_settings.world_gap
+	var inset := PackedVector3Array()
+	inset.resize(_surface_faces.size())
+	for i in _surface_faces.size():
+		inset[i] = _surface_faces[i] + _surface_normals[i] * _ball_surface_gap
+	_ball_surface_shape.set_faces(inset)
 
 
 ## The wall line (where the straight walls stand), walked once round as
@@ -247,26 +302,30 @@ func _footprint_ring(end_wall_cuts: Array) -> Array[Dictionary]:
 	return ring
 
 
-## The floor ramp's radius for a footprint entry facing `normal`: the back
-## walls' tighter one, blending to the side walls' across the corner joins.
-func _floor_radius(normal: Vector2) -> float:
-	var toward_back := clampf((absf(normal.y) - cos(PI / 4.0)) / (1.0 - cos(PI / 4.0)), 0.0, 1.0)
-	return lerpf(EDGE_RADIUS, BACK_EDGE_RADIUS, toward_back)
+## How far a footprint entry facing `normal` is toward the back walls (0 on
+## the side walls, 1 on the back walls, blending across the corner joins).
+func _toward_back(normal: Vector2) -> float:
+	return clampf((absf(normal.y) - cos(PI / 4.0)) / (1.0 - cos(PI / 4.0)), 0.0, 1.0)
 
 
 ## The wall's cross-section from the floor to the ceiling, as Vector4(outward
 ## offset from the wall line (0 on the wall, negative inside), height, outward
-## normal's horizontal and vertical parts): a quarter circle of `floor_radius`
-## up from the floor, the straight wall (with extra points at the `wall_cuts`
-## heights) and a quarter circle of CEILING_RADIUS onto the ceiling.
-func _wall_profile(wall_cuts: Array, floor_radius := EDGE_RADIUS) -> Array[Vector4]:
-	var r := floor_radius
+## normal's horizontal and vertical parts): the floor ramp up from the floor,
+## the straight wall (with extra points at the `wall_cuts` heights) and a
+## quarter circle of CEILING_RADIUS onto the ceiling. The floor ramp of a
+## footprint entry `toward_back` (_toward_back) blends the side walls' ramp
+## into the back walls' (radius and flat facets: SIDE_RAMP_FACETS, BACK_RAMP_FACETS).
+func _wall_profile(wall_cuts: Array, toward_back := 0.0) -> Array[Vector4]:
+	var r := lerpf(EDGE_RADIUS, BACK_EDGE_RADIUS, toward_back)
 	var rc := CEILING_RADIUS
 	var top := SIZE.y - rc
 	var profile: Array[Vector4] = []
-	for k in EDGE_STEPS + 1:
-		var angle := -PI / 2.0 + PI / 2.0 * k / EDGE_STEPS
-		profile.append(Vector4(r * cos(angle) - r, r + r * sin(angle), cos(angle), sin(angle)))
+	for k in RAMP_POINTS + 1:
+		var side := _ramp_point(k, SIDE_RAMP_FACETS)
+		var back := _ramp_point(k, BACK_RAMP_FACETS)
+		var at := side.lerp(back, toward_back)  # position as (offset, height) for a radius of 1
+		var normal := Vector2(side.z, side.w).lerp(Vector2(back.z, back.w), toward_back).normalized()
+		profile.append(Vector4(r * at.x, r * at.y, normal.x, normal.y))
 	for height: float in wall_cuts:
 		assert(height > r and height < top, "wall cut %.1f is outside the flat part of the wall" % height)
 		profile.append(Vector4(0.0, height, 1.0, 0.0))
@@ -274,6 +333,28 @@ func _wall_profile(wall_cuts: Array, floor_radius := EDGE_RADIUS) -> Array[Vecto
 		var angle := PI / 2.0 * k / EDGE_STEPS
 		profile.append(Vector4(rc * cos(angle) - rc, top + rc * sin(angle), cos(angle), sin(angle)))
 	return profile
+
+
+## Point `k` of RAMP_POINTS along a floor ramp of radius 1 made of `facets`
+## flat facets with their corners on the quarter circle, as Vector4(outward
+## offset, height, outward normal's horizontal and vertical parts). Corners
+## take the circle's normal there, points along a facet the facet's own, so
+## an inset copy (the ball's surface) keeps the facets flat.
+func _ramp_point(k: int, facets: int) -> Vector4:
+	var s := float(k) * facets / RAMP_POINTS
+	var facet := mini(int(floor(s)), facets - 1)
+	var t := s - facet
+	var a0 := -PI / 2.0 + PI / 2.0 * facet / facets
+	var a1 := -PI / 2.0 + PI / 2.0 * (facet + 1) / facets
+	var p0 := Vector2(cos(a0) - 1.0, 1.0 + sin(a0))
+	var p1 := Vector2(cos(a1) - 1.0, 1.0 + sin(a1))
+	var at := p0.lerp(p1, t)
+	var angle := (a0 + a1) / 2.0  # along the facet
+	if is_zero_approx(t):
+		angle = a0
+	elif is_equal_approx(t, 1.0):
+		angle = a1
+	return Vector4(at.x, at.y, cos(angle), sin(angle))
 
 
 ## A point on the swept surface: footprint entry `edge` pushed out along a profile entry.
