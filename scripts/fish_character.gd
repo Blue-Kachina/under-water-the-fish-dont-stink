@@ -40,14 +40,14 @@ const CARS := {
 		"ride": 13.704,
 	},
 	Family.HYBRID: {
-		"key": "hybrid", "car": "Hybrid", "fish": "Bubble-Eye Goldfish",
+		"key": "hybrid", "car": "Hybrid", "fish": "Butterfly Koi",
 		"hitbox": Vector3(129.519, 84.6879, 36.6591), "offset": Vector3(13.8757, 0.0, 20.755),
 		"front": {"radius": 12.5, "rest": 38.755, "at": Vector3(51.25, 25.9, 20.755)},
 		"back": {"radius": 15.0, "rest": 37.055, "at": Vector3(-34.0, 29.5, 20.755)},
 		"ride": 19.342,
 	},
 	Family.MERC: {
-		"key": "merc", "car": "Merc", "fish": "Cushion Star",
+		"key": "merc", "car": "Merc", "fish": "Boxfish",
 		"hitbox": Vector3(123.22, 79.2103, 44.1591), "offset": Vector3(11.3757, 0.0, 21.505),
 		"front": {"radius": 15.0, "rest": 39.505, "at": Vector3(51.25, 25.9, 21.505)},
 		"back": {"radius": 15.0, "rest": 39.105, "at": Vector3(-33.75, 29.5, 21.505)},

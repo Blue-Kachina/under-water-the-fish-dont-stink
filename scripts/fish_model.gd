@@ -8,14 +8,17 @@ extends Node3D
 ## Every model has the nodes the swim animation moves (TailPivot, FinLeftPivot,
 ## FinRightPivot) and a Body whose colour set_body_color() changes (replays
 ## tint each fish in its team's colour). Parts sharing the body's material
-## (a starfish's arms) change with it. A model with a
-## `squash` node squashes and stretches it with the fish's acceleration (react);
-## one with a `_skin` (the ray) bends and ripples it with the fin pivots instead.
+## change with it, as do its shader skins (_skins). Fins and skins that ripple as
+## it swims (_waving) are moved by react(), which also squashes and stretches a
+## model's `squash` node, if it has one, with the fish's acceleration.
 
 const BLACK := Color(0.04, 0.04, 0.06)
 const WHITE := Color(0.97, 0.97, 0.95)
 const BLUSH := Color(1.0, 0.55, 0.65)
 const RAY_SKIN := preload("res://shaders/ray_skin.gdshader")
+const KOI_SKIN := preload("res://shaders/koi_skin.gdshader")
+const BOX_SKIN := preload("res://shaders/box_skin.gdshader")
+const FIN_MEMBRANE := preload("res://shaders/fin_membrane.gdshader")
 
 var family := FishCharacter.Family.OCTANE
 var tail: Node3D
@@ -37,10 +40,15 @@ var _stretch_speed := Vector2.ZERO
 ## on the body at rest, moved with the squash in react().
 var _face_anchors: Array[Node3D] = []
 var _face_rest: Array[Vector3] = []
-## The ray's skin, body and tail (ray_skin.gdshader), and its swim wave.
+## Shader skins set_body_color() tints (their "albedo"), and the shaders react()
+## ripples with the swim (their "phase" and "effort").
+var _skins: Array[ShaderMaterial] = []
+var _waving: Array[ShaderMaterial] = []
+var _swim_phase := 0.0
+## The ray's skin, body and tail (ray_skin.gdshader), whose wings and whip
+## react() also bends.
 var _skin: ShaderMaterial
 var _tail_skin: ShaderMaterial
-var _swim_phase := 0.0
 
 
 static func build(character: FishCharacter.Family) -> FishModel:
@@ -58,9 +66,9 @@ static func build(character: FishCharacter.Family) -> FishModel:
 		FishCharacter.Family.BREAKOUT:
 			model._build_swordfish()
 		FishCharacter.Family.HYBRID:
-			model._build_goldfish()
+			model._build_koi()
 		FishCharacter.Family.MERC:
-			model._build_starfish()
+			model._build_boxfish()
 	return model
 
 
@@ -71,8 +79,8 @@ static func build(character: FishCharacter.Family) -> FishModel:
 ## edge it's moving toward stays put and the trailing side does the stretching
 ## (the bottom, when it isn't moving up or down, so it squashes onto the floor).
 func react(delta: float, velocity: Vector3) -> void:
-	if _skin != null:
-		_ripple(delta, velocity)
+	if not _waving.is_empty():
+		_swim(delta, velocity)
 	if squash == null or delta <= 0.0:
 		return
 	var raw := (velocity - _last_velocity) / delta
@@ -113,24 +121,26 @@ func reset_body_color() -> void:
 
 func _tint(color: Color) -> void:
 	_body_material.albedo_color = color
-	for skin in [_skin, _tail_skin]:
-		if skin != null:
-			skin.set_shader_parameter("albedo", color)
+	for skin in _skins:
+		skin.set_shader_parameter("albedo", color)
 
 
-## The ray's wings follow the fin pivots (their roll lifts the tips, their turn
-## sweeps them back), with a wave rippling down them nose to tail that grows and
-## quickens with speed; the tail whips the same way.
-func _ripple(delta: float, velocity: Vector3) -> void:
+## The swim wave: fins and skins ripple, harder and quicker with speed. The
+## ray's wings also follow the fin pivots (their roll lifts the tips, their turn
+## sweeps them back) and its tail whips.
+func _swim(delta: float, velocity: Vector3) -> void:
 	var effort := clampf(velocity.length() / 23.0, 0.0, 1.0)
 	_swim_phase = fmod(_swim_phase + delta * lerpf(2.5, 9.0, effort), TAU * 100.0)
-	_skin.set_shader_parameter("phase", _swim_phase)
+	for material in _waving:
+		material.set_shader_parameter("phase", _swim_phase)
+		material.set_shader_parameter("effort", effort)
+	if _skin == null:
+		return
 	_skin.set_shader_parameter("ripple", lerpf(0.012, 0.035, effort))
 	_skin.set_shader_parameter("flap_left", -fin_left.rotation.z)
 	_skin.set_shader_parameter("flap_right", fin_right.rotation.z)
 	_skin.set_shader_parameter("sweep_left", fin_left.rotation.y)
 	_skin.set_shader_parameter("sweep_right", -fin_right.rotation.y)
-	_tail_skin.set_shader_parameter("phase", _swim_phase)
 	_tail_skin.set_shader_parameter("tail_ripple", lerpf(0.05, 0.12, effort))
 
 
@@ -216,6 +226,12 @@ func _build_ray() -> void:
 	_skin.set_shader_parameter("streak_from", -l * 0.33)
 	_skin.set_shader_parameter("streak_to", -l * 0.12)
 	_skin.set_shader_parameter("streak_gap", w * 0.04)
+	_skin.set_shader_parameter("gill_from", -l * 0.27)
+	_skin.set_shader_parameter("gill_to", -l * 0.1)
+	_skin.set_shader_parameter("gill_x", w * 0.1)
+	_skin.set_shader_parameter("gill_length", w * 0.026)
+	_skin.set_shader_parameter("mouth_z", -l * 0.34)
+	_skin.set_shader_parameter("mouth_width", w * 0.05)
 	var body := MeshInstance3D.new()
 	body.name = "Body"
 	body.mesh = _ray_mesh()
@@ -231,7 +247,7 @@ func _build_ray() -> void:
 		var at := Vector3(brow.x, _ray_top(brow.x, brow.z - radius * 0.9) - radius * 0.55, brow.z - radius * 0.9)
 		_eye(at, radius, Vector3(side * 0.6, 0.2, -0.75), 0.7, null, Color(0.35, 0.13, 0.06))
 	# The wings bend in the shader: the pivots only carry the swim animation's
-	# flap and sweep to it (_ripple).
+	# flap and sweep to it (_swim).
 	_fin_pivots(Vector3(w * 0.18, 0.0, -l * 0.06))
 	_tail_pivot(Vector3(0.0, 0.0, l * 0.26))
 	var tail_length := l * 0.7
@@ -240,9 +256,11 @@ func _build_ray() -> void:
 	_tail_skin.set_shader_parameter("tail_mode", true)
 	_tail_skin.set_shader_parameter("albedo", color)
 	_tail_skin.set_shader_parameter("tail_length", tail_length)
+	_skins.append_array([_skin, _tail_skin])
+	_waving.append_array([_skin, _tail_skin])
 	var whip := MeshInstance3D.new()
 	whip.name = "Whip"
-	whip.mesh = _tail_mesh(tail_length)
+	whip.mesh = _tube_mesh(tail_length, 0.034, 1.2)
 	whip.material_override = _tail_skin
 	whip.extra_cull_margin = 0.2
 	tail.add_child(whip)
@@ -333,9 +351,10 @@ func _ray_mesh() -> ArrayMesh:
 	return tool.commit()
 
 
-## The whip tail: a tube from the tail pivot back, thinning to a point as it
-## curls up; UV.x runs 0 at the base to 1 at the tip and UV.y round it.
-func _tail_mesh(length: float) -> ArrayMesh:
+## A whip tail or whisker: a tube along +Z, `radius` thick at its base and
+## thinning to a point as it curls up by `curl` (rad, down if less than 0);
+## UV.x runs 0 at the base to 1 at the tip and UV.y round it.
+func _tube_mesh(length: float, radius: float, curl: float) -> ArrayMesh:
 	var rings := 32
 	var sides := 8
 	var tool := SurfaceTool.new()
@@ -343,14 +362,14 @@ func _tail_mesh(length: float) -> ArrayMesh:
 	var at := Vector3.ZERO
 	for i in rings + 1:
 		var along := float(i) / rings
-		var pitch := 1.2 * pow(along, 1.6)
+		var pitch := curl * pow(along, 1.6)
 		var forward := Vector3(0.0, sin(pitch), cos(pitch))
 		var up := Vector3(0.0, cos(pitch), -sin(pitch))
-		var radius := lerpf(0.034, 0.003, along)
+		var thickness := radius * lerpf(1.0, 0.1, along)
 		for k in sides + 1:
 			var angle := TAU * k / sides
 			tool.set_uv(Vector2(along, float(k) / sides))
-			tool.add_vertex(at + (Vector3.RIGHT * cos(angle) + up * sin(angle)) * radius)
+			tool.add_vertex(at + (Vector3.RIGHT * cos(angle) + up * sin(angle)) * thickness)
 		at += forward * length / rings
 	for i in rings:
 		for k in sides:
@@ -393,92 +412,221 @@ func _build_swordfish() -> void:
 	_mouth(Vector3(0.0, -h * 0.14, nose + l * 0.035), Vector3(w * 0.14, h * 0.05, 0.03))
 
 
-## Hybrid: a bubble-eye goldfish, gazing upward over two wobbly bubble sacs,
-## with a flowing double tail.
-func _build_goldfish() -> void:
+## Hybrid: a butterfly koi, white with orange-red patches and a few ink spots
+## (koi_skin.gdshader), with long flowing fins and a big forked tail, all thin
+## frilly membranes that ripple as it swims (fin_membrane.gdshader), whiskers
+## and round lips. Its fins and tail reach out past the hitbox.
+func _build_koi() -> void:
 	var w := _size.x
 	var h := _size.y
 	var l := _size.z
-	var body_centre := Vector3(0.0, 0.0, l * 0.04)
-	var semi := Vector3(w * 0.4, h * 0.5, l * 0.4)
-	_body(Color(1.0, 0.62, 0.15), body_centre, semi * 2.0)
-	var bubble := _material(Color(0.75, 0.9, 1.0), 0.1, 0.55)
-	var fin_color := Color(1.0, 0.72, 0.3)
-	var fin_material := _material(fin_color, 0.5, 0.85)
-	for side: float in [-1.0, 1.0]:
-		_part(self, _sphere(), bubble, Vector3(side * w * 0.3, -h * 0.12, -l * 0.27), Vector3(w * 0.32, h * 0.6, l * 0.2))
-		# Eyes on top, looking up.
-		_eye(Vector3(side * w * 0.25, h * 0.26, -l * 0.3), h * 0.13, Vector3(side * 0.3, 1.0, -0.4))
-	_cheeks(semi, -l * 0.18 - body_centre.z, -h * 0.02, h * 0.08, body_centre)
-	_part(self, _sphere(), fin_material, Vector3(0.0, semi.y * 0.9, l * 0.02), Vector3(0.035, h * 0.5, l * 0.3))
-	_tail_pivot(Vector3(0.0, 0.0, body_centre.z + semi.z * 0.88))
-	for side: float in [-1.0, 1.0]:
-		_part(tail, _sphere(), fin_material, Vector3(side * w * 0.07, 0.0, l * 0.11), Vector3(0.03, h * 1.15, l * 0.26),
-				Vector3(0.0, side * 0.45, 0.0))
-	_fin_pivots(Vector3(semi.x * 0.85, -h * 0.18, -l * 0.08))
+	var color := Color(0.93, 0.3, 0.07)
+	_body_material = _material(color)  # for set_body_color(); the skin is shaded by koi_skin
+	var skin := ShaderMaterial.new()
+	skin.shader = KOI_SKIN
+	skin.set_shader_parameter("albedo", color)
+	_skins.append(skin)
+	var ends := Vector2(-l * 0.5, l * 0.36)
+	var semi := Vector2(w * 0.24, h * 0.46)
+	skin.set_shader_parameter("girth", (semi.x + semi.y) / 2.0)
+	skin.set_shader_parameter("scales_from", -l * 0.33)
+	var body := MeshInstance3D.new()
+	body.name = "Body"
+	body.mesh = _koi_mesh(ends, semi)
+	body.material_override = skin
+	add_child(body)
+	var fins := _fin_material(Color(1.0, 0.86, 0.74), Color(1.0, 0.97, 0.93), 14.0, 0.035, 0.8, 0.5)
+	fins.set_shader_parameter("ray_color", Color(1.0, 0.6, 0.4))
+	# Long flowing pectorals on the swim animation's pivots, little pelvics.
+	_fin_pivots(Vector3(semi.x * 0.7, -semi.y * 0.45, -l * 0.22))
 	for side: float in [-1.0, 1.0]:
 		var pivot := fin_left if side < 0.0 else fin_right
-		_part(pivot, _sphere(), fin_material, Vector3(side * w * 0.06, 0.0, 0.0), Vector3(w * 0.18, 0.03, l * 0.13))
-	_mouth(Vector3(0.0, -h * 0.02, body_centre.z - semi.z * 0.985), Vector3(w * 0.07, h * 0.09, 0.03))
+		_membrane(pivot, fins, Vector3(0.0, 0.0, -0.03), Vector3(0.0, 0.0, 0.05), Vector3(side, -0.3, 0.9),
+				[l * 0.16, l * 0.24, l * 0.26, l * 0.22], 0.5, 0.15, 0.08)
+		_membrane(self, fins, Vector3(side * semi.x * 0.35, -_koi_height(ends, semi, 0.0) * 0.8, -l * 0.02), Vector3(side * semi.x * 0.3, -_koi_height(ends, semi, l * 0.06) * 0.8, l * 0.06),
+				Vector3(side * 0.5, -0.7, 0.8), [l * 0.08, l * 0.11, l * 0.09], 0.3, 0.12, 0.05)
+	# A long ruffled dorsal fin along the back, a small anal fin underneath.
+	_membrane(self, fins, Vector3(0.0, _koi_height(ends, semi, -l * 0.1) * 0.93, -l * 0.1), Vector3(0.0, _koi_height(ends, semi, l * 0.26) * 0.9, l * 0.26), Vector3(0.0, 1.0, 0.9),
+			[h * 0.28, h * 0.42, h * 0.4, h * 0.34, h * 0.26], 0.0, 0.14, 0.12)
+	_membrane(self, fins, Vector3(0.0, -_koi_height(ends, semi, l * 0.17) * 0.9, l * 0.17), Vector3(0.0, -_koi_height(ends, semi, l * 0.28) * 0.9, l * 0.28), Vector3(0.0, -1.0, 0.8),
+			[h * 0.2, h * 0.26, h * 0.18], 0.0, 0.12, 0.06)
+	# The big forked tail: two long lobes fanning up and down.
+	_tail_pivot(Vector3(0.0, 0.0, ends.y - l * 0.04))
+	var stalk := _koi_height(ends, semi, ends.y - l * 0.04)
+	_membrane(tail, fins, Vector3(0.0, stalk * 0.9, 0.0), Vector3(0.0, -stalk * 0.9, 0.0), Vector3(0.0, 0.0, 1.0),
+			[l * 0.34, l * 0.25, l * 0.14, l * 0.25, l * 0.34], 1.3, 0.15, 0.08)
+	# Eyes on the sides of the head, round lips, and two pairs of whiskers.
+	var head_z := -l * 0.37
+	var head := semi.x * _koi_radius(inverse_lerp(ends.x, ends.y, head_z))
+	for side: float in [-1.0, 1.0]:
+		_eye(Vector3(side * head * 0.8, semi.y * 0.18, head_z), h * 0.12, Vector3(side * 0.8, 0.15, -0.6), 0.65)
+	var lips_at := Vector3(0.0, -semi.y * 0.06, ends.x + 0.01)
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.15
+	ring.outer_radius = 0.5
+	var lip_material := _material(Color(1.0, 0.8, 0.74), 0.4)
+	_part(self, ring, lip_material, lips_at, Vector3(w * 0.09, 0.07, w * 0.075), Vector3(PI / 2.0, 0.0, 0.0)).name = "Lips"
+	_mouth(lips_at + Vector3(0.0, 0.0, -0.008), Vector3(w * 0.03, w * 0.025, 0.02))
+	for side: float in [-1.0, 1.0]:
+		for whisker: Vector2 in [Vector2(l * 0.06, 0.6), Vector2(l * 0.035, -0.2)]:
+			var root := lips_at + Vector3(side * w * 0.045, -0.005, 0.02)
+			var barbel := MeshInstance3D.new()
+			barbel.name = "Whisker"
+			barbel.mesh = _tube_mesh(whisker.x, 0.006, -0.9)
+			barbel.material_override = lip_material
+			barbel.position = root
+			barbel.basis = Basis.looking_at(-Vector3(side * 0.8, -0.4, whisker.y).normalized())
+			add_child(barbel)
 
 
-## Merc: a puffy cushion starfish lying flat, one arm forward, with a domed
-## middle, cream bumps and a face on top. It squashes and stretches with its
-## acceleration (react): long and thin speeding up, short and wide braking,
-## tall falling and flat landing, with a jiggle. Its side arms are the "fins".
-func _build_starfish() -> void:
+## How thick a koi is (of its widest) `along` it, nose 0 to tail 1: a round
+## head, widest a third of the way back, narrowing to a slim tail stalk with a
+## rounded end.
+static func _koi_radius(along: float) -> float:
+	var widest := 0.33
+	var stalk := 0.93
+	if along < widest:
+		return sqrt(maxf(1.0 - pow((widest - along) / widest, 2.0), 0.0))
+	if along < stalk:
+		var t := (along - widest) / (stalk - widest)
+		return lerpf(1.0, 0.2, t * t * (3.0 - 2.0 * t))
+	return 0.2 * sqrt(maxf(1.0 - pow((along - stalk) / (1.0 - stalk), 2.0), 0.0))
+
+
+## How high a koi's top is (m) at z, the body running nose `ends.x` to tail
+## `ends.y`, `semi.y` at its tallest.
+static func _koi_height(ends: Vector2, semi: Vector2, z: float) -> float:
+	return semi.y * _koi_radius(inverse_lerp(ends.x, ends.y, z))
+
+
+## A koi's body from its nose (`ends.x`) to its tail (`ends.y`), `semi` its
+## widest half width and height.
+func _koi_mesh(ends: Vector2, semi: Vector2) -> ArrayMesh:
+	var rows := 48
+	var around := 32
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in rows + 1:
+		var along := float(i) / rows
+		var z := lerpf(ends.x, ends.y, along)
+		var radius := _koi_radius(along)
+		for k in around:
+			var angle := TAU * k / around
+			tool.set_uv(Vector2(along, float(k) / around))
+			tool.add_vertex(Vector3(sin(angle) * semi.x * radius, cos(angle) * semi.y * radius, z))
+	for i in rows:
+		for k in around:
+			var a := i * around + k
+			var b := i * around + (k + 1) % around
+			for corner: int in [a, b, a + around, b, b + around, a + around]:
+				tool.add_index(corner)
+	tool.generate_normals()
+	return tool.commit()
+
+
+## Merc: a yellow boxfish, a rounded box narrowing to its tail, armoured in
+## faint plates most with a black spot (box_skin.gdshader), with big eyes, pouty
+## lips and little fan fins that flutter fast (fin_membrane.gdshader). It
+## squashes and stretches with its acceleration (react) like a jelly sweet: long
+## and thin speeding up, short and wide braking, tall falling, flat landing.
+func _build_boxfish() -> void:
 	var w := _size.x
 	var h := _size.y
 	var l := _size.z
-	var color := Color(0.95, 0.32, 0.35)
-	# Built in a unit box (-0.5..0.5 each way) scaled to the hitbox, so the star
-	# squashes and stretches as one.
+	var color := Color(1.0, 0.8, 0.06)
+	# A unit box scaled to the hitbox, so it all squashes as one; `inside` it
+	# undoes that so the parts are placed in metres.
 	squash = Node3D.new()
 	squash.name = "Squash"
 	_squash_base = _size
 	squash.scale = _squash_base
 	add_child(squash)
-	_body_material = _material(color, 0.75)
-	var dome := _part(squash, _sphere(), _body_material, Vector3.ZERO, Vector3(0.62, 1.0, 0.62))
-	dome.name = "Body"
-	for i in 5:
-		var angle := TAU * i / 5.0
-		var along := Vector3(sin(angle), 0.0, -cos(angle))
-		var arm := _part(squash, _sphere(), _body_material, along * 0.25 + Vector3(0.0, -0.2, 0.0), Vector3(0.36, 0.55, 0.5),
-				Vector3(0.0, PI - angle, 0.0))
-		arm.name = "Arm%d" % i
-	# Everything else in metres, riding along with the squash.
-	var top := Node3D.new()
-	top.name = "Top"
-	top.scale = Vector3.ONE / _squash_base
-	squash.add_child(top)
-	var bump := _material(Color(1.0, 0.88, 0.7), 0.6)
-	var tip := _material(Color(1.0, 0.6, 0.4), 0.7)
-	for i in 5:
-		var angle := TAU * i / 5.0
-		var along := Vector3(sin(angle), 0.0, -cos(angle))
-		for d: float in [0.14, 0.24, 0.33, 0.41]:
-			var at := along * d
-			_part(top, _sphere(), bump, Vector3(at.x * w, _star_top(at) * h, at.z * l), Vector3(h * 0.09, h * 0.05, h * 0.09))
-		var end := along * 0.47
-		_part(top, _sphere(), tip, Vector3(end.x * w, (_star_top(end) - 0.04) * h, end.z * l), Vector3(h * 0.16, h * 0.1, h * 0.16))
-	for i in 5:
-		var angle := TAU * (i + 0.5) / 5.0
-		var at := Vector3(sin(angle), 0.0, -cos(angle)) * 0.08
-		_part(top, _sphere(), bump, Vector3(at.x * w, _star_top(at) * h, at.z * l), Vector3(h * 0.08, h * 0.05, h * 0.08))
-	# A face on top: eyes on the dome looking ahead and up, the mouth on the front
-	# arm. It rides on the squashing body without squashing (_face_anchor).
+	var inside := Node3D.new()
+	inside.name = "Inside"
+	inside.scale = Vector3.ONE / _squash_base
+	squash.add_child(inside)
+	_body_material = _material(color)  # for set_body_color(); the skin is shaded by box_skin
+	var skin := ShaderMaterial.new()
+	skin.shader = BOX_SKIN
+	skin.set_shader_parameter("albedo", color)
+	skin.set_shader_parameter("plate_size", w * 0.17)
+	_skins.append(skin)
+	var centre := Vector3(0.0, 0.0, -l * 0.04)
+	var semi := Vector3(w * 0.46, h * 0.47, l * 0.42)
+	var taper := 0.36
+	var body := MeshInstance3D.new()
+	body.name = "Body"
+	body.mesh = _box_mesh(semi, 0.5, taper)
+	body.material_override = skin
+	body.position = centre
+	inside.add_child(body)
+	# Big eyes high on the front of its sides and pouty lips, riding the squash
+	# without squashing (_face_anchor).
 	for side: float in [-1.0, 1.0]:
-		var at := Vector3(side * 0.09, 0.0, -0.12)
-		_eye(Vector3.ZERO, h * 0.15, Vector3(side * 0.25, 0.7, -1.0), 0.6, _face_anchor(Vector3(at.x * w, _star_top(at) * h, at.z * l)))
-		var cheek := Vector3(side * 0.15, 0.0, -0.2)
-		_part(_face_anchor(Vector3(cheek.x * w, _star_top(cheek) * h, cheek.z * l)), _sphere(), _material(BLUSH), Vector3.ZERO,
-				Vector3(w * 0.09, 0.02, h * 0.12))
-	var mouth := Vector3(0.0, 0.0, -0.27)
-	_part(_face_anchor(Vector3(0.0, _star_top(mouth) * h, mouth.z * l)), _sphere(), _material(Color(0.25, 0.05, 0.08), 0.4),
-			Vector3.ZERO, Vector3(w * 0.08, 0.02, h * 0.06)).name = "Mouth"
-	_tail_pivot(Vector3.ZERO)  # nothing to wag: the squash is its motion
-	_fin_pivots(Vector3(w * 0.4, 0.0, 0.0))
+		var eye := centre + Vector3(side * semi.x * 0.9, semi.y * 0.4, -semi.z * 0.62)
+		_eye(Vector3.ZERO, h * 0.15, Vector3(side * 0.65, 0.15, -0.75), 0.62, _face_anchor(eye))
+	var lips := _face_anchor(centre + Vector3(0.0, -semi.y * 0.28, -semi.z + 0.004))
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.12
+	ring.outer_radius = 0.5
+	_part(lips, ring, _material(Color(1.0, 0.5, 0.45), 0.35), Vector3.ZERO, Vector3(w * 0.12, 0.09, h * 0.15), Vector3(PI / 2.0, 0.0, 0.0)).name = "Lips"
+	_part(lips, _sphere(), _material(Color(0.25, 0.05, 0.08), 0.4), Vector3(0.0, 0.0, -0.022), Vector3(w * 0.03, h * 0.04, 0.02)).name = "Mouth"
+	# Fan fins: pectorals behind the eyes on the swim animation's pivots, a
+	# small dorsal and anal fin near the back, and a rounded tail fan.
+	var fins := _fin_material(Color(1.0, 0.62, 0.12), Color(1.0, 0.88, 0.5), 9.0, 0.014, 2.6, 0.45)
+	_fin_pivots(Vector3(semi.x * 0.96, -semi.y * 0.12, centre.z - semi.z * 0.18), inside)
+	for side: float in [-1.0, 1.0]:
+		var pivot := fin_left if side < 0.0 else fin_right
+		_membrane(pivot, fins, Vector3(0.0, h * 0.12, 0.0), Vector3(0.0, -h * 0.12, 0.0), Vector3(side * 0.7, 0.0, 1.0),
+				[l * 0.11, l * 0.15, l * 0.15, l * 0.11], 0.9, 0.1)
+	_membrane(inside, fins, centre + Vector3(0.0, semi.y * _box_narrowing(0.45, taper) * 0.92, semi.z * 0.45), centre + Vector3(0.0, semi.y * _box_narrowing(0.75, taper) * 0.85, semi.z * 0.75),
+			Vector3(0.0, 1.0, 0.7), [l * 0.06, l * 0.09, l * 0.06], 0.0, 0.1)
+	_membrane(inside, fins, centre + Vector3(0.0, -semi.y * _box_narrowing(0.45, taper) * 0.92, semi.z * 0.45), centre + Vector3(0.0, -semi.y * _box_narrowing(0.75, taper) * 0.85, semi.z * 0.75),
+			Vector3(0.0, -1.0, 0.7), [l * 0.06, l * 0.09, l * 0.06], 0.0, 0.1)
+	_tail_pivot(centre + Vector3(0.0, 0.0, semi.z * 0.92), inside)
+	var stalk := semi.y * _box_narrowing(0.95, taper)
+	_membrane(tail, fins, Vector3(0.0, stalk * 0.8, 0.0), Vector3(0.0, -stalk * 0.8, 0.0), Vector3(0.0, 0.0, 1.0),
+			[l * 0.18, l * 0.23, l * 0.24, l * 0.23, l * 0.18], 1.2, 0.1)
+
+
+## How much a boxfish narrows `along` it (-1 the nose to 1 the tail): a little
+## toward its snout, down to `taper` at the tail.
+static func _box_narrowing(along: float, taper: float) -> float:
+	var t := clampf((along - 0.15) / 0.85, 0.0, 1.0)
+	var snout := clampf((-along - 0.5) / 0.5, 0.0, 1.0)
+	return lerpf(1.0, taper, t * t * (3.0 - 2.0 * t)) * lerpf(1.0, 0.85, snout * snout)
+
+
+## `value` to the `power`, keeping its sign.
+static func _signed_pow(value: float, power: float) -> float:
+	return signf(value) * pow(absf(value), power)
+
+
+## A rounded box (a superellipsoid: `roundness` 1 an ellipsoid, toward 0 a
+## box) with half sizes `semi`, narrowing toward the tail (+Z) to `taper`.
+func _box_mesh(semi: Vector3, roundness: float, taper: float) -> ArrayMesh:
+	var rows := 36
+	var around := 56
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in rows + 1:
+		var latitude := lerpf(-PI / 2.0, PI / 2.0, float(i) / rows)
+		for k in around:
+			var longitude := TAU * k / around - PI  # starting at the tail
+			var flat := _signed_pow(cos(latitude), roundness)
+			var z := -semi.z * flat * _signed_pow(cos(longitude), roundness)
+			var narrow := _box_narrowing(z / semi.z, taper)
+			var x := semi.x * flat * _signed_pow(sin(longitude), roundness) * narrow
+			var y := semi.y * _signed_pow(sin(latitude), roundness) * narrow
+			tool.add_vertex(Vector3(x, y, z))
+	for i in rows:
+		for k in around:
+			var a := i * around + k
+			var b := i * around + (k + 1) % around
+			for corner: int in [a, b, a + around, b, b + around, a + around]:
+				tool.add_index(corner)
+	tool.generate_normals()
+	return tool.commit()
 
 
 ## A spot on a squashing body (`at`, m, at rest) for a face feature: it moves
@@ -493,20 +641,68 @@ func _face_anchor(at: Vector3) -> Node3D:
 	return anchor
 
 
-## How high (unit box) the starfish's top is above unit point `at` (x, z): the
-## dome or the arm under it, whichever is higher.
-func _star_top(at: Vector3) -> float:
-	var top := 0.5 * sqrt(maxf(1.0 - pow(at.x / 0.31, 2.0) - pow(at.z / 0.31, 2.0), 0.0))
-	for i in 5:
-		var angle := TAU * i / 5.0
-		var along := Vector3(sin(angle), 0.0, -cos(angle))
-		var across := Vector3(-along.z, 0.0, along.x)
-		var a := (at.dot(along) - 0.25) / 0.25
-		var b := at.dot(across) / 0.18
-		var inside := 1.0 - a * a - b * b
-		if inside > 0.0:
-			top = maxf(top, -0.2 + 0.275 * sqrt(inside))
-	return top
+## A fin membrane's look (fin_membrane.gdshader): `root` fading to see-through
+## `edge`, `rays` across it, rippling `flutter` m at the edge at `tempo`.
+func _fin_material(root: Color, edge: Color, rays: float, flutter: float, tempo := 1.0, edge_alpha := 0.45) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = FIN_MEMBRANE
+	material.set_shader_parameter("albedo", root)
+	material.set_shader_parameter("edge_color", edge)
+	material.set_shader_parameter("ray_color", root.darkened(0.12))
+	material.set_shader_parameter("rays", rays)
+	material.set_shader_parameter("flutter", flutter)
+	material.set_shader_parameter("tempo", tempo)
+	material.set_shader_parameter("edge_alpha", edge_alpha)
+	_waving.append(material)
+	return material
+
+
+## A thin fin on `parent`: rays fanning out of a root line from `from` to `to`
+## (parent space) toward `out`, as long as `lengths` says along the root (spread
+## evenly from its start to its end). `spread` (rad) fans the outer rays apart;
+## the edge dips between the rays by `frill` (of their length) and the membrane
+## ruffles by `ruffle`.
+func _membrane(parent: Node3D, material: ShaderMaterial, from: Vector3, to: Vector3, out: Vector3, lengths: Array,
+		spread := 0.0, frill := 0.12, ruffle := 0.0) -> MeshInstance3D:
+	var columns := 72
+	var rows := 10
+	var rays: float = material.get_shader_parameter("rays")
+	var along := to - from
+	var normal := along.cross(out).normalized()
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in columns + 1:
+		var u := float(i) / columns
+		var direction := out.normalized().rotated(normal, (u - 0.5) * spread)
+		var length := _sample(lengths, u) * (1.0 - frill * 0.5 * (1.0 - cos(u * rays * TAU)))
+		for j in rows + 1:
+			var v := float(j) / rows
+			var wave := normal * ruffle * length * v * v * sin(u * TAU * 2.5)
+			tool.set_uv(Vector2(u, v))
+			tool.add_vertex(from + along * u + direction * length * v + wave)
+	for i in columns:
+		for j in rows:
+			var a := i * (rows + 1) + j
+			var b := a + rows + 1
+			for corner: int in [a, b, a + 1, a + 1, b, b + 1]:
+				tool.add_index(corner)
+	tool.generate_normals()
+	var fin := MeshInstance3D.new()
+	fin.name = "Fin"
+	fin.mesh = tool.commit()
+	fin.material_override = material
+	fin.extra_cull_margin = 0.1  # it ripples out of its bounds
+	parent.add_child(fin)
+	return fin
+
+
+## `values` spread evenly over 0..1, read off smoothly at `t`.
+static func _sample(values: Array, t: float) -> float:
+	var at := clampf(t, 0.0, 1.0) * (values.size() - 1)
+	var i := mini(int(at), values.size() - 2)
+	var before: float = values[maxi(i - 1, 0)]
+	var after: float = values[mini(i + 2, values.size() - 1)]
+	return cubic_interpolate(values[i], values[i + 1], before, after, at - i)
 
 
 # --- Parts ----------------------------------------------------------------------
@@ -517,23 +713,25 @@ func _body(color: Color, centre: Vector3, size: Vector3) -> void:
 	body.name = "Body"
 
 
-func _tail_pivot(at: Vector3) -> void:
+func _tail_pivot(at: Vector3, parent: Node3D = null) -> void:
 	tail = Node3D.new()
 	tail.name = "TailPivot"
 	tail.position = at
-	add_child(tail)
+	(parent if parent else self).add_child(tail)
 
 
 ## Fin pivots either side, at `at` and its mirror (at.x is the right one's).
-func _fin_pivots(at: Vector3) -> void:
+func _fin_pivots(at: Vector3, parent: Node3D = null) -> void:
+	if parent == null:
+		parent = self
 	fin_left = Node3D.new()
 	fin_left.name = "FinLeftPivot"
 	fin_left.position = Vector3(-at.x, at.y, at.z)
-	add_child(fin_left)
+	parent.add_child(fin_left)
 	fin_right = Node3D.new()
 	fin_right.name = "FinRightPivot"
 	fin_right.position = at
-	add_child(fin_right)
+	parent.add_child(fin_right)
 
 
 ## A triangular fin standing up along the fish (a dorsal fin), its base centred
