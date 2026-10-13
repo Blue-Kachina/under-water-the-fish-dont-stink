@@ -95,6 +95,10 @@ const SURFACE_JUMP_GRACE := 0.1
 const RL_AUTOFLIP_IMPULSE := 2.0
 const RL_AUTOFLIP_TORQUE := 50.0
 const RL_AUTOFLIP_TIME := 0.4
+## RL's auto-roll (see rl_auto_roll): the pull onto the surface (100 uu/s²)
+## and the most it turns the car flush (rad/s²).
+const RL_AUTOROLL_FORCE := 1.0
+const RL_AUTOROLL_TORQUE := 80.0
 const RL_AUTOFLIP_ROLL_THRESH := 2.8
 # Rocket League dodge push scaling (RocketSim RLConst.h, Car::_UpdateDoubleJumpOrFlip).
 const RL_CAR_MAX_SPEED := 23.0  # 2300 uu/s, what "forward speed ratio" is relative to
@@ -138,8 +142,10 @@ const RL_FRICTION_SLIP_MIN := 0.05
 ## Front wheel angle at full lock while powersliding (rad, by speed in uu/s).
 const RL_POWERSLIDE_STEER_ANGLE_CURVE := [Vector2(0.0, 0.39235), Vector2(2500.0, 0.12610)]
 ## How much the hitbox's lower front and rear edges are bevelled for hitting
-## the arena (up, along): see _apply_hitbox.
-const HULL_BEVEL := Vector2(0.0, 0.0)
+## the arena (up, along): see _apply_hitbox. RL's (Bullet's) box has its edges
+## rounded by 2 cm. Square, a low car's nose digs into the back walls' ramp
+## facets and Jolt stops it dead (RocketSim parity: the Breakout up the back wall).
+const HULL_BEVEL := Vector2(0.02, 0.02)
 ## A contact counts as on the roof when its normal is this far against the fish's up
 ## (lying upside down or over on its upper flank).
 const ROOF_CONTACT_DOT := -0.1
@@ -363,6 +369,11 @@ const TIME_EPSILON := 0.0001
 ## not while the spring is slack) and is kept until the wheel next bottoms out
 ## or leaves the ground. Off: fresh each tick, only while bottomed out.
 @export var rl_pushback_holds := false
+## RL's auto-roll (RocketSim Car::_UpdateAutoRoll): on the throttle with only
+## some wheels down, or the body touching the arena, the car is pulled onto
+## the surface and turned to sit flush with it. It carries a car over a ramp's
+## creases and onto a wall without its nose scraping. Needs rl_suspension.
+@export var rl_auto_roll := true
 
 @export_group("Hitbox")
 ## Which fish this is, one per Rocket League hitbox (FishCharacter): sets the
@@ -536,6 +547,10 @@ var _reset_queued := false
 var _surface_grace := 0.0
 ## Normal of a surface touching the fish's roof while it's nearly upside down (else zero).
 var _roof_normal := Vector3.ZERO
+## The normal of a contact between the body and the arena last step (else zero), for auto-roll.
+var _world_contact_normal := Vector3.ZERO
+## The sum of the touching wheels' surface normals this tick (_update_suspension).
+var _wheel_normal_sum := Vector3.ZERO
 ## Lying on its upper side (roof or upper flank) against the arena: air control can't roll it over.
 var _resting_on_roof := false
 var _autoflip_left := 0.0
@@ -691,16 +706,24 @@ func velocity_for_last_step() -> Vector3:
 	return _prev_step_velocity if _step_frame == Engine.get_physics_frames() else _step_velocity
 
 
+## The fish's live physics state. Inside another body's _integrate_forces the
+## node's transform and velocities can still be last tick's: Jolt syncs each
+## node right after its own callback, so it depends which body went first.
+func physics_state() -> PhysicsDirectBodyState3D:
+	return PhysicsServer3D.body_get_direct_state(get_rid())
+
+
 ## The ball's half of a contact (Ball._resolve_fish_contact): `impulse` at
 ## world point `at`, moving and turning the fish by its mass and inertia.
 func apply_ball_impulse(impulse: Vector3, at: Vector3) -> void:
+	var xform := physics_state().transform
 	_ball_push += impulse / mass
-	_ball_twist += inverse_inertia_world() * (at - global_transform * center_of_mass).cross(impulse)
+	_ball_twist += inverse_inertia_world(xform.basis) * (at - xform * center_of_mass).cross(impulse)
 
 
-## The fish's inverse inertia tensor in world axes.
-func inverse_inertia_world() -> Basis:
-	var b := global_basis.orthonormalized()
+## The fish's inverse inertia tensor in world axes (for the fish turned to `basis`).
+func inverse_inertia_world(basis := global_basis) -> Basis:
+	var b := basis.orthonormalized()
 	return b * Basis.from_scale(Vector3.ONE / inertia) * b.transposed()
 
 
@@ -743,7 +766,7 @@ func is_option_active(property: String) -> bool:
 			return rl_surface_mechanics and rl_suspension
 		"tyre_axle_on_surface", "tyre_force_drop":
 			return _uses_tyres()
-		"rl_pushback_holds":
+		"rl_pushback_holds", "rl_auto_roll":
 			return rl_surface_mechanics and rl_suspension
 		"boost_drain", "boost_regen":
 			return not boost_unlimited
@@ -963,6 +986,10 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		_update_tyre_settings(start_velocity, start_spin, state, body_basis)
 	velocity = _start_autoflip(velocity, body_basis)
 	velocity = _apply_jump(velocity, body_basis, state.get_contact_count() > 0, dt)
+	if rl_auto_roll and rl_suspension and rl_surface_mechanics:
+		var roll := _auto_roll(body_basis, dt)
+		velocity += roll[0]
+		state.angular_velocity += roll[1]
 
 	# Steering uses the full speed (so a sliding fish can still steer), signed
 	# negative when swimming backwards so steering flips like a reversing car.
@@ -995,6 +1022,29 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	forward_speed = velocity.dot(forward)
 	drift_angle = rad_to_deg(forward.angle_to(velocity)) if speed > 0.5 else 0.0
 	angular_speed = local_spin.length()
+
+
+## RL's auto-roll (RocketSim Car::_UpdateAutoRoll), while on the throttle with
+## one to three wheels down or the body touching the arena: a pull towards the
+## surface (the wheels' average normal, else the body's contact) and a turn
+## about the nose and the axle, by how far the car is from sitting flush.
+## Returns [velocity change, spin change] (world axes).
+func _auto_roll(body_basis: Basis, dt: float) -> Array:
+	var throttle := 1.0 if is_boosting else input_forward - input_reverse
+	var some_wheels := wheels_touching > 0 and wheels_touching < 4
+	if throttle == 0.0 or not (some_wheels or _world_contact_normal != Vector3.ZERO):
+		return [Vector3.ZERO, Vector3.ZERO]
+	var ground_up := _wheel_normal_sum.normalized() if wheels_touching > 0 else _world_contact_normal
+	var forward := -body_basis.z
+	# RocketSim's "right" axis is up x forward, which in our axes points left.
+	var left := -body_basis.x
+	var cross_left := ground_up.cross(forward)  # the car's left, were it flush
+	var cross_forward := -ground_up.cross(cross_left)  # and its forward
+	var roll_factor := 1.0 - clampf(left.dot(cross_left), 0.0, 1.0)
+	var pitch_factor := 1.0 - clampf(forward.dot(cross_forward), 0.0, 1.0)
+	var roll := forward * (-1.0 if left.dot(ground_up) >= 0.0 else 1.0) * roll_factor
+	var pitch := left * (1.0 if forward.dot(ground_up) >= 0.0 else -1.0) * pitch_factor
+	return [-ground_up * RL_AUTOROLL_FORCE * dt, (roll + pitch) * RL_AUTOROLL_TORQUE * dt]
 
 
 func _apply_thrust(velocity: Vector3, forward: Vector3, dt: float) -> Vector3:
@@ -1045,15 +1095,18 @@ func _update_boost(dt: float) -> void:
 
 
 ## On a surface when a contact under the fish (normal within ~45° of its up)
-## touches anything: floor, wall, ceiling, the ball. Not mid-flip, nor just
-## after a jump.
+## touches anything: floor, wall, ceiling, the ball. Not just after a jump, nor
+## mid-flip unless three wheels touch down (which ends the flip, as in RL).
 func _detect_surface(state: PhysicsDirectBodyState3D, body_basis: Basis, dt: float) -> void:
 	_surface_grace -= dt
 	var normal_sum := Vector3.ZERO
 	_roof_normal = Vector3.ZERO
 	_resting_on_roof = false
+	_world_contact_normal = Vector3.ZERO
 	for i in state.get_contact_count():
 		var normal := state.get_contact_local_normal(i)
+		if state.get_contact_collider_object(i) is StaticBody3D:
+			_world_contact_normal = normal  # RocketSim keeps the last one too
 		# Touching on its underside (belly or the hitbox's bottom) counts too,
 		# however steep: RL's wheels follow a curving ramp, and the fish's flat
 		# bottom meets it at its front edge.
@@ -1068,10 +1121,20 @@ func _detect_surface(state: PhysicsDirectBodyState3D, body_basis: Basis, dt: flo
 			_resting_on_roof = true
 	_tyre_push = Vector3.ZERO
 	_tyre_twist = Vector3.ZERO
+	_wheel_normal_sum = Vector3.ZERO
 	if rl_suspension and rl_surface_mechanics:
 		normal_sum = _update_suspension(state, body_basis, dt)
-	if not rl_surface_mechanics or _surface_grace > 0.0 or _flip_time >= 0.0 or is_dodging:
+		_wheel_normal_sum = normal_sum
+	# A Rocket League flip ends the moment three wheels are down (RocketSim
+	# Car::_PreTickUpdate), so a dodge just before landing keeps its push and
+	# drives on: the wave dash. Short of that, a flip stays airborne.
+	var flip_landed := _flip_time >= 0.0 and rl_suspension and wheels_touching >= 3
+	if not rl_surface_mechanics or _surface_grace > 0.0 or ((_flip_time >= 0.0 or is_dodging) and not flip_landed):
 		normal_sum = Vector3.ZERO
+	if flip_landed and normal_sum != Vector3.ZERO:
+		_flip_time = -1.0
+		is_dodging = false
+		_flip_spin_out = false
 	var was_on_surface := on_surface
 	on_surface = normal_sum != Vector3.ZERO
 	if on_surface != was_on_surface:
@@ -1498,8 +1561,9 @@ func _apply_jump(velocity: Vector3, body_basis: Basis, touching: bool, dt: float
 				else:
 					_jump_hold_elapsed = -1.0
 			if pressed:
+				# No landing grace here, unlike the first jump: RL has none, and a
+				# dodge just above the floor has to be able to land (wave dash).
 				velocity = _second_jump(velocity, body_basis)
-				_surface_grace = SURFACE_JUMP_GRACE
 				_post_jump_time_left = post_jump_drag_time
 				_start_cooldown()
 			elif _jump_timer <= 0.0:

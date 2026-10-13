@@ -26,7 +26,7 @@ const CARS := {
 		"ride": 15.923,
 	},
 	Family.PLANK: {
-		"key": "plank", "car": "Plank", "fish": "Manta Ray",
+		"key": "plank", "car": "Plank", "fish": "String Ray",
 		"hitbox": Vector3(131.32, 87.1704, 31.8944), "offset": Vector3(9.00857, 0.0, 12.0942),
 		"front": {"radius": 12.5, "rest": 31.924, "at": Vector3(49.97, 27.8, 12.0942)},
 		"back": {"radius": 17.0, "rest": 27.924, "at": Vector3(-35.43, 20.28, 12.0942)},

@@ -50,7 +50,8 @@ var time := 0.0
 var shot := ""
 
 var _ball: ReplayBall
-var _cars: Array[ReplayCar] = []
+## The ghosts, in the clip's player order.
+var cars: Array[ReplayCar] = []
 var _camera := Camera3D.new()
 var _previous_camera: Camera3D
 var _sample := ReplayData.Sample.new()
@@ -79,7 +80,7 @@ func _ready() -> void:
 		var car := ReplayCar.new()
 		car.setup(player)
 		add_child(car)
-		_cars.append(car)
+		cars.append(car)
 	_camera.name = "ReplayCamera"
 	_camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_camera.near = 0.05
@@ -145,8 +146,8 @@ func _show(t: float) -> void:
 	_ball.apply(data.sample_ball(t, _sample))
 	if _sample.present:
 		_ball_position = _sample.position  # after the goal: where it went in
-	for i in _cars.size():
-		_cars[i].apply(data.sample_car(i, t, _sample))
+	for i in cars.size():
+		cars[i].apply(data.sample_car(i, t, _sample))
 
 
 ## Places the camera for this moment's shot; `delta` 0 jumps straight to it.
@@ -160,9 +161,9 @@ func _frame(delta: float) -> void:
 	if shot == "chase":
 		var subject := _ball_position
 		var subject_velocity := _ball.linear_velocity
-		if scorer >= 0 and _cars[scorer].visible:
-			subject = _cars[scorer].global_position
-			subject_velocity = _cars[scorer].linear_velocity
+		if scorer >= 0 and cars[scorer].visible:
+			subject = cars[scorer].global_position
+			subject_velocity = cars[scorer].linear_velocity
 		var away := subject - _ball_position
 		away.y = 0.0
 		if away.length() < 1.0:  # on the ball (or watching the ball itself): behind its travel

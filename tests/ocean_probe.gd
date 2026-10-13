@@ -11,7 +11,7 @@ var events := {}
 func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
-	main.set_environment("Ocean", false)
+	main.set_environment("Ocean")
 	fish = main.get_node("Fish")
 
 func once(key: String, at: float) -> bool:
@@ -34,7 +34,7 @@ func _physics_process(delta: float) -> void:
 	if once("far", 8.2):
 		print("ocean: after 8s of boost, fish at (%.0f, %.0f, %.0f), %.0f m from spawn, speed %.1f m/s" % [fish.global_position.x, fish.global_position.y, fish.global_position.z, fish.global_position.length(), fish.speed])
 		Input.action_release("thrust_forward"); Input.action_release("boost")
-		main.set_environment("Obstacle Course", false)
+		main.set_environment("Obstacle Course")
 	if once("back", 8.4):
 		print("switched back: environment=%s, solid bodies=%d, fish at %s" % [main.current_environment, count_solids(main), fish.global_position])
 	if once("quit", 8.5): get_tree().quit()

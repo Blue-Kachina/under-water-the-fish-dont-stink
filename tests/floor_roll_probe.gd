@@ -45,7 +45,7 @@ func _ready() -> void:
 	main.ball_settings.ball_type = BallSettings.BallType.SURFACE
 	main.ball_settings.kickoff_float = false
 	add_child(main)
-	main.set_environment("Aquarium Arena", false)
+	main.set_environment("Aquarium Arena")
 	var aquarium: AquariumArena = main._environment
 	aquarium.scoring_enabled = false
 	ball = aquarium.ball

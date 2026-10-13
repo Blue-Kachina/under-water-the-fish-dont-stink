@@ -14,7 +14,7 @@ func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	main.ball_settings.ball_type = BallSettings.BallType.SURFACE
-	main.set_environment("Aquarium Arena", false)
+	main.set_environment("Aquarium Arena")
 	aquarium = main._environment
 
 func once(key: String, at: float) -> bool:

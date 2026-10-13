@@ -17,7 +17,7 @@ var worst := INF
 func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
-	main.set_environment("Aquarium Arena", false)
+	main.set_environment("Aquarium Arena")
 	fish = main.get_node("Fish")
 	camera = main.get_node("FollowCamera")
 

@@ -27,12 +27,13 @@ func check(ok: bool, what: String) -> void:
 func _run() -> void:
 	main.ball_settings.ball_type = BallSettings.BallType.SURFACE
 	main.set_mode(main.FREE_PLAY)
-	main.set_environment("Aquarium Arena", false)
+	main.set_environment("Aquarium Arena")
 	await _seconds(0.5)
 	check(main.match_1v1 == null, "Free Play: no match")
 
 	# Into 1v1.
 	main.set_mode(main.ONE_V_ONE)
+	main.play_match()
 	var game: Match1v1 = main.match_1v1
 	game.goal_replays = false  # goal_replay_probe covers those
 	await get_tree().physics_frame

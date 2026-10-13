@@ -9,7 +9,15 @@ extends Node
 ## A 5-minute clock runs while the ball's live; tied at 0:00 goes to overtime,
 ## where the next goal wins. After each goal, once the explosion's settled, a
 ## replay of it (GoalReplay, from a GoalRecorder) plays unless goal_replays is
-## off; it can be skipped.
+## off; it can be skipped. Goals, assists, shots, saves and demos are called
+## out as they happen (stat_event; see MatchStats), and each fish's scoreboard
+## line (stats) adds them up with its touches, clears and centres, RL's points
+## and all, for the HUD's scoreboard; each team's possession, boost used and
+## time with the ball in the other half go in team_stats.
+##
+## At the end, instead of RL's podium, a bubble column (BubbleColumn) rises at
+## centre field in the winners' colour with both fish in it, and everyone's free
+## to swim about, on unlimited boost, until the next match (or Start / R).
 ##
 ## Lives under the AquariumArena (setup() before adding it). end() hands the
 ## arena and the player's fish back as they were, for Free Play.
@@ -21,6 +29,9 @@ signal goal_replay_started(replay: GoalReplay)
 signal goal_replay_ended
 ## The clock ran out with a winner, or someone scored in overtime.
 signal match_over(winner: int)
+## A goal, assist, shot, save or demo (MatchStats): "type", "player" (0 the
+## player, 1 the bot), "team", and for a demo "victim".
+signal stat_event(event: Dictionary)
 
 enum Phase { COUNTDOWN, LIVE, GOAL, REPLAY, OVER }
 
@@ -34,8 +45,8 @@ const MATCH_TIME := 300.0
 ## The goal replay starts this long before the goal and runs on this long after it.
 const REPLAY_BEFORE := 5.0
 const REPLAY_AFTER := 1.2
-## How long the result shows before a new match kicks off.
-const OVER_TIME := 8.0
+## How long the result shows before a new match kicks off (Start / R sooner).
+const OVER_TIME := 20.0
 ## The bot's name, picked at random each match.
 const BOT_NAMES := ["Barracuda", "Snapper", "Grouper", "Kipper", "Wahoo", "Marlin", "Halibut", "Mackerel", "Pike", "Tarpon"]
 ## How long "GO!" shows after the countdown.
@@ -77,14 +88,34 @@ var goal_replays := true
 var goal_replay: GoalReplay
 ## Once the match is over: 0 Blue, 1 Orange.
 var winner := -1
-var _over_left := 0.0
+## Each fish's scoreboard line this match (MatchStats.new_line): the player's, then the bot's.
+var stats: Array[Dictionary] = []
+## Each team's totals this match, Blue's then Orange's: "possession" (s the
+## ball was theirs, by the last touch), "boost" (used) and "territory" (s the
+## ball spent in the other team's half). Live play only.
+var team_stats := {}
+## Once the match is over: seconds until the next one.
+var over_left := 0.0
+## The end-of-match bubble column, while there is one.
+var bubble_column: BubbleColumn
+## Each fish's own boost_unlimited, put back after the celebration's free boost.
+var _saved_unlimited := {}
+## The team that touched the ball last, -1 since the kickoff.
+var _possession := -1
 var _recorder := GoalRecorder.new()
+## Whether each fish has a shot on that the other hasn't touched since: a goal
+## without one counts as a shot too (as in RL, shots never fall short of goals).
+var _shot_on := [false, false]
 ## The recorder's time when the last goal went in.
 var _goal_record_time := 0.0
 
 ## Demolished fish -> seconds until it respawns.
 var _respawn_left := {}
 var _demo_box := BoxShape3D.new()
+## Touches waiting a tick to see where they sent the ball: [fish, ball position
+## and velocity before].
+var _pending_touches: Array = []
+var _ball_before := [Vector3.ZERO, Vector3.ZERO]
 
 
 func setup(match_arena: AquariumArena, player_fish: FishController) -> void:
@@ -96,6 +127,7 @@ func _ready() -> void:
 	arena.auto_respawn = false
 	arena.scores = [0, 0]
 	arena.goal_scored.connect(_on_goal_scored)
+	arena.ball.touched.connect(_on_touched)
 
 	bot_fish = FISH_SCENE.instantiate()
 	bot_fish.name = "BotFish"
@@ -117,15 +149,19 @@ func _ready() -> void:
 	bot_fish.team_color = AquariumArena.TEAM_COLORS[1]
 	player.team = 0
 	_recorder.setup(arena.ball, [player, bot_fish] as Array[FishController])
+	_reset_stats()
 	kickoff()
 
 
 ## Hands everything back for Free Play. Call before freeing the match.
 func end() -> void:
 	_stop_replay()
+	_end_celebration()
 	if is_instance_valid(arena):
 		if arena.goal_scored.is_connected(_on_goal_scored):
 			arena.goal_scored.disconnect(_on_goal_scored)
+		if is_instance_valid(arena.ball) and arena.ball.touched.is_connected(_on_touched):
+			arena.ball.touched.disconnect(_on_touched)
 		arena.auto_respawn = true
 		if is_instance_valid(arena.ball):
 			arena.ball.remove_player(bot_fish)
@@ -150,7 +186,12 @@ func kickoff() -> void:
 		overtime = false
 		overtime_elapsed = 0.0
 		winner = -1
+		_reset_stats()
 	_recorder.clear()
+	_pending_touches.clear()
+	_shot_on = [false, false]
+	_possession = -1
+	_end_celebration()
 	phase = Phase.COUNTDOWN
 	countdown_left = COUNTDOWN_TIME
 	go_time_left = 0.0
@@ -183,6 +224,7 @@ func _physics_process(delta: float) -> void:
 				if clock_left <= 0.0:
 					_time_up()
 					return
+			_add_team_stats(delta)
 		Phase.GOAL:
 			goal_time_left -= delta
 			if goal_time_left <= 0.0:
@@ -192,12 +234,13 @@ func _physics_process(delta: float) -> void:
 		Phase.REPLAY:
 			return  # everything waits for the replay
 		Phase.OVER:
-			_over_left -= delta
-			if _over_left <= 0.0:
+			over_left -= delta
+			if over_left <= 0.0:
 				kickoff()
 				return
 	if phase == Phase.LIVE or phase == Phase.GOAL:
 		_recorder.record(delta)
+	_judge_touches()
 	go_time_left = maxf(go_time_left - delta, 0.0)
 
 	for fish: FishController in _respawn_left.keys():
@@ -208,15 +251,80 @@ func _physics_process(delta: float) -> void:
 			fish.revive(_respawn_transform(_team_of(fish)))
 			_announce_teleport([fish])
 
-	if phase != Phase.COUNTDOWN:
+	if phase != Phase.COUNTDOWN and phase != Phase.OVER:
 		_check_demolition(player, bot_fish)
 		_check_demolition(bot_fish, player)
 
 
-func _on_goal_scored(_team: int) -> void:
+func _on_goal_scored(team: int) -> void:
 	phase = Phase.GOAL
 	goal_time_left = arena.ball.settings.goal_reset_delay
 	_goal_record_time = _recorder.time
+	_pending_touches.clear()  # the ball's popped: nothing to judge them by
+	var credit := arena.last_goal
+	if credit.get("scorer") is FishController:
+		if not _shot_on[_team_of(credit.scorer)]:
+			_announce(MatchStats.SHOT, credit.scorer)
+		_announce(MatchStats.GOAL, credit.scorer, {"team": team})
+	if credit.get("assister") is FishController:
+		_announce(MatchStats.ASSIST, credit.assister, {"team": team})
+
+
+func _on_touched(by: Node3D, _hit_speed: float) -> void:
+	if (by == player or by == bot_fish) and phase == Phase.LIVE:
+		_pending_touches.append([by, _ball_before[0], _ball_before[1]])
+		_shot_on[1 - _team_of(by)] = false
+		_possession = _team_of(by)
+		MatchStats.tally(stats[_team_of(by)], MatchStats.TOUCH)
+
+
+## Shots and saves (and the clears and centres they score points for): each
+## touch from last tick, by where it has sent the ball. Then notes the ball's
+## motion before this tick's touches.
+func _judge_touches() -> void:
+	var ball := arena.ball
+	if not _pending_touches.is_empty() and not ball.popped:
+		var model := MatchStats.ball_model(ball.settings)
+		for touch: Array in _pending_touches:
+			var fish: FishController = touch[0]
+			var team := _team_of(fish)
+			var kind := MatchStats.classify_touch(team, touch[1], touch[2], ball.global_position, ball.linear_velocity, model)
+			if kind:
+				_shot_on[team] = _shot_on[team] or kind == MatchStats.SHOT
+				_announce(kind, fish)
+			else:
+				kind = MatchStats.classify_play(team, touch[1], ball.linear_velocity)
+				if kind:
+					MatchStats.tally(stats[team], kind)  # points only: nothing to call out
+	_pending_touches.clear()
+	_ball_before = [ball.global_position, ball.linear_velocity]
+
+
+## Tells the HUD (stat_event) and the recorder, for replays.
+func _announce(type: String, fish: FishController, extra := {}) -> void:
+	var event := {"type": type, "player": 0 if fish == player else 1, "team": _team_of(fish)}
+	event.merge(extra, true)
+	MatchStats.tally(stats[event.player], type)
+	_recorder.log_event(event)
+	stat_event.emit(event)
+
+
+func _reset_stats() -> void:
+	stats.assign([MatchStats.new_line(), MatchStats.new_line()])
+	team_stats = {"possession": [0.0, 0.0], "boost": [0.0, 0.0], "territory": [0.0, 0.0]}
+	_shot_on = [false, false]
+
+
+func _add_team_stats(delta: float) -> void:
+	if _possession >= 0:
+		team_stats.possession[_possession] += delta
+	for team in 2:
+		var fish := _fish_of(team)
+		if fish.is_boosting:
+			team_stats.boost[team] += fish.boost_drain * delta
+	if not arena.ball.popped:
+		# Blue defends +Z: the ball beyond the centre line there is Orange's ground.
+		team_stats.territory[1 if arena.ball.global_position.z > 0.0 else 0] += delta
 
 
 ## After a goal (and its replay): the next kickoff, or in overtime the end.
@@ -240,16 +348,47 @@ func _finish_match() -> void:
 	_stop_replay()
 	phase = Phase.OVER
 	winner = 0 if arena.scores[0] > arena.scores[1] else 1
-	_over_left = OVER_TIME
+	over_left = OVER_TIME
 	arena.ball.pop()
-	# Free to swim about (a replay may have parked everyone).
-	var spot: Array = KICKOFF_SPOTS[4]
+	_respawn_left.clear()
+	_celebrate()
+	match_over.emit(winner)
+
+
+## The end of the match: a bubble column at centre field in the winners'
+## colour, both fish at the foot of it (back from a demolition or a replay too),
+## free to swim on unlimited boost (off a surface, boost is what really moves a
+## fish, as in RL), the bot looping about in it.
+func _celebrate() -> void:
+	_end_celebration()
+	bubble_column = BubbleColumn.new()
+	bubble_column.name = "BubbleColumn"
+	bubble_column.color = AquariumArena.TEAM_COLORS[winner]
+	bubble_column.height = AquariumArena.SIZE.y - 3.5
+	arena.add_child(bubble_column)
+	var y := arena.spawn_transform().origin.y
 	for team in 2:
 		var fish := _fish_of(team)
+		var side := -1.0 if team == 0 else 1.0
+		var at := Vector3(side * 2.5, y, 0.0)
 		fish.controls_locked = false
-		if not fish.visible and not fish.demolished:
-			fish.revive(_kickoff_transform(spot[0], spot[1], team))
-	match_over.emit(winner)
+		_saved_unlimited[fish] = fish.boost_unlimited
+		fish.boost_unlimited = true
+		fish.revive(Transform3D(Basis.looking_at(Vector3(-side, 0.0, 0.0), Vector3.UP), at))
+	bot.celebrating = true
+	_announce_teleport([player, bot_fish])
+
+
+func _end_celebration() -> void:
+	if is_instance_valid(bubble_column):
+		bubble_column.queue_free()
+	bubble_column = null
+	if bot:
+		bot.celebrating = false
+	for fish: FishController in _saved_unlimited:
+		if is_instance_valid(fish):
+			fish.boost_unlimited = _saved_unlimited[fish]
+	_saved_unlimited.clear()
 
 
 ## Starts the replay of the goal just scored. False when there's too little
@@ -302,6 +441,7 @@ func _check_demolition(attacker: FishController, victim: FishController) -> void
 	Explosion.spawn(arena, victim.global_position, AquariumArena.TEAM_COLORS[_team_of(victim)], 6.0)
 	victim.demolish()
 	_respawn_left[victim] = RESPAWN_TIME
+	_announce(MatchStats.DEMO, attacker, {"victim": 0 if victim == player else 1})
 	demolished.emit(attacker, victim)
 
 

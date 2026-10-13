@@ -5,7 +5,8 @@ extends Node
 ## ball on the line to the goal it attacks and drives through it, falls back
 ## goal-side when it's out of position, boosts down straights, powerslides
 ## round tight turns, dodges into the ball when it's close, and lands wheels
-## down after a jump or a bump. No aerials or wall play yet.
+## down after a jump or a bump. No aerials or wall play yet. While celebrating
+## (the end of a 1v1) it forgets the ball and swims loops, rolling now and then.
 
 ## Within this of the ball (m) and lined up, it dodges into it.
 const DODGE_RANGE := 3.2
@@ -23,12 +24,15 @@ var ball: Node3D
 var arena: AquariumArena
 ## The team it plays for: 0 (Blue) defends +Z, 1 (Orange) defends -Z.
 var team := 1
+## Swim loops for fun instead of playing.
+var celebrating := false
 
 var input := FishInput.new()
 ## Ticks into a jump-and-dodge; -1 while not doing one.
 var _dodge_tick := -1
 var _dodge_stick := Vector2.ZERO
 var _stuck_time := 0.0
+var _celebrate_time := 0.0
 
 
 func _ready() -> void:
@@ -38,6 +42,9 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	input.clear()
+	if celebrating and is_instance_valid(fish) and not fish.controls_locked:
+		_celebrate(delta)
+		return
 	if not is_instance_valid(fish) or not is_instance_valid(ball) or fish.demolished or fish.controls_locked:
 		_dodge_tick = -1
 		return
@@ -48,6 +55,16 @@ func _physics_process(delta: float) -> void:
 		_recover()
 		return
 	_drive(delta)
+
+
+## Lazy loops: a steady turn that drifts up and down, with a barrel roll every
+## few seconds and a hop when it finds itself on a surface.
+func _celebrate(delta: float) -> void:
+	_celebrate_time += delta
+	input.forward = 0.6
+	input.stick = Vector2(0.55, 0.4 * sin(_celebrate_time * 0.9))
+	input.roll = 1.0 if fmod(_celebrate_time, 4.0) < 0.6 else 0.0
+	input.jump = fish.on_surface and fmod(_celebrate_time, 1.5) < 0.1
 
 
 ## Where to go and how, on a surface.

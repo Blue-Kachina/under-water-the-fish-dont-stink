@@ -90,7 +90,7 @@ func _next_scenario() -> void:
 	var env_name: String = ENVIRONMENTS[scenario.arena]
 	wait = 3
 	if main.current_environment != env_name:
-		main.set_environment.call_deferred(env_name, false)
+		main.set_environment.call_deferred(env_name)
 		wait = 10
 	ticks = []
 	started = false
@@ -116,7 +116,10 @@ func _spawn(scenario: Dictionary) -> void:
 	if fish.character != character:
 		fish.set_deferred("character", character)  # not mid physics callback; lands before the start tick
 	for setting: String in scenario.get("settings", {}):
-		fish.set(setting, scenario.settings[setting])
+		if setting.begins_with("ball."):  # a ball setting (BallSettings), e.g. ball.world_gap
+			ball.settings.set(setting.trim_prefix("ball."), scenario.settings[setting])
+		else:
+			fish.set(setting, scenario.settings[setting])
 	fish.set_spawn(Transform3D(_basis(start), _pos(start.centre)))
 	if scenario.ball:
 		ball.respawn(_pos(scenario.ball.pos), scenario.ball.get("kickoff_float", false))

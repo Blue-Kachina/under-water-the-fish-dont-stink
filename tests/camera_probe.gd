@@ -17,7 +17,7 @@ var max_pitch := 0.0
 func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
-	main.set_environment("Ocean", false)
+	main.set_environment("Ocean")
 	fish = main.get_node("Fish")
 	camera = main.get_node("FollowCamera")
 

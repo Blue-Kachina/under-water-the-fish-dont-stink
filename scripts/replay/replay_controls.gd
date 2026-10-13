@@ -5,16 +5,25 @@ extends CanvasLayer
 ## (Player or Director), and display toggles. Keyboard and D-pad shortcuts are
 ## registered in controls.gd (replay_* actions); the jump button also plays and
 ## pauses, and boost switches the Camera.
+##
+## Without a player (Replays mode before a replay is picked) it's just a
+## message and Open.
 
 signal close_requested
 ## A soundtrack was picked (Audio...).
 signal audio_requested(path: String)
+## A replay file was picked (Open, Replay...): .replay or .rlreplay.json.
+signal replay_requested(path: String)
 
 const GOAL_TICK_COLORS := [Color(0.35, 0.6, 1.0), Color(1.0, 0.55, 0.15)]
+## Where the replay picker remembers its folder (shared with main.gd's settings).
+const SETTINGS_PATH := "user://playground.cfg"
 
 var player: ReplayPlayer
 ## Where the audio picker opens: the replay's own folder.
 var audio_dir := ""
+
+var _message: Label
 
 var _scrub: HSlider
 var _scrubbing := false
@@ -50,6 +59,9 @@ func _ready() -> void:
 
 	var column := VBoxContainer.new()
 	panel.add_child(column)
+	if player == null:
+		_build_empty(column)
+		return
 
 	_scrub = HSlider.new()
 	_scrub.focus_mode = Control.FOCUS_NONE
@@ -135,6 +147,7 @@ func _ready() -> void:
 			func(on: bool) -> void: player.skip_pauses = on))
 	row.add_child(_toggle("Loop", "Start again at the end", player.loop,
 			func(on: bool) -> void: player.loop = on))
+	row.add_child(_button("Replay...", "Watch another Rocket League replay (.replay or .rlreplay.json)", pick_replay))
 	row.add_child(_button("Close", "Back to playing", func() -> void: close_requested.emit()))
 
 	player.target_changed.connect(func(_car: ReplayCar) -> void: _show_choices())
@@ -142,7 +155,29 @@ func _ready() -> void:
 	_show_choices()
 
 
+## Before a replay is picked: a message (see show_message) and Open.
+func _build_empty(column: VBoxContainer) -> void:
+	column.alignment = BoxContainer.ALIGNMENT_CENTER
+	column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var row := HBoxContainer.new()
+	column.add_child(row)
+	_message = _label("Pick a Rocket League replay (.replay or .rlreplay.json), or drop one on the window.")
+	_message.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.add_child(_message)
+	row.add_child(_button("Open", "Watch a Rocket League replay (.replay or .rlreplay.json)", pick_replay))
+
+
+## Shows `text` in place of the hint, before a replay is picked (loading
+## progress, problems).
+func show_message(text: String) -> void:
+	if _message:
+		_message.text = text
+
+
 func _process(_delta: float) -> void:
+	if player == null:
+		return
 	if Input.is_action_just_pressed("replay_play_pause") or Input.is_action_just_pressed("jump"):
 		player.toggle_play()
 	if Input.is_action_just_pressed("replay_back"):
@@ -189,6 +224,37 @@ func _show_choices() -> void:
 		if _watch.get_item_metadata(i) == player.watch:
 			_watch.select(i)
 	_view.select(_view.get_item_index(player.view))
+
+
+## Opens a file picker in the folder last picked from; the first time, in the
+## project's private_content/replays (gitignored) or else Rocket League's own
+## replay folder. A pick is reported via replay_requested.
+func pick_replay() -> void:
+	var dialog := FileDialog.new()
+	dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	dialog.access = FileDialog.ACCESS_FILESYSTEM
+	dialog.use_native_dialog = true
+	dialog.title = "Watch a Rocket League replay"
+	dialog.filters = PackedStringArray(["*.replay, *.rlreplay.json ; Rocket League replays"])
+	var settings := ConfigFile.new()
+	settings.load(SETTINGS_PATH)
+	for dir: String in [settings.get_value("replay", "last_dir", ""),
+			ProjectSettings.globalize_path("res://private_content/replays"),
+			OS.get_executable_path().get_base_dir().path_join("../../private_content/replays").simplify_path(),
+			OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS).path_join("My Games/Rocket League/TAGame/Demos")]:
+		if not dir.is_empty() and DirAccess.dir_exists_absolute(dir):
+			dialog.current_dir = dir
+			break
+	dialog.file_selected.connect(func(path: String) -> void:
+		settings.clear()
+		settings.load(SETTINGS_PATH)  # again: other settings may have changed since
+		settings.set_value("replay", "last_dir", path.get_base_dir())
+		settings.save(SETTINGS_PATH)
+		replay_requested.emit(path)
+		dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered_ratio(0.6)
 
 
 func _pick_audio() -> void:

@@ -3,7 +3,8 @@ extends RefCounted
 ## Keeps the last few seconds of a match (the ball and every fish, each physics
 ## tick) and turns a stretch of it into a ReplayData clip for the goal replay
 ## (GoalReplay), so it plays back on the replay ghosts like a Rocket League
-## replay does. Clear it at each kickoff: a clip never reaches back past one.
+## replay does, along with the match's events (MatchStats: goals, shots, ...).
+## Clear it at each kickoff: a clip never reaches back past one.
 
 ## Seconds kept.
 const KEEP := 9.0
@@ -20,6 +21,8 @@ var _times := PackedFloat64Array()
 var _ball: Array = []
 ## Per fish, per tick: the same, then [boost, throttle, steer, flags].
 var _fish: Array = []
+## Events logged (log_event), with recorder times.
+var _events: Array[Dictionary] = []
 
 
 func setup(the_ball: Ball, the_fish: Array[FishController]) -> void:
@@ -32,8 +35,16 @@ func clear() -> void:
 	_times.clear()
 	_ball.clear()
 	_fish.clear()
+	_events.clear()
 	for i in fish.size():
 		_fish.append([])
+
+
+## Keeps `event` (its "player" an index into `fish`) for clips, stamped with the time now.
+func log_event(event: Dictionary) -> void:
+	var stamped := event.duplicate()
+	stamped.time = time
+	_events.append(stamped)
 
 
 ## Call once per physics tick.
@@ -67,6 +78,7 @@ func record(delta: float) -> void:
 		_ball = _ball.slice(keep_from)
 		for i in _fish.size():
 			_fish[i] = _fish[i].slice(keep_from)
+		_events = _events.filter(func(e: Dictionary) -> bool: return e.time >= time - KEEP)
 
 
 ## The earliest time still kept.
@@ -100,6 +112,12 @@ func clip(from: float, to: float) -> ReplayData:
 			"hitbox_offset": Vector3.ZERO,  # the fish's origin is its hitbox centre already
 		})
 		data.cars.append(_track(_fish[i].slice(i0, i1), data.times, true))
+	for event in _events:
+		if event.time >= from and event.time <= to:
+			var shifted := event.duplicate()
+			shifted.time -= from
+			shifted.frame = data.frame_at(shifted.time)
+			data.events.append(shifted)
 	return data
 
 

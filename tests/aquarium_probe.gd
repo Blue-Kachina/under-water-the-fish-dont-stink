@@ -27,7 +27,7 @@ func _ready() -> void:
 	add_child(main)
 	settings = main.ball_settings
 	settings.ball_type = SURFACE
-	main.set_environment("Aquarium Arena", false)
+	main.set_environment("Aquarium Arena")
 	fish = main.get_node("Fish")
 	aquarium = main._environment  # by reference: the one main started with may still be in the tree
 	ball = aquarium.ball

@@ -23,7 +23,7 @@ var cuts := 0
 func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
-	main.set_environment("Ocean", false)  # the replay must switch to the Aquarium, and back after
+	main.set_mode(main.FREE_SWIM)  # the replay must switch to the Aquarium, and back after
 	fish = main.get_node("Fish")
 	camera = main.get_node("FollowCamera")
 	hud = main.get_node("HUD")
@@ -137,6 +137,15 @@ func _check_seeking() -> void:
 			"at Blue's goal the ball is in Orange's net: %s" % replay.ball.global_position)
 	hud._process(0.0)  # the HUD refreshes once a frame; read it now
 	check(hud._scorebug.scores == [1, 0] and hud._scorebug.visible, "scoreboard shows the score at the goal: %s" % str(hud._scorebug.scores))
+	check(hud._lists[0].visible and hud._lists[1].visible and hud._lists[0].rows[0].name == data.players[0].name,
+			"player lists show each team")
+	var types: Array = MatchStats.replay_events(data).map(func(e: Dictionary) -> String: return e.type)
+	check(types.has(MatchStats.GOAL) and types.has(MatchStats.SHOT), "events worked out from the touches: %s" % str(types))
+	replay.seek(goal_time - 0.3)
+	hud._process(0.0)
+	replay.seek(goal_time + 0.05)
+	hud._process(0.0)
+	check(hud._lists[0]._badges.get(0, [""])[0] == MatchStats.GOAL, "the scorer's goal badge pops as the goal plays")
 	replay.seek(goal_time + 0.5)
 	check(not replay.ball.visible, "ball gone after the goal")
 

@@ -2,7 +2,7 @@ class_name BroadcastUI
 extends RefCounted
 ## The HUD's broadcast-style pieces, after esports overlays (RLCS-style): a
 ## scoreboard bug at the top, a boost gauge in the bottom right, the goal
-## splash and the replay overlay. Slanted dark-navy panels, white score
+## splash, the replay overlay and the 1v1's held-up scoreboard. Slanted dark-navy panels, white score
 ## plates, team colours for accents and gold for labels; bold slanted type.
 ## Each draws itself (_draw), so it scales cleanly with the window.
 
@@ -289,8 +289,8 @@ class ReplayOverlay extends Control:
 		if is_instance_valid(replay) and replay.data.duration > 0.0:
 			draw_rect(Rect2(0.0, size.y - bar, size.x * clampf(replay.time / replay.data.duration, 0.0, 1.0), 3.0), color)
 
-		# REPLAY tag, top left, with a blinking dot.
-		var tag := Rect2(36.0, 16.0, 150.0, 34.0)
+		# REPLAY tag, bottom left, with a blinking dot.
+		var tag := Rect2(36.0, size.y - bar + 15.0, 150.0, 34.0)
 		draw_colored_polygon(BroadcastUI.parallelogram(tag, 10.0), BroadcastUI.GOLD)
 		if fmod(_age, 1.0) < 0.6:
 			draw_circle(tag.position + Vector2(24.0, 17.0), 6.0, Color(0.85, 0.1, 0.1))
@@ -312,3 +312,313 @@ class ReplayOverlay extends Control:
 			var column := Rect2(card.position.x + (10.0 if side == 0 else card.size.x - 150.0), card.position.y + 14.0, 140.0, 24.0)
 			BroadcastUI.text(self, column, label, 12, Color(1, 1, 1, 0.55), HORIZONTAL_ALIGNMENT_CENTER, 600)
 			BroadcastUI.text(self, Rect2(column.position + Vector2(0.0, 24.0), column.size + Vector2(0.0, 8.0)), value.to_upper(), 19, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 700)
+
+
+## One team's players down a top corner: name, boost and a boost bar each,
+## and a badge beside a player for a moment when they do something (pop()).
+## Blue's list sits top left, Orange's top right, mirrored.
+class PlayerList extends Control:
+	const ROW_WIDTH := 230.0
+	const ROW_HEIGHT := 38.0
+	const GAP := 6.0
+	const BADGE := 30.0
+	const BADGE_TIME := 3.5
+	const LABELS := {"goal": "GOAL", "assist": "ASSIST", "save": "SAVE", "shot": "SHOT", "demo": "DEMO"}
+
+	var team := 0
+	## Each: "name", "boost" (0-100), "present" (false: dimmed, e.g. demolished)
+	## and "focus" (outlined: the player being watched).
+	var rows: Array[Dictionary] = []
+	## Row -> [type, age] of its badge.
+	var _badges := {}
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var right := team == 1
+		anchor_left = 1.0 if right else 0.0
+		anchor_right = anchor_left
+		offset_left = -ROW_WIDTH - 140.0 - 16.0 if right else 16.0
+		offset_right = -16.0 if right else ROW_WIDTH + 140.0 + 16.0
+		offset_top = 14.0
+		offset_bottom = 14.0 + 3.0 * (ROW_HEIGHT + GAP)
+
+	## Shows `type`'s badge (a MatchStats event type) beside row `row`.
+	func pop(row: int, type: String) -> void:
+		if LABELS.has(type):
+			_badges[row] = [type, 0.0]
+
+	func clear_badges() -> void:
+		_badges.clear()
+
+	func _process(delta: float) -> void:
+		for row: int in _badges.keys():
+			_badges[row][1] += delta
+			if _badges[row][1] > BADGE_TIME:
+				_badges.erase(row)
+		queue_redraw()
+
+	func _draw() -> void:
+		var right := team == 1
+		var color: Color = AquariumArena.TEAM_COLORS[team]
+		var x := size.x - ROW_WIDTH if right else 0.0
+		for i in rows.size():
+			var row := rows[i]
+			var y := i * (ROW_HEIGHT + GAP)
+			var alpha := 1.0 if row.get("present", true) else 0.45
+			var panel := Rect2(x, y, ROW_WIDTH, ROW_HEIGHT)
+			draw_colored_polygon(BroadcastUI.parallelogram(panel, 8.0), Color(BroadcastUI.INK, BroadcastUI.INK.a * alpha))
+			if row.get("focus", false):
+				var outline := BroadcastUI.parallelogram(panel, 8.0)
+				outline.append(outline[0])
+				draw_polyline(outline, Color(BroadcastUI.GOLD, 0.9), 2.0, true)
+			# Team colour edge on the outer side.
+			draw_colored_polygon(BroadcastUI.parallelogram(Rect2(x + (ROW_WIDTH - 5.0 if right else 0.0), y, 5.0, ROW_HEIGHT), 8.0), color)
+			var text_row := Rect2(x + 14.0, y + 2.0, ROW_WIDTH - 28.0, 24.0)
+			var boost: float = row.get("boost", 0.0)
+			BroadcastUI.text(self, text_row, str(row.get("name", "")).to_upper(), 16, Color(1, 1, 1, alpha),
+					HORIZONTAL_ALIGNMENT_RIGHT if right else HORIZONTAL_ALIGNMENT_LEFT, 700)
+			BroadcastUI.text(self, text_row, str(roundi(boost)) if row.get("present", true) else "-", 15, Color(BroadcastUI.GOLD, alpha),
+					HORIZONTAL_ALIGNMENT_LEFT if right else HORIZONTAL_ALIGNMENT_RIGHT, 700)
+			# The boost bar, filling from the outer side.
+			var track := Rect2(x + 12.0, y + ROW_HEIGHT - 11.0, ROW_WIDTH - 26.0, 6.0)
+			draw_rect(track, Color(1, 1, 1, 0.12 * alpha))
+			var fill := track.size.x * clampf(boost / 100.0, 0.0, 1.0)
+			draw_rect(Rect2(track.end.x - fill if right else track.position.x, track.position.y, fill, track.size.y), Color(color.lightened(0.15), alpha))
+			if _badges.has(i):
+				_draw_badge(i, Vector2(x - 10.0 - BADGE if right else x + ROW_WIDTH + 10.0, y + (ROW_HEIGHT - BADGE) / 2.0), right, color)
+
+	func _draw_badge(row: int, at: Vector2, right: bool, color: Color) -> void:
+		var type: String = _badges[row][0]
+		var age: float = _badges[row][1]
+		var pop_in := BroadcastUI.ease_out(age / 0.25)
+		var fade := clampf((BADGE_TIME - age) / 0.4, 0.0, 1.0)
+		var grow := 0.6 + 0.4 * pop_in + 0.15 * sin(clampf(age / 0.25, 0.0, 1.0) * PI)
+		var centre := at + Vector2(BADGE, BADGE) / 2.0
+		var half := BADGE / 2.0 * grow
+		var plate := type == "goal"
+		draw_rect(Rect2(centre - Vector2(half, half), Vector2(half, half) * 2.0), Color(color if plate else BroadcastUI.INK, fade))
+		draw_rect(Rect2(centre - Vector2(half, half), Vector2(half, half) * 2.0), Color(color, fade), false, 2.0)
+		_draw_glyph(type, centre, half * 0.62, Color(1, 1, 1, fade))
+		var label := Rect2(at.x - 72.0 if right else at.x + BADGE + 6.0, at.y, 66.0, BADGE)
+		BroadcastUI.text(self, label, LABELS[type], 14, Color(BroadcastUI.GOLD, fade * pop_in),
+				HORIZONTAL_ALIGNMENT_RIGHT if right else HORIZONTAL_ALIGNMENT_LEFT, 800)
+
+	## Small white pictograms: a ball in a net, a pass, a shield, a target, a burst.
+	func _draw_glyph(type: String, c: Vector2, r: float, ink: Color) -> void:
+		match type:
+			"goal":
+				draw_polyline(PackedVector2Array([c + Vector2(-r, r), c + Vector2(-r, -r * 0.7), c + Vector2(r, -r * 0.7), c + Vector2(r, r)]), ink, 2.0, true)
+				draw_circle(c + Vector2(0.0, r * 0.35), r * 0.45, ink)
+			"assist":
+				for k in 2:
+					var o := Vector2(-r * 0.45 + k * r * 0.75, 0.0)
+					draw_polyline(PackedVector2Array([c + o + Vector2(-r * 0.4, -r * 0.7), c + o + Vector2(r * 0.3, 0.0), c + o + Vector2(-r * 0.4, r * 0.7)]), ink, 2.5, true)
+			"save":
+				draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 0.8, -r * 0.8), c + Vector2(r * 0.8, -r * 0.8), c + Vector2(r * 0.8, 0.0),
+						c + Vector2(0.0, r), c + Vector2(-r * 0.8, 0.0)]), ink)
+			"shot":
+				draw_arc(c, r * 0.8, 0.0, TAU, 24, ink, 2.0, true)
+				draw_circle(c, r * 0.25, ink)
+				for a in 4:
+					var d := Vector2.from_angle(a * PI / 2.0)
+					draw_line(c + d * r * 0.5, c + d * r * 1.1, ink, 2.0, true)
+			"demo":
+				var points := PackedVector2Array()
+				for k in 16:
+					points.append(c + Vector2.from_angle(k * TAU / 16.0 - PI / 2.0) * (r if k % 2 == 0 else r * 0.45))
+				draw_colored_polygon(points, ink)
+
+
+## Name plates over the other fish in live play: a slanted tab with the
+## player's name and their team's colour under it, pointing down at the fish.
+## A teammate's plate also shows their boost as a circle that fills like a pie
+## (a solid disc at full boost, as in Rocket League); an opponent's never does.
+class NamePlates extends Control:
+	const HEIGHT := 26.0
+	const DISC := 9.0
+
+	## Each: "at" (screen point above the fish), "name", "color", "boost"
+	## (0-100, or negative to hide it) and "scale" (smaller when far away).
+	var plates: Array[Dictionary] = []
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	func _process(_delta: float) -> void:
+		queue_redraw()
+
+	func _draw() -> void:
+		# Nearer plates last, so they sit on top.
+		var order := plates.duplicate()
+		order.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.scale < b.scale)
+		for plate: Dictionary in order:
+			_draw_plate(plate)
+
+	func _draw_plate(plate: Dictionary) -> void:
+		var s: float = plate.scale
+		var size_px := roundi(15.0 * s)
+		var label := str(plate.name).to_upper()
+		var f := BroadcastUI.font(700)
+		var text_width := f.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
+		var boost: float = plate.boost
+		var disc := DISC * s
+		var pad := 12.0 * s
+		var width := text_width + 2.0 * pad + (2.0 * disc + 6.0 * s if boost >= 0.0 else 0.0)
+		var height := HEIGHT * s
+		var at: Vector2 = plate.at
+		var rect := Rect2(at.x - width / 2.0, at.y - height - 7.0 * s, width, height)
+		var color: Color = plate.color
+		draw_colored_polygon(BroadcastUI.parallelogram(rect, 6.0 * s), BroadcastUI.INK)
+		draw_colored_polygon(BroadcastUI.parallelogram(Rect2(rect.position.x, rect.end.y - 3.0 * s, rect.size.x, 3.0 * s), 0.7 * s), color)
+		draw_colored_polygon(PackedVector2Array([Vector2(at.x - 6.0 * s, rect.end.y), Vector2(at.x + 6.0 * s, rect.end.y),
+				Vector2(at.x, rect.end.y + 7.0 * s)]), color)
+		var text_rect := Rect2(rect.position.x + pad, rect.position.y, text_width + 4.0, height - 3.0 * s)
+		if boost >= 0.0:
+			var centre := Vector2(rect.position.x + pad + disc, rect.position.y + (height - 3.0 * s) / 2.0)
+			_draw_boost(centre, disc, boost, color)
+			text_rect.position.x += 2.0 * disc + 6.0 * s
+		BroadcastUI.text(self, text_rect, label, size_px, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, 700)
+
+	## A pie from twelve o'clock, clockwise; full boost is a solid disc.
+	func _draw_boost(centre: Vector2, r: float, boost: float, color: Color) -> void:
+		var fill := clampf(boost / 100.0, 0.0, 1.0)
+		var bright := color.lightened(0.3)
+		draw_circle(centre, r, Color(1, 1, 1, 0.12))
+		if fill >= 0.995:
+			draw_circle(centre, r, bright)
+		elif fill > 0.005:
+			var points := PackedVector2Array([centre])
+			var steps := maxi(ceili(fill * 32.0), 2)
+			for k in steps + 1:
+				points.append(centre + Vector2.from_angle(-PI / 2.0 + TAU * fill * k / steps) * r)
+			draw_colored_polygon(points, bright)
+		draw_arc(centre, r, 0.0, TAU, 24, Color(1, 1, 1, 0.7), maxf(1.0, 1.5 * r / DISC), true)
+
+
+## The scoreboard held up during a 1v1 (as RL's): under the score bug, a block
+## per team, its score on a plate in its colour, its name, then RL's columns
+## along a strip in its colour, and a row per player. Under them, side by side,
+## bars splitting a team stat between Blue (left) and Orange (right), and a
+## footer line if there's one. See-through enough to keep the play in view
+## behind it; the type stays solid to read.
+class StatsBoard extends Control:
+	const HEADINGS := ["SCORE", "GOALS", "SHOTS", "ASSISTS", "SAVES", "DEMOS", "TOUCHES"]
+	const PLATE_WIDTH := 52.0
+	const NAME_WIDTH := 236.0
+	const COLUMN_WIDTH := 76.0
+	const HEADER_HEIGHT := 34.0
+	const ROW_HEIGHT := 30.0
+	const TITLE_HEIGHT := 26.0
+	const GAP := 10.0
+	const FADE_TIME := 0.12
+	const BAR_LABEL_HEIGHT := 20.0
+	const BAR_HEIGHT := 22.0
+	const FOOTER_HEIGHT := 26.0
+	## How much of the play shows through the panels.
+	const SHADE := 0.62
+
+	## Each team: "name", "score", "color" and "rows", each row "name", "values"
+	## (one per HEADINGS) and "focus" (the player's own row).
+	var teams: Array = []
+	## Each: "label", "share" (Blue's, 0-1) and "text" (what to write at each end).
+	var bars: Array = []
+	var title := "MATCH STATS"
+	var footer := ""
+	## Whether it's held up; it fades in and out.
+	var shown := false
+	var _fade := 0.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var width := PLATE_WIDTH + NAME_WIDTH + COLUMN_WIDTH * HEADINGS.size()
+		anchor_left = 0.5
+		anchor_right = 0.5
+		offset_left = -width / 2.0
+		offset_right = width / 2.0
+		offset_top = 112.0  # under the score bug
+		modulate.a = 0.0
+		visible = false
+
+	func _process(delta: float) -> void:
+		_fade = move_toward(_fade, 1.0 if shown else 0.0, delta / FADE_TIME)
+		modulate.a = _fade
+		visible = _fade > 0.0
+		offset_bottom = offset_top + _height()
+		if visible:
+			queue_redraw()
+
+	func _height() -> float:
+		var height := TITLE_HEIGHT
+		for team: Dictionary in teams:
+			height += GAP + HEADER_HEIGHT + ROW_HEIGHT * team.rows.size()
+		if not bars.is_empty():
+			height += GAP + BAR_LABEL_HEIGHT + BAR_HEIGHT
+		if not footer.is_empty():
+			height += GAP + FOOTER_HEIGHT
+		return height
+
+	func _draw() -> void:
+		var shade := Color(BroadcastUI.INK, SHADE)
+		var tab := Rect2(PLATE_WIDTH, 0.0, NAME_WIDTH, TITLE_HEIGHT)
+		draw_colored_polygon(BroadcastUI.parallelogram(tab, 8.0), shade)
+		BroadcastUI.text(self, tab, title, 14, BroadcastUI.GOLD, HORIZONTAL_ALIGNMENT_CENTER, 700)
+		var y := TITLE_HEIGHT
+		var columns_x := PLATE_WIDTH + NAME_WIDTH
+		for team: Dictionary in teams:
+			y += GAP
+			var color: Color = team.color
+			var name_rect := Rect2(PLATE_WIDTH, y, NAME_WIDTH, HEADER_HEIGHT)
+			draw_rect(name_rect, shade)
+			var plate := Rect2(0.0, y, PLATE_WIDTH, HEADER_HEIGHT)
+			draw_colored_polygon(BroadcastUI.parallelogram(plate, 8.0), color)
+			BroadcastUI.text(self, plate, str(team.score), 26, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 800)
+			BroadcastUI.text(self, name_rect.grow_individual(-14.0, 0.0, 0.0, 0.0), str(team.name).to_upper(), 18, Color.WHITE,
+					HORIZONTAL_ALIGNMENT_LEFT, 700)
+			var strip := Rect2(columns_x, y, size.x - columns_x, HEADER_HEIGHT)
+			draw_rect(strip, Color(color, 0.82))
+			for i in HEADINGS.size():
+				BroadcastUI.text(self, Rect2(columns_x + i * COLUMN_WIDTH, y, COLUMN_WIDTH, HEADER_HEIGHT), HEADINGS[i], 12,
+						Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 700)
+			y += HEADER_HEIGHT
+			var striped := false
+			for row: Dictionary in team.rows:
+				var rect := Rect2(PLATE_WIDTH, y, size.x - PLATE_WIDTH, ROW_HEIGHT)
+				draw_rect(rect, Color(BroadcastUI.INK_LIGHT if striped else BroadcastUI.INK, SHADE))
+				if row.get("focus", false):
+					draw_rect(Rect2(rect.position.x, y, 4.0, ROW_HEIGHT), BroadcastUI.GOLD)
+				BroadcastUI.text(self, Rect2(PLATE_WIDTH + 14.0, y, NAME_WIDTH - 14.0, ROW_HEIGHT), str(row.name).to_upper(), 16,
+						Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, 600)
+				var values: Array = row["values"]
+				for i in values.size():
+					BroadcastUI.text(self, Rect2(columns_x + i * COLUMN_WIDTH, y, COLUMN_WIDTH, ROW_HEIGHT), str(values[i]), 18,
+							BroadcastUI.GOLD if i == 0 else Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 700)
+				y += ROW_HEIGHT
+				striped = not striped
+		if not bars.is_empty():
+			y += GAP
+			_draw_bars(y)
+			y += BAR_LABEL_HEIGHT + BAR_HEIGHT
+		if not footer.is_empty():
+			y += GAP
+			var rect := Rect2(PLATE_WIDTH, y, size.x - PLATE_WIDTH, FOOTER_HEIGHT)
+			draw_rect(rect, shade)
+			BroadcastUI.text(self, rect, footer, 14, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 700)
+
+	func _draw_bars(y: float) -> void:
+		var colors: Array = AquariumArena.TEAM_COLORS
+		var left := PLATE_WIDTH
+		var width := (size.x - left - GAP * (bars.size() - 1)) / bars.size()
+		for i in bars.size():
+			var bar: Dictionary = bars[i]
+			var x := left + i * (width + GAP)
+			var label := Rect2(x, y, width, BAR_LABEL_HEIGHT)
+			draw_rect(label, Color(BroadcastUI.INK, SHADE))
+			BroadcastUI.text(self, label, bar.label, 12, BroadcastUI.GOLD, HORIZONTAL_ALIGNMENT_CENTER, 700)
+			var split := width * clampf(bar.share, 0.0, 1.0)
+			var top := y + BAR_LABEL_HEIGHT
+			draw_rect(Rect2(x, top, split, BAR_HEIGHT), Color(colors[0], 0.85))
+			draw_rect(Rect2(x + split, top, width - split, BAR_HEIGHT), Color(colors[1], 0.85))
+			var ends := Rect2(x + 8.0, top, width - 16.0, BAR_HEIGHT)
+			BroadcastUI.text(self, ends, bar.text[0], 14, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, 700)
+			BroadcastUI.text(self, ends, bar.text[1], 14, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT, 700)

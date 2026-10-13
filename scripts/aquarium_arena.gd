@@ -26,11 +26,11 @@ const CEILING_RADIUS := 5.12
 const CORNER_JOIN_RADIUS := 8.8
 ## Flat facets in each rounded edge, as RL's collision mesh has them: the side
 ## walls' floor ramp and the ceiling curve have 8 (measured from the dumped
-## Soccar meshes). For the back walls' ramp the meshes didn't settle it; 6
-## matches real RL's cars better in replays (private_content/rea/
-## rl_physics_evidence.md §3.2).
+## Soccar meshes). The back walls' ramp has 8 too: fitted from where
+## RocketSim's ball first touches it (8 facets of 160 uu, 0.13 uu rms) and
+## the car's contact normals there (private_content/rea/rl_physics_evidence.md §3.4).
 const SIDE_RAMP_FACETS := 8
-const BACK_RAMP_FACETS := 6
+const BACK_RAMP_FACETS := 8
 const EDGE_STEPS := 8  # ceiling curve
 ## Points along every floor ramp profile, so side and back profiles join up
 ## point for point: a multiple of both facet counts.

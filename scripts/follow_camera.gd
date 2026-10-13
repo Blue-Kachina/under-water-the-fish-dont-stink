@@ -93,6 +93,8 @@ var ball_cam := false
 ## dodge ends, a ball cam toggle finishes or the fish lands.
 var _rotation := Quaternion.IDENTITY
 var _spin := Vector3.ZERO
+## How much _spin changed this frame, so the roll can share MAX_TURN_ACCEL with it.
+var _turn_change := Vector3.ZERO
 ## Camera up, carried from frame to frame so its roll can only turn, never jump.
 var _up := Vector3.UP
 var _look_yaw := 0.0
@@ -201,7 +203,16 @@ func _process(delta: float) -> void:
 			_leaving_surface = absf(_roll_to(up, target_up, forward)) > 0.03
 	# Roll on a spring too (see _rotation), in the angle between up and its target.
 	var roll_error := -_roll_to(up, target_up, forward)
-	var rolled := _spring_step(roll_error, _roll_speed, 2.0 * roll_rate, delta, MAX_TURN_ACCEL)
+	var rolled := _spring_step(roll_error, _roll_speed, 2.0 * roll_rate, delta)
+	# What's left of MAX_TURN_ACCEL after this frame's turn of the view axis
+	# (the part of _turn_change across it; the up is carried, not turned with
+	# it): the roll speeds up only as far as the two together stay within it.
+	var budget := MAX_TURN_ACCEL * delta
+	var swing := _turn_change - forward * _turn_change.dot(forward)
+	var room := sqrt(maxf(budget * budget - swing.length_squared(), 0.0))
+	var roll_change := clampf(rolled.y - _roll_speed, -room, room)
+	if roll_change != rolled.y - _roll_speed:
+		rolled = Vector2(roll_error + (2.0 * _roll_speed + roll_change) * 0.5 * delta, _roll_speed + roll_change)
 	_roll_speed = rolled.y
 	up = up.rotated(forward, rolled.x - roll_error)
 	_up = up
@@ -264,17 +275,31 @@ func _turn_toward(target: Quaternion, rate: float, delta: float) -> void:
 	var turned := Vector3.ZERO
 	var spin := Vector3.ZERO
 	var speed := error.length() + _spin.length()
+	_turn_change = Vector3.ZERO
 	if speed < 1e-9:
+		_turn_change = -_spin
 		_spin = Vector3.ZERO
 		return
 	# The spring acts along the error, with the spin split along and across it.
 	var along := error.normalized() if error.length_squared() > 1e-12 else _spin.normalized()
 	var spin_along := _spin.dot(along)
-	var stepped := _spring_step(error.length() if error.length_squared() > 1e-12 else 0.0, spin_along, 2.0 * rate, delta, MAX_TURN_ACCEL)
+	var distance := error.length() if error.length_squared() > 1e-12 else 0.0
+	var stepped := _spring_step(distance, spin_along, 2.0 * rate, delta)
 	var across := _spin - along * spin_along
-	var across_step := _spring_step(0.0, across.length(), 2.0 * rate, delta, MAX_TURN_ACCEL)
-	turned = along * stepped.x + (across.normalized() * across_step.x if across.length_squared() > 1e-12 else Vector3.ZERO)
-	spin = along * stepped.y + (across.normalized() * across_step.y if across.length_squared() > 1e-12 else Vector3.ZERO)
+	var across_dir := across.normalized() if across.length_squared() > 1e-12 else Vector3.ZERO
+	var across_step := _spring_step(0.0, across.length(), 2.0 * rate, delta)
+	spin = along * stepped.y + across_dir * across_step.y
+	# MAX_TURN_ACCEL caps the whole turn's change of speed, not each part's.
+	var change := spin - _spin
+	if change.length() > MAX_TURN_ACCEL * delta:
+		spin = _spin + change * (MAX_TURN_ACCEL * delta / change.length())
+		var new_along := spin.dot(along)
+		var new_across := spin.dot(across_dir)
+		turned = along * (distance + (spin_along + new_along) * 0.5 * delta) \
+				+ across_dir * ((across.length() + new_across) * 0.5 * delta)
+	else:
+		turned = along * stepped.x + across_dir * across_step.x
+	_turn_change = spin - _spin
 	_spin = spin
 	_rotation = (_quaternion_from(turned) * target).normalized()
 

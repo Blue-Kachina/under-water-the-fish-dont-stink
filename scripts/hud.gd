@@ -4,12 +4,24 @@ extends CanvasLayer
 ## someone scores; in a 1v1 (set_match) also the clock, the kickoff countdown,
 ## demolitions, the goal replay's overlay and the result. While a Rocket League
 ## replay plays (set_replay), the same for the replay and its followed player.
+## In both kinds of replay, each team's players are listed in the top corners
+## with their boost, and a badge pops up beside a player for a goal, assist,
+## shot, save or demo (MatchStats). Live, the lists stay hidden (they'd give
+## away the opponents' boost); the other fish get name plates instead, with
+## boost shown for teammates only. Holding D-pad up (or B) in a 1v1 holds up
+## its scoreboard (BroadcastUI.StatsBoard), each fish's points and stats and
+## the teams' possession, boost and territory. It comes up by itself at the end
+## of the match, once the winner's splash has been.
 ##
 ## Two tuning aids show only when switched on in the tuning panel's UI section
 ## (UISettings): the speed / drift / ... readout and the controller-input display.
 
 ## How long the goal splash shows.
 const SPLASH_TIME := 3.0
+## How long the winner's splash shows before the final scoreboard comes up.
+const RESULT_TIME := 4.5
+## How far above a fish's centre its name plate points (m).
+const NAME_PLATE_HEIGHT := 0.9
 
 @export var fish: FishController
 @export var arena: Arena
@@ -29,11 +41,29 @@ var _scorebug: BroadcastUI.ScoreBug
 var _boost: BroadcastUI.BoostGauge
 var _splash: BroadcastUI.Splash
 var _replay_overlay: BroadcastUI.ReplayOverlay
+var _lists: Array[BroadcastUI.PlayerList] = []
+var _plates: BroadcastUI.NamePlates
+var _board: BroadcastUI.StatsBoard
+## Player index -> [team, row] in the lists, for the events' "player".
+var _row_of := {}
+## The replay (ReplayData) whose events the lists are calling out, those
+## events, and how far through them the lists have got.
+var _events_source: ReplayData
+var _events: Array[Dictionary] = []
+var _events_time := 0.0
 var replay: ReplayPlayer
 var match_1v1: Match1v1
+## Replays mode before a replay's picked: the live fish sits out, so its
+## boost, the scorebug and the ball countdown are hidden.
+var fish_sitting_out := false:
+	set(value):
+		fish_sitting_out = value
+		_update_hint()
 
 
 func _ready() -> void:
+	_plates = BroadcastUI.NamePlates.new()
+	add_child(_plates)
 	_replay_overlay = BroadcastUI.ReplayOverlay.new()
 	add_child(_replay_overlay)
 
@@ -42,7 +72,7 @@ func _ready() -> void:
 	_stats_panel.anchor_right = 1.0
 	_stats_panel.offset_left = -290.0
 	_stats_panel.offset_right = -16.0
-	_stats_panel.offset_top = 16.0
+	_stats_panel.offset_top = 140.0  # under the player lists
 	add_child(_stats_panel)
 	var column := VBoxContainer.new()
 	_stats_panel.add_child(column)
@@ -59,6 +89,12 @@ func _ready() -> void:
 	add_child(_scorebug)
 	_boost = BroadcastUI.BoostGauge.new()
 	add_child(_boost)
+	for team in 2:
+		var list := BroadcastUI.PlayerList.new()
+		list.team = team
+		list.visible = false
+		add_child(list)
+		_lists.append(list)
 
 	_course = _centred_label(16.0, 28)
 	add_child(_course)
@@ -78,6 +114,8 @@ func _ready() -> void:
 	_splash = BroadcastUI.Splash.new()
 	_splash.visible = false
 	add_child(_splash)
+	_board = BroadcastUI.StatsBoard.new()
+	add_child(_board)
 
 	_viz = InputViz.new()
 	_viz.fish = fish
@@ -136,6 +174,7 @@ func set_replay(new_replay: ReplayPlayer) -> void:
 	_banner.text = ""
 	_banner_time_left = 0.0
 	_splash.hide_now()
+	_events_source = null
 	if replay:
 		replay.target_changed.connect(func(car: ReplayCar) -> void: _viz.fish = car)
 		replay.goal_reached.connect(_on_replay_goal)
@@ -172,18 +211,31 @@ func _on_demolished(attacker: FishController, victim: FishController) -> void:
 
 
 func _update_hint() -> void:
+	if _hint == null:
+		return
 	if replay:
 		_hint.text = "P/jump: play    , . / D-pad: 5 s    [ ]: goals    V/boost: camera    T G / D-pad: target    - =: speed    H: hitboxes    Y: ball cam"
+	elif fish_sitting_out:
+		_hint.text = "Start/Esc: pause, settings    F11: fullscreen"
 	else:
-		_hint.text = "View/F1: tuning panel    Start/R: %s    Right stick/IJKL: look around    Y: %s cam    F11: fullscreen" % [
-				"restart kickoff" if match_1v1 else "reset", "ring" if arena else "ball"]
+		_hint.text = "Start/Esc: pause, settings    R: %s    Right stick/IJKL: look around    Y: %s cam    %sF11: fullscreen" % [
+				"restart kickoff" if match_1v1 else "reset", "ring" if arena else "ball",
+				"Hold D-pad up/B: scoreboard    " if match_1v1 else ""]
 
 
 func _process(delta: float) -> void:
+	_update_player_lists()
+	_update_name_plates()
+	_update_board()
 	if is_instance_valid(replay):
 		_replay_readouts(delta)
 		return
 	if fish == null:
+		return
+	if fish_sitting_out:
+		_boost.visible = false
+		_scorebug.visible = false
+		_course.text = ""
 		return
 	var in_goal_replay := is_instance_valid(match_1v1) and match_1v1.phase == Match1v1.Phase.REPLAY
 	_hint.visible = not in_goal_replay
@@ -268,6 +320,131 @@ func _update_scorebug() -> void:
 		_scorebug.players = [fish.display_name, ""]
 		_scorebug.clock = "--:--"
 		_scorebug.caption = "FREE PLAY"
+
+
+## The player lists: a Rocket League replay's players or a goal replay's
+## ghosts; hidden otherwise. Badges pop as playback passes each event.
+func _update_player_lists() -> void:
+	var rows: Array = [[], []]
+	_row_of.clear()
+	var goal_replay: GoalReplay = match_1v1.goal_replay if is_instance_valid(match_1v1) else null
+	if is_instance_valid(replay):
+		for car in replay.cars:
+			_add_row(rows, car.player.index, car.team, car.player.name, car.boost_amount, car.visible, car == replay.target)
+		_follow_events(replay.data, replay.time, func(data: ReplayData) -> Array[Dictionary]: return MatchStats.replay_events(data))
+	elif is_instance_valid(goal_replay):
+		for i in goal_replay.cars.size():
+			var car := goal_replay.cars[i]
+			_add_row(rows, i, car.team, car.player.name, car.boost_amount, car.visible, i == goal_replay.scorer)
+		_follow_events(goal_replay.data, goal_replay.time, func(data: ReplayData) -> Array[Dictionary]: return data.events)
+	elif _events_source != null:  # back from a replay: its badges are done with
+		_events_source = null
+		for list in _lists:
+			list.clear_badges()
+	for team in 2:
+		_lists[team].visible = not rows[team].is_empty()
+		_lists[team].rows.assign(rows[team])
+
+
+## The 1v1's scoreboard, while the button's held (not over a Rocket League replay).
+func _update_board() -> void:
+	var over := is_instance_valid(match_1v1) and match_1v1.phase == Match1v1.Phase.OVER
+	var result_up := over and match_1v1.over_left < Match1v1.OVER_TIME - RESULT_TIME
+	_board.shown = is_instance_valid(match_1v1) and match_1v1.stats.size() == 2 and not is_instance_valid(replay) \
+			and (Input.is_action_pressed("show_scoreboard") or result_up)
+	if not _board.shown:
+		return
+	_board.title = "FINAL STATS" if over else "MATCH STATS"
+	_board.footer = "NEXT MATCH IN %d    ·    START / R: PLAY AGAIN" % ceili(match_1v1.over_left) if over else ""
+	var totals: Dictionary = match_1v1.team_stats
+	_board.bars = [
+		_share_bar("BALL POSSESSION", totals.possession),
+		_share_bar("BOOST USED", totals.boost, false),
+		_share_bar("FIELD DOMINATION", totals.territory),
+	]
+	var teams := []
+	for team in 2:
+		var fish_of_team := match_1v1.player if team == 0 else match_1v1.bot_fish
+		var line: Dictionary = match_1v1.stats[team]
+		var values := MatchStats.COLUMNS.map(func(column: String) -> int: return line[column])
+		teams.append({
+			"name": AquariumArena.TEAM_NAMES[team],
+			"score": aquarium.scores[team] if is_instance_valid(aquarium) else 0,
+			"color": AquariumArena.TEAM_COLORS[team],
+			"rows": [{"name": _name_of(fish_of_team), "values": values, "focus": fish_of_team == fish}],
+		})
+	_board.teams = teams
+
+
+## A StatsBoard bar: Blue's and Orange's shares of `values`, written at the
+## ends as percentages or as the amounts themselves.
+static func _share_bar(label: String, values: Array, percent := true) -> Dictionary:
+	var total: float = values[0] + values[1]
+	var share: float = 0.5 if total <= 0.0 else values[0] / total
+	var text := ["%d" % roundi(values[0]), "%d" % roundi(values[1])]
+	if percent:
+		text = ["%d%%" % roundi(share * 100.0), "%d%%" % (100 - roundi(share * 100.0))] if total > 0.0 else ["-", "-"]
+	return {"label": label, "share": share, "text": text}
+
+
+## A name plate over each other fish in view, live only (replays have the lists).
+## Teammates' plates carry their boost; opponents' don't.
+func _update_name_plates() -> void:
+	var plates: Array[Dictionary] = []
+	var camera := get_viewport().get_camera_3d()
+	var live := not is_instance_valid(replay) and not (is_instance_valid(match_1v1) and match_1v1.phase == Match1v1.Phase.REPLAY)
+	if live and camera and fish:
+		for other: FishController in get_tree().get_nodes_in_group(FishController.GROUP):
+			if other == fish or not other.is_visible_in_tree() or other.demolished:
+				continue
+			var above := other.global_position + Vector3.UP * NAME_PLATE_HEIGHT
+			if camera.is_position_behind(above):
+				continue
+			var distance := camera.global_position.distance_to(above)
+			var teammate := other.team >= 0 and other.team == fish.team
+			var color: Color = AquariumArena.TEAM_COLORS[other.team] if other.team >= 0 else BroadcastUI.GOLD
+			plates.append({
+				"at": camera.unproject_position(above),
+				"name": _name_of(other),
+				"color": color,
+				"boost": (100.0 if other.boost_unlimited else other.boost_amount) if teammate else -1.0,
+				"scale": clampf(18.0 / maxf(distance, 0.1), 0.75, 1.0),
+			})
+	_plates.plates = plates
+
+
+func _add_row(rows: Array, index: int, team: int, player_name: String, boost: float, present: bool, focus: bool) -> void:
+	_row_of[index] = [team, rows[team].size()]
+	rows[team].append({"name": player_name, "boost": boost, "present": present, "focus": focus})
+
+
+## Pops badges for `data`'s events between the last call and `time`. A new
+## replay (or a jump back, or a long jump ahead) starts afresh without them.
+func _follow_events(data: ReplayData, time: float, events_of: Callable) -> void:
+	if data != _events_source:
+		_events_source = data
+		_events = events_of.call(data)
+		_events_time = time
+		for list in _lists:
+			list.clear_badges()
+		return
+	var back := time < _events_time - 0.001
+	if back or time > _events_time + 1.0:
+		if back:
+			for list in _lists:
+				list.clear_badges()
+		_events_time = time
+		return
+	for event in _events:
+		if event.time > _events_time and event.time <= time:
+			_pop(event)
+	_events_time = time
+
+
+func _pop(event: Dictionary) -> void:
+	var at = _row_of.get(event.get("player"))
+	if at != null:
+		_lists[at[0]].pop(at[1], event.type)
 
 
 func _on_course_finished(time: float, is_best: bool) -> void:
@@ -369,7 +546,7 @@ func _on_goal_replay_started(goal_replay: GoalReplay) -> void:
 func _on_match_over(winner: int) -> void:
 	var winner_fish := match_1v1.player if winner == 0 else match_1v1.bot_fish
 	_splash.play("%s WINS" % AquariumArena.TEAM_NAMES[winner].to_upper(), _name_of(winner_fish),
-			"Final  %d - %d" % [aquarium.scores[0], aquarium.scores[1]], AquariumArena.TEAM_COLORS[winner], Match1v1.OVER_TIME - 0.5)
+			"Final  %d - %d" % [aquarium.scores[0], aquarium.scores[1]], AquariumArena.TEAM_COLORS[winner], RESULT_TIME)
 
 
 func _name_of(node: Node3D) -> String:

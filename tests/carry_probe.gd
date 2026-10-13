@@ -28,7 +28,7 @@ func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	main.ball_settings.ball_type = BallSettings.BallType.SURFACE
-	main.set_environment("Aquarium Arena", false)
+	main.set_environment("Aquarium Arena")
 	fish = main.get_node("Fish")
 	aquarium = main._environment
 	ball = aquarium.ball

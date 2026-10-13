@@ -30,10 +30,12 @@ func check(ok: bool, what: String) -> void:
 
 func _run() -> void:
 	_check_credit()
+	_check_flight()
 
 	main.ball_settings.ball_type = BallSettings.BallType.SURFACE
-	main.set_environment("Aquarium Arena", false)
+	main.set_environment("Aquarium Arena")
 	main.set_mode(main.ONE_V_ONE)
+	main.play_match()
 	var game: Match1v1 = main.match_1v1
 	game.goal_replays = true
 	var aquarium: AquariumArena = main._environment
@@ -45,6 +47,20 @@ func _run() -> void:
 	check(not game.bot_fish.display_name.is_empty() and game.bot_fish.team == 1 and fish.team == 0, "names and teams (bot: %s)" % game.bot_fish.display_name)
 	check(hud._scorebug.visible and hud._boost.visible, "scoreboard and boost gauge show in the 1v1")
 	check(hud._scorebug.clock == "5:00", "the clock starts at 5:00 (%s)" % hud._scorebug.clock)
+	await get_tree().process_frame
+	await get_tree().process_frame  # the HUD updates after this signal
+	check(not hud._lists[0].visible and not hud._lists[1].visible, "no player lists in live play")
+	var plates: Array[Dictionary] = hud._plates.plates
+	check(plates.size() == 1 and plates[0].name == game.bot_fish.display_name and plates[0].boost < 0.0,
+			"one name plate, over the opponent, without its boost (%s)" % str(plates))
+	game.bot_fish.team = 0  # pretend it's a teammate
+	game.bot_fish.boost_amount = 100.0
+	await get_tree().process_frame
+	plates = hud._plates.plates
+	check(plates.size() == 1 and plates[0].boost == 100.0, "a teammate's plate shows its boost (%s)" % str(plates))
+	game.bot_fish.team = 1
+	var stats: Array[Dictionary] = []
+	game.stat_event.connect(func(e: Dictionary) -> void: stats.append(e))
 	await _seconds(3.2)
 	check(game.phase == Match1v1.Phase.LIVE, "live after the countdown")
 	await _seconds(2.0)
@@ -54,6 +70,7 @@ func _run() -> void:
 	await _shoot(ball, fish, -1.0)
 	check(game.phase == Match1v1.Phase.GOAL and aquarium.scores == [1, 0], "Blue scores (%s)" % str(aquarium.scores))
 	check(aquarium.last_goal.get("scorer") == fish, "the player is credited")
+	check(stats.any(func(e: Dictionary) -> bool: return e.type == MatchStats.GOAL and e.player == 0), "a goal event for the player")
 	check(hud._splash.visible and hud._splash.headline == fish.display_name, "the splash names the scorer (%s)" % hud._splash.headline)
 	var clock_at_goal := game.clock_left
 	await _seconds(ball.settings.goal_reset_delay + 0.1)
@@ -67,13 +84,22 @@ func _run() -> void:
 		check(replay.data.duration > 3.0 and replay.goal_time > 2.5, "a clip from before the goal (%.1f s, goal at %.1f)" % [replay.data.duration, replay.goal_time])
 		check(replay.shot == "chase", "it opens on the chase camera")
 		check(replay.playback_rate(replay.goal_time) < 0.5 and replay.playback_rate(0.0) == 1.0, "slow motion at the goal only")
+		check(replay.data.events.any(func(e: Dictionary) -> bool: return e.type == MatchStats.GOAL and absf(e.time - replay.goal_time) < 0.02),
+				"the clip carries the goal event at the goal")
+		await get_tree().process_frame
+		check(hud._lists[0].visible and hud._lists[0]._badges.is_empty(), "lists show for the replay, badges start afresh")
+		check(hud._plates.plates.is_empty(), "no name plates in the replay")
 		var shots := {}
+		var badges := {}
 		var waited := 0.0
 		while is_instance_valid(replay) and not replay._done and waited < 20.0:
 			shots[replay.shot] = true
+			if hud._lists[0]._badges.has(0):
+				badges[hud._lists[0]._badges[0][0]] = true
 			await get_tree().process_frame
 			waited += get_process_delta_time()
 		check(shots.has("net"), "it cuts to the net camera (%s)" % ", ".join(shots.keys()))
+		check(badges.has(MatchStats.GOAL), "the goal badge pops again as the replay reaches it (%s)" % ", ".join(badges.keys()))
 		check(waited < 15.0, "and finishes by itself (%.1f s)" % waited)
 		await get_tree().physics_frame
 		check(game.phase == Match1v1.Phase.COUNTDOWN and game.goal_replay == null, "then the next kickoff")
@@ -147,12 +173,31 @@ func _check_credit() -> void:
 		node.free()
 
 
+## Shots and saves by the ball's predicted flight.
+func _check_flight() -> void:
+	var model := MatchStats.RL_BALL
+	check(MatchStats.would_score(Vector3(0, 1, -35), Vector3(0, 0, -20), -1.0, model), "straight at the -Z net: on target")
+	check(not MatchStats.would_score(Vector3(0, 1, -35), Vector3(0, 0, 20), -1.0, model), "going the other way: not")
+	check(not MatchStats.would_score(Vector3(0, 1, -35), Vector3(15, 0, -20), -1.0, model), "wide: not")
+	check(not MatchStats.would_score(Vector3(0, 1, -35), Vector3(0, 12, -20), -1.0, model), "over the bar: not")
+	check(MatchStats.classify_touch(0, Vector3(0, 1, 40), Vector3(0, 0, 20), Vector3(0, 1, 40), Vector3(0, 5, -15), model) == MatchStats.SAVE,
+			"Blue clears a ball heading into its own net: save")
+	check(MatchStats.classify_touch(0, Vector3(0, 1, -30), Vector3(0, 0, 0), Vector3(0, 1, -30), Vector3(0, 0, -25), model) == MatchStats.SHOT,
+			"Blue puts a still ball on target: shot")
+	check(MatchStats.classify_touch(1, Vector3(0, 1, -30), Vector3(0, 0, 0), Vector3(0, 1, -30), Vector3(0, 0, -25), model) == "",
+			"Orange knocking it toward its own net: neither")
+
+
 ## Puts `shooter` behind the ball near a goal (`end`: -1 Orange's at -Z, +1 Blue's)
 ## and rolls the ball in off it, waiting for the goal.
 func _shoot(ball: Ball, shooter: FishController, end: float) -> void:
 	var height: float = ball.settings.radius + 0.05
 	var spot := Vector3(0.0, height, end * 44.0)
 	shooter.set_spawn(Transform3D(Basis.looking_at(Vector3(0.0, 0.0, end)), spot - Vector3(0.0, 0.0, end * 3.0) + Vector3(0.0, 0.3, 0.0)))
+	# The other fish waits out on the wing: parked on its kickoff spot it can block the shot.
+	var game: Match1v1 = main.match_1v1
+	var other := game.bot_fish if shooter == game.player else game.player
+	other.set_spawn(Transform3D(Basis.IDENTITY, Vector3(30.0, height + 0.3, 0.0)))
 	ball.respawn(spot)
 	await get_tree().physics_frame
 	await get_tree().physics_frame

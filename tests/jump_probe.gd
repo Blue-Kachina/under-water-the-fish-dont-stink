@@ -23,7 +23,7 @@ var pressed_at := -1.0
 func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
-	main.set_environment("Ocean", false)
+	main.set_environment("Ocean")
 	fish = main.get_node("Fish")
 	panel = main.get_node("DebugPanel")
 	fish.buoyancy = 0.0  # measure the jump alone

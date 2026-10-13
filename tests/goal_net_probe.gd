@@ -18,7 +18,7 @@ var failures := 0
 func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
-	main.set_environment("Aquarium Arena", false)
+	main.set_environment("Aquarium Arena")
 	aquarium = main._environment
 	goal = aquarium.goals[1]  # Orange, at -Z
 	main.get_node("Fish").set_spawn(Transform3D(Basis.IDENTITY, aquarium.centre + Vector3(20, 0, 20)))  # out of the way

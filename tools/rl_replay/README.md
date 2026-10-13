@@ -14,8 +14,8 @@ uv run python -m unittest discover tests              # converter tests (no real
 The first run creates `.venv` and installs `subtr-actor-py` (pinned in `pyproject.toml`). If no wheel
 fits your Python, uv builds it from source, which needs a Rust toolchain and takes about a minute.
 
-**You don't normally run this by hand.** The game converts a `.replay` itself when you pick one in the
-tuning panel ("Watch a replay..."), drop it on the window, or start the game with
+**You don't normally run this by hand.** The game converts a `.replay` itself when you pick one in
+Replays mode (the replay bar's "Replay..."), drop it on the window, or start the game with
 `-- --replay=PATH`. It runs this tool through `uv` and keeps the result in
 `user://replays/`, so each replay converts once. Rocket League saves replays in
 `Documents/My Games/Rocket League/TAGame/Demos`.

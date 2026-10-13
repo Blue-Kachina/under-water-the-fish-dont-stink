@@ -23,7 +23,7 @@ var turned := 0.0
 func _ready() -> void:
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
-	main.set_environment("Ocean", false)
+	main.set_environment("Ocean")
 	fish = main.get_node("Fish")
 	print("buoyancy %.1f, lateral_drag %.2f, car_steering_pitch %s" % [fish.buoyancy, fish.lateral_drag, fish.car_steering_pitch])
 	_next()

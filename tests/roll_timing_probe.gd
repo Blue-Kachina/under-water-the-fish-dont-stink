@@ -23,7 +23,7 @@ var steps: Array
 func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
-	main.set_environment("Ocean", false)
+	main.set_environment("Ocean")
 	fish = main.get_node("Fish")
 	_print_roll_reference()
 	print("RL front flip:       %s" % _flip_reference(FishController.RL_FLIP_TORQUE_FORWARD, FishController.RL_PITCH_DAMPING, -1))

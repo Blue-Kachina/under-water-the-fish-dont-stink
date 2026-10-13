@@ -33,8 +33,8 @@ var start_forward := Vector3.FORWARD
 func _ready() -> void:
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
-	main.set_environment("Obstacle Course", false)
-	main.get_node("DebugPanel")._apply_preset("Water")  # tests the underwater mechanics
+	main.set_environment("Obstacle Course")
+	main.get_node("DebugPanel")._load_preset("res://presets/water.cfg")  # tests the underwater mechanics
 	fish = main.get_node("Fish")
 	fish.stroked.connect(func(_quality: float) -> void: boosted_beats += 1)
 	_next()

@@ -17,10 +17,15 @@ const HIT_COOLDOWN := 0.1
 ## Fish-ball contact, as RL's car-ball contact (RocketSim RLConst.h): no bounce
 ## (CARBALL_COLLISION_RESTITUTION 0) and very grippy (CARBALL_COLLISION_FRICTION).
 const CARBALL_FRICTION := 2.0
-## A fish this close counts as touching, so contact doesn't flicker on and off.
-const CONTACT_MARGIN := 0.02
-## Overlap allowed before the ball is pushed back out of the fish.
-const PENETRATION_SLOP := 0.005
+## A fish this close counts as touching (Bullet keeps contacts a little apart).
+## Measured against RocketSim: 2 cm touches a tick early, 0 misses touches.
+const CONTACT_MARGIN := 0.015
+## How much of an overlap is pushed out each tick: Bullet's split impulse
+## (RocketSim sets erp2 0.8), which moves the bodies without adding speed.
+const SPLIT_ERP := 0.8
+## Bullet's collision margin on the car's box (0.04 BT units = 2 cm): the box
+## keeps its size, but its edges and corners are rounded with this radius.
+const BOX_MARGIN := 0.02
 ## Contact solver passes per tick (Bullet's default).
 const SOLVER_ITERATIONS := 10
 
@@ -62,6 +67,8 @@ var _step_frame := -1
 ## Fish touching the ball last tick (a touch is fresh on the first tick of contact).
 var _touching_fish := {}
 var _hit_cooldown := 0.0
+## RL's extra hit impulse, added after the step that found the touch (see _resolve_fish_contact).
+var _pending_hit_velocity := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -155,6 +162,9 @@ func _apply_settings() -> void:
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var dt := state.step
+	# Last tick's extra hit impulse, before the caps (RocketSim Ball::_FinishPhysicsTick).
+	state.linear_velocity += _pending_hit_velocity
+	_pending_hit_velocity = Vector3.ZERO
 	# Like RL (RocketSim Ball::_FinishPhysicsTick), speed and spin are capped
 	# after each step, so a step runs at the cap plus that tick's acceleration.
 	state.linear_velocity = state.linear_velocity.limit_length(settings.max_speed)
@@ -265,14 +275,18 @@ func _fish_contact(centre: Vector3, who: FishController) -> Dictionary:
 	if not is_instance_valid(who) or who.demolished or popped:
 		return {}
 	var best := {}
+	var fish_state := who.physics_state()  # not who.global_transform, which may be last tick's
 	for child in who.get_children():
 		var shape_node := child as CollisionShape3D
 		# The fish's box hitbox: disabled for the engine (the arena meets a
 		# bevelled hull), but it's the shape the ball is checked against.
 		if shape_node == null or not shape_node.shape is BoxShape3D:
 			continue
-		var xform := shape_node.global_transform
+		var xform := fish_state.transform * shape_node.transform
 		var half: Vector3 = (shape_node.shape as BoxShape3D).size / 2.0
+		# Bullet's box: the same size, but its edges and corners rounded by its
+		# collision margin (an inner box grown by a sphere of that radius).
+		half -= Vector3.ONE * BOX_MARGIN
 		var local := xform.affine_inverse() * centre
 		var closest := local.clamp(-half, half)
 		var normal: Vector3
@@ -284,14 +298,14 @@ func _fish_contact(centre: Vector3, who: FishController) -> Dictionary:
 			var local_normal := Vector3.ZERO
 			local_normal[axis] = signf(local[axis]) if local[axis] != 0.0 else 1.0
 			normal = (xform.basis * local_normal).normalized()
-			depth = _radius + room[axis]
+			depth = _radius + BOX_MARGIN + room[axis]
 		else:
 			var offset := centre - xform * closest
 			var distance := offset.length()
 			normal = offset / distance
-			depth = _radius - distance
+			depth = _radius + BOX_MARGIN - distance
 		if depth > -CONTACT_MARGIN and (best.is_empty() or depth > best.depth):
-			best = {"fish": who, "normal": normal, "depth": depth}
+			best = {"fish": who, "fish_state": fish_state, "normal": normal, "depth": depth}
 	return best
 
 
@@ -312,13 +326,15 @@ func _resolve_fish_contact(state: PhysicsDirectBodyState3D, contact: Dictionary,
 	var centre := state.transform.origin
 	var point := centre - normal * _radius
 	var r_ball := point - centre
-	var r_fish := point - hitter.global_transform * hitter.center_of_mass
-	var fish_velocity := hitter.linear_velocity
-	var fish_spin := hitter.angular_velocity
+	var fish_state: PhysicsDirectBodyState3D = contact.fish_state
+	var fish_com := fish_state.transform * hitter.center_of_mass
+	var r_fish := point - fish_com
+	var fish_velocity := fish_state.linear_velocity
+	var fish_spin := fish_state.angular_velocity
 	var inv_mass_ball := 1.0 / mass
 	var inv_mass_fish := 1.0 / hitter.mass
 	var inv_inertia_ball := 1.0 / (0.4 * mass * _radius * _radius)  # solid sphere
-	var inv_inertia_fish := hitter.inverse_inertia_world()
+	var inv_inertia_fish := hitter.inverse_inertia_world(fish_state.transform.basis)
 
 	# Speculative: a ball still just apart may close the gap this tick, but no more.
 	var allowed := maxf(-depth, 0.0) / state.step
@@ -332,30 +348,35 @@ func _resolve_fish_contact(state: PhysicsDirectBodyState3D, contact: Dictionary,
 	# how the bodies move and turn at the contact, which changes what the other
 	# needs (a hit makes the fish pitch, and its face then rubs spin onto the ball).
 	var pushed := 0.0
-	var gripped := Vector3.ZERO
 	var fish_v := fish_velocity
 	var fish_w := fish_spin
+	# Bullet (default solver mode) grips along one line only: the way the
+	# contact slips before the solve, or any tangent when it doesn't.
+	var slip0 := (velocity + spin.cross(r_ball)) - (fish_velocity + fish_spin.cross(r_fish))
+	slip0 -= normal * slip0.dot(normal)
+	var grip_dir := slip0.normalized() if slip0.length() > 0.0001 else normal.cross(Vector3.RIGHT if absf(normal.x) < 0.7 else Vector3.UP).normalized()
+	var grip_mass := _inverse_effective_mass(grip_dir, r_ball, r_fish, inv_mass_ball, inv_mass_fish, inv_inertia_ball, inv_inertia_fish)
+	var grip := 0.0
 	for i in SOLVER_ITERATIONS:
 		var relative := (velocity + spin.cross(r_ball)) - (fish_v + fish_w.cross(r_fish))
 		var push := maxf(pushed - (relative.dot(normal) + allowed) / normal_mass, 0.0) - pushed
 		pushed += push
 		var impulse := normal * push
 		relative += _contact_velocity_change(impulse, normal, r_ball, r_fish, inv_mass_ball, inv_mass_fish, inv_inertia_ball, inv_inertia_fish)
-		var slide := relative - normal * relative.dot(normal)
-		if slide.length() > 0.00001:
-			var tangent := slide.normalized()
-			var stop := slide.length() / _inverse_effective_mass(tangent, r_ball, r_fish, inv_mass_ball, inv_mass_fish, inv_inertia_ball, inv_inertia_fish)
-			var total := (gripped - tangent * stop).limit_length(CARBALL_FRICTION * pushed)
-			impulse += total - gripped
-			gripped = total
+		var limit := CARBALL_FRICTION * pushed
+		var new_grip := clampf(grip - relative.dot(grip_dir) / grip_mass, -limit, limit)
+		impulse += grip_dir * (new_grip - grip)
+		grip = new_grip
 		velocity += impulse * inv_mass_ball
 		spin += r_ball.cross(impulse) * inv_inertia_ball
 		fish_v -= impulse * inv_mass_fish
 		fish_w -= inv_inertia_fish * r_fish.cross(impulse)
-	if pushed > 0.0 or gripped != Vector3.ZERO:
-		hitter.apply_ball_impulse(-(normal * pushed + gripped), point)
-	if depth > PENETRATION_SLOP:
-		state.transform = Transform3D(state.transform.basis, centre + normal * (depth - PENETRATION_SLOP))
+	if pushed > 0.0 or grip != 0.0:
+		hitter.apply_ball_impulse(-(normal * pushed + grip_dir * grip), point)
+	if depth > 0.0:
+		# The ball's share of the push-out. The fish's (about a seventh) is left
+		# out: tried 2026-10-12, a wash (car paths ~0.03 m better, ball ~0.04 m worse).
+		state.transform = Transform3D(state.transform.basis, centre + normal * (SPLIT_ERP * depth * inv_mass_ball / normal_mass))
 
 	# A touch starts on the first tick the fish pushes the ball, even while the
 	# two are still just apart (the speculative push above). Waiting for overlap
@@ -373,12 +394,13 @@ func _resolve_fish_contact(state: PhysicsDirectBodyState3D, contact: Dictionary,
 		return [velocity, spin]
 	_hit_cooldown = HIT_COOLDOWN
 
-	var forward := -hitter.global_basis.orthonormalized().z
-	var direction := centre - hitter.global_transform * hitter.center_of_mass
+	var forward := -fish_state.transform.basis.orthonormalized().z
+	var direction := centre - fish_com
 	direction.y *= settings.hit_up_scale  # world up, as in RL
 	direction = direction.normalized()
 	direction = (direction - forward * direction.dot(forward) * (1.0 - settings.hit_forward_scale)).normalized()
-	velocity += direction * hit_speed * _hit_factor(hit_speed) * settings.hit_force_scale
+	# Like RocketSim's velocity cache: it doesn't move the ball until the next step.
+	_pending_hit_velocity += direction * hit_speed * _hit_factor(hit_speed) * settings.hit_force_scale
 	return [velocity, spin]
 
 

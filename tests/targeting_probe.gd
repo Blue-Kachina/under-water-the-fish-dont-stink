@@ -39,7 +39,7 @@ func check(ok: bool, what: String) -> void:
 
 
 func _run() -> void:
-	main.set_environment("Obstacle Course", false)
+	main.set_environment("Obstacle Course")
 	arena = main._environment
 	await _frames(2)
 	check(camera.course == arena and camera.ball == null, "on the course the camera has the course and no ball")
@@ -72,7 +72,7 @@ func _run() -> void:
 
 	# The ball.
 	main.ball_settings.ball_type = BallSettings.BallType.SURFACE
-	main.set_environment("Aquarium Arena", false)
+	main.set_environment("Aquarium Arena")
 	await _frames(2)
 	var aquarium: AquariumArena = main._environment
 	check(camera.course == null and camera.ball == aquarium.ball, "in the aquarium ball cam has the ball again")

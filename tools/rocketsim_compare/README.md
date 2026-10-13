@@ -9,6 +9,8 @@ cd tools/rocketsim_compare
 uv run run.py                         # every runnable scenario (about 50 s)
 uv run run.py front_flip ball_hit_centre
 uv run run.py --godot PATH/TO/Godot_console.exe   # or set GODOT
+uv run run.py --set tyre_axle_on_surface=false     # a fish_controller property for the run
+uv run run.py --set ball.world_gap=0               # a BallSettings property (ball. prefix)
 ```
 
 `uv` creates `.venv` and installs `rocketsim` and `numpy` from `pyproject.toml` the first time.
@@ -16,6 +18,11 @@ Results go to `out/`:
 - `report.txt`: the summary also printed to the console.
 - `rocketsim.json` and `game.json`: per-tick states from each side.
 - `scenarios.json`: the inputs and start states that were run.
+
+`uv run ramp_fit.py end 2000` (or `side 0`) measures a floor ramp of RocketSim's Soccar arena, which
+is RL's own collision mesh. It throws the ball at the ramp with gravity off and fits the facet count,
+radius and wall position of the profile `aquarium_arena.gd` builds. Both ramps measure 8 facets: 160 uu
+on the back walls, 256 uu on the side walls. Needs the collision meshes.
 
 `uv run timeline.py NAME [step_seconds]` prints one scenario from the last run side by side:
 height, speed, how upright the car is, which way it faces, and surface contact.

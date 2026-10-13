@@ -5,7 +5,8 @@ extends Node
 ## Sticks, triggers and keyboard keys are the same in every profile; a profile
 ## only decides which controller buttons trigger which actions. The chosen
 ## profile is remembered per machine in user://controls.cfg, so testers start
-## on "Default" unless they pick something else.
+## on DEFAULT_PROFILE unless they pick something else. (The panel's profile
+## picker is hidden for now; apply_profile() still switches.)
 
 signal profile_changed(profile: String)
 
@@ -13,33 +14,11 @@ const DEADZONE_STICK := 0.15
 const DEADZONE_TRIGGER := 0.05
 const DEADZONE_BUTTON := 0.5
 const SETTINGS_PATH := "user://controls.cfg"
+const DEFAULT_PROFILE := "Personal"
 
 ## Profile name -> { action: controller button }. Actions a profile leaves out
 ## have no controller button in it (they still work from the keyboard).
 const PROFILES := {
-	# Rocket League defaults. Powerslide gets its own button because RL's shared
-	# powerslide/air-roll button depends on being on the ground.
-	"Default": {
-		"jump": JOY_BUTTON_A,
-		"boost": JOY_BUTTON_B,
-		"air_roll": JOY_BUTTON_X,
-		"ball_cam": JOY_BUTTON_Y,
-		"powerslide": JOY_BUTTON_LEFT_STICK,  # Y is ball cam, as in RL
-		"roll_left": JOY_BUTTON_LEFT_SHOULDER,
-		"roll_right": JOY_BUTTON_RIGHT_SHOULDER,
-		"direction_lock": JOY_BUTTON_RIGHT_STICK,  # every face/shoulder button is taken
-	},
-	# Pro player BeastMode's binds (PlayStation layout: Cross = A, Circle = B,
-	# Square = X, Triangle = Y): one button for powerslide and air roll, as RL's
-	# shared "Powerslide / Air Roll", and directional air roll left only.
-	"BeastMode": {
-		"jump": JOY_BUTTON_A,
-		"boost": JOY_BUTTON_B,
-		"powerslide": JOY_BUTTON_X,
-		"air_roll": JOY_BUTTON_X,
-		"ball_cam": JOY_BUTTON_Y,
-		"roll_left": JOY_BUTTON_LEFT_SHOULDER,
-	},
 	# Directional air roll on face buttons, boost on RB, and LB as RL's shared
 	# "Powerslide / Air Roll": powerslide on a surface, free air roll off it.
 	"Personal": {
@@ -65,7 +44,7 @@ const BUTTON_KEYS := {
 	"ball_cam": [KEY_Y],
 }
 
-var current_profile := "Default"
+var current_profile := DEFAULT_PROFILE
 
 
 func _enter_tree() -> void:
@@ -82,8 +61,17 @@ func _enter_tree() -> void:
 	_axis("camera_up", JOY_AXIS_RIGHT_Y, -1.0, [KEY_I])
 	_axis("camera_down", JOY_AXIS_RIGHT_Y, 1.0, [KEY_K])
 
-	_button("reset", JOY_BUTTON_START, [KEY_R])
-	_button("toggle_panel", JOY_BUTTON_BACK, [KEY_F1, KEY_TAB])
+	_keys("reset", [KEY_R])  # on a controller: the pause menu's reset option
+	# The pause menu (PauseMenu), where the tuning panel is.
+	_button("pause", JOY_BUTTON_START, [KEY_ESCAPE, KEY_F1])
+	# Godot's ui_ actions are keyboard-only: the controller for menus (the pause
+	# menu, the match card's Play).
+	_add_button("ui_accept", JOY_BUTTON_A)
+	_add_button("ui_cancel", JOY_BUTTON_B)
+	_add_button("ui_up", JOY_BUTTON_DPAD_UP)
+	_add_button("ui_down", JOY_BUTTON_DPAD_DOWN)
+	# Held: the 1v1's scoreboard (RL's is on Tab, which the panel has).
+	_button("show_scoreboard", JOY_BUTTON_DPAD_UP, [KEY_B])
 
 	# Replay playback (only while a replay plays; the jump button also plays and
 	# pauses, and boost switches the Camera between Player and Director).
@@ -111,7 +99,7 @@ func profile_names() -> Array:
 
 func apply_profile(profile: String, remember := true) -> void:
 	if not PROFILES.has(profile):
-		profile = "Default"
+		profile = DEFAULT_PROFILE
 	current_profile = profile
 	var buttons: Dictionary = PROFILES[profile]
 	for action: String in BUTTON_KEYS:
@@ -147,6 +135,14 @@ func _button(action: StringName, button: JoyButton, keys: Array) -> void:
 	event.button_index = button
 	InputMap.action_add_event(action, event)
 	_add_keys(action, keys)
+
+
+## Adds `button` to an existing action, keeping its other events.
+func _add_button(action: StringName, button: JoyButton) -> void:
+	var event := InputEventJoypadButton.new()
+	event.device = -1
+	event.button_index = button
+	InputMap.action_add_event(action, event)
 
 
 func _keys(action: StringName, keys: Array) -> void:

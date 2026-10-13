@@ -6,12 +6,20 @@ A swimming game with Rocket League-style movement. See
 The current build is a **movement playground**: an underwater arena with hoops, obstacles,
 speed readouts and a live tuning panel for dialling in how the fish handles.
 
-Two environments, picked from the tuning panel's *Environment* dropdown (remembered per PC):
+Pick a mode from the settings panel's *Mode* dropdown (remembered per PC, apart from Replays):
 
+- **Free Play**: the Aquarium Arena with a ball, on your own.
+- **1v1**: the Aquarium Arena against a bot.
+- **Free Swim (Ocean)**: endless open water with no walls, floor or obstacles. Floating specks
+  surround you wherever you go, and the water is lighter above and darker below so you can tell
+  up from down.
 - **Obstacle Course**: walled arena with a timed 10-hoop course, tunnel, pillars, ramps and an arch.
-- **Ocean**: endless open water with no walls, floor or obstacles. Floating specks surround you
-  wherever you go, and the water is lighter above and darker below so you can tell up from down.
-  Environments are listed in `ENVIRONMENTS` in `scripts/main.gd`.
+- **Replays**: watch Rocket League replays in the Aquarium Arena. Pick one with **Replay...** in the
+  replay bar, or drop a `.replay` / `.rlreplay.json` on the window from any mode. **Close** goes back
+  to the mode you came from.
+
+Modes and the environment each is played in are listed in `MODES` and `MODE_ENVIRONMENTS` in
+`scripts/main.gd`.
 
 ## Running it
 
@@ -23,25 +31,21 @@ recommended; keyboard works for quick checks.
 | Swim forward | RT | W |
 | Reverse / brake | LT | S |
 | Pitch / yaw | Left stick | Arrows (A/D also yaw) |
-| Boost | B | Shift |
+| Boost | RB | Shift |
 | Jump; press again within 1.25 s to double jump, or with the stick pushed to dodge | A | Space |
-| Air roll (stick yaws → rolls) | X (hold) | C (hold) |
-| Powerslide (drift sideways, turn harder) | L3 (hold) | Ctrl (hold) |
+| Powerslide / Air roll (see below) | LB (hold) | Ctrl / C (hold) |
 | Ball cam | Y | Y |
-| Roll left / right | LB / RB | Q / E |
+| Roll left / right | X / B | Q / E |
 | Look around | Right stick | I J K L |
-| Reset fish and course | Start | R |
-| Show / hide tuning panel | View | F1 / Tab |
+| Pause (Resume, reset, Settings); B or Start again resumes | Start | Esc / F1 |
+| Reset fish and course (1v1: restart kickoff) | Pause menu | R |
 
-The table shows the **Default** controller profile. Pick another in the tuning panel's
-*Controller profile* dropdown; the choice is remembered on that PC only. Sticks, triggers and
-keyboard keys are the same in every profile. Profiles live in `PROFILES` in `scripts/controls.gd`.
+The settings panel opens from the pause menu's **Settings**, so it's only reachable with the game
+paused.
 
-| Profile | A | B | X | Y | LB | RB | L3 | R3 |
-|---|---|---|---|---|---|---|---|---|
-| Default | Jump | Boost | Air roll | Ball cam | Roll left | Roll right | Powerslide | Direction lock |
-| BeastMode | Jump | Boost | Powerslide / Air roll | Ball cam | Roll left | — | — | — |
-| Personal | Jump | Roll right | Roll left | Ball cam | Powerslide / Air roll | Boost | — | — |
+The controller buttons are the **Personal** profile (`Controls.DEFAULT_PROFILE`), remembered per
+PC. Sticks, triggers and keyboard keys are the same in every profile. Profiles live in `PROFILES`
+in `scripts/controls.gd`; the panel's *Controller profile* picker is hidden for now.
 
 *Powerslide / Air roll* is one button doing both jobs, as RL's shared bind: on a surface it
 powerslides and the stick steers; off it (in the air or water) the stick's left/right rolls the
@@ -55,7 +59,7 @@ swims; a lower *Steer Response* makes that gentler.
 **Boost works at any time**, including mid-dodge, and always pushes the way the fish is facing.
 A flip cancel hands control straight back (throttle, boost, camera) while the spin winds down.
 
-**Direction lock** (keyboard F; R3 in the Default profile): keeps the nose pointed where it faced
+**Direction lock** (keyboard F): keeps the nose pointed where it faced
 when pressed. No turning, but rolling still works.
 
 **Roll and dodge timing match Rocket League:** air roll, dodge flips and flip cancels use
@@ -78,16 +82,21 @@ Project → Export → "Windows Desktop", or from the command line:
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --export-debug "Windows Desktop" builds/windows/FishPlayground.exe
 ```
 
-Builds go to `builds/` (ignored by git). Tuning saved inside a build goes to
-`%APPDATA%\Godot\app_userdata\Under Water The Fish Don't Stink\tuning.cfg`; the panel's
-**Copy** button puts the values on the clipboard so you can paste them into the project's `tuning.cfg`.
+Builds go to `builds/` (ignored by git).
 
 ## Tuning
 
 The panel lists every `@export_range` float and `@export` bool on the fish
 (`scripts/fish_controller.gd`) and camera (`scripts/follow_camera.gd`). Add a new exported
-value to either script and it shows up automatically. **Save** writes `res://tuning.cfg`, which
-is loaded on startup, so committed tuning is shared through git.
+value to either script and it shows up automatically.
+
+Tuning is saved as **presets**: **Save...** asks where to save one (Save As), **Load...** opens one,
+**Default** goes back to the defaults (Rocket League's) and **Copy** puts the values on the clipboard.
+Both pickers open in the presets folder,
+`%APPDATA%\Godot\app_userdata\Under Water The Fish Don't Stink\presets`, where the shipped
+presets in `presets/` (such as **Water**, the original underwater tuning) are copied on startup.
+A preset only needs to list what it changes: loading one applies the defaults first. The preset
+last saved or loaded is loaded again at startup.
 
 Rotation defaults match community measurements of Rocket League's aerial physics, so it should
 feel familiar before you start changing things.

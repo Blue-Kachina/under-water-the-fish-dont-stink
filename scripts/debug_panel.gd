@@ -1,26 +1,28 @@
 extends CanvasLayer
 ## Live tuning panel. Lists every @export_range float, @export bool and @export
 ## enum on the fish, the camera and the ball settings, writes changes to them
-## immediately, and saves/loads them. Add a new export to any of them and it
-## appears here, in a collapsible panel for its @export_group (all start
-## collapsed). A target can hide options that don't apply with is_option_active().
-## Also picks the environment, the Aquarium Arena's mode (Free Play or 1v1) and
-## the fish's character (FishCharacter).
+## immediately, and saves/loads them as preset files. Add a new export to any of
+## them and it appears here, in a collapsible panel for its @export_group (all
+## start collapsed). A target can hide options that don't apply with
+## is_option_active(). Also picks the mode (main.gd's MODES) and the fish's
+## character (FishCharacter), and has the Gameplay and UI settings (UISettings).
 ##
-## Controls are mouse-only (no keyboard/gamepad focus) so the controller keeps
-## flying the fish while you drag sliders.
+## Shown from the pause menu's Settings (PauseMenu), so it runs while the game
+## is paused. Controls are mouse-only (no keyboard/gamepad focus), so the
+## controller stays on the pause menu.
 
-const SAVE_PATH_EDITOR := "res://tuning.cfg"  # tracked in git while developing
-const SAVE_PATH_USER := "user://tuning.cfg"   # exported builds can't write res://
-## Each .cfg here is a preset: the values it lists are applied over the defaults
-## (which are Rocket League's).
-const PRESET_DIR := "res://presets"
-const DEFAULT_PRESET := "Rocket League (defaults)"
-## Saved tuning carries this; older saves (the underwater tuning from before the
-## switch to Rocket League physics) aren't loaded automatically at startup.
+## Where Save and Load open: preset files (.cfg) on this PC. A preset's values
+## are applied over the defaults (Rocket League's), so it only needs to list
+## what it changes.
+const PRESET_DIR := "user://presets"
+## Presets that ship with the game, copied into PRESET_DIR when it lacks them.
+const BUNDLED_PRESET_DIR := "res://presets"
+## Remembers the preset last saved or loaded, which is loaded at startup.
+const SETTINGS_PATH := "user://playground.cfg"
+## Where Save wrote before presets: still loaded at startup until a preset is.
+const LEGACY_SAVE_PATH := "user://tuning.cfg"
+## Saved presets carry this (in [meta]).
 const TUNING_VERSION := 2
-## Where the replay picker remembers its folder (shared with main.gd's settings).
-const REPLAY_SETTINGS_PATH := "user://playground.cfg"
 
 @export var fish: FishController
 @export var follow_camera: Camera3D
@@ -34,29 +36,32 @@ var _rows := {}  # "section/property" -> the control to hide when the option doe
 var _group_panels := {}  # group's FoldableContainer -> its "section/property" keys
 var _panel: PanelContainer
 var _status: Label
-var _environment_row: HBoxContainer
 var _mode_row: HBoxContainer
 var _mode_picker: OptionButton
 var _character_picker: OptionButton
 
-signal environment_selected(env_name: String)
 signal mode_selected(mode: String)
 signal character_selected(character: FishCharacter.Family)
-## A replay file was picked (.replay or .rlreplay.json).
-signal replay_requested(path: String)
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	layer = 7  # over the pause menu's dimming
 	_targets = {"fish": fish, "camera": follow_camera, "ball": ball_settings}
 	for section: String in _targets:
 		_defaults[section] = _snapshot(_targets[section])
 	_build_ui()
-	_load(true)
+	_panel.visible = false
+	_export_presets()
+	_load_startup_preset()
 
 
-func _process(_delta: float) -> void:
-	if Input.is_action_just_pressed("toggle_panel"):
-		_panel.visible = not _panel.visible
+func is_open() -> bool:
+	return _panel.visible
+
+
+func set_open(open: bool) -> void:
+	_panel.visible = open
 
 
 func _build_ui() -> void:
@@ -77,18 +82,20 @@ func _build_ui() -> void:
 	_panel.add_child(root)
 
 	var title := Label.new()
-	title.text = "Movement tuning"
+	title.text = "Settings"
 	title.add_theme_font_size_override("font_size", 20)
 	root.add_child(title)
 
 	var buttons := HBoxContainer.new()
 	root.add_child(buttons)
-	buttons.add_child(_button("Save", _save))
-	buttons.add_child(_button("Load", _load))
-	buttons.add_child(_button("Defaults", _restore_defaults))
+	buttons.add_child(_button("Save...", _pick_preset.bind(true)))
+	buttons.add_child(_button("Load...", _pick_preset.bind(false)))
+	buttons.add_child(_button("Default", _restore_defaults))
 	buttons.add_child(_button("Copy", _copy_to_clipboard))
 
+	# Hidden for now: just the one profile (Controls.DEFAULT_PROFILE).
 	var profile_row := HBoxContainer.new()
+	profile_row.visible = false
 	root.add_child(profile_row)
 	var profile_label := Label.new()
 	profile_label.text = "Controller profile"
@@ -102,29 +109,8 @@ func _build_ui() -> void:
 	profiles.item_selected.connect(func(index: int) -> void:
 		Controls.apply_profile(profiles.get_item_text(index))
 		_status.text = "Controller profile: %s (remembered on this PC)" % Controls.current_profile)
-	# Follow profile changes made elsewhere (a preset can pick one).
-	Controls.profile_changed.connect(func(profile: String) -> void:
-		for i in profiles.item_count:
-			if profiles.get_item_text(i) == profile:
-				profiles.select(i))
 	profile_row.add_child(profiles)
 
-	var preset_row := HBoxContainer.new()
-	root.add_child(preset_row)
-	var preset_label := Label.new()
-	preset_label.text = "Preset"
-	preset_row.add_child(preset_label)
-	var presets := OptionButton.new()
-	presets.focus_mode = Control.FOCUS_NONE
-	presets.add_item(DEFAULT_PRESET)
-	for preset_name: String in _preset_names():
-		presets.add_item(preset_name)
-	presets.item_selected.connect(func(index: int) -> void:
-		_apply_preset(presets.get_item_text(index)))
-	preset_row.add_child(presets)
-
-	_environment_row = HBoxContainer.new()  # filled in by set_environments()
-	root.add_child(_environment_row)
 	_mode_row = HBoxContainer.new()  # filled in by set_modes()
 	root.add_child(_mode_row)
 
@@ -142,13 +128,6 @@ func _build_ui() -> void:
 		_status.text = "Character: %s (remembered on this PC)" % _character_picker.get_item_text(index))
 	character_row.add_child(_character_picker)
 
-	var replay_row := HBoxContainer.new()
-	root.add_child(replay_row)
-	var replay_label := Label.new()
-	replay_label.text = "Rocket League replay"
-	replay_row.add_child(replay_label)
-	replay_row.add_child(_button("Watch a replay...", _pick_replay))
-
 	_status = Label.new()
 	_status.modulate = Color(1, 1, 1, 0.6)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -162,38 +141,24 @@ func _build_ui() -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 
-	_build_ui_section(list)
+	_build_game_section(list)
 	for section: String in _targets:
 		_build_section(list, section, _targets[section])
 
 
-## Display preferences (UISettings): saved on this PC as they change, not
-## with the tuning.
-func _build_ui_section(list: VBoxContainer) -> void:
+## Gameplay and display preferences (UISettings): saved on this PC as they
+## change, not with the tuning.
+func _build_game_section(list: VBoxContainer) -> void:
 	var header := Label.new()
-	header.text = "UI"
+	header.text = "GAME"
 	header.add_theme_font_size_override("font_size", 18)
 	list.add_child(header)
-	var checks := {}
-	for entry: Array in [["show_stats", "Show stats panel (speed, drift, ...)"],
-			["show_input_overlay", "Show controller overlay"],
-			["goal_replays", "Goal replays (1v1)"],
-			["fullscreen", "Fullscreen (F11)"]]:
-		var key: String = entry[0]
-		var check := CheckBox.new()
-		check.text = entry[1]
-		check.focus_mode = Control.FOCUS_NONE
-		check.button_pressed = UISettings.get(key)
-		check.toggled.connect(func(on: bool) -> void: UISettings.set_value(key, on))
-		list.add_child(check)
-		checks[key] = check
-	# Follow changes made elsewhere (F11).
-	UISettings.changed.connect(func(key: String) -> void:
-		if checks.has(key):
-			checks[key].set_pressed_no_signal(UISettings.get(key)))
 
+	var gameplay := _foldable(list, "Gameplay")
+	var checks := {}
+	checks["goal_replays"] = _ui_check(gameplay, "goal_replays", "Goal replays (1v1)")
 	var name_row := HBoxContainer.new()
-	list.add_child(name_row)
+	gameplay.add_child(name_row)
 	var name_label := Label.new()
 	name_label.text = "Player name"
 	name_label.custom_minimum_size.x = 170.0
@@ -206,40 +171,46 @@ func _build_ui_section(list: VBoxContainer) -> void:
 	name_edit.text_changed.connect(func(text: String) -> void: UISettings.set_value("player_name", text))
 	name_edit.text_submitted.connect(func(_text: String) -> void: name_edit.release_focus())
 	name_row.add_child(name_edit)
+
+	var ui := _foldable(list, "UI")
+	for entry: Array in [["show_stats", "Show stats panel (speed, drift, ...)"],
+			["show_input_overlay", "Show controller overlay"],
+			["fullscreen", "Fullscreen (F11)"]]:
+		checks[entry[0]] = _ui_check(ui, entry[0], entry[1])
+	# Follow changes made elsewhere (F11).
+	UISettings.changed.connect(func(key: String) -> void:
+		if checks.has(key):
+			checks[key].set_pressed_no_signal(UISettings.get(key)))
 	list.add_child(HSeparator.new())
+
+
+## A CheckBox in `parent` for the UISettings bool `key`.
+func _ui_check(parent: Control, key: String, text: String) -> CheckBox:
+	var check := CheckBox.new()
+	check.text = text
+	check.focus_mode = Control.FOCUS_NONE
+	check.button_pressed = UISettings.get(key)
+	check.toggled.connect(func(on: bool) -> void: UISettings.set_value(key, on))
+	parent.add_child(check)
+	return check
+
+
+## A collapsible (and collapsed) panel titled `title` in `list`; returns the
+## list to fill it with.
+func _foldable(list: VBoxContainer, title: String) -> VBoxContainer:
+	var panel := FoldableContainer.new()
+	panel.title = title
+	panel.folded = true
+	panel.focus_mode = Control.FOCUS_NONE
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_child(panel)
+	var contents := VBoxContainer.new()
+	panel.add_child(contents)
+	return contents
 
 
 func show_status(text: String) -> void:
 	_status.text = text
-
-
-## Opens a file picker in the folder last picked from; the first time, in the
-## project's private_content/replays (gitignored) or else Rocket League's own
-## replay folder.
-func _pick_replay() -> void:
-	var dialog := FileDialog.new()
-	dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	dialog.access = FileDialog.ACCESS_FILESYSTEM
-	dialog.use_native_dialog = true
-	dialog.title = "Watch a Rocket League replay"
-	dialog.filters = PackedStringArray(["*.replay, *.rlreplay.json ; Rocket League replays"])
-	var settings := ConfigFile.new()
-	settings.load(REPLAY_SETTINGS_PATH)
-	for dir: String in [settings.get_value("replay", "last_dir", ""),
-			ProjectSettings.globalize_path("res://private_content/replays"),
-			OS.get_executable_path().get_base_dir().path_join("../../private_content/replays").simplify_path(),
-			OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS).path_join("My Games/Rocket League/TAGame/Demos")]:
-		if not dir.is_empty() and DirAccess.dir_exists_absolute(dir):
-			dialog.current_dir = dir
-			break
-	dialog.file_selected.connect(func(path: String) -> void:
-		settings.set_value("replay", "last_dir", path.get_base_dir())
-		settings.save(REPLAY_SETTINGS_PATH)
-		replay_requested.emit(path)
-		dialog.queue_free())
-	dialog.canceled.connect(dialog.queue_free)
-	add_child(dialog)
-	dialog.popup_centered_ratio(0.6)
 
 
 ## Shows `character` as picked in the Character row (selections are reported
@@ -254,23 +225,6 @@ func set_character_enabled(enabled: bool) -> void:
 	_character_picker.tooltip_text = "" if enabled else "Close the replay to change character"
 
 
-## Adds the environment picker; selections are reported via environment_selected.
-func set_environments(names: Array, current: String) -> void:
-	var label := Label.new()
-	label.text = "Environment"
-	_environment_row.add_child(label)
-	var picker := OptionButton.new()
-	picker.focus_mode = Control.FOCUS_NONE
-	for env_name: String in names:
-		picker.add_item(env_name)
-		if env_name == current:
-			picker.select(picker.item_count - 1)
-	picker.item_selected.connect(func(index: int) -> void:
-		environment_selected.emit(picker.get_item_text(index))
-		_status.text = "Environment: %s (remembered on this PC)" % picker.get_item_text(index))
-	_environment_row.add_child(picker)
-
-
 ## Adds the mode picker; selections are reported via mode_selected.
 func set_modes(names: Array, current: String) -> void:
 	var label := Label.new()
@@ -280,19 +234,21 @@ func set_modes(names: Array, current: String) -> void:
 	_mode_picker.focus_mode = Control.FOCUS_NONE
 	for mode: String in names:
 		_mode_picker.add_item(mode)
-		if mode == current:
-			_mode_picker.select(_mode_picker.item_count - 1)
+	set_mode(current)
 	_mode_picker.item_selected.connect(func(index: int) -> void:
-		mode_selected.emit(_mode_picker.get_item_text(index))
-		_status.text = "Mode: %s (remembered on this PC)" % _mode_picker.get_item_text(index))
+		var mode := _mode_picker.get_item_text(index)
+		mode_selected.emit(mode)
+		_status.text = "Mode: %s" % mode)
 	_mode_row.add_child(_mode_picker)
 
 
-## Modes are for the Aquarium Arena only.
-func set_mode_enabled(enabled: bool) -> void:
-	if _mode_picker:
-		_mode_picker.disabled = not enabled
-		_mode_picker.tooltip_text = "" if enabled else "Modes are played in the Aquarium Arena"
+## Shows `mode` as picked (selections are reported via mode_selected).
+func set_mode(mode: String) -> void:
+	if _mode_picker == null:
+		return
+	for i in _mode_picker.item_count:
+		if _mode_picker.get_item_text(i) == mode:
+			_mode_picker.select(i)
 
 
 func _build_section(list: VBoxContainer, section: String, target: Object) -> void:
@@ -309,14 +265,8 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 		var key := "%s/%s" % [section, prop]
 		if group_panel == null or property.group != shown_group:
 			shown_group = property.group
-			group_panel = FoldableContainer.new()
-			group_panel.title = shown_group if shown_group else "General"
-			group_panel.folded = true
-			group_panel.focus_mode = Control.FOCUS_NONE
-			group_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			list.add_child(group_panel)
-			group_list = VBoxContainer.new()
-			group_panel.add_child(group_list)
+			group_list = _foldable(list, shown_group if shown_group else "General")
+			group_panel = group_list.get_parent()
 			_group_panels[group_panel] = []
 		_group_panels[group_panel].append(key)
 
@@ -454,73 +404,97 @@ func _to_config() -> ConfigFile:
 	return config
 
 
-func _save_path() -> String:
-	return SAVE_PATH_EDITOR if OS.has_feature("editor") else SAVE_PATH_USER
+## Copies the shipped presets into PRESET_DIR (without replacing any there), so
+## Load finds them.
+func _export_presets() -> void:
+	DirAccess.make_dir_recursive_absolute(PRESET_DIR)
+	for file in DirAccess.get_files_at(BUNDLED_PRESET_DIR):
+		var target := PRESET_DIR.path_join(file)
+		if file.get_extension() == "cfg" and not FileAccess.file_exists(target):
+			var out := FileAccess.open(target, FileAccess.WRITE)
+			if out:
+				out.store_string(FileAccess.get_file_as_string(BUNDLED_PRESET_DIR.path_join(file)))
 
 
-func _save() -> void:
-	var error := _to_config().save(_save_path())
-	_status.text = "Saved to %s" % _save_path() if error == OK else "Save failed: %s" % error_string(error)
+## The preset last saved or loaded, else what Save wrote before presets. Not
+## in test probes, which run on the defaults.
+func _load_startup_preset() -> void:
+	if get_tree().current_scene != get_parent():
+		return
+	var settings := ConfigFile.new()
+	settings.load(SETTINGS_PATH)
+	var path: String = settings.get_value("tuning", "preset", "")
+	if path.is_empty() or not FileAccess.file_exists(path):
+		path = LEGACY_SAVE_PATH
+	if FileAccess.file_exists(path):
+		_load_preset(path)
 
 
-func _load(quiet := false) -> void:
-	# Exported builds fall back to the tuning that shipped with the project.
-	var path := _save_path()
-	if not FileAccess.file_exists(path):
-		path = SAVE_PATH_EDITOR
+## Save (Save As) or Load a preset file, in a native picker that opens in
+## PRESET_DIR.
+func _pick_preset(saving: bool) -> void:
+	var dialog := FileDialog.new()
+	dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE if saving else FileDialog.FILE_MODE_OPEN_FILE
+	dialog.access = FileDialog.ACCESS_FILESYSTEM
+	dialog.use_native_dialog = true
+	dialog.title = "Save tuning preset" if saving else "Load tuning preset"
+	dialog.filters = PackedStringArray(["*.cfg ; Tuning presets"])
+	dialog.current_dir = ProjectSettings.globalize_path(PRESET_DIR)
+	if saving:
+		dialog.current_file = "my_preset.cfg"
+	dialog.file_selected.connect(func(path: String) -> void:
+		if saving:
+			_save_preset(path)
+		else:
+			_load_preset(path)
+		dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered_ratio(0.6)
+
+
+func _save_preset(path: String) -> void:
+	var error := _to_config().save(path)
+	if error != OK:
+		_status.text = "Save failed: %s" % error_string(error)
+		return
+	_remember_preset(path)
+	_status.text = "Saved %s" % path.get_file()
+
+
+## Defaults first, then the preset's values on top, so a preset only needs to
+## list what it changes.
+func _load_preset(path: String) -> void:
 	var config := ConfigFile.new()
 	if config.load(path) != OK:
-		if not quiet:
-			_status.text = "No saved tuning at %s" % _save_path()
+		_status.text = "Couldn't load %s" % path
 		return
-	if quiet and int(config.get_value("meta", "version", 1)) < TUNING_VERSION:
-		_status.text = "Skipped saved tuning from before Rocket League physics (%s). Press Load to use it anyway." % path
-		return
-	for section: String in _targets:
-		if not config.has_section(section):
-			continue
-		var values := {}
-		for prop in config.get_section_keys(section):
-			values[prop] = config.get_value(section, prop)
-		_apply(section, values)
-	_status.text = "Loaded %s" % path
-
-
-func _preset_names() -> PackedStringArray:
-	var names := PackedStringArray()
-	for file in DirAccess.get_files_at(PRESET_DIR):
-		if file.get_extension() == "cfg":
-			names.append(file.get_basename().capitalize())
-	return names
-
-
-## Defaults first, then the preset file's values on top, so a preset only needs
-## to list what it changes.
-func _apply_preset(preset_name: String) -> void:
 	for section: String in _targets:
 		_apply(section, _defaults[section])
-	if preset_name != DEFAULT_PRESET:
-		var config := ConfigFile.new()
-		var path := "%s/%s.cfg" % [PRESET_DIR, preset_name.to_snake_case()]
-		if config.load(path) != OK:
-			_status.text = "Couldn't load preset %s" % path
-			return
-		for section: String in _targets:
-			if config.has_section(section):
-				var values := {}
-				for prop in config.get_section_keys(section):
-					values[prop] = config.get_value(section, prop)
-				_apply(section, values)
-		if config.has_section_key("controls", "profile"):
-			Controls.apply_profile(config.get_value("controls", "profile"))
+		if config.has_section(section):
+			var values := {}
+			for prop in config.get_section_keys(section):
+				values[prop] = config.get_value(section, prop)
+			_apply(section, values)
 	_refresh_visibility()
-	_status.text = "Preset: %s (not saved)" % preset_name
+	if not path.begins_with("res://") and path != LEGACY_SAVE_PATH:
+		_remember_preset(path)
+	_status.text = "Loaded %s" % path.get_file()
+
+
+## Loaded at startup from now on.
+func _remember_preset(path: String) -> void:
+	var settings := ConfigFile.new()
+	settings.load(SETTINGS_PATH)
+	settings.set_value("tuning", "preset", path)
+	settings.save(SETTINGS_PATH)
 
 
 func _restore_defaults() -> void:
 	for section: String in _targets:
 		_apply(section, _defaults[section])
-	_status.text = "Restored defaults (not saved)"
+	_refresh_visibility()
+	_status.text = "Default tuning (not saved)"
 
 
 func _copy_to_clipboard() -> void:
