@@ -3,7 +3,10 @@ render_mode cull_disabled, depth_draw_always;
 // A thin fin (FishModel._membrane): UV.x runs along its root, UV.y from the root
 // (0) out to its edge (1). It ripples out of its plane, more toward the edge and
 // harder the faster the fish swims, and goes see-through toward the edge with
-// its rays showing.
+// its rays showing. A tail's fin also shows the stride cue (stride_cue.gdshaderinc),
+// root to edge.
+
+#include "res://shaders/stride_cue.gdshaderinc"
 
 uniform vec4 albedo : source_color = vec4(1.0);  // at the root
 uniform vec4 edge_color : source_color = vec4(1.0);
@@ -36,4 +39,8 @@ void fragment() {
 	ALPHA = mix(1.0, edge_alpha, out_part);
 	ROUGHNESS = 0.35;
 	BACKLIGHT = color * 0.5;
+	// The lit part of a see-through fin firms up, so the cue reads on it too.
+	vec3 cue = stride_cue(UV.y);
+	EMISSION = cue * 1.5;
+	ALPHA = max(ALPHA, min(length(cue), 1.0));
 }

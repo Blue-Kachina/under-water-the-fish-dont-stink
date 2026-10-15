@@ -51,11 +51,6 @@ const OVER_TIME := 20.0
 const BOT_NAMES := ["Barracuda", "Snapper", "Grouper", "Kipper", "Wahoo", "Marlin", "Halibut", "Mackerel", "Pike", "Tarpon"]
 ## How long "GO!" shows after the countdown.
 const GO_TIME := 0.8
-## The hitboxes must come within this (m) for a demolition.
-const DEMO_REACH := 0.1
-## The victim must be at least this far ahead of the attacker (cosine of the
-## angle off its nose): a demolition takes the front of the fish, as RL's bumper.
-const DEMO_FRONT := 0.3
 const BOT_CHARACTER := FishCharacter.Family.OCTANE
 ## RL's kickoff spots for the team defending +Z (x, z in m) and whether the
 ## fish there faces the ball (the diagonals) or straight down the tank. The
@@ -111,7 +106,6 @@ var _goal_record_time := 0.0
 
 ## Demolished fish -> seconds until it respawns.
 var _respawn_left := {}
-var _demo_box := BoxShape3D.new()
 ## Touches waiting a tick to see where they sent the ball: [fish, ball position
 ## and velocity before].
 var _pending_touches: Array = []
@@ -433,30 +427,13 @@ func _stop_replay() -> void:
 
 ## `attacker` demolishes `victim` if it's supersonic and its front is touching it.
 func _check_demolition(attacker: FishController, victim: FishController) -> void:
-	if attacker.demolished or victim.demolished or attacker.speed < FishController.SUPERSONIC_SPEED:
-		return
-	var ahead := (victim.global_position - attacker.global_position).normalized()
-	if ahead.dot(-attacker.global_basis.z) < DEMO_FRONT or not _touching(attacker, victim):
+	if not Demolition.hits(attacker, victim):
 		return
 	Explosion.spawn(arena, victim.global_position, AquariumArena.TEAM_COLORS[_team_of(victim)], 6.0)
 	victim.demolish()
 	_respawn_left[victim] = RESPAWN_TIME
 	_announce(MatchStats.DEMO, attacker, {"victim": 0 if victim == player else 1})
 	demolished.emit(attacker, victim)
-
-
-## Whether `attacker`'s hitbox (grown by DEMO_REACH) overlaps `victim`.
-func _touching(attacker: FishController, victim: FishController) -> bool:
-	var hitbox := attacker.get_node("Collision") as CollisionShape3D
-	_demo_box.size = (hitbox.shape as BoxShape3D).size + Vector3.ONE * DEMO_REACH * 2.0
-	var query := PhysicsShapeQueryParameters3D.new()
-	query.shape = _demo_box
-	query.transform = hitbox.global_transform
-	query.exclude = [attacker.get_rid()]
-	for hit in attacker.get_world_3d().direct_space_state.intersect_shape(query, 8):
-		if hit.collider == victim:
-			return true
-	return false
 
 
 ## Fish the cameras should snap to once they've actually moved (resets land on

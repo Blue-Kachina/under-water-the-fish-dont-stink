@@ -42,6 +42,8 @@ uniform float mouth_width = 0.04;  // half
 
 // The tail (UV.x runs 0 at the base to 1 at the tip).
 uniform float tail_length = 0.8;
+
+#include "res://shaders/stride_cue.gdshaderinc"
 uniform float tail_ripple = 0.08;
 
 varying vec3 rest;
@@ -143,5 +145,8 @@ void fragment() {
 	}
 	ALBEDO = mix(color, spot_color.rgb, spot);
 	EMISSION = spot_color.rgb * spot * spot_glow;
+	if (tail_mode) {
+		EMISSION += stride_cue(UV.x);
+	}
 	ROUGHNESS = 0.45;
 }

@@ -1,8 +1,9 @@
 class_name PauseMenu
 extends CanvasLayer
 ## Start (Esc, F1) pauses the game and shows this menu: Resume, the mode's reset
-## (Start used to reset; R still does), and Settings, which shows the tuning
-## panel (only reachable from here). Start again, B or Resume carries on.
+## (Start used to reset; R still does), Settings, which shows the tuning
+## panel (only reachable from here), and Exit, which quits the game. Start
+## again, B or Resume carries on.
 ##
 ## Runs while the tree is paused. Its buttons act on release, so the A press
 ## that picks Resume is over before the fish runs again (no stray jump).
@@ -64,6 +65,7 @@ func _ready() -> void:
 	_settings = _button(column, "Settings", func() -> void:
 		settings_panel.set_open(not settings_panel.is_open())
 		_update_buttons())
+	_button(column, "Exit", func() -> void: get_tree().quit())
 	var hint := Label.new()
 	hint.text = "Start / B: resume"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

@@ -2,11 +2,13 @@ extends Node3D
 ## Movement playground root: owns the swappable environment, global shortcuts
 ## and the pause menu (PauseMenu, on Start), whose Settings shows the tuning
 ## panel. The mode (picked in the tuning panel) decides the environment: Free Play and
-## 1v1 (against a bot, Match1v1) in the Aquarium Arena, Free Swim in the Ocean,
-## the Obstacle Course, and Replays.
+## 1v1 (against a bot, Match1v1) in the Aquarium Arena, Free Swim and Nature
+## (Extra Swishy strides after a fish to demolish, NatureRun) in the Ocean, the
+## Obstacle Course, and Replays.
 ##
 ## Match modes (MATCH_MODES) start on a card (MatchCard) with the fish sitting
-## out; its Play starts the match (play_match).
+## out; its Play starts the match (play_match). Nature plays on its own tuning
+## (NATURE_PRESET), and leaving it puts the tuning from before back.
 ##
 ## Replays mode plays Rocket League replays in the Aquarium Arena (load_replay):
 ## pick one with the replay card's Open, drop a file on the window (from any
@@ -27,16 +29,20 @@ const SETTINGS_PATH := "user://playground.cfg"
 const FREE_PLAY := "Free Play"
 const ONE_V_ONE := "1v1"
 const FREE_SWIM := "Free Swim (Ocean)"
+const NATURE := "Nature"
 const OBSTACLE_COURSE := "Obstacle Course"
 const REPLAYS := "Replays"
-const MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, OBSTACLE_COURSE, REPLAYS]
+const MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, NATURE, OBSTACLE_COURSE, REPLAYS]
 ## Modes played as a match, which wait on a card for Play.
-const MATCH_MODES := [ONE_V_ONE]
+const MATCH_MODES := [ONE_V_ONE, NATURE]
+## Nature's tuning: Extra Swishy strides, no boost.
+const NATURE_PRESET := "res://presets/nature.cfg"
 ## Mode -> the environment it's played in.
 const MODE_ENVIRONMENTS := {
 	FREE_PLAY: "Aquarium Arena",
 	ONE_V_ONE: "Aquarium Arena",
 	FREE_SWIM: "Ocean",
+	NATURE: "Ocean",
 	OBSTACLE_COURSE: "Obstacle Course",
 	REPLAYS: "Aquarium Arena",
 }
@@ -52,6 +58,10 @@ var current_mode := ""
 var replay: ReplayPlayer
 ## The 1v1 being played, if any.
 var match_1v1: Match1v1
+## The Nature run being played, if any.
+var nature_run: NatureRun
+## The tuning from before Nature's, while Nature's is on (else empty).
+var _tuning_before_nature := {}
 ## Shown in a match mode until Play starts the match.
 var _match_card: MatchCard
 var _environment: Node3D
@@ -77,8 +87,8 @@ func _ready() -> void:
 	if settings.load(SETTINGS_PATH) == OK:
 		saved_mode = _saved_mode(settings)
 		saved_character = FishCharacter.from_key(settings.get_value("playground", "character", "octane"))
-	if get_tree().current_scene != self and saved_mode == ONE_V_ONE:
-		saved_mode = FREE_PLAY  # inside a test probe: no bot, whatever was last played
+	if get_tree().current_scene != self and saved_mode in [ONE_V_ONE, NATURE]:
+		saved_mode = FREE_PLAY  # inside a test probe: no bot or Nature tuning, whatever was last played
 	_fish.character = saved_character
 	_fish.display_name = UISettings.display_name()
 	UISettings.changed.connect(func(key: String) -> void:
@@ -160,6 +170,8 @@ func set_character(character: FishCharacter.Family) -> void:
 	_fish.character = character
 	if match_1v1:
 		match_1v1.kickoff()  # back to a kickoff as the new character
+	elif nature_run:
+		nature_run.start()
 	else:
 		_fish.set_spawn(_environment.spawn_transform())
 	_panel.set_character(character)
@@ -183,6 +195,9 @@ func reset_play() -> void:
 	if match_1v1:
 		match_1v1.kickoff()
 		return
+	if nature_run:
+		nature_run.start()
+		return
 	_fish.set_spawn(_environment.spawn_transform())  # re-read: the aquarium's depends on the ball type
 	if _environment is Arena:
 		(_environment as Arena).reset_course()
@@ -194,7 +209,9 @@ func reset_play() -> void:
 func _reset_label() -> String:
 	if current_mode == REPLAYS or _match_card:
 		return ""
-	return "Restart kickoff" if match_1v1 else "Reset"
+	if match_1v1:
+		return "Restart kickoff"
+	return "Restart" if nature_run else "Reset"
 
 
 ## Loads (converting a .replay first) and plays a replay. Runs in the
@@ -351,27 +368,29 @@ func _leave_replays() -> void:
 	_come_back()
 
 
-## The live fish and the Aquarium's ball sit out (Replays, a match card).
+## The live fish (and the Aquarium's ball) sit out (Replays, a match card).
 func _sit_out() -> void:
-	var aquarium := _environment as AquariumArena
 	_fish.visible = false
 	_fish.freeze = true
 	_fish.process_mode = Node.PROCESS_MODE_DISABLED
-	aquarium.set_physics_process(false)  # no scoring, no ball respawn
-	aquarium.ball.pop()
 	_hud.fish_sitting_out = true
+	var aquarium := _environment as AquariumArena
+	if aquarium:
+		aquarium.set_physics_process(false)  # no scoring, no ball respawn
+		aquarium.ball.pop()
 
 
-## Back from _sit_out: the live fish and ball at a kickoff.
+## Back from _sit_out: the live fish (and ball, at a kickoff).
 func _come_back() -> void:
 	_fish.visible = true
 	_fish.freeze = false
 	_fish.process_mode = Node.PROCESS_MODE_INHERIT
 	_hud.fish_sitting_out = false
 	var aquarium := _environment as AquariumArena
-	aquarium.set_physics_process(true)
-	aquarium.reset_kickoff()
-	_camera.ball = aquarium.ball
+	if aquarium:
+		aquarium.set_physics_process(true)
+		aquarium.reset_kickoff()
+	_camera.ball = aquarium.ball if aquarium else null
 	_fish.set_spawn(_environment.spawn_transform())
 
 
@@ -397,6 +416,8 @@ static func _match_card_text(mode: String) -> String:
 	match mode:
 		ONE_V_ONE:
 			return "1v1 against a bot: %d minutes on the clock, overtime on a tie." % int(Match1v1.MATCH_TIME / 60.0)
+		NATURE:
+			return "Swim like a fish: no boost here. Hold throttle and sweep the stick from side to side (any direction, as long as each sweep goes back the other way). Each stride builds to a peak, when its glow flashes; sweep back right then and the next stride pushes harder. Keep it up and the push builds. Ram the fish your camera's locked on fast enough to demolish it."
 	return mode
 
 
@@ -453,21 +474,44 @@ func set_mode(mode: String, remember := true) -> void:
 ## Shows a match mode's card (the match starts on Play), or ends the match
 ## (or card) outside one.
 func _apply_mode() -> void:
-	var wanted := current_mode in MATCH_MODES and _environment is AquariumArena
+	_use_nature_tuning(current_mode == NATURE)
+	var wanted: bool = current_mode in MATCH_MODES and current_environment == MODE_ENVIRONMENTS[current_mode]
 	if wanted:
-		if match_1v1 == null and _match_card == null:
+		if not _playing() and _match_card == null:
 			_show_match_card()
 		return
 	_close_match_card()
-	if match_1v1 == null:
+	if not _playing():
 		return
 	_end_match()
-	if _environment is AquariumArena and current_mode != REPLAYS:
+	if current_mode == REPLAYS:
+		return
+	if _environment is AquariumArena:
 		(_environment as AquariumArena).reset_kickoff()
-		_fish.set_spawn(_environment.spawn_transform())
+	_fish.set_spawn(_environment.spawn_transform())
+
+
+## A match or a Nature run is on.
+func _playing() -> bool:
+	return match_1v1 != null or nature_run != null
+
+
+## Nature's tuning on (keeping what was there) or off (putting it back).
+func _use_nature_tuning(on: bool) -> void:
+	if on != _tuning_before_nature.is_empty():
+		return  # already so
+	if on:
+		_tuning_before_nature = _panel.tuning_snapshot()
+		_panel.load_mode_preset(NATURE_PRESET)
+	else:
+		_panel.restore_tuning(_tuning_before_nature)
+		_tuning_before_nature = {}
 
 
 func _start_match() -> void:
+	if current_mode == NATURE:
+		_start_nature()
+		return
 	match_1v1 = Match1v1.new()
 	match_1v1.name = "Match"
 	match_1v1.setup(_environment as AquariumArena, _fish)
@@ -479,7 +523,26 @@ func _start_match() -> void:
 	_hud.set_match(match_1v1)
 
 
+func _start_nature() -> void:
+	nature_run = NatureRun.new()
+	nature_run.name = "Nature"
+	nature_run.setup(_environment, _fish)
+	nature_run.fish_teleported.connect(func(fish: FishController) -> void:
+		if fish == _fish:
+			_camera.snap())
+	_environment.add_child(nature_run)
+	_camera.ball = nature_run.target  # ball cam follows the fish to catch
+	_camera.ball_cam = true
+	_hud.set_nature(nature_run)
+
+
 func _end_match() -> void:
+	if nature_run:
+		nature_run.end()
+		nature_run.queue_free()
+		nature_run = null
+		_camera.ball = null
+		_hud.set_nature(null)
 	if match_1v1 == null:
 		return
 	match_1v1.end()

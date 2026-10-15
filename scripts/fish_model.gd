@@ -19,6 +19,7 @@ const RAY_SKIN := preload("res://shaders/ray_skin.gdshader")
 const KOI_SKIN := preload("res://shaders/koi_skin.gdshader")
 const BOX_SKIN := preload("res://shaders/box_skin.gdshader")
 const FIN_MEMBRANE := preload("res://shaders/fin_membrane.gdshader")
+const STRIDE_OVERLAY := preload("res://shaders/stride_overlay.gdshader")
 
 var family := FishCharacter.Family.OCTANE
 var tail: Node3D
@@ -49,6 +50,8 @@ var _swim_phase := 0.0
 ## react() also bends.
 var _skin: ShaderMaterial
 var _tail_skin: ShaderMaterial
+## The tail's meshes that show set_stride_cue(), found the first time it shows.
+var _tail_cue: Array[GeometryInstance3D] = []
 
 
 static func build(character: FishCharacter.Family) -> FishModel:
@@ -105,6 +108,58 @@ func react(delta: float, velocity: Vector3) -> void:
 	squash.position = shift
 	for i in _face_anchors.size():
 		_face_anchors[i].position = _face_rest[i] * shape + shift
+
+
+## Extra Swishy's timing cue (SwishySwim): the tail lights up from its root
+## to its tip like a progress bar, `fill` 0..1 (the tip is the stride's peak),
+## at brightness `glow`, turning gold as `sweet` goes to 1 (at the peak). The
+## tail's own shaders draw it (stride_cue.gdshaderinc); plain parts get an
+## overlay that does. glow 0 turns it off.
+func set_stride_cue(fill: float, glow: float, sweet: float) -> void:
+	if _tail_cue.is_empty():
+		if glow <= 0.0:
+			return
+		_setup_tail_cue()
+	for part: GeometryInstance3D in _tail_cue:
+		part.set_instance_shader_parameter("stride_fill", fill)
+		part.set_instance_shader_parameter("stride_glow", glow)
+		part.set_instance_shader_parameter("stride_sweet", sweet)
+
+
+## Finds the tail's meshes for set_stride_cue(). Fins and the ray's whip already
+## draw the cue (their shaders include it); plain parts get an overlay that
+## works out how far back along the tail each point is.
+func _setup_tail_cue() -> void:
+	var plain: Array[MeshInstance3D] = []
+	var bounds := AABB()
+	for node in tail.find_children("*", "MeshInstance3D", true, false):
+		var part := node as MeshInstance3D
+		var shader_material := part.material_override as ShaderMaterial
+		if shader_material and shader_material.shader in [FIN_MEMBRANE, RAY_SKIN]:
+			_tail_cue.append(part)
+			continue
+		var in_pivot := _transform_in_tail(part)
+		var box := in_pivot * part.get_aabb()
+		bounds = box if plain.is_empty() else bounds.merge(box)
+		plain.append(part)
+	for part in plain:
+		var overlay := ShaderMaterial.new()
+		overlay.shader = STRIDE_OVERLAY
+		overlay.set_shader_parameter("to_pivot", Projection(_transform_in_tail(part)))
+		overlay.set_shader_parameter("root", bounds.position.z)
+		overlay.set_shader_parameter("tip", bounds.end.z)
+		part.material_overlay = overlay
+		_tail_cue.append(part)
+
+
+## `part`'s transform in the tail pivot's space.
+func _transform_in_tail(part: Node3D) -> Transform3D:
+	var xform := Transform3D.IDENTITY
+	var node: Node3D = part
+	while node != tail:
+		xform = node.transform * xform
+		node = node.get_parent_node_3d()
+	return xform
 
 
 func set_body_color(color: Color) -> void:

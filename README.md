@@ -13,6 +13,10 @@ Pick a mode from the settings panel's *Mode* dropdown (remembered per PC, apart 
 - **Free Swim (Ocean)**: endless open water with no walls, floor or obstacles. Floating specks
   surround you wherever you go, and the water is lighter above and darker below so you can tell
   up from down.
+- **Nature**: the Ocean, with no boost and the **Extra Swishy** swim style (see below). It starts on a
+  card; after **Play**, a calm fish waits ahead and ball cam locks onto it. Ram it nose first at 10 m/s
+  or more (*Nature Demo Speed*) to demolish it, and a new one turns up 30-50 m away. Nature has its
+  own tuning (`presets/nature.cfg`); leaving Nature puts your tuning from before back.
 - **Obstacle Course**: walled arena with a timed 10-hoop course, tunnel, pillars, ramps and an arch.
 - **Replays**: watch Rocket League replays in the Aquarium Arena. Pick one with **Replay...** in the
   replay bar, or drop a `.replay` / `.rlreplay.json` on the window from any mode. **Close** goes back
@@ -55,6 +59,26 @@ fish instead of turning it (free air roll).
 two beats set the tempo; every on-tempo beat after that adds a small speed boost. An off-tempo
 beat breaks the rhythm, and mashing gives nothing. Sweeps also steer, so the fish wiggles as it
 swims; a lower *Steer Response* makes that gentler.
+
+**Extra Swishy** (Nature, or *Swim Style* in the panel's Swim Strokes): while you hold throttle,
+each sweep of the left stick to the opposite side is a stride, like a skater pushing off alternate blades. Any direction works
+(left/right, up/down, diagonal), as long as each sweep goes back the other way through the middle;
+circling the stick does nothing. A stride's push builds to a peak (*Stride Peak Time*), then fades.
+The fish's tail is the timing cue: it lights up from its root to its tip like a progress bar
+as the stride builds, reaching the tip (and turning gold) at the peak, then dims as the stride fades.
+Sweeping back right at the peak builds **flow**, which multiplies every stride's push. Too early and the stride hadn't
+built up; too late and it had already faded. Each stride pushes a little sideways away from the
+sweep, so alternate strides weave forward. Steering follows a smoothed stick (*Stride Steer
+Smoothing*), so alternating sweeps mostly cancel out while a held direction still turns. Without
+throttle the stick just steers, directly, as in the other modes (*Stride Needs Throttle*).
+`tests/swishy_probe` measures the timings. The bottom of the screen shows how the last stride was
+timed (EARLY / PERFECT / LATE) and the flow.
+
+**Bow wave** (on in Nature, *Bow Wave* in the panel): speed pushes a mostly clear, torpedo-tip
+shell of water out ahead of the fish, from *Bow Start Speed* to full size at *Bow Full Speed*. It
+counts as the fish's front for demolitions, so a fast fish has a bigger target area, but it doesn't
+push anything. `tests/stride_shots` (needs a window) renders the tail cue and the bow wave on
+every fish.
 
 **Boost works at any time**, including mid-dodge, and always pushes the way the fish is facing.
 A flip cancel hands control straight back (throttle, boost, camera) while the spin winds down.

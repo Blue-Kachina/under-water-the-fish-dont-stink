@@ -15,6 +15,9 @@ signal jumped
 signal double_jumped
 signal dodged(direction: Vector3)
 signal stroked(quality: float)
+## An Extra Swishy stride began (SwishySwim): its timing (0..1, or -1 for a
+## fresh start) and the flow it left.
+signal strode(timing: float, flow: float)
 ## Start of every physics tick, before input is sampled: `state` is the result
 ## of the last step. Lets a test driver (tests/physics_parity_probe) read the
 ## state and set this tick's input with no lag.
@@ -27,9 +30,19 @@ enum JumpState { READY, SECOND_JUMP, COOLDOWN }
 const GROUP := &"fish"
 ## RL's supersonic speed (2200 uu/s): demolitions need it.
 const SUPERSONIC_SPEED := 22.0
+## How quickly the bow wave grows and shrinks (its size, 0..1, per second).
+const BOW_RESPONSE := 2.5
+const BOW_SHADER := preload("res://shaders/bow_wave.gdshader")
+## The bow wave's convex shape: rings from the middle to the tip, points per ring.
+const BOW_RINGS := 6
+const BOW_SIDES := 12
 ## Rocket League's deadzone shapes. CIRCLE: on the stick's distance from centre.
 ## CROSS: on each axis separately, so a nearly straight push stays exactly straight.
 enum DeadzoneShape { CIRCLE, CROSS }
+## How swim strokes work. ORIGINAL: a steady rhythm of stick sweeps adds a
+## little speed per on-tempo beat. EXTRA_SWISHY: each sweep is a stride that
+## builds and fades, and alternating at its peak compounds speed (SwishySwim).
+enum SwimStyle { ORIGINAL, EXTRA_SWISHY }
 
 # Rocket League air roll, from RocketSim (RLConst.h): angular acceleration =
 # (CAR_AIR_CONTROL_TORQUE.roll * input - CAR_AIR_CONTROL_DAMPING.roll * roll rate)
@@ -167,6 +180,8 @@ const TIME_EPSILON := 0.0001
 @export_range(0.0, 30.0, 0.5) var max_reverse_speed := 23.0
 
 @export_group("Boost")
+## Off: the boost button does nothing (and the gauge hides), e.g. in Nature.
+@export var boost_enabled := true
 ## RL: 1058.3 uu/s^2 in the air.
 @export_range(0.0, 60.0, 0.01) var boost_accel := 10.58
 ## Absolute speed cap, also applied to jumps and dodges. RL: 2300 uu/s.
@@ -238,6 +253,7 @@ const TIME_EPSILON := 0.0001
 ## fish wiggles as it swims (gentler with a low steer_response). The first two
 ## beats set the tempo; every on-tempo beat after that adds speed.
 @export var swim_strokes := true
+@export var swim_style := SwimStyle.ORIGINAL
 ## Strokes only count while the direction lock is held. Off = they always count.
 @export var strokes_need_lock := false
 ## Speed added by each on-tempo beat (from the 3rd beat on).
@@ -253,6 +269,54 @@ const TIME_EPSILON := 0.0001
 ## How much a beat may differ from the previous one (as a fraction) and still
 ## count as on tempo. Smaller = stricter timing. A beat outside it breaks the rhythm.
 @export_range(0.05, 1.0, 0.05) var rhythm_tolerance := 0.3
+
+@export_group("Extra Swishy")
+## Sweeps only stride while swimming forward (throttle held). Without
+## throttle, the stick just steers, directly. Off = sweeps always stride.
+@export var stride_needs_throttle := true
+## How far the stick must reach for a sweep to count as a stride.
+@export_range(0.1, 1.0, 0.05) var stride_threshold := 0.5
+## How opposite the next sweep must be (cosine): 0.5 = within 60° of straight back.
+@export_range(0.0, 1.0, 0.05) var stride_reversal := 0.5
+## Push at a stride's peak (m/s²), before flow and timing.
+@export_range(0.0, 150.0, 0.5) var stride_force := 40.0
+## Time from a stride's start to its peak: alternate here for full timing.
+@export_range(0.05, 1.5, 0.01) var stride_peak_time := 0.35
+## Time from the peak until the stride has faded to nothing.
+@export_range(0.05, 2.0, 0.01) var stride_fade_time := 0.6
+## A stride with nothing before it (or after a mistimed one) pushes this much.
+@export_range(0.0, 1.0, 0.05) var stride_fresh := 0.6
+## How far off straight ahead each stride pushes, away from the sweep (degrees).
+@export_range(0.0, 45.0, 0.5) var stride_side_angle := 12.0
+## Strides fade out approaching this forward speed.
+@export_range(1.0, 120.0, 0.5) var stride_max_speed := 45.0
+## Flow gained by a perfectly timed stride (lost by one timed at zero).
+@export_range(0.0, 2.0, 0.01) var stride_flow_gain := 0.3
+## Most flow: strides push up to 1 + this times as hard.
+@export_range(0.0, 6.0, 0.1) var stride_flow_max := 2.0
+## Flow lost per second while no stride is pushing.
+@export_range(0.0, 10.0, 0.1) var stride_flow_decay := 1.5
+## Off a surface, the stick steers through a smoothing of this long (s), so
+## alternating sweeps mostly cancel out while a held direction still turns.
+## 0 = the stick steers directly, sweeps and all.
+@export_range(0.0, 1.0, 0.01) var stride_steer_smoothing := 0.35
+
+@export_group("Bow Wave")
+## Speed pushes a torpedo-tip shell of water out ahead of the fish, from
+## bow_start_speed to full size at bow_full_speed. It counts as the fish's front
+## for demolitions (Demolition), and for nothing else: it doesn't push anything.
+@export var bow_wave := false
+@export_range(0.0, 60.0, 0.5) var bow_start_speed := 8.0
+@export_range(1.0, 80.0, 0.5) var bow_full_speed := 30.0
+## How far its tip reaches ahead of the hitbox's front at full size (m).
+@export_range(0.0, 5.0, 0.05) var bow_length := 1.0
+## How wide it is at full size, as a multiple of the hitbox's width. It's
+## rounder than the hitbox: at least 0.7 times as tall as it is wide.
+@export_range(1.0, 4.0, 0.05) var bow_girth := 1.8
+
+@export_group("Nature")
+## The slowest ram that demolishes Nature's target fish (m/s). RL's supersonic: 22.
+@export_range(5.0, 60.0, 0.5) var nature_demo_speed := 22.0
 
 @export_group("Jump & Dodge")
 ## Instant push along the fish's up axis on pressing jump. A double jump is this alone.
@@ -564,6 +628,13 @@ var _stroke_axis := -1  # axis the current rhythm is on (0 = side to side, 1 = u
 var _last_stroke_time := -INF
 var _last_stroke_interval := 0.0
 var _queued_stroke := 0.0
+## How big the bow wave is now, 0..1 (see bow_wave).
+var bow_amount := 0.0
+var _bow_view := MeshInstance3D.new()
+var _bow_material := ShaderMaterial.new()
+var _bow_flow := 0.0  # how far its ripples have streamed back
+## Extra Swishy's strides (swim_style), read by the HUD's stride meter.
+var swishy := SwishySwim.new(self)
 
 ## The character's model (built in _apply_character) and the parts the swim
 ## animation moves.
@@ -604,6 +675,7 @@ func _ready() -> void:
 	_hitbox_view.material_override = material
 	_hitbox_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_hitbox_view)
+	_build_bow_view()
 
 	for i in _wheel_collisions.size():
 		_wheel_collisions[i].name = ["FrontWheels", "RearWheels"][i]
@@ -745,6 +817,10 @@ func is_flipping() -> bool:
 
 ## Whether a setting does anything with the current toggles; the tuning panel hides the rest.
 func is_option_active(property: String) -> bool:
+	if property.begins_with("bow_") and property != "bow_wave":
+		return bow_wave
+	if property.begins_with("stride_"):
+		return swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY
 	match property:
 		"roll_torque", "roll_damping", "max_angular_speed":
 			return not rl_roll_timing
@@ -773,11 +849,15 @@ func is_option_active(property: String) -> bool:
 			return _uses_tyres()
 		"rl_pushback_holds", "rl_auto_roll":
 			return rl_surface_mechanics and rl_suspension
+		"boost_unlimited", "boost_accel":
+			return boost_enabled
 		"boost_drain", "boost_regen":
-			return not boost_unlimited
-		"strokes_need_lock", "stroke_impulse", "stroke_max_speed", "stroke_threshold", \
-				"stroke_min_interval", "stroke_max_interval", "rhythm_tolerance":
+			return boost_enabled and not boost_unlimited
+		"swim_style", "strokes_need_lock":
 			return swim_strokes
+		"stroke_impulse", "stroke_max_speed", "stroke_threshold", \
+				"stroke_min_interval", "stroke_max_interval", "rhythm_tolerance":
+			return swim_strokes and swim_style == SwimStyle.ORIGINAL
 		"jump_hold_accel", "jump_hold_time":
 			return variable_jump
 		"complete_flips", "rl_flip_z_damp":
@@ -889,6 +969,12 @@ func _detect_strokes(delta: float) -> void:
 		stroke_chain = 0
 		_last_stroke_interval = 0.0
 		_stroke_side = Vector2i.ZERO
+		swishy.reset()
+		return
+	if swim_style == SwimStyle.EXTRA_SWISHY:
+		swishy.sample(input_stick, delta)
+		stroke_chain = swishy.strides
+		stroke_quality = maxf(swishy.last_timing, 0.0)
 		return
 	for axis in 2:
 		var value := input_stick[axis]
@@ -985,7 +1071,10 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		velocity = _apply_ground(velocity, body_basis, dt)
 	else:
 		velocity = _apply_thrust(velocity, forward, dt)
-		velocity = _apply_strokes(velocity, forward)
+		if swim_style == SwimStyle.EXTRA_SWISHY:
+			velocity = swishy.apply(velocity, body_basis, dt)
+		else:
+			velocity = _apply_strokes(velocity, forward)
 		velocity = _apply_water(velocity, forward, dt)
 	if _uses_tyres():
 		_update_tyre_settings(start_velocity, start_spin, state, body_basis)
@@ -1027,6 +1116,10 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	forward_speed = velocity.dot(forward)
 	drift_angle = rad_to_deg(forward.angle_to(velocity)) if speed > 0.5 else 0.0
 	angular_speed = local_spin.length()
+	var bow_target := 0.0
+	if bow_wave:
+		bow_target = clampf((speed - bow_start_speed) / maxf(bow_full_speed - bow_start_speed, 0.1), 0.0, 1.0)
+	bow_amount = move_toward(bow_amount, bow_target, BOW_RESPONSE * dt)
 
 
 ## RL's auto-roll (RocketSim Car::_UpdateAutoRoll), while on the throttle with
@@ -1090,6 +1183,9 @@ func _start_autoflip(velocity: Vector3, body_basis: Basis) -> Vector3:
 
 
 func _update_boost(dt: float) -> void:
+	if not boost_enabled:
+		is_boosting = false
+		return
 	is_boosting = boost_held and (boost_unlimited or boost_amount > 0.0)
 	if boost_unlimited:
 		return
@@ -1480,7 +1576,8 @@ func _apply_strokes(velocity: Vector3, direction: Vector3) -> Vector3:
 
 func _apply_water(velocity: Vector3, forward: Vector3, dt: float) -> Vector3:
 	var current := velocity.length()
-	var swimming := input_forward > 0.0 or is_boosting or stroke_chain >= 2
+	var stroking := swishy.power > 0.0 if swim_style == SwimStyle.EXTRA_SWISHY else stroke_chain >= 2
+	var swimming := input_forward > 0.0 or is_boosting or stroking
 	if swimming and current > max_speed:
 		# Only the speed earned above cruise fades; cruise itself is held.
 		velocity *= (max_speed + (current - max_speed) * exp(-overspeed_drag * dt)) / current
@@ -1661,8 +1758,11 @@ func _apply_rotation(local_spin: Vector3, dt: float) -> Vector3:
 		return _flip_axis * (dodge_flip_turns * TAU / dodge_flip_duration)
 
 	# Rocket League convention: stick forward pitches the nose down.
-	var pitch_in := -input_stick.y if invert_pitch else input_stick.y
-	var yaw_in := input_stick.x
+	var steer_stick := input_stick
+	if swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY:
+		steer_stick = swishy.steer  # sweeps power strides more than they turn
+	var pitch_in := -steer_stick.y if invert_pitch else steer_stick.y
+	var yaw_in := steer_stick.x
 	var roll_in := input_roll
 	if air_roll_held:
 		roll_in += yaw_in
@@ -1841,6 +1941,8 @@ func _apply_reset(state: PhysicsDirectBodyState3D) -> void:
 	_post_jump_time_left = 0.0
 	_queued_stroke = 0.0
 	stroke_chain = 0
+	swishy.reset()
+	bow_amount = 0.0
 	is_dodging = false
 	jump_state = JumpState.READY
 	_jump_hold_elapsed = -1.0
@@ -1882,4 +1984,71 @@ func _process(delta: float) -> void:
 	_fin_left.rotation.z = flutter
 	_fin_right.rotation.z = -flutter
 	_visual.react(delta, linear_velocity)
-	_bubbles.emitting = is_boosting
+	var cue := swishy.cue() if swim_style == SwimStyle.EXTRA_SWISHY else Vector3.ZERO
+	_visual.set_stride_cue(cue.x, cue.y, cue.z)
+	# A strong, flowing stride churns up a wake.
+	var churning := swim_style == SwimStyle.EXTRA_SWISHY and swishy.power > 0.5 and swishy.flow > 0.5
+	_bubbles.emitting = is_boosting or churning
+	_update_bow_view(delta)
+
+
+## The bow wave's shape now (bow_amount), in the hitbox's space: an
+## ellipse-nosed cone from the hitbox's middle out past its front, as points
+## for a convex shape. Its size: (half width, half height, reach ahead).
+func bow_size() -> Vector3:
+	var half := (_collision.shape as BoxShape3D).size / 2.0
+	var girth := lerpf(1.1, bow_girth, bow_amount)
+	return Vector3(half.x, maxf(half.y, half.x * 0.7), 0.0) * girth + Vector3(0.0, 0.0, half.z + lerpf(0.1, bow_length, bow_amount))
+
+
+func bow_points() -> PackedVector3Array:
+	var size := bow_size()
+	var points := PackedVector3Array([Vector3(0.0, 0.0, -size.z)])
+	for ring in BOW_RINGS:
+		var along := float(ring) / BOW_RINGS  # 0 at the middle to 1 at the tip
+		var round_off := sqrt(1.0 - along * along)
+		for side in BOW_SIDES:
+			var angle := TAU * side / BOW_SIDES
+			points.append(Vector3(cos(angle) * size.x * round_off, sin(angle) * size.y * round_off, -size.z * along))
+	return points
+
+
+## A unit bow (radius 1, reaching 1 ahead along -Z), scaled to bow_size() as it
+## swims; UV.x runs round it and UV.y from its open back (0) to its tip (1).
+func _build_bow_view() -> void:
+	var rings := 16
+	var sides := 32
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for ring in rings + 1:
+		var along := float(ring) / rings
+		var round_off := sqrt(maxf(1.0 - along * along, 0.0))
+		for side in sides + 1:
+			var angle := TAU * side / sides
+			tool.set_uv(Vector2(float(side) / sides, along))
+			tool.add_vertex(Vector3(cos(angle) * round_off, sin(angle) * round_off, -along))
+	for ring in rings:
+		for side in sides:
+			var a := ring * (sides + 1) + side
+			var b := a + sides + 1
+			for corner: int in [a, a + 1, b, b, a + 1, b + 1]:
+				tool.add_index(corner)
+	tool.generate_normals()
+	_bow_view.name = "BowWave"
+	_bow_view.mesh = tool.commit()
+	_bow_material.shader = BOW_SHADER
+	_bow_view.material_override = _bow_material
+	_bow_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_bow_view.visible = false
+	add_child(_bow_view)
+
+
+func _update_bow_view(delta: float) -> void:
+	_bow_view.visible = bow_amount > 0.005
+	if not _bow_view.visible:
+		return
+	_bow_view.position = _collision.position
+	_bow_view.scale = bow_size()
+	_bow_flow += delta * speed * 0.8
+	_bow_material.set_shader_parameter("amount", bow_amount)
+	_bow_material.set_shader_parameter("flow", _bow_flow)

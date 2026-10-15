@@ -13,6 +13,10 @@ extends CanvasLayer
 ## the teams' possession, boost and territory. It comes up by itself at the end
 ## of the match, once the winner's splash has been.
 ##
+## With Extra Swishy swimming (Nature), the last stride's timing and the flow
+## (StrideMeter) sit at the bottom centre and the boost gauge hides while boost is off; in Nature
+## (set_nature) the demolition count shows at the top.
+##
 ## Two tuning aids show only when switched on in the tuning panel's UI section
 ## (UISettings): the speed / drift / ... readout and the controller-input display.
 
@@ -53,6 +57,8 @@ var _events: Array[Dictionary] = []
 var _events_time := 0.0
 var replay: ReplayPlayer
 var match_1v1: Match1v1
+var nature_run: NatureRun
+var _stride_meter: StrideMeter
 ## Replays mode before a replay's picked: the live fish sits out, so its
 ## boost, the scorebug and the ball countdown are hidden.
 var fish_sitting_out := false:
@@ -116,6 +122,18 @@ func _ready() -> void:
 	add_child(_splash)
 	_board = BroadcastUI.StatsBoard.new()
 	add_child(_board)
+
+	_stride_meter = StrideMeter.new()
+	_stride_meter.fish = fish
+	_stride_meter.anchor_left = 0.5
+	_stride_meter.anchor_right = 0.5
+	_stride_meter.anchor_top = 1.0
+	_stride_meter.anchor_bottom = 1.0
+	_stride_meter.offset_left = -140.0
+	_stride_meter.offset_right = 140.0
+	_stride_meter.offset_top = -110.0
+	_stride_meter.offset_bottom = -36.0
+	add_child(_stride_meter)
 
 	_viz = InputViz.new()
 	_viz.fish = fish
@@ -200,11 +218,24 @@ func set_match(new_match: Match1v1) -> void:
 		_update_hint()
 
 
+## Show a Nature run's demolitions, or null when there's none.
+func set_nature(new_run: NatureRun) -> void:
+	nature_run = new_run
+	if nature_run:
+		nature_run.demolished.connect(_on_demolished)
+	if _course:
+		_course.text = ""
+	if _hint:
+		_update_hint()
+
+
 func _on_demolished(attacker: FishController, victim: FishController) -> void:
 	if victim == fish:
 		_banner.text = "DEMOLISHED!  Respawning..."
 	elif attacker == fish:
 		_banner.text = "DEMOLITION!"
+		if is_instance_valid(nature_run):
+			_banner.text = "DEMOLITION!  %s" % _speed_text(nature_run.last_demo_speed)
 	else:
 		return
 	_banner_time_left = 2.5
@@ -219,7 +250,7 @@ func _update_hint() -> void:
 		_hint.text = "Start/Esc: pause, settings    F11: fullscreen"
 	else:
 		_hint.text = "Start/Esc: pause, settings    R: %s    Right stick/IJKL: look around    Y: %s cam    %sF11: fullscreen" % [
-				"restart kickoff" if match_1v1 else "reset", "ring" if arena else "ball",
+				"restart kickoff" if match_1v1 else "reset", "ring" if arena else ("fish" if nature_run else "ball"),
 				"Hold D-pad up/B: scoreboard    " if match_1v1 else ""]
 
 
@@ -232,6 +263,7 @@ func _process(delta: float) -> void:
 		return
 	if fish == null:
 		return
+	_stride_meter.visible = not fish_sitting_out and fish.swim_strokes and fish.swim_style == FishController.SwimStyle.EXTRA_SWISHY
 	if fish_sitting_out:
 		_boost.visible = false
 		_scorebug.visible = false
@@ -261,7 +293,7 @@ func _process(delta: float) -> void:
 		_speed_bar.value = fish.speed
 		_boost_bar.value = 100.0 if fish.boost_unlimited else fish.boost_amount
 
-	_boost.visible = not in_goal_replay
+	_boost.visible = not in_goal_replay and fish.boost_enabled
 	_boost.amount = 100.0 if fish.boost_unlimited else fish.boost_amount
 	_boost.boosting = fish.is_boosting
 	_boost.color = fish.body_color()  # its team's colour in a match, else the character's own
@@ -274,6 +306,8 @@ func _process(delta: float) -> void:
 			_course.text = "Hoop %d / %d    %.2f s    best %s" % [arena.next_hoop + 1, arena.hoops.size(), arena.course_time, best]
 		else:
 			_course.text = "Swim through the yellow hoop to start    best %s" % best
+	elif is_instance_valid(nature_run):
+		_course.text = "Demolitions  %d" % nature_run.demos
 	elif is_instance_valid(aquarium):
 		_update_scorebug()
 		_course.offset_top = 104.0
@@ -291,6 +325,8 @@ func _process(delta: float) -> void:
 	if _banner_time_left <= 0.0:
 		if fish.is_boosting and fish.speed > fish.max_speed:
 			_banner.text = "TORPEDO!"
+		elif fish.swim_style == FishController.SwimStyle.EXTRA_SWISHY:
+			_banner.text = "IN THE FLOW  x%.1f" % (1.0 + fish.swishy.flow) if fish.swishy.flow >= 0.5 else ""
 		elif fish.stroke_chain >= 3:
 			_banner.text = "IN THE RHYTHM  x%d" % fish.stroke_chain
 		else:
@@ -651,3 +687,38 @@ class InputViz extends Control:
 		var fill_height := bar.size.y * amount
 		draw_rect(Rect2(pos.x, bar.end.y - fill_height, bar.size.x, fill_height), color)
 		draw_string(ThemeDB.fallback_font, Vector2(pos.x, bar.end.y + 16.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
+
+
+## Extra Swishy's readout (the timing cue itself is the fish's tail, which
+## lights up root to tip as a stride builds): how the last stride was timed,
+## and the flow built up.
+class StrideMeter extends Control:
+	const DIM := Color(1, 1, 1, 0.35)
+	const FLOW := Color(0.45, 0.85, 1.0)
+	## How long the last stride's timing shows (s).
+	const TIMING_TIME := 0.6
+	var fish: FishController
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(_delta: float) -> void:
+		if visible:
+			queue_redraw()
+
+	func _draw() -> void:
+		if fish == null:
+			return
+		var swim := fish.swishy
+		var font := BroadcastUI.font(700)
+		var width := size.x
+		if swim.last_timing >= 0.0 and swim.phase >= 0.0 and swim.phase < TIMING_TIME:
+			var perfect := swim.last_timing >= SwishySwim.SWEET_SPOT
+			var text := "PERFECT" if perfect else ("EARLY" if swim.last_early else "LATE")
+			var color := BroadcastUI.GOLD if perfect else Color(1.0, 0.55, 0.45)
+			color.a = 1.0 - swim.phase / TIMING_TIME
+			draw_string(font, Vector2(0, 22), text, HORIZONTAL_ALIGNMENT_CENTER, width, 22, color)
+		var bar := Rect2(width * 0.2, 36.0, width * 0.6, 8.0)
+		draw_rect(bar, DIM, false, 1.5)
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * swim.flow / maxf(fish.stride_flow_max, 0.01), bar.size.y)), FLOW)
+		draw_string(font, Vector2(0, 64), "FLOW  x%.1f" % (1.0 + swim.flow), HORIZONTAL_ALIGNMENT_CENTER, width, 14, Color.WHITE)

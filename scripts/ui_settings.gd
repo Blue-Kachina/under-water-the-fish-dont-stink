@@ -2,7 +2,8 @@ extends Node
 ## Display preferences (autoloaded as "UISettings"): which HUD extras show, the
 ## player's name, goal replays and fullscreen. Saved on this PC as soon as they
 ## change (user://playground.cfg, section "ui"); the tuning panel's UI section
-## edits them. F11 or Alt+Enter toggles fullscreen.
+## edits them. The game always starts fullscreen (not test scenes); F11 or
+## Alt+Enter toggles it.
 
 signal changed(key: String)
 
@@ -16,7 +17,7 @@ var show_stats := false
 var show_input_overlay := false
 ## A replay of each goal in a 1v1, from the net (skippable).
 var goal_replays := true
-var fullscreen := false
+var fullscreen := true
 ## Shown on the scoreboard and when you score.
 var player_name := DEFAULT_NAME
 
@@ -30,7 +31,8 @@ func _ready() -> void:
 			set(key, settings.get_value(SECTION, key, get(key)))
 	if player_name.strip_edges().is_empty():
 		player_name = DEFAULT_NAME
-	_apply_fullscreen()
+	fullscreen = true  # every start, whatever it was left on
+	_apply_fullscreen.call_deferred()  # once the scene's known
 
 
 ## Changes one setting, applies it and remembers it.
@@ -65,6 +67,9 @@ func _input(event: InputEvent) -> void:
 func _apply_fullscreen() -> void:
 	if DisplayServer.get_name() == "headless":
 		return
+	var scene := get_tree().current_scene
+	if scene and scene.scene_file_path.begins_with("res://tests/"):
+		return  # screenshot tools and probes keep their own window
 	var mode := DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED
 	if DisplayServer.window_get_mode() != mode:
 		DisplayServer.window_set_mode(mode)

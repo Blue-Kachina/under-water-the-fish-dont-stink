@@ -482,6 +482,40 @@ func _load_preset(path: String) -> void:
 	_status.text = "Loaded %s" % path.get_file()
 
 
+## Every section's tuning now, for restore_tuning().
+func tuning_snapshot() -> Dictionary:
+	var snapshot := {}
+	for section: String in _targets:
+		snapshot[section] = _snapshot(_targets[section])
+	return snapshot
+
+
+func restore_tuning(snapshot: Dictionary) -> void:
+	for section: String in snapshot:
+		_apply(section, snapshot[section])
+	_refresh_visibility()
+
+
+## A mode's own tuning (e.g. Nature's): for each section the file lists, the
+## defaults with its values on top; other sections are left as they are. Not
+## remembered for startup.
+func load_mode_preset(path: String) -> void:
+	var config := ConfigFile.new()
+	if config.load(path) != OK:
+		push_warning("Couldn't load mode preset %s" % path)
+		return
+	for section: String in _targets:
+		if not config.has_section(section):
+			continue
+		_apply(section, _defaults[section])
+		var values := {}
+		for prop in config.get_section_keys(section):
+			values[prop] = config.get_value(section, prop)
+		_apply(section, values)
+	_refresh_visibility()
+	_status.text = "%s tuning" % path.get_file().get_basename().capitalize()
+
+
 ## Loaded at startup from now on.
 func _remember_preset(path: String) -> void:
 	var settings := ConfigFile.new()
