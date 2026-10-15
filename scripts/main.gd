@@ -147,6 +147,7 @@ func set_environment(env_name: String) -> void:
 	_hud.set_aquarium(_environment as AquariumArena)
 	_camera.ball = (_environment as AquariumArena).ball if _environment is AquariumArena else null
 	_camera.course = _environment as Arena
+	_camera.floor_height = AquariumArena.FLOOR_HEIGHT if _environment is AquariumArena else -INF
 	_fish.set_spawn(_environment.spawn_transform())
 	_apply_mode()
 

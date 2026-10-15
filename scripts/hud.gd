@@ -264,7 +264,7 @@ func _process(delta: float) -> void:
 	_boost.visible = not in_goal_replay
 	_boost.amount = 100.0 if fish.boost_unlimited else fish.boost_amount
 	_boost.boosting = fish.is_boosting
-	_boost.color = fish.team_color if fish.team_color.a > 0.0 else BroadcastUI.BOOST_COLOR
+	_boost.color = fish.body_color()  # its team's colour in a match, else the character's own
 
 	_scorebug.visible = is_instance_valid(aquarium)
 	_course.offset_top = 16.0

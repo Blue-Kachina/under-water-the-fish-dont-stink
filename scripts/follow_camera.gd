@@ -8,6 +8,11 @@ extends Camera3D
 ## camera behind the fish on the line from the ball, so the ball stays in view,
 ## with a level horizon. It falls back to the normal view while there's no ball.
 ## On the obstacle course the same toggle is ring cam: it aims at the next hoop.
+##
+## As in Rocket League, it keeps its full distance in the match tank instead of
+## pulling in at the walls, so it can end up outside them: the tank's walls are
+## see-through glass (AquariumArena.SEE_THROUGH_GROUP). It still keeps above
+## the floor, and still pulls in at solid obstacles (the course's rocks).
 
 ## Clearance kept between walls and the point the camera aims at.
 const ANCHOR_CLEARANCE := 0.1
@@ -36,6 +41,9 @@ var ball: Node3D
 var course: Arena
 ## Ball cam, or ring cam on the course.
 var ball_cam := false
+## Set by the environment: the camera keeps collision_margin above this
+## (the see-through tank's floor). -INF: no floor of its own to keep above.
+var floor_height := -INF
 
 @export_group("Follow")
 ## Rocket League's camera settings, with the same meanings (RL's uu are cm).
@@ -236,13 +244,14 @@ func _process(delta: float) -> void:
 	var eye := fish_xform.origin + view * Vector3(0.0, height, distance) + _lag
 	var look_basis := view * Basis(Vector3.RIGHT, deg_to_rad(angle))
 
-	# Keep clear of walls: sweep a sphere from the fish up to the anchor (which
+	# Keep clear of solid walls (not the see-through tank): sweep a sphere from the fish up to the anchor (which
 	# can be inside a wall or ceiling the fish is up against), then from there
 	# back to the eye, and stop each short of anything solid. A sphere rather
 	# than a ray, so the wide view can't poke through a wall the camera runs
 	# alongside. The look direction stays the same while pulled in.
 	anchor = _sweep(fish_xform.origin, anchor, ANCHOR_CLEARANCE)
 	eye = _sweep(anchor, eye, collision_margin)
+	eye.y = maxf(eye.y, floor_height + collision_margin)
 
 	global_transform = Transform3D(look_basis.orthonormalized(), eye)
 
@@ -352,6 +361,9 @@ func _sweep(from: Vector3, to: Vector3, radius: float) -> Vector3:
 			exclude.append((body as CollisionObject3D).get_rid())
 	if is_instance_valid(ball) and ball is CollisionObject3D:
 		exclude.append((ball as CollisionObject3D).get_rid())
+	for body: Node in get_tree().get_nodes_in_group(AquariumArena.SEE_THROUGH_GROUP):
+		if body is CollisionObject3D:
+			exclude.append((body as CollisionObject3D).get_rid())
 
 	var allowed := 1.0
 	var ray := PhysicsRayQueryParameters3D.create(from, to, AquariumArena.WORLD_QUERY_MASK)

@@ -1,7 +1,8 @@
-## The chase camera never ends up inside or skimming a wall: fish hugging the
+## The chase camera keeps its full distance at the tank's see-through walls
+## (Rocket League style), even if that puts it outside them: fish hugging the
 ## side wall with the camera swung toward it, and fish pressed up under the
-## ceiling (where the camera's aim point would be inside it). Reports the
-## camera's clearance from solid geometry each time. Then drives along the
+## ceiling. Reports the camera's shortest distance from the fish and how far
+## outside the tank it got, and that it stays above the floor. Then drives along the
 ## side wall, where the camera should roll with the fish (as RL's does), and
 ## jumps clear, where it should ease back to a level horizon.
 ## Run headless: Godot_console.exe --headless --path . res://tests/camera_wall_probe.tscn
@@ -12,7 +13,9 @@ var fish: FishController
 var camera: Camera3D
 var t := 0.0
 var events := {}
-var worst := INF
+var nearest := INF
+var outside := -INF
+var lowest := INF
 
 func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
@@ -27,23 +30,19 @@ func once(key: String, at: float) -> bool:
 		return true
 	return false
 
-## Largest of a few test radii that fits around the camera without touching anything solid.
-func clearance() -> float:
-	var space := camera.get_world_3d().direct_space_state
-	var sphere := SphereShape3D.new()
-	var query := PhysicsShapeQueryParameters3D.new()
-	query.shape = sphere
-	query.transform = Transform3D(Basis.IDENTITY, camera.global_position)
-	query.exclude = [fish.get_rid()]
-	for r in [0.4, 0.3, 0.2, 0.1, 0.05]:
-		sphere.radius = r
-		if space.intersect_shape(query, 1).is_empty():
-			return r
-	return 0.0
-
 func _process(_delta: float) -> void:
 	if t > 0.6:
-		worst = minf(worst, clearance())
+		nearest = minf(nearest, camera.global_position.distance_to(fish.global_position))
+		outside = maxf(outside, AquariumArena.distance_outside(camera.global_position))
+		lowest = minf(lowest, camera.global_position.y)
+
+func report() -> String:
+	var text := "nearest to the fish %.2f m (full distance %.2f), furthest outside the tank %.2f m, lowest y %.2f" % [
+			nearest, Vector2(camera.distance, camera.height).length(), outside, lowest]
+	nearest = INF
+	outside = -INF
+	lowest = INF
+	return text
 
 func _physics_process(delta: float) -> void:
 	t += delta
@@ -54,17 +53,17 @@ func _physics_process(delta: float) -> void:
 		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(wall_x - 0.6, 3.0, 0)))
 		Input.action_press("camera_left")
 	if once("wall read", 2.0):
-		print("against the side wall, camera swung toward it: camera at x %.2f (wall at %.2f), worst clearance %.2f m" % [camera.global_position.x, wall_x, worst])
+		print("against the side wall, camera swung toward it: camera at x %.2f (wall at %.2f), %s" % [camera.global_position.x, wall_x, report()])
 		Input.action_release("camera_left")
-		worst = INF
 		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(0, AquariumArena.SIZE.y - 0.4, 0)))
 	if once("ceiling read", 3.5):
-		print("pressed under the ceiling: camera at y %.2f (ceiling at %.2f), worst clearance %.2f m" % [camera.global_position.y, AquariumArena.SIZE.y, worst])
+		print("pressed under the ceiling: camera at y %.2f (ceiling at %.2f), %s" % [camera.global_position.y, AquariumArena.SIZE.y, report()])
 		# On the +X wall, wheels to it (up = -X), facing -Z, driving along it.
 		fish.set_spawn(Transform3D(Basis(Vector3.UP, Vector3.LEFT, Vector3.BACK), Vector3(wall_x - 0.4, 6.0, 20.0)))
 		Input.action_press("thrust_forward")
 	if once("on wall", 5.0):
 		var camera_up := camera.global_basis.y
+		print("driving along the side wall: %s" % report())
 		print("driving along the side wall: on surface %s, camera up . fish up %.2f, camera up . world up %.2f" % [fish.on_surface, camera_up.dot(fish.global_basis.y), camera_up.dot(Vector3.UP)])
 		Input.action_release("thrust_forward")
 		# Clear of the wall in mid-air, upright: the camera starts rolled and should level out.

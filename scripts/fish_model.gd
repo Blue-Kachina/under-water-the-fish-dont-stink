@@ -113,6 +113,11 @@ func set_body_color(color: Color) -> void:
 	_tint(color)
 
 
+## The body's colour now: the character's own, or the one set_body_color() gave it.
+func body_color() -> Color:
+	return _body_material.albedo_color
+
+
 ## Back to the character's own colour after set_body_color().
 func reset_body_color() -> void:
 	if _own_body_color != null:

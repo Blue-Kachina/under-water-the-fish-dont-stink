@@ -43,6 +43,29 @@ const GOAL_DEPTH := 8.8
 ## RL's kickoff spot furthest back, the fish's start.
 const KICKOFF_DISTANCE := 46.08
 const GRID_SHADER := preload("res://shaders/grid.gdshader")
+const GLASS_SHADER := preload("res://shaders/glass.gdshader")
+const FIELD_SHADER := preload("res://shaders/field.gdshader")
+## Floor markings (field.gdshader), proportioned like a football pitch's.
+const CENTRE_CIRCLE_RADIUS := 9.2
+## Full width, and depth out from the goal line.
+const GOAL_AREA := Vector2(28.0, 6.0)
+const PENALTY_AREA := Vector2(48.0, 16.0)
+## Rocket League's boost pad spots (x, z in m), for the boost pickups to come.
+const BIG_BOOST_PADS: Array[Vector2] = [
+	Vector2(-35.84, 0.0), Vector2(35.84, 0.0),
+	Vector2(-30.72, -40.96), Vector2(30.72, -40.96), Vector2(-30.72, 40.96), Vector2(30.72, 40.96),
+]
+const SMALL_BOOST_PADS: Array[Vector2] = [
+	Vector2(0.0, -42.40), Vector2(-17.92, -41.84), Vector2(17.92, -41.84),
+	Vector2(-9.40, -33.08), Vector2(9.40, -33.08), Vector2(0.0, -28.16),
+	Vector2(-35.84, -24.84), Vector2(35.84, -24.84), Vector2(-17.88, -23.00), Vector2(17.88, -23.00),
+	Vector2(-20.48, -10.36), Vector2(0.0, -10.24), Vector2(20.48, -10.36),
+	Vector2(-10.24, 0.0), Vector2(10.24, 0.0),
+	Vector2(-20.48, 10.36), Vector2(0.0, 10.24), Vector2(20.48, 10.36),
+	Vector2(-17.88, 23.00), Vector2(17.88, 23.00), Vector2(-35.84, 24.84), Vector2(35.84, 24.84),
+	Vector2(0.0, 28.16), Vector2(-9.40, 33.08), Vector2(9.40, 33.08),
+	Vector2(-17.92, 41.84), Vector2(17.92, 41.84), Vector2(0.0, 42.40),
+]
 ## A goal explosion's reach (m), and how hard it shoves fish at its centre (m/s).
 const GOAL_EXPLOSION_RADIUS := 16.0
 const GOAL_BLAST := 18.0
@@ -51,6 +74,11 @@ const GOAL_BLAST := 18.0
 const BALL_SURFACE_LAYER := 1 << 4
 ## For queries that should find the real surfaces (wheels, camera): everything but BALL_SURFACE_LAYER.
 const WORLD_QUERY_MASK := 0xFFFFFFFF & ~BALL_SURFACE_LAYER
+## Bodies the chase camera passes through instead of pulling in at (the tank:
+## its walls are glass and the camera keeps above the floor on its own).
+const SEE_THROUGH_GROUP := &"camera_see_through"
+## The floor's height; the chase camera keeps above it.
+const FLOOR_HEIGHT := 0.0
 
 const TEAM_NAMES := ["Blue", "Orange"]
 const TEAM_COLORS := [Color(0.25, 0.55, 1.0), Color(1.0, 0.5, 0.1)]
@@ -262,8 +290,12 @@ func _build_shell() -> void:
 		arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array(part[0])
 		arrays[Mesh.ARRAY_NORMAL] = PackedVector3Array(part[1])
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	mesh.surface_set_material(0, _grid_material(COLOR_SAND))
-	mesh.surface_set_material(1, _grid_material(COLOR_GLASS))
+	mesh.surface_set_material(0, _field_material())
+	# See-through, as in Rocket League: the chase camera keeps its distance
+	# instead of pulling in at the walls, so it can end up outside them.
+	var glass := _grid_material(COLOR_GLASS)
+	glass.shader = GLASS_SHADER
+	mesh.surface_set_material(1, glass)
 
 	_surface_faces = PackedVector3Array(floor_tris[0] + wall_tris[0])
 	_surface_normals = PackedVector3Array(floor_tris[1] + wall_tris[1])
@@ -277,6 +309,7 @@ func _build_shell() -> void:
 
 	_shell = StaticBody3D.new()
 	_shell.name = "Shell"
+	_shell.add_to_group(SEE_THROUGH_GROUP)
 	var collision := CollisionShape3D.new()
 	collision.shape = shape
 	_shell.add_child(collision)
@@ -501,6 +534,25 @@ func _build_specks() -> void:
 	instance.multimesh = multimesh
 	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(instance)
+
+
+## The floor, with the pitch markings painted on (see field.gdshader).
+func _field_material() -> ShaderMaterial:
+	var material := _grid_material(COLOR_SAND)
+	material.shader = FIELD_SHADER
+	material.set_shader_parameter("team_0_color", TEAM_COLORS[0])
+	material.set_shader_parameter("team_1_color", TEAM_COLORS[1])
+	material.set_shader_parameter("half_length", SIZE.z / 2.0)
+	material.set_shader_parameter("half_width", SIZE.x / 2.0)
+	material.set_shader_parameter("goal_half_width", GOAL_SIZE.x / 2.0)
+	material.set_shader_parameter("centre_radius", CENTRE_CIRCLE_RADIUS)
+	material.set_shader_parameter("goal_area", GOAL_AREA)
+	material.set_shader_parameter("penalty_area", PENALTY_AREA)
+	var kickoff := PackedVector2Array()
+	for spot: Array in Match1v1.KICKOFF_SPOTS:
+		kickoff.append(spot[0])
+	material.set_shader_parameter("kickoff_spots", kickoff)
+	return material
 
 
 func _grid_material(color: Color) -> ShaderMaterial:

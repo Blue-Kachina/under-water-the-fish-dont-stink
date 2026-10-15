@@ -644,6 +644,11 @@ func _apply_character() -> void:
 	belly_length = belly.z
 
 
+## The body's colour as shown: its team's, or the character's own.
+func body_color() -> Color:
+	return _visual.body_color() if _visual else team_color
+
+
 func _apply_team_color() -> void:
 	if _visual == null:
 		return
