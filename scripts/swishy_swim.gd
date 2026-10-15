@@ -44,6 +44,11 @@ var strides := 0
 var strength := 0.0
 ## The stick as it steers: smoothed over stride_steer_smoothing.
 var steer := Vector2.ZERO
+## Where the tail is, in the stick's terms (x right, y down), -1..1 each way:
+## a stride sweeps it from wherever it was to the side opposite the push,
+## arriving at the peak, and it relaxes back to the middle as the stride fades.
+var tail_swing := Vector2.ZERO
+var _tail_from := Vector2.ZERO
 
 var _dir := Vector2.ZERO  # the current stride's sweep direction (unit stick vector)
 var _reach := 0.0  # how far the stick has reached along the current stride's direction
@@ -64,6 +69,8 @@ func reset() -> void:
 	strides = 0
 	strength = 0.0
 	steer = Vector2.ZERO
+	tail_swing = Vector2.ZERO
+	_tail_from = Vector2.ZERO
 	_dir = Vector2.ZERO
 	_reach = 0.0
 	_crossed = true
@@ -120,6 +127,7 @@ func sample(stick: Vector2, delta: float) -> void:
 	power = envelope(phase)
 	if phase < 0.0:
 		flow = move_toward(flow, 0.0, fish.stride_flow_decay * delta)
+	_swing_tail(delta)
 
 	if _dir != Vector2.ZERO:
 		_reach = maxf(_reach, stick.dot(_dir))
@@ -163,7 +171,21 @@ func _start(dir: Vector2, reach: float) -> void:
 	_dir = dir
 	_reach = reach
 	_crossed = false
+	_tail_from = tail_swing
 	fish.strode.emit(timing, flow)
+
+
+## Sweeps the tail across to the side opposite the push by the peak, then
+## lets it relax back as the stride fades.
+func _swing_tail(delta: float) -> void:
+	if phase < 0.0:
+		tail_swing = tail_swing.move_toward(Vector2.ZERO, 3.0 * delta)
+		return
+	var across := -_dir
+	if phase < fish.stride_peak_time:
+		tail_swing = _tail_from.lerp(across, smoothstep(0.0, fish.stride_peak_time, phase))
+	else:
+		tail_swing = across * power
 
 
 ## The stride's push this tick, added to `velocity` (off a surface).

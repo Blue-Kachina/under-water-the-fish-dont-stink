@@ -64,7 +64,9 @@ swims; a lower *Steer Response* makes that gentler.
 each sweep of the left stick to the opposite side is a stride, like a skater pushing off alternate blades. Any direction works
 (left/right, up/down, diagonal), as long as each sweep goes back the other way through the middle;
 circling the stick does nothing. A stride's push builds to a peak (*Stride Peak Time*), then fades.
-The fish's tail is the timing cue: it lights up from its root to its tip like a progress bar
+Strides drive the tail: push right and it sweeps across to the left, arriving at the far side at the
+peak, ready for the push back the other way (*Stride Tail Swing*); it relaxes to the middle as a
+stride fades. The fish's tail is also the timing cue: it lights up from its root to its tip like a progress bar
 as the stride builds, reaching the tip (and turning gold) at the peak, then dims as the stride fades.
 Sweeping back right at the peak builds **flow**, which multiplies every stride's push. Too early and the stride hadn't
 built up; too late and it had already faded. Each stride pushes a little sideways away from the

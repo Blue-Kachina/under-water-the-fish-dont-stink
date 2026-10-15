@@ -300,6 +300,9 @@ const TIME_EPSILON := 0.0001
 ## alternating sweeps mostly cancel out while a held direction still turns.
 ## 0 = the stick steers directly, sweeps and all.
 @export_range(0.0, 1.0, 0.01) var stride_steer_smoothing := 0.35
+## How far the tail swings to each side on a stride (rad). A stride sweeps it
+## across, away from the push, arriving at the far side at the peak.
+@export_range(0.0, 1.5, 0.01) var stride_tail_swing := 0.6
 
 @export_group("Bow Wave")
 ## Speed pushes a torpedo-tip shell of water out ahead of the fish, from
@@ -1972,10 +1975,19 @@ func _process(delta: float) -> void:
 	# Powerslide: tail kicks out toward the turn, fins flare like air brakes.
 	var slide := 1.0 if is_powersliding else 0.0
 	var tail_kick := -input_stick.x * 0.6 * slide
-	# Swim strokes: the tail sweeps with the stick (side to side, or up and down like a dolphin).
-	var stroking := 1.0 if stroke_chain > 0 else 0.0
-	_tail.rotation.y = sin(_swim_phase) * lerpf(0.15, 0.45, effort) + tail_kick - input_stick.x * 0.5 * stroking
-	_tail.rotation.x = input_stick.y * 0.5 * stroking
+	if swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY:
+		# Strides drive the tail: each sweeps it across, away from the push, to
+		# the far side at the peak (SwishySwim.tail_swing). The idle wiggle only
+		# shows between strides.
+		var swing := swishy.tail_swing * stride_tail_swing
+		var idle := sin(_swim_phase) * lerpf(0.1, 0.25, effort) * (1.0 - minf(swishy.tail_swing.length(), 1.0))
+		_tail.rotation.y = swing.x + idle + tail_kick
+		_tail.rotation.x = swing.y
+	else:
+		# Swim strokes: the tail sweeps with the stick (side to side, or up and down like a dolphin).
+		var stroking := 1.0 if stroke_chain > 0 else 0.0
+		_tail.rotation.y = sin(_swim_phase) * lerpf(0.15, 0.45, effort) + tail_kick - input_stick.x * 0.5 * stroking
+		_tail.rotation.x = input_stick.y * 0.5 * stroking
 	_fin_left.rotation.y = lerpf(_fin_left.rotation.y, 0.9 * slide, 1.0 - exp(-15.0 * delta))
 	_fin_right.rotation.y = -_fin_left.rotation.y
 

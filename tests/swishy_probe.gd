@@ -65,6 +65,25 @@ func _run() -> void:
 	check(results["at the peak, direction lock"].side < 2.0, "the weave cancels sideways under a lock (%.2f m off the line)" % results["at the peak, direction lock"].side)
 	check(on_peak.peak >= fish.nature_demo_speed, "good strides reach demo speed (%.1f of %.1f)" % [on_peak.peak, fish.nature_demo_speed])
 
+	print("tail:")
+	input.clear()
+	fish.request_reset()
+	await _ticks(5)
+	input.forward = 1.0
+	var swings := []
+	for side: Vector2 in [Vector2.RIGHT, Vector2.LEFT, Vector2.UP, Vector2.DOWN]:
+		input.stick = side
+		for i in roundi(peak * 120.0):
+			await get_tree().physics_frame
+		swings.append(fish.swishy.tail_swing)
+	check(swings[0].x < -0.9, "push right: the tail swings to the left by the peak (%.2f)" % swings[0].x)
+	check(swings[1].x > 0.9, "then push left: it swings back across to the right (%.2f)" % swings[1].x)
+	check(swings[3].y < -0.9 and absf(swings[3].x) < 0.1, "up, then down: it swings up (%s)" % swings[3])
+	input.clear()
+	for i in roundi((peak + fade + 0.5) * 120.0):
+		await get_tree().physics_frame
+	check(fish.swishy.tail_swing.length() < 0.05, "it relaxes back to the middle after a stride")
+
 	print("boost:")
 	fish.request_reset()
 	await _ticks(5)
