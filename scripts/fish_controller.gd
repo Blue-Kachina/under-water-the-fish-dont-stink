@@ -306,9 +306,10 @@ const TIME_EPSILON := 0.0001
 ## How much bigger the tail grows with flow: at full flow it's 1 + this times
 ## its size (Battletoads style), and each stride swells it a little more.
 @export_range(0.0, 3.0, 0.05) var stride_tail_growth := 0.8
-## Each stride sheds a swirl of water from the tail (Swirl), bigger and
-## brighter the stronger it was.
-@export var stride_swirls := true
+## While a stride pushes, the tail pours a stream of tiny bubbles
+## (StrideStream), like a boost trail: denser and brighter as the stride builds
+## and with flow, coloured by its timing. It stops once out of stride.
+@export var stride_bubbles := true
 
 @export_group("Bow Wave")
 ## Speed pushes a torpedo-tip shell of water out ahead of the fish, from
@@ -642,6 +643,7 @@ var bow_amount := 0.0
 var _bow_view := MeshInstance3D.new()
 var _bow_material := ShaderMaterial.new()
 var _bow_flow := 0.0  # how far its ripples have streamed back
+var _stream := StrideStream.new()
 ## Extra Swishy's strides (swim_style), read by the HUD's stride meter.
 var swishy := SwishySwim.new(self)
 
@@ -685,9 +687,8 @@ func _ready() -> void:
 	_hitbox_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_hitbox_view)
 	_build_bow_view()
-	strode.connect(func(timing: float, _flow: float) -> void:
-		if timing >= 0.0 and stride_swirls:
-			_shed_swirl.call_deferred(timing))
+	_stream.name = "StrideStream"
+	add_child(_stream)
 
 	for i in _wheel_collisions.size():
 		_wheel_collisions[i].name = ["FrontWheels", "RearWheels"][i]
@@ -2010,10 +2011,9 @@ func _process(delta: float) -> void:
 	_visual.react(delta, linear_velocity)
 	var cue := swishy.cue() if swim_style == SwimStyle.EXTRA_SWISHY else Vector3.ZERO
 	_visual.set_stride_cue(cue.x, cue.y, cue.z)
-	# A strong, flowing stride churns up a wake.
-	var churning := swim_style == SwimStyle.EXTRA_SWISHY and swishy.power > 0.5 and swishy.flow > 0.5
-	_bubbles.emitting = is_boosting or churning
+	_bubbles.emitting = is_boosting
 	_update_bow_view(delta)
+	_pour_bubbles(delta)
 
 
 ## The bow wave's shape now (bow_amount), in the hitbox's space: an
@@ -2078,19 +2078,21 @@ func _update_bow_view(delta: float) -> void:
 	_bow_material.set_shader_parameter("flow", _bow_flow)
 
 
-## A stride sheds a swirl from the tail's tip, where the last stride left it,
-## jetting back and out to that side. It keeps some of the fish's speed, so at
-## speed it streams past the camera instead of vanishing behind it at once. Stronger strides (timing, flow) make
-## bigger, brighter ones; a perfect one is gold.
-func _shed_swirl(timing: float) -> void:
-	if not visible or get_parent() == null:
+## While a stride pushes, the tail pours a stream of bubbles (StrideStream):
+## from its tip, jetting back and out to the side it's swinging from, denser
+## as the stride builds and with flow, in the stride's timing colour.
+func _pour_bubbles(delta: float) -> void:
+	var swishing := stride_bubbles and swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY
+	if not swishing or swishy.phase < 0.0 or not is_visible_in_tree():
 		return
 	var tip := _tail.global_transform * _visual.tail_tip()
 	var body := global_basis.orthonormalized()
 	var swing := swishy.tail_swing
 	var side := body.x * swing.x - body.y * swing.y
-	var axis := (body.z + side * 0.6).normalized()  # body.z is backward
+	var jet := (body.z + side * 0.4).normalized()  # body.z is backward
 	var push := (1.0 + swishy.flow) / (1.0 + stride_flow_max)
-	var size := 0.35 * _tail.scale.x * lerpf(0.6, 1.2, timing)
-	Swirl.spawn(get_parent(), tip, axis, size, linear_velocity * 0.6 + axis * 2.0, lerpf(0.4, 1.0, timing) * lerpf(0.5, 1.0, push),
-			timing >= SwishySwim.SWEET_SPOT)
+	var rate := lerpf(60.0, 220.0, push) * lerpf(0.4, 1.0, swishy.power)
+	var color := StrideStream.color_for(swishy.last_timing)
+	color.a = lerpf(0.4, 1.0, push)
+	# They keep most of the fish's speed, so the stream stays tight behind the tail.
+	_stream.pour(delta, tip, jet, linear_velocity * 0.75, 0.025 * _tail.scale.x, rate, color)

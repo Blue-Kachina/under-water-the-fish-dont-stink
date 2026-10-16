@@ -77,8 +77,9 @@ throttle the stick just steers, directly, as in the other modes (*Stride Needs T
 timed (EARLY / PERFECT / LATE) and the flow.
 
 Strides get visibly more powerful as flow builds: the tail grows (*Stride Tail Growth*, Battletoads
-style) and swells on each stride, and each stride sheds a swirl of water from the tail, bigger and
-brighter the stronger it was, gold for a perfect one (*Stride Swirls*). The camera closes in a little
+style) and swells on each stride, and while a stride pushes, the tail pours a tight stream of tiny bubbles like a
+boost trail, denser as the stride builds and with flow, coloured by its timing: pale, blue, gold for a
+perfect one (*Stride Bubbles*). It stops once you're out of stride. The camera closes in a little
 with flow and a vignette darkens the screen's edges, warming to gold near full flow, with speed
 streaks when you're fast; a perfect stride punches the view in (camera *Arcade Zoom* / *Arcade
 Punch*; `scripts/arcade_fx.gd`).

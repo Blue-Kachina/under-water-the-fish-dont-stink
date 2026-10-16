@@ -48,7 +48,8 @@ func _run(main: Node) -> void:
 			side.make_current()
 			await _frames(4)
 			get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_%s_side.png" % [key, shot[0]]))
-		# Full flow: a big tail at its peak, swirls left behind, the arcade vignette and zoom.
+		# Full flow: a big tail at its peak, stretches of bubble stream in each
+		# timing's colour (perfect to fresh), the arcade vignette and zoom.
 		fish.swishy.flow = fish.stride_flow_max
 		fish.speed = 34.0
 		fish._tail.scale = Vector3.ONE * (1.0 + fish.stride_tail_growth) * 1.2
@@ -60,7 +61,10 @@ func _run(main: Node) -> void:
 		chase.make_current()  # the arcade effects only show through the chase camera
 		for i in 4:
 			var offset := Vector3.RIGHT * (0.5 if i % 2 == 0 else -0.5)
-			Swirl.spawn(main, fish.global_position + back * (1.2 + i * 1.6) + offset, (back + offset).normalized(), 0.4 + 0.1 * i, Vector3.ZERO, 1.0, i == 0)
+			var stream: StrideStream = fish.get_node("StrideStream")
+			var color := StrideStream.color_for([1.0, 0.6, 0.3, -1.0][i])
+			for k in 12:  # a short stretch of stream in each timing's colour
+				stream.pour(1.0 / 60.0, fish.global_position + back * (0.8 + i * 0.6 + k * 0.05) + offset * 0.3, back, Vector3.ZERO, 0.03, 60.0, color)
 		for i in 40:
 			await RenderingServer.frame_post_draw
 		chase.make_current()
@@ -73,7 +77,41 @@ func _run(main: Node) -> void:
 		fish._tail.rotation = Vector3.ZERO
 		fish.freeze = false
 		fish.set_process(true)
+	await _live(main, fish, chase, side)
 	get_tree().quit()
+
+
+## The real thing: striding at the peak for a while (the stream pouring, the
+## tail growing), shot from the chase camera and from the side.
+func _live(main: Node, fish: FishController, chase: Camera3D, side: Camera3D) -> void:
+	fish.character = FishCharacter.Family.OCTANE
+	fish.set_spawn(Transform3D.IDENTITY)
+	await _frames(10)
+	var input := FishInput.new()
+	fish.controls = input
+	chase.make_current()
+	chase.snap()
+	var t := 0.0
+	var shots := {1.2: "live_chase_a", 2.0: "live_side", 2.6: "live_chase_b"}
+	while t < 2.7:
+		input.forward = 1.0
+		input.stick = Vector2.RIGHT * (1.0 if int(t / fish.stride_peak_time) % 2 == 0 else -1.0)
+		input.direction_lock = true  # straight, so the trail lines up behind
+		await RenderingServer.frame_post_draw
+		t += get_process_delta_time()
+		for at: float in shots:
+			if t >= at and shots[at] != "":
+				if shots[at] == "live_side":
+					side.position = fish.global_position + Vector3(-4.0, 1.2, 1.5)
+					side.look_at(fish.global_position + Vector3(0.0, 0.0, 1.5))
+					side.make_current()
+				else:
+					chase.make_current()
+				await RenderingServer.frame_post_draw
+				get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s.png" % shots[at]))
+				shots[at] = ""
+	chase.make_current()
+	fish.controls = null
 
 
 func _frames(n: int) -> void:

@@ -97,17 +97,17 @@ func _run() -> void:
 		await get_tree().physics_frame
 		await get_tree().process_frame  # the tail and camera update per frame
 		t += get_physics_process_delta_time()
-	var swirls := main.find_children("*", "Swirl", false, false).size()
+	var poured: int = fish.get_node("StrideStream").count()
 	var tail_size: float = fish._tail.scale.x
 	var zoom: float = camera.zoom
 	check(tail_size > 1.8, "the tail grows with flow (x%.2f at flow %.2f)" % [tail_size, fish.swishy.flow])
-	check(swirls >= 3, "strides shed swirls (%d out)" % swirls)
+	check(poured >= 20, "strides pour a stream of bubbles (%d out)" % poured)
 	check(zoom < 0.95, "the view closes in (zoom %.3f)" % zoom)
 	input.clear()
 	for i in 480:
 		await get_tree().process_frame
 	check(fish._tail.scale.x < 1.05 and camera.zoom > 0.995, "all back to normal after (tail x%.2f, zoom %.3f)" % [fish._tail.scale.x, camera.zoom])
-	check(main.find_children("*", "Swirl", false, false).is_empty(), "the swirls fade away")
+	check(fish.get_node("StrideStream").count() == 0, "out of stride: the stream stops and its bubbles fade away")
 
 	print("boost:")
 	fish.request_reset()
