@@ -251,6 +251,8 @@ class ReplayOverlay extends Control:
 	const BAR := 64.0
 
 	var replay: GoalReplay
+	var credit_label := "SCORED BY"
+	var second_label := "ASSIST"
 	var scorer := ""
 	var assister := ""
 	var speed_text := ""
@@ -262,8 +264,13 @@ class ReplayOverlay extends Control:
 		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		visible = false
 
-	func start(goal_replay: GoalReplay, scorer_name: String, assister_name: String, speed: String, team_color: Color) -> void:
+	## `credit` and `second`: the card's heading over the name and its left
+	## column (a demolition's replay: "DEMOLITION BY" and "VICTIM").
+	func start(goal_replay: GoalReplay, scorer_name: String, assister_name: String, speed: String, team_color: Color,
+			credit := "SCORED BY", second := "ASSIST") -> void:
 		replay = goal_replay
+		credit_label = credit
+		second_label = second
 		scorer = scorer_name
 		assister = assister_name
 		speed_text = speed
@@ -304,10 +311,10 @@ class ReplayOverlay extends Control:
 		var header := Rect2(card.position.x + card.size.x * 0.5 - 80.0, card.position.y - 20.0, 160.0, 22.0)
 		draw_colored_polygon(PackedVector2Array([header.position + Vector2(10.0, 0.0), Vector2(header.end.x - 10.0, header.position.y),
 				Vector2(header.end.x, header.end.y), Vector2(header.position.x, header.end.y)]), BroadcastUI.INK)
-		BroadcastUI.text(self, header, "SCORED BY", 13, BroadcastUI.GOLD, HORIZONTAL_ALIGNMENT_CENTER, 600)
+		BroadcastUI.text(self, header, credit_label, 13, BroadcastUI.GOLD, HORIZONTAL_ALIGNMENT_CENTER, 600)
 		BroadcastUI.text(self, Rect2(card.position.x + 150.0, card.position.y + 6.0, 300.0, 74.0), scorer.to_upper(), 34, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 800)
 		for side in 2:
-			var label := "ASSIST" if side == 0 else "SPEED"
+			var label := second_label if side == 0 else "SPEED"
 			var value := (assister if not assister.is_empty() else "-") if side == 0 else speed_text
 			var column := Rect2(card.position.x + (10.0 if side == 0 else card.size.x - 150.0), card.position.y + 14.0, 140.0, 24.0)
 			BroadcastUI.text(self, column, label, 12, Color(1, 1, 1, 0.55), HORIZONTAL_ALIGNMENT_CENTER, 600)
@@ -519,10 +526,12 @@ class StatsBoard extends Control:
 	const SHADE := 0.62
 
 	## Each team: "name", "score", "color" and "rows", each row "name", "values"
-	## (one per HEADINGS) and "focus" (the player's own row).
+	## (one per headings) and "focus" (the player's own row).
 	var teams: Array = []
 	## Each: "label", "share" (Blue's, 0-1) and "text" (what to write at each end).
 	var bars: Array = []
+	## The column headings (always as many as HEADINGS, which sets the width).
+	var headings: Array = HEADINGS
 	var title := "MATCH STATS"
 	var footer := ""
 	## Whether it's held up; it fades in and out.
@@ -577,8 +586,8 @@ class StatsBoard extends Control:
 					HORIZONTAL_ALIGNMENT_LEFT, 700)
 			var strip := Rect2(columns_x, y, size.x - columns_x, HEADER_HEIGHT)
 			draw_rect(strip, Color(color, 0.82))
-			for i in HEADINGS.size():
-				BroadcastUI.text(self, Rect2(columns_x + i * COLUMN_WIDTH, y, COLUMN_WIDTH, HEADER_HEIGHT), HEADINGS[i], 12,
+			for i in headings.size():
+				BroadcastUI.text(self, Rect2(columns_x + i * COLUMN_WIDTH, y, COLUMN_WIDTH, HEADER_HEIGHT), headings[i], 12,
 						Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 700)
 			y += HEADER_HEIGHT
 			var striped := false

@@ -18,6 +18,15 @@ Pick a mode from the settings panel's *Mode* dropdown (remembered per PC, apart 
   card; after **Play**, a calm fish waits ahead and ball cam locks onto it. Ram it nose first at 10 m/s
   or more (*Nature Demo Speed*) to demolish it, and a new one turns up 30-50 m away. Nature has its
   own tuning (`presets/nature.cfg`); leaving Nature puts your tuning from before back.
+- **Hunt**: a 1v1 in the Ocean on Nature's tuning against a hostile fish (`HunterBot`, Basic
+  difficulty) that swims with exactly your mechanics and is out to demolish you. A demolition is a
+  goal: ram it nose first at *Nature Demo Speed* or faster. Rammed by each other at once, the faster
+  fish scores (the same speed: both explode, nobody scores). After each demolition, a replay of it
+  (unless *Goal replays* is off), then a kickoff with both fish back on their lanes. 5 minutes on
+  the clock; level on goals at 0:00, the most **points** wins (close call +25, dodge +50, every 4
+  perfect strides in a row +10, demolition +100), and level on those too, overtime's next
+  demolition wins. The arena reaches 90 m out from the centre: near its edge the water
+  darkens, and past it you're pushed back in. Hold D-pad up / B for the scoreboard.
 - **Obstacle Course**: walled arena with a timed 10-hoop course, tunnel, pillars, ramps and an arch.
 - **Replays**: watch Rocket League replays in the Aquarium Arena. Pick one with **Replay...** in the
   replay bar, or drop a `.replay` / `.rlreplay.json` on the window from any mode. **Close** goes back
@@ -43,7 +52,7 @@ recommended; keyboard works for quick checks.
 | Roll left / right | X / B | Q / E |
 | Look around | Right stick | I J K L |
 | Pause (Resume, reset, Settings); B or Start again resumes | Start | Esc / F1 |
-| Reset fish and course (1v1: restart kickoff) | Pause menu | R |
+| Reset fish and course (1v1: restart kickoff; Hunt: restart match) | Pause menu | R |
 
 The settings panel opens from the pause menu's **Settings**, so it's only reachable with the game
 paused.

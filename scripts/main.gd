@@ -3,12 +3,13 @@ extends Node3D
 ## and the pause menu (PauseMenu, on Start), whose Settings shows the tuning
 ## panel. The mode (picked in the tuning panel) decides the environment: Free Play and
 ## 1v1 (against a bot, Match1v1) in the Aquarium Arena, Free Swim and Nature
-## (Extra Swishy strides after a fish to demolish, NatureRun) in the Ocean, the
+## (Extra Swishy strides after a fish to demolish, NatureRun) and Hunt (a 1v1
+## on Nature's tuning against a hostile fish, HuntMatch) in the Ocean, the
 ## Obstacle Course, and Replays.
 ##
 ## Match modes (MATCH_MODES) start on a card (MatchCard) with the fish sitting
-## out; its Play starts the match (play_match). Nature plays on its own tuning
-## (NATURE_PRESET), and leaving it puts the tuning from before back.
+## out; its Play starts the match (play_match). Nature and Hunt play on Nature's
+## tuning (NATURE_PRESET), and leaving them puts the tuning from before back.
 ##
 ## Replays mode plays Rocket League replays in the Aquarium Arena (load_replay):
 ## pick one with the replay card's Open, drop a file on the window (from any
@@ -30,11 +31,14 @@ const FREE_PLAY := "Free Play"
 const ONE_V_ONE := "1v1"
 const FREE_SWIM := "Free Swim (Ocean)"
 const NATURE := "Nature"
+const HUNT := "Hunt"
 const OBSTACLE_COURSE := "Obstacle Course"
 const REPLAYS := "Replays"
-const MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, NATURE, OBSTACLE_COURSE, REPLAYS]
+const MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, NATURE, HUNT, OBSTACLE_COURSE, REPLAYS]
 ## Modes played as a match, which wait on a card for Play.
-const MATCH_MODES := [ONE_V_ONE, NATURE]
+const MATCH_MODES := [ONE_V_ONE, NATURE, HUNT]
+## Modes played on Nature's tuning.
+const NATURE_MODES := [NATURE, HUNT]
 ## Nature's tuning: Extra Swishy strides, no boost.
 const NATURE_PRESET := "res://presets/nature.cfg"
 ## Mode -> the environment it's played in.
@@ -43,6 +47,7 @@ const MODE_ENVIRONMENTS := {
 	ONE_V_ONE: "Aquarium Arena",
 	FREE_SWIM: "Ocean",
 	NATURE: "Ocean",
+	HUNT: "Ocean",
 	OBSTACLE_COURSE: "Obstacle Course",
 	REPLAYS: "Aquarium Arena",
 }
@@ -60,6 +65,8 @@ var replay: ReplayPlayer
 var match_1v1: Match1v1
 ## The Nature run being played, if any.
 var nature_run: NatureRun
+## The Hunt match being played, if any.
+var hunt_match: HuntMatch
 ## The tuning from before Nature's, while Nature's is on (else empty).
 var _tuning_before_nature := {}
 ## Shown in a match mode until Play starts the match.
@@ -177,6 +184,8 @@ func set_character(character: FishCharacter.Family) -> void:
 		match_1v1.kickoff()  # back to a kickoff as the new character
 	elif nature_run:
 		nature_run.start()
+	elif hunt_match:
+		hunt_match.kickoff()
 	else:
 		_fish.set_spawn(_environment.spawn_transform())
 	_panel.set_character(character)
@@ -203,6 +212,9 @@ func reset_play() -> void:
 	if nature_run:
 		nature_run.start()
 		return
+	if hunt_match:
+		hunt_match.restart()
+		return
 	_fish.set_spawn(_environment.spawn_transform())  # re-read: the aquarium's depends on the ball type
 	if _environment is Arena:
 		(_environment as Arena).reset_course()
@@ -216,6 +228,8 @@ func _reset_label() -> String:
 		return ""
 	if match_1v1:
 		return "Restart kickoff"
+	if hunt_match:
+		return "Restart match"
 	return "Restart" if nature_run else "Reset"
 
 
@@ -423,6 +437,8 @@ static func _match_card_text(mode: String) -> String:
 			return "1v1 against a bot: %d minutes on the clock, overtime on a tie." % int(Match1v1.MATCH_TIME / 60.0)
 		NATURE:
 			return "Swim like a fish: no boost here. Hold throttle and sweep the stick from side to side (any direction, as long as each sweep goes back the other way). Each stride builds to a peak, when its glow flashes; sweep back right then and the next stride pushes harder. Keep it up and the push builds. Ram the fish your camera's locked on fast enough to demolish it."
+		HUNT:
+			return "Hunt: 1v1 in open water, %d minutes on the clock. Demolish your opponent to score, and watch out: it's out to demolish you too. Close calls, dodges and runs of perfect strides earn points, and level on goals, points decide it." % int(HuntMatch.MATCH_TIME / 60.0)
 	return mode
 
 
@@ -479,9 +495,15 @@ func set_mode(mode: String, remember := true) -> void:
 ## Shows a match mode's card (the match starts on Play), or ends the match
 ## (or card) outside one.
 func _apply_mode() -> void:
-	_use_nature_tuning(current_mode == NATURE)
+	_use_nature_tuning(current_mode in NATURE_MODES)
 	var wanted: bool = current_mode in MATCH_MODES and current_environment == MODE_ENVIRONMENTS[current_mode]
 	if wanted:
+		# From one match mode straight to another in the same water (Nature to Hunt):
+		# the other's match or card goes first.
+		if _playing() and _playing_mode() != current_mode:
+			_end_match()
+		if _match_card and _match_card.message != _match_card_text(current_mode):
+			_close_match_card()
 		if not _playing() and _match_card == null:
 			_show_match_card()
 		return
@@ -496,9 +518,18 @@ func _apply_mode() -> void:
 	_fish.set_spawn(_environment.spawn_transform())
 
 
-## A match or a Nature run is on.
+## A match, a Nature run or a Hunt is on.
 func _playing() -> bool:
-	return match_1v1 != null or nature_run != null
+	return match_1v1 != null or nature_run != null or hunt_match != null
+
+
+## The mode of the match being played ("" when none).
+func _playing_mode() -> String:
+	if match_1v1:
+		return ONE_V_ONE
+	if nature_run:
+		return NATURE
+	return HUNT if hunt_match else ""
 
 
 ## Nature's tuning on (keeping what was there) or off (putting it back).
@@ -516,6 +547,9 @@ func _use_nature_tuning(on: bool) -> void:
 func _start_match() -> void:
 	if current_mode == NATURE:
 		_start_nature()
+		return
+	if current_mode == HUNT:
+		_start_hunt()
 		return
 	match_1v1 = Match1v1.new()
 	match_1v1.name = "Match"
@@ -541,7 +575,27 @@ func _start_nature() -> void:
 	_hud.set_nature(nature_run)
 
 
+func _start_hunt() -> void:
+	hunt_match = HuntMatch.new()
+	hunt_match.name = "Hunt"
+	hunt_match.setup(_environment as Ocean, _fish)
+	hunt_match.demo_replays = UISettings.goal_replays
+	hunt_match.fish_teleported.connect(func(fish: FishController) -> void:
+		if fish == _fish:
+			_camera.snap())
+	_environment.add_child(hunt_match)
+	_camera.ball = hunt_match.opponent  # ball cam follows the opponent
+	_camera.ball_cam = true
+	_hud.set_hunt(hunt_match)
+
+
 func _end_match() -> void:
+	if hunt_match:
+		hunt_match.end()
+		hunt_match.queue_free()
+		hunt_match = null
+		_camera.ball = null
+		_hud.set_hunt(null)
 	if nature_run:
 		nature_run.end()
 		nature_run.queue_free()

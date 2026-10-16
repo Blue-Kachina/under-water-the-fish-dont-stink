@@ -7,6 +7,12 @@ extends Node3D
 ## (on the ball, for an own goal), then a cut to a camera tucked in the back
 ## corner of the net as the ball comes in. Playback eases into slow motion for
 ## the finish, holds it through the goal explosion, and speeds back up.
+##
+## A demolition replays the same way (Hunt): set `victim` and leave the net
+## out. The victim stands in for the ball (the chase camera rides with the
+## attacker toward it), the second shot is a camera off to the side of where
+## they meet, and the explosion is a demolition's. In open water (in_arena
+## off) the cameras aren't kept inside the aquarium's walls.
 
 signal finished
 
@@ -44,6 +50,12 @@ var goal: Goal
 ## The scoring team's colour (the explosion's).
 var color := Color.WHITE
 var ball_radius := ReplayBall.RADIUS
+## A demolition replay: the victim's player index in `data` (-1 for a goal).
+var victim := -1
+## The explosion's size at the goal (or demolition).
+var explosion_radius := AquariumArena.GOAL_EXPLOSION_RADIUS
+## Keep the cameras inside the aquarium (off in open water).
+var in_arena := true
 ## Clip time now.
 var time := 0.0
 ## "chase" or "net".
@@ -120,7 +132,7 @@ func _process(delta: float) -> void:
 	_show(time)
 	if not _exploded and time >= goal_time:
 		_exploded = true
-		Explosion.spawn(self, _ball_position, color, AquariumArena.GOAL_EXPLOSION_RADIUS)  # no blast: just the show
+		Explosion.spawn(self, _ball_position, color, explosion_radius)  # no blast: just the show
 	_frame(delta)
 
 
@@ -144,10 +156,12 @@ func _finish() -> void:
 
 func _show(t: float) -> void:
 	_ball.apply(data.sample_ball(t, _sample))
-	if _sample.present:
+	if _sample.present and victim < 0:
 		_ball_position = _sample.position  # after the goal: where it went in
 	for i in cars.size():
 		cars[i].apply(data.sample_car(i, t, _sample))
+		if i == victim and _sample.present:
+			_ball_position = _sample.position  # after the demolition: where it was hit
 
 
 ## Places the camera for this moment's shot; `delta` 0 jumps straight to it.
@@ -173,7 +187,8 @@ func _frame(delta: float) -> void:
 		away = away.normalized()
 		var side := away.cross(Vector3.UP)
 		eye = subject + away * CHASE_DISTANCE + Vector3.UP * CHASE_HEIGHT + side * CHASE_SIDE
-		eye = DirectorCamera._clear_of_walls(eye)
+		if in_arena:
+			eye = DirectorCamera._clear_of_walls(eye)
 		aim = subject.lerp(_ball_position, CHASE_AIM)
 		fov = CHASE_FOV
 	else:
@@ -195,8 +210,26 @@ func _frame(delta: float) -> void:
 ## Low in the back corner of the net, on the far side from where the ball
 ## comes in, so it crosses the frame toward the camera.
 func _net_camera_spot() -> Vector3:
+	if goal == null and victim >= 0:
+		return _impact_camera_spot()
 	if goal == null:
 		return Vector3(0.0, 3.0, 0.0)
 	var entry := goal.to_local(data.sample_ball(maxf(goal_time - 0.05, 0.0), _sample).position)
 	var across := -signf(entry.x) if absf(entry.x) > 0.5 else 1.0
 	return goal.to_global(Vector3(across * (goal.width / 2.0 - 1.5), -goal.height / 2.0 + 1.7, goal.depth - 3.0))
+
+
+## For a demolition: off to the side of where the attacker meets the victim,
+## a little above, so the attacker crosses the frame into it.
+func _impact_camera_spot() -> Vector3:
+	var at := maxf(goal_time - 0.05, 0.0)
+	var hit := data.sample_car(victim, at, _sample).position
+	var approach := Vector3.FORWARD
+	if scorer >= 0:
+		var attacker := data.sample_car(scorer, at, _sample)
+		if attacker.velocity.length() > 0.5:
+			approach = attacker.velocity.normalized()
+	var side := approach.cross(Vector3.UP)
+	if side.length() < 0.1:
+		side = approach.cross(Vector3.RIGHT)
+	return hit + side.normalized() * 7.0 - approach * 3.0 + Vector3.UP * 2.0
