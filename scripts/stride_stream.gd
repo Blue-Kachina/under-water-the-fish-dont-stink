@@ -19,6 +19,8 @@ var _velocities := PackedVector3Array()
 var _ages := PackedFloat32Array()
 var _sizes := PackedFloat32Array()
 var _colors := PackedColorArray()
+## Stream seconds per real second (a slow-motion replay slows its bubbles too).
+var time_scale := 1.0
 var _owed := 0.0  # bubbles due but not yet made (fractions carry over)
 ## Where the last pour came from, and the frame it was in: a frame's bubbles
 ## spread along the path from there, so a fast fish leaves a line, not clumps.
@@ -83,7 +85,8 @@ func pour(delta: float, at: Vector3, jet: Vector3, carry: Vector3, spread: float
 	_owed = minf(_owed, 1.0)
 
 
-func _process(delta: float) -> void:
+func _process(real_delta: float) -> void:
+	var delta := real_delta * time_scale
 	var i := 0
 	while i < _positions.size():
 		_ages[i] += delta

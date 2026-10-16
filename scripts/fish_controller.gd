@@ -647,6 +647,11 @@ var _bow_view := MeshInstance3D.new()
 var _bow_material := ShaderMaterial.new()
 var _bow_flow := 0.0  # how far its ripples have streamed back
 var _stream := StrideStream.new()
+static var _bow_mesh: ArrayMesh
+## The stride bubbles poured this frame (bubbles/s, 0 when none) and their
+## colour, for replay_fx().
+var _pour_rate := 0.0
+var _pour_color := Color.TRANSPARENT
 ## Extra Swishy's strides (swim_style), read by the HUD's stride meter.
 var swishy := SwishySwim.new(self)
 
@@ -2047,7 +2052,10 @@ func bow_points() -> PackedVector3Array:
 
 ## A unit bow (radius 1, reaching 1 ahead along -Z), scaled to bow_size() as it
 ## swims; UV.x runs round it and UV.y from its open back (0) to its tip (1).
-func _build_bow_view() -> void:
+## Shared by every fish and the replay ghosts (ReplayCar).
+static func bow_mesh() -> ArrayMesh:
+	if _bow_mesh:
+		return _bow_mesh
 	var rings := 16
 	var sides := 32
 	var tool := SurfaceTool.new()
@@ -2066,8 +2074,13 @@ func _build_bow_view() -> void:
 			for corner: int in [a, a + 1, b, b, a + 1, b + 1]:
 				tool.add_index(corner)
 	tool.generate_normals()
+	_bow_mesh = tool.commit()
+	return _bow_mesh
+
+
+func _build_bow_view() -> void:
 	_bow_view.name = "BowWave"
-	_bow_view.mesh = tool.commit()
+	_bow_view.mesh = bow_mesh()
 	_bow_material.shader = BOW_SHADER
 	_bow_view.material_override = _bow_material
 	_bow_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -2091,6 +2104,7 @@ func _update_bow_view(delta: float) -> void:
 ## as the stride builds and with flow, in the stride's timing colour.
 func _pour_bubbles(delta: float) -> void:
 	var swishing := stride_bubbles and swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY
+	_pour_rate = 0.0
 	if not swishing or swishy.phase < 0.0 or not is_visible_in_tree():
 		return
 	var tip := _tail.global_transform * _visual.tail_tip()
@@ -2102,5 +2116,42 @@ func _pour_bubbles(delta: float) -> void:
 	var rate := lerpf(60.0, 220.0, push) * lerpf(0.4, 1.0, swishy.power)
 	var color := StrideStream.color_for(swishy.last_timing)
 	color.a = lerpf(0.4, 1.0, push)
+	_pour_rate = rate
+	_pour_color = color
 	# They keep most of the fish's speed, so the stream stays tight behind the tail.
 	_stream.pour(delta, tip, jet, linear_velocity * 0.75, 0.025 * _tail.scale.x, rate, color)
+
+
+## How the fish looks now beyond where it is and which way it faces (the
+## stride tail's swing and growth, its timing cue, the bow wave, the stride
+## bubbles, the flow), laid out as ReplayData's FX_* entries. GoalRecorder
+## keeps it every tick so replays (ReplayCar) show it all.
+func replay_fx() -> PackedFloat32Array:
+	var fx := PackedFloat32Array()
+	fx.resize(ReplayData.FX_SIZE)
+	var striding := swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY
+	if _tail:
+		fx[ReplayData.FX_TAIL_YAW] = _tail.rotation.y
+		fx[ReplayData.FX_TAIL_PITCH] = _tail.rotation.x
+		fx[ReplayData.FX_TAIL_SCALE] = _tail.scale.x
+	var cue := swishy.cue() if swim_style == SwimStyle.EXTRA_SWISHY else Vector3.ZERO
+	fx[ReplayData.FX_CUE_FILL] = cue.x
+	fx[ReplayData.FX_CUE_GLOW] = cue.y
+	fx[ReplayData.FX_CUE_SWEET] = cue.z
+	if striding:
+		fx[ReplayData.FX_SWING_X] = swishy.tail_swing.x
+		fx[ReplayData.FX_SWING_Y] = swishy.tail_swing.y
+		fx[ReplayData.FX_POWER] = swishy.power
+		fx[ReplayData.FX_FLOW] = swishy.flow / maxf(stride_flow_max, 0.01)
+	fx[ReplayData.FX_BOW] = bow_amount
+	if bow_amount > 0.0:
+		var size := bow_size()
+		fx[ReplayData.FX_BOW_X] = size.x
+		fx[ReplayData.FX_BOW_Y] = size.y
+		fx[ReplayData.FX_BOW_Z] = size.z
+	fx[ReplayData.FX_POUR] = _pour_rate
+	fx[ReplayData.FX_POUR_R] = _pour_color.r
+	fx[ReplayData.FX_POUR_G] = _pour_color.g
+	fx[ReplayData.FX_POUR_B] = _pour_color.b
+	fx[ReplayData.FX_POUR_A] = _pour_color.a
+	return fx

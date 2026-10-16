@@ -12,7 +12,15 @@ extends Node3D
 ## out. The victim stands in for the ball (the chase camera rides with the
 ## attacker toward it), the second shot is a camera off to the side of where
 ## they meet, and the explosion is a demolition's. In open water (in_arena
-## off) the cameras aren't kept inside the aquarium's walls.
+## off) the cameras aren't kept inside the aquarium's walls. Both fish
+## battered at once (a Fish Fry, `double`): the scorer stands for one, the
+## victim the other, and both explode.
+##
+## `arcade` (Hunt) shoots it like an arcade fighter's finisher: a vignette
+## that closes in with the attacker's flow, speed streaks, a hit-stop freeze
+## at the impact with a flash, a punch-in and a shake. The fish show what they
+## did live (their stride tails, bow waves and bubbles: ReplayCar), slowed
+## with the playback.
 
 signal finished
 
@@ -38,6 +46,15 @@ const NET_FOV_END := 46.0
 ## How quickly the camera eases toward its shot (1/s).
 const EYE_RATE := 5.0
 const AIM_RATE := 7.0
+## Arcade: the hit-stop at the impact, real seconds at FREEZE_RATE.
+const IMPACT_FREEZE := 0.35
+const FREEZE_RATE := 0.03
+## Arcade: the impact's shake (m at its peak) and punch-in (share of the field
+## of view), dying away at IMPACT_DECAY per real second.
+const SHAKE := 0.35
+const PUNCH := 0.22
+const IMPACT_DECAY := 2.5
+const VIGNETTE := preload("res://shaders/arcade_vignette.gdshader")
 
 ## The goal as a replay (time 0 = its start).
 var data: ReplayData
@@ -56,6 +73,11 @@ var victim := -1
 var explosion_radius := AquariumArena.GOAL_EXPLOSION_RADIUS
 ## Keep the cameras inside the aquarium (off in open water).
 var in_arena := true
+## A Fish Fry: the scorer was battered too (explodes in scorer_color).
+var double := false
+var scorer_color := Color.WHITE
+## Shot like an arcade finisher (see the class description).
+var arcade := false
 ## Clip time now.
 var time := 0.0
 ## "chase" or "net".
@@ -70,8 +92,15 @@ var _sample := ReplayData.Sample.new()
 var _ball_position := Vector3.ZERO
 var _aim := Vector3.ZERO
 var _net_spot := Vector3.ZERO
+var _scorer_position := Vector3.ZERO
 var _exploded := false
 var _done := false
+var _freeze_left := 0.0
+var _impact := 0.0  # 1 at the impact, dying away
+var _flow_level := 0.0
+var _vignette_layer := CanvasLayer.new()
+var _vignette := ColorRect.new()
+var _vignette_material := ShaderMaterial.new()
 
 
 func setup(clip: ReplayData, goal_at: float, scorer_index: int, net: Goal, team_color: Color, radius: float) -> void:
@@ -100,6 +129,14 @@ func _ready() -> void:
 	_previous_camera = get_viewport().get_camera_3d()
 	_camera.make_current()
 	_net_spot = _net_camera_spot()
+	if arcade:
+		_vignette_layer.layer = 0  # under the HUD's replay card
+		_vignette_material.shader = VIGNETTE
+		_vignette.material = _vignette_material
+		_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_vignette_layer.add_child(_vignette)
+		add_child(_vignette_layer)
 	_show(0.0)
 	_frame(0.0)
 
@@ -125,15 +162,29 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("jump"):
 		skip()
 		return
-	time += delta * playback_rate(time)
+	var rate := playback_rate(time)
+	if _freeze_left > 0.0:
+		_freeze_left -= delta
+		rate = FREEZE_RATE
+	time += delta * rate
 	if time >= data.duration:
 		_finish()
 		return
+	for car in cars:
+		car.time_scale = rate
 	_show(time)
 	if not _exploded and time >= goal_time:
 		_exploded = true
 		Explosion.spawn(self, _ball_position, color, explosion_radius)  # no blast: just the show
+		if double:
+			Explosion.spawn(self, _scorer_position, scorer_color, explosion_radius)
+		if arcade:
+			_freeze_left = IMPACT_FREEZE
+			_impact = 1.0
+	_impact = maxf(_impact - IMPACT_DECAY * delta, 0.0)
 	_frame(delta)
+	if arcade:
+		_update_vignette(delta)
 
 
 ## Playback speed at clip time `t`: full speed, slowing into the goal.
@@ -162,6 +213,8 @@ func _show(t: float) -> void:
 		cars[i].apply(data.sample_car(i, t, _sample))
 		if i == victim and _sample.present:
 			_ball_position = _sample.position  # after the demolition: where it was hit
+		if i == scorer and _sample.present:
+			_scorer_position = _sample.position
 
 
 ## Places the camera for this moment's shot; `delta` 0 jumps straight to it.
@@ -202,9 +255,32 @@ func _frame(delta: float) -> void:
 	else:
 		_camera.global_position = _camera.global_position.lerp(eye, 1.0 - exp(-EYE_RATE * delta))
 		_aim = _aim.lerp(aim, 1.0 - exp(-AIM_RATE * delta))
-	_camera.fov = fov
+	_camera.fov = fov * (1.0 - PUNCH * _impact)
 	if _camera.global_position.distance_to(_aim) > 0.01:
 		_camera.look_at(_aim, Vector3.UP)
+	if _impact > 0.0:
+		var shake := Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * SHAKE * _impact * _impact
+		_camera.global_position += _camera.global_basis * shake
+
+
+## Arcade: the vignette closes in with the attacker's flow (as recorded), with
+## speed streaks as it flies, and flashes at the impact.
+func _update_vignette(delta: float) -> void:
+	var flow := 0.0
+	var fast := 0.0
+	if scorer >= 0 and cars[scorer].visible:
+		var fx := cars[scorer].fx
+		if fx.size() == ReplayData.FX_SIZE:
+			flow = fx[ReplayData.FX_FLOW]
+		fast = cars[scorer].speed
+	# A little in even without flow: it's a replay, after all.
+	_flow_level = move_toward(_flow_level, maxf(flow, 0.35), ArcadeFx.RESPONSE * delta)
+	var size := _vignette.get_viewport_rect().size
+	_vignette_material.set_shader_parameter("aspect", size.x / maxf(size.y, 1.0))
+	_vignette_material.set_shader_parameter("strength", _flow_level)
+	_vignette_material.set_shader_parameter("heat", maxf(smoothstep(0.5, 1.0, _flow_level), _impact))
+	_vignette_material.set_shader_parameter("streaks", smoothstep(0.3, 1.0, clampf(fast / 35.0, 0.0, 1.0)) * maxf(_flow_level, 0.5))
+	_vignette_material.set_shader_parameter("flash", _impact)
 
 
 ## Low in the back corner of the net, on the far side from where the ball
@@ -220,7 +296,7 @@ func _net_camera_spot() -> Vector3:
 
 
 ## For a demolition: off to the side of where the attacker meets the victim,
-## a little above, so the attacker crosses the frame into it.
+## a little above and a little past it, so the attacker crosses the frame into it.
 func _impact_camera_spot() -> Vector3:
 	var at := maxf(goal_time - 0.05, 0.0)
 	var hit := data.sample_car(victim, at, _sample).position
@@ -232,4 +308,4 @@ func _impact_camera_spot() -> Vector3:
 	var side := approach.cross(Vector3.UP)
 	if side.length() < 0.1:
 		side = approach.cross(Vector3.RIGHT)
-	return hit + side.normalized() * 7.0 - approach * 3.0 + Vector3.UP * 2.0
+	return hit + side.normalized() * 8.0 + approach * 1.5 + Vector3.UP * 2.0

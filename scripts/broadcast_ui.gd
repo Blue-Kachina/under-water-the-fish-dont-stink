@@ -265,7 +265,7 @@ class ReplayOverlay extends Control:
 		visible = false
 
 	## `credit` and `second`: the card's heading over the name and its left
-	## column (a demolition's replay: "DEMOLITION BY" and "VICTIM").
+	## column (Hunt's demolition replay: "BATTERED BY" and "VICTIM").
 	func start(goal_replay: GoalReplay, scorer_name: String, assister_name: String, speed: String, team_color: Color,
 			credit := "SCORED BY", second := "ASSIST") -> void:
 		replay = goal_replay

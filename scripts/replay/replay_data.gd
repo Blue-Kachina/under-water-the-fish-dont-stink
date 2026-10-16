@@ -20,6 +20,31 @@ const FLAG_DODGE := 8
 const FLAG_POWERSLIDE := 16
 const FLAG_SUPERSONIC := 32
 const FLAG_DEMOLISHED := 64
+## A recorded fish's looks (FishController.replay_fx, GoalRecorder clips
+## only; RL replays have none): the stride tail's swing (rad) and growth, its
+## timing cue, the stride's swing and power, the bow wave's size (0..1, then
+## its shape in m), the stride bubbles poured (bubbles/s, then their colour),
+## and the flow's share of its most.
+const FX_TAIL_YAW := 0
+const FX_TAIL_PITCH := 1
+const FX_TAIL_SCALE := 2
+const FX_CUE_FILL := 3
+const FX_CUE_GLOW := 4
+const FX_CUE_SWEET := 5
+const FX_SWING_X := 6
+const FX_SWING_Y := 7
+const FX_POWER := 8
+const FX_BOW := 9
+const FX_BOW_X := 10
+const FX_BOW_Y := 11
+const FX_BOW_Z := 12
+const FX_POUR := 13
+const FX_POUR_R := 14
+const FX_POUR_G := 15
+const FX_POUR_B := 16
+const FX_POUR_A := 17
+const FX_FLOW := 18
+const FX_SIZE := 19
 const GAME_LIVE := 0
 const GAME_COUNTDOWN := 1
 const GAME_POST_GOAL := 2
@@ -49,6 +74,8 @@ class Track:
 	var throttle := PackedFloat32Array()
 	var steer := PackedFloat32Array()
 	var flags := PackedInt32Array()
+	## Per sample, FX_SIZE looks (recorded fish only; empty otherwise).
+	var fx: Array[PackedFloat32Array] = []
 
 
 ## A body's state at one moment (reused between calls to avoid allocations).
@@ -64,6 +91,8 @@ class Sample:
 	var throttle := 0.0
 	var steer := 0.0
 	var flags := 0
+	## The car's FX_* looks, blended between samples (empty when it has none).
+	var fx := PackedFloat32Array()
 
 
 var source := {}
@@ -214,6 +243,18 @@ func sample_car(index: int, t: float, out: Sample) -> Sample:
 	out.throttle = track.throttle[i]
 	out.steer = track.steer[i]
 	out.flags = track.flags[i]
+	if track.fx.is_empty():
+		out.fx = PackedFloat32Array()
+		return out
+	var i1 := mini(i + 1, track.fx.size() - 1)
+	var dt := track.times[i1] - track.times[i]
+	var s := clampf((t - track.times[i]) / dt, 0.0, 1.0) if dt > 0.0 else 0.0
+	var a := track.fx[i]
+	var b := track.fx[i1]
+	out.fx = a.duplicate()
+	if s > 0.0 and out.present:
+		for k in out.fx.size():
+			out.fx[k] = lerpf(a[k], b[k], s)
 	return out
 
 

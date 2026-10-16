@@ -29,7 +29,7 @@ const PERFECT_RHYTHM := "perfect_rhythm"
 const DEMO := "demo"
 const POINTS := {CLOSE_CALL: 25, DODGE: 50, PERFECT_RHYTHM: 10, DEMO: 100}
 ## What the callouts say.
-const TITLES := {CLOSE_CALL: "CLOSE CALL", DODGE: "DODGE", PERFECT_RHYTHM: "PERFECT RHYTHM", DEMO: "DEMOLITION"}
+const TITLES := {CLOSE_CALL: "CLOSE CALL", DODGE: "DODGE", PERFECT_RHYTHM: "PERFECT RHYTHM", DEMO: "BATTERED"}
 ## How close (m, centre to centre) a fast fish must come for it to be a threat.
 const THREAT_RANGE := 6.0
 ## How near (m, between hitboxes) a miss must be to score.

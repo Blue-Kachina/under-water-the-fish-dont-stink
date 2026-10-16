@@ -4,6 +4,11 @@ extends Node3D
 ## in its team's colour, sized to that hitbox. Pure playback: no physics, set from ReplayData samples every
 ## rendered frame. Its origin is the hitbox centre, like the live fish's.
 ##
+## A fish recorded in this game (a GoalRecorder clip) also carries its looks
+## (ReplayData.FX_*): it then swings and grows its stride tail, lights its
+## timing cue, pushes its bow wave and pours its stride bubbles as it did live.
+## time_scale slows all of that (and its swimming) with slow-motion playback.
+##
 ## It offers the same read-only fields the follow camera and the HUD's input
 ## display read from the live fish (on_surface, linear_velocity,
 ## is_flipping(), input_stick and so on), so either can follow it.
@@ -45,6 +50,11 @@ var input_roll := 0.0
 var boost_held := false
 var air_roll_held := false
 var direction_lock_held := false
+## The clip's looks at this moment (ReplayData.FX_*), or empty.
+var fx := PackedFloat32Array()
+## Clip seconds per real second (GoalReplay's slow motion): the swimming,
+## bow wave and bubbles keep pace with the playback.
+var time_scale := 1.0
 
 var _visual: FishModel
 var _tail: Node3D
@@ -55,6 +65,10 @@ var _hitbox_view := MeshInstance3D.new()
 var _label := Label3D.new()
 var _burst := CPUParticles3D.new()
 var _swim_phase := 0.0
+var _bow_view := MeshInstance3D.new()
+var _bow_material := ShaderMaterial.new()
+var _bow_flow := 0.0
+var _stream := StrideStream.new()
 
 
 func setup(replay_player: Dictionary) -> void:
@@ -108,12 +122,23 @@ func _ready() -> void:
 	_label.visible = show_name
 	add_child(_label)
 
+	_bow_view.name = "BowWave"
+	_bow_view.mesh = FishController.bow_mesh()
+	_bow_material.shader = FishController.BOW_SHADER
+	_bow_view.material_override = _bow_material
+	_bow_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_bow_view.visible = false
+	add_child(_bow_view)
+	_stream.name = "StrideStream"
+	add_child(_stream)
+
 	_build_burst(color)
 
 
 ## Show the car as `sample` has it (a ReplayData.Sample from sample_car).
 func apply(sample: ReplayData.Sample) -> void:
 	visible = sample.present
+	fx = sample.fx
 	if not sample.present:
 		_bubbles.emitting = false
 		return
@@ -146,22 +171,60 @@ func explode() -> void:
 	_burst.restart()
 
 
-func _process(delta: float) -> void:
+func _process(real_delta: float) -> void:
 	if not visible:
+		_bow_view.visible = false
 		return
+	var delta := real_delta * time_scale
 	# The live fish's swimming animation, driven by the replay's inputs.
 	var effort := maxf(input_forward, 1.0 if is_boosting else 0.0)
 	_swim_phase += delta * lerpf(4.0, 18.0, effort)
 	var slide := 1.0 if is_powersliding else 0.0
-	_tail.rotation.y = sin(_swim_phase) * lerpf(0.15, 0.45, effort) - input_stick.x * 0.6 * slide
-	_tail.rotation.x = 0.0
+	var recorded := fx.size() == ReplayData.FX_SIZE
+	if recorded:
+		_tail.rotation = Vector3(fx[ReplayData.FX_TAIL_PITCH], fx[ReplayData.FX_TAIL_YAW], 0.0)
+		_tail.scale = Vector3.ONE * maxf(fx[ReplayData.FX_TAIL_SCALE], 0.01)
+	else:
+		_tail.rotation.y = sin(_swim_phase) * lerpf(0.15, 0.45, effort) - input_stick.x * 0.6 * slide
+		_tail.rotation.x = 0.0
 	_fin_left.rotation.y = lerpf(_fin_left.rotation.y, 0.9 * slide, 1.0 - exp(-15.0 * delta))
 	_fin_right.rotation.y = -_fin_left.rotation.y
 	var flutter := sin(Time.get_ticks_msec() * 0.05) * 0.7 * input_reverse
 	_fin_left.rotation.z = flutter
 	_fin_right.rotation.z = -flutter
 	_visual.grounded = on_surface
+	if recorded:
+		_visual.stride_swing = Vector2(fx[ReplayData.FX_SWING_X], fx[ReplayData.FX_SWING_Y])
+		_visual.stride_power = fx[ReplayData.FX_POWER]
+		_visual.set_stride_cue(fx[ReplayData.FX_CUE_FILL], fx[ReplayData.FX_CUE_GLOW], fx[ReplayData.FX_CUE_SWEET])
 	_visual.react(delta, linear_velocity)
+	_show_bow(delta, recorded)
+	if recorded and fx[ReplayData.FX_POUR] > 0.0:
+		_pour(delta)
+
+
+## The bow wave as recorded.
+func _show_bow(delta: float, recorded: bool) -> void:
+	_bow_view.visible = recorded and fx[ReplayData.FX_BOW] > 0.005
+	if not _bow_view.visible:
+		return
+	_bow_view.scale = Vector3(fx[ReplayData.FX_BOW_X], fx[ReplayData.FX_BOW_Y], fx[ReplayData.FX_BOW_Z])
+	_bow_flow += delta * speed * 0.8
+	_bow_material.set_shader_parameter("amount", fx[ReplayData.FX_BOW])
+	_bow_material.set_shader_parameter("flow", _bow_flow)
+
+
+## The stride bubbles as poured live (FishController._pour_bubbles): from the
+## tail's tip, back and out to the side it swings from.
+func _pour(delta: float) -> void:
+	var tip := _tail.global_transform * _visual.tail_tip()
+	var body := global_basis.orthonormalized()
+	var swing := Vector2(fx[ReplayData.FX_SWING_X], fx[ReplayData.FX_SWING_Y])
+	var side := body.x * swing.x - body.y * swing.y
+	var jet := (body.z + side * 0.4).normalized()
+	var color := Color(fx[ReplayData.FX_POUR_R], fx[ReplayData.FX_POUR_G], fx[ReplayData.FX_POUR_B], fx[ReplayData.FX_POUR_A])
+	_stream.pour(delta, tip, jet, linear_velocity * 0.75, 0.025 * _tail.scale.x, fx[ReplayData.FX_POUR], color)
+	_stream.time_scale = time_scale
 
 
 func _build_burst(color: Color) -> void:

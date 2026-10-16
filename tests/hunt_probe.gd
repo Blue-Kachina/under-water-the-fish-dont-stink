@@ -2,9 +2,11 @@ extends Node
 ## Hunt mode: its card with the fish sitting out on Nature's tuning; Play
 ## starts a match against a hostile opponent, both locked through the countdown
 ## with the clock stopped; a fast ram by either fish scores (a slow bump
-## doesn't), explodes the victim, replays it and kicks off again with both back
-## at their spots and their flow gone; head-on, the faster fish scores and the
-## same speed demolishes both for nothing; at 0:00 goals decide, then points,
+## doesn't), explodes the victim ("Battered"), replays it arcade style (the
+## ghosts showing the bow wave and the grown stride tail, a hit-stop at the
+## impact) and kicks off again with both back at their spots and their flow
+## gone; head-on, the faster fish scores and the same speed batters both for
+## nothing (a Fish Fry, replayed too); at 0:00 goals decide, then points,
 ## then overtime's next demolition; the arena's edge pushes back and darkens
 ## the water; leaving puts everything back.
 ##   Godot_console.exe --headless --path . res://tests/hunt_probe.tscn
@@ -76,16 +78,25 @@ func _run() -> void:
 	check(hunt.phase == HuntMatch.Phase.DEMOED, "a pause for the explosion")
 	check(hunt.style.points[0] >= StylePoints.POINTS[StylePoints.DEMO], "+%d points for it (%d)" % [StylePoints.POINTS[StylePoints.DEMO], hunt.style.points[0]])
 	check(events.any(func(e: Dictionary) -> bool: return e.type == StylePoints.DEMO and e.player == 0 and e.victim == 1), "called out as a demolition")
+	check(StylePoints.TITLES[StylePoints.DEMO] == "BATTERED" and "BATTERIES" in load("res://scripts/hud.gd").HUNT_HEADINGS,
+			"called BATTERED, counted as BATTERIES on the scoreboard")
 	fish.swishy.flow = 1.5  # to see the kickoff clear it
 	await _ticks(roundi((HuntMatch.DEMO_PAUSE + 0.2) * 120.0))
 	check(hunt.phase == HuntMatch.Phase.REPLAY and is_instance_valid(hunt.demo_replay), "then a replay of it")
 	if is_instance_valid(hunt.demo_replay):
-		check(hunt.demo_replay.victim == 1 and hunt.demo_replay.scorer == 0 and not hunt.demo_replay.in_arena, "replaying the player into the opponent, in open water")
-		await _ticks(60)
-		check(hunt.demo_replay.shot != "", "the replay's camera is shooting (%s)" % hunt.demo_replay.shot)
-		hunt.demo_replay.skip()
+		var replay := hunt.demo_replay
+		check(replay.victim == 1 and replay.scorer == 0 and not replay.in_arena and replay.arcade and not replay.double,
+				"replaying the player into the opponent, in open water, arcade style")
+		var track: ReplayData.Track = replay.data.cars[0]
+		check(not track.fx.is_empty() and track.fx.size() == track.flags.size(), "the clip has the fish's looks every tick (%d)" % track.fx.size())
+		var stats := await _watch_replay(hunt)
+		check(stats.shot, "the replay's camera is shooting")
+		check(stats.bow, "the attacker's ghost pushes its bow wave")
+		check(stats.tail > 1.3, "and its tail is grown with flow (x%.2f)" % stats.tail)
+		check(stats.froze, "a hit-stop at the impact")
+		check(stats.vignette, "the arcade vignette shows")
 	await _ticks(5)
-	check(hunt.phase == HuntMatch.Phase.COUNTDOWN and hunt.demo_replay == null, "skipping it goes to the kickoff")
+	check(hunt.phase == HuntMatch.Phase.COUNTDOWN and hunt.demo_replay == null, "the replay ends at the kickoff")
 	check(not opponent.demolished and opponent.visible and fish.visible, "both back")
 	check(fish.swishy.flow == 0.0 and fish.linear_velocity.length() < 0.5, "the player's flow and speed are gone")
 	var spots_ok := false
@@ -109,9 +120,17 @@ func _run() -> void:
 	check(hunt.scores == [2, 1] and opponent.demolished and not fish.demolished, "the faster fish scores")
 	await _ticks(roundi((HuntMatch.DEMO_PAUSE + 0.2) * 120.0))
 	await _go_live(hunt)
+	hunt.demo_replays = true
 	await _joust(hunt, hunt.demo_speed() + 5.0, hunt.demo_speed() + 5.0)
-	check(hunt.scores == [2, 1] and opponent.demolished and fish.demolished, "the same speed: both demolished, nobody scores")
+	check(hunt.scores == [2, 1] and opponent.demolished and fish.demolished and hunt.last_demo.double,
+			"the same speed: a Fish Fry, both battered, nobody scores")
 	await _ticks(roundi((HuntMatch.DEMO_PAUSE + 0.2) * 120.0))
+	check(hunt.phase == HuntMatch.Phase.REPLAY and is_instance_valid(hunt.demo_replay) and hunt.demo_replay.double,
+			"the Fish Fry is replayed")
+	if is_instance_valid(hunt.demo_replay):
+		hunt.demo_replay.skip()
+	await _ticks(5)
+	hunt.demo_replays = false
 	check(hunt.phase == HuntMatch.Phase.COUNTDOWN and not fish.demolished and not opponent.demolished, "and back to a kickoff")
 
 	print("time up:")
@@ -178,6 +197,25 @@ func _run() -> void:
 
 	print("hunt_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)
+
+
+## Plays the demo replay through, noting what it showed: "shot" (the camera
+## framed something), "bow" (the attacker's ghost showed its bow wave),
+## "tail" (its tail's largest scale), "froze" (the hit-stop) and "vignette".
+func _watch_replay(hunt: HuntMatch) -> Dictionary:
+	var stats := {"shot": false, "bow": false, "tail": 0.0, "froze": false, "vignette": false}
+	var replay := hunt.demo_replay
+	for i in 2400:
+		if not is_instance_valid(replay) or hunt.demo_replay != replay:
+			break
+		var ghost: ReplayCar = replay.cars[replay.scorer]
+		stats.shot = stats.shot or replay.shot != ""
+		stats.bow = stats.bow or (ghost.visible and ghost._bow_view.visible)
+		stats.tail = maxf(stats.tail, ghost._tail.scale.x)
+		stats.froze = stats.froze or replay._freeze_left > 0.0
+		stats.vignette = stats.vignette or (replay._vignette.is_visible_in_tree() and replay._flow_level > 0.0)
+		await get_tree().process_frame
+	return stats
 
 
 ## Through a kickoff's countdown to live play.

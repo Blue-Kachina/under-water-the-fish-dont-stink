@@ -2,16 +2,17 @@ class_name HuntMatch
 extends Node
 ## Hunt: a 1v1 in the Ocean against a hostile fish (a HunterBot) with the
 ## player's own tuning (Nature's: Extra Swishy strides, no boost, bow wave).
-## A demolition is a goal: ramming the other fish nose first at
-## nature_demo_speed or faster scores for the rammer. Both fish ramming each
-## other at once: the faster one scores; at the same speed both explode and
-## nobody does.
+## A demolition (in Hunt, the victim's been "Battered") is a goal: ramming
+## the other fish nose first at nature_demo_speed or faster scores for the
+## rammer. Both fish ramming each other at once: the faster one scores; at the
+## same speed both are battered (a "Fish Fry") and nobody scores.
 ##
 ## Each play starts from a kickoff: the fish facing each other down parallel
 ## lanes KICKOFF_DISTANCE out from the centre, a little offset (one of
 ## KICKOFF_LAYOUTS, mirrored for team 1), frozen through a 3-2-1 countdown, the
 ## clock stopped. After a demolition, a moment for the explosion, then a replay
-## of it (GoalReplay) unless demo_replays is off, then the next kickoff.
+## of it (GoalReplay, shot arcade style) unless demo_replays is off, then the
+## next kickoff. A Fish Fry is replayed too.
 ##
 ## A 5-minute clock. At 0:00 the most goals wins; level on goals, the most
 ## points (StylePoints: close calls, dodges, perfect rhythm, demolitions) wins;
@@ -25,7 +26,7 @@ extends Node
 
 ## A kickoff has moved `fish` (cameras following it can snap).
 signal fish_teleported(fish: FishController)
-## `attacker` null: both fish demolished each other at the same speed.
+## `attacker` null: both fish demolished each other at the same speed (a Fish Fry).
 signal demolished(attacker: FishController, victim: FishController)
 signal demo_replay_started(replay: GoalReplay)
 signal demo_replay_ended
@@ -92,7 +93,8 @@ var demo_replays := true
 ## The demo replay playing, if any.
 var demo_replay: GoalReplay
 var style := StylePoints.new()
-## The last demolition: "attacker" (null for a double), "victim", "speed", "team".
+## The last demolition: "attacker" and "victim" (both null for a Fish Fry),
+## "speed", "team" (-1 for a Fish Fry) and "double".
 var last_demo := {}
 ## The arena's centre (the ocean's spawn).
 var center := Vector3.ZERO
@@ -253,7 +255,7 @@ func _check_demolitions() -> void:
 func _demo(attacker: FishController, victim: FishController) -> void:
 	var team := _team_of(attacker)
 	scores[team] += 1
-	last_demo = {"attacker": attacker, "victim": victim, "speed": attacker.speed, "team": team}
+	last_demo = {"attacker": attacker, "victim": victim, "speed": attacker.speed, "team": team, "double": false}
 	Explosion.spawn(ocean, victim.global_position, AquariumArena.TEAM_COLORS[1 - team], DEMO_EXPLOSION)
 	victim.demolish()
 	style.on_demo(team, 1 - team)
@@ -263,13 +265,14 @@ func _demo(attacker: FishController, victim: FishController) -> void:
 	demolished.emit(attacker, victim)
 
 
-## Both at once at the same speed: both explode, nobody scores.
+## Both at once at the same speed: a Fish Fry. Both explode, nobody scores.
 func _double_demo() -> void:
-	last_demo = {"attacker": null, "victim": null, "speed": player.speed, "team": -1}
+	last_demo = {"attacker": null, "victim": null, "speed": player.speed, "team": -1, "double": true}
 	for team in 2:
 		var fish := _fish_of(team)
 		Explosion.spawn(ocean, fish.global_position, AquariumArena.TEAM_COLORS[team], DEMO_EXPLOSION)
 		fish.demolish()
+	_demo_record_time = _recorder.time
 	phase = Phase.DEMOED
 	_demo_left = DEMO_PAUSE
 	demolished.emit(null, null)
@@ -335,12 +338,15 @@ func _pick_opponent() -> void:
 	opponent.display_name = OPPONENT_NAMES.pick_random()
 
 
-## Starts the replay of the demolition just made. False when there's no one
-## to credit (a double) or too little recorded to show.
+## Starts the replay of the demolition just made. False when there's too
+## little recorded to show.
 func _start_replay() -> bool:
-	var attacker: FishController = last_demo.get("attacker")
-	if attacker == null:
+	if last_demo.is_empty():
 		return false
+	var double: bool = last_demo.double
+	# A Fish Fry is shot from the player's side, the opponent standing in as the victim.
+	var attacker: FishController = player if double else last_demo.attacker
+	var victim: FishController = opponent if double else last_demo.victim
 	var from := maxf(_recorder.start_time(), _demo_record_time - REPLAY_BEFORE)
 	var clip := _recorder.clip(from, _demo_record_time + REPLAY_AFTER)
 	if clip.times.size() < 30:
@@ -348,11 +354,15 @@ func _start_replay() -> bool:
 	var fish := [player, opponent]
 	demo_replay = GoalReplay.new()
 	demo_replay.name = "DemoReplay"
+	# Each explosion in the victim's own team colour, as live.
 	demo_replay.setup(clip, _demo_record_time - from, fish.find(attacker), null,
-			AquariumArena.TEAM_COLORS[last_demo.team], ReplayBall.RADIUS)
-	demo_replay.victim = fish.find(last_demo.victim)
+			AquariumArena.TEAM_COLORS[_team_of(victim)], ReplayBall.RADIUS)
+	demo_replay.victim = fish.find(victim)
+	demo_replay.double = double
+	demo_replay.scorer_color = AquariumArena.TEAM_COLORS[_team_of(attacker)]
 	demo_replay.explosion_radius = DEMO_EXPLOSION
 	demo_replay.in_arena = false
+	demo_replay.arcade = true
 	demo_replay.finished.connect(func() -> void:
 		_stop_replay()
 		_after_demo())

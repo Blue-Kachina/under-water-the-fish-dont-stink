@@ -94,7 +94,7 @@ func _ready() -> void:
 	if settings.load(SETTINGS_PATH) == OK:
 		saved_mode = _saved_mode(settings)
 		saved_character = FishCharacter.from_key(settings.get_value("playground", "character", "octane"))
-	if get_tree().current_scene != self and saved_mode in [ONE_V_ONE, NATURE]:
+	if get_tree().current_scene != self and (saved_mode == ONE_V_ONE or saved_mode in NATURE_MODES):
 		saved_mode = FREE_PLAY  # inside a test probe: no bot or Nature tuning, whatever was last played
 	_fish.character = saved_character
 	_fish.display_name = UISettings.display_name()
@@ -438,7 +438,7 @@ static func _match_card_text(mode: String) -> String:
 		NATURE:
 			return "Swim like a fish: no boost here. Hold throttle and sweep the stick from side to side (any direction, as long as each sweep goes back the other way). Each stride builds to a peak, when its glow flashes; sweep back right then and the next stride pushes harder. Keep it up and the push builds. Ram the fish your camera's locked on fast enough to demolish it."
 		HUNT:
-			return "Hunt: 1v1 in open water, %d minutes on the clock. Demolish your opponent to score, and watch out: it's out to demolish you too. Close calls, dodges and runs of perfect strides earn points, and level on goals, points decide it." % int(HuntMatch.MATCH_TIME / 60.0)
+			return "Hunt: 1v1 in open water, %d minutes on the clock. Batter your opponent (ram it nose first, fast) to score, and watch out: it's out to batter you too. Batter each other at once and it's a Fish Fry. Close calls, dodges and runs of perfect strides earn points, and level on goals, points decide it." % int(HuntMatch.MATCH_TIME / 60.0)
 	return mode
 
 

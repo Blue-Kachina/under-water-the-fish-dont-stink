@@ -19,7 +19,8 @@ var time := 0.0
 var _times := PackedFloat64Array()
 ## Per tick: [present, position, velocity, rotation, angular velocity].
 var _ball: Array = []
-## Per fish, per tick: the same, then [boost, throttle, steer, flags].
+## Per fish, per tick: the same, then [boost, throttle, steer, flags, looks
+## (FishController.replay_fx)].
 var _fish: Array = []
 ## Events logged (log_event), with recorder times.
 var _events: Array[Dictionary] = []
@@ -67,9 +68,9 @@ func record(delta: float) -> void:
 				flags |= ReplayData.FLAG_DODGE
 			elif not f.on_surface:
 				flags |= ReplayData.FLAG_JUMP
-			state.append_array([f.boost_amount, f.input_forward - f.input_reverse, f.input_stick.x, flags])
+			state.append_array([f.boost_amount, f.input_forward - f.input_reverse, f.input_stick.x, flags, f.replay_fx()])
 		else:
-			state.append_array([0.0, 0.0, 0.0, 0])
+			state.append_array([0.0, 0.0, 0.0, 0, PackedFloat32Array()])
 		_fish[i].append(state)
 	# Drop what's too old, a second's worth at a time.
 	if _times[0] < time - KEEP - 1.0:
@@ -149,4 +150,9 @@ static func _track(states: Array, times: PackedFloat64Array, car: bool) -> Repla
 			track.throttle.append(s[6])
 			track.steer.append(s[7])
 			track.flags.append(s[8])
+			var fx: PackedFloat32Array = s[9]
+			if fx.size() == ReplayData.FX_SIZE:
+				track.fx.append(fx)
+	if car and track.fx.size() != track.flags.size():
+		track.fx.clear()  # all or nothing
 	return track

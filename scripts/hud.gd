@@ -34,7 +34,8 @@ const NAME_PLATE_HEIGHT := 0.9
 const FEED_TIME := 2.5
 const FEED_LINES := 4
 ## Hunt's scoreboard columns (as many as StatsBoard.HEADINGS).
-const HUNT_HEADINGS := ["POINTS", "DEMOS", "CLOSE", "DODGES", "PERFECT", "BEST RUN", "TOP KM/H"]
+## BATTERIES: fish battered (Hunt's demolitions; a battery being a beating).
+const HUNT_HEADINGS := ["POINTS", "BATTERIES", "CLOSE", "DODGES", "PERFECT", "BEST RUN", "TOP KM/H"]
 
 @export var fish: FishController
 @export var arena: Arena
@@ -280,10 +281,10 @@ func set_hunt(new_match: HuntMatch) -> void:
 
 func _on_hunt_demolished(attacker: FishController, _victim: FishController) -> void:
 	if attacker == null:
-		_splash.play("DOUBLE DEMO!", "Nobody scores", "", BroadcastUI.GOLD, SPLASH_TIME)
+		_splash.play("FISH FRY!", "Both battered  ·  nobody scores", "", BroadcastUI.GOLD, SPLASH_TIME)
 		return
 	var team := hunt_match._team_of(attacker)
-	_splash.play("DEMOLITION!", _name_of(attacker), _speed_text(hunt_match.last_demo.speed),
+	_splash.play("BATTERED!", _name_of(attacker), _speed_text(hunt_match.last_demo.speed),
 			AquariumArena.TEAM_COLORS[team], SPLASH_TIME)
 	_scorebug.flash(team)
 
@@ -318,13 +319,18 @@ func _update_feed(delta: float) -> void:
 
 func _on_demo_replay_started(demo_replay: GoalReplay) -> void:
 	var demo := hunt_match.last_demo
-	var attacker: FishController = demo.get("attacker")
 	_splash.hide_now()
 	_feed_lines.clear()
+	var speed := _speed_text(demo.get("speed", 0.0))
+	if demo.get("double", false):
+		_replay_overlay.start(demo_replay, _name_of(hunt_match.player), _name_of(hunt_match.opponent), speed,
+				BroadcastUI.GOLD, "FISH FRY", "WITH")
+		return
+	var attacker: FishController = demo.get("attacker")
 	var victim: FishController = demo.get("victim")
 	_replay_overlay.start(demo_replay, _name_of(attacker) if is_instance_valid(attacker) else "",
-			_name_of(victim) if is_instance_valid(victim) else "", _speed_text(demo.get("speed", 0.0)),
-			AquariumArena.TEAM_COLORS[maxi(demo.get("team", 0), 0)], "DEMOLITION BY", "VICTIM")
+			_name_of(victim) if is_instance_valid(victim) else "", speed,
+			AquariumArena.TEAM_COLORS[maxi(demo.get("team", 0), 0)], "BATTERED BY", "VICTIM")
 
 
 func _on_hunt_over(winner: int) -> void:
@@ -390,7 +396,8 @@ func _process(delta: float) -> void:
 		return
 	if fish == null:
 		return
-	_stride_meter.visible = not fish_sitting_out and fish.swim_strokes and fish.swim_style == FishController.SwimStyle.EXTRA_SWISHY
+	_stride_meter.visible = not fish_sitting_out and not _in_live_replay() and fish.swim_strokes \
+			and fish.swim_style == FishController.SwimStyle.EXTRA_SWISHY
 	if fish_sitting_out:
 		_boost.visible = false
 		_scorebug.visible = false

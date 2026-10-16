@@ -41,13 +41,34 @@ All phases are implemented and pass headless probes. A build is ready for manual
 - **The bot has a fourth state, *commit*.** When it's fast and close, it lets go of the throttle (so nothing strides) and lines up the ram with the full stick.
 - **The bot notices threats from 20 m** (the plan didn't fix a range). When it evades, it keeps striding while it turns.
 - **Dodges count if pressed up to 0.6 s before a threat starts**, not only during it.
-- **Results.** The scoreboard (held, or up by itself at the end) shows POINTS, DEMOS, CLOSE, DODGES, PERFECT, BEST RUN and TOP KM/H. There's no separate results card.
+- **Results.** The scoreboard (held, or up by itself at the end) shows POINTS, BATTERIES, CLOSE, DODGES, PERFECT, BEST RUN and TOP KM/H. There's no separate results card.
 
 **Open items for tuning:**
 - Basic's numbers (`BotDifficulty`).
 - Point values and thresholds (`StylePoints` consts).
 - `KICKOFF_DISTANCE` / `KICKOFF_LAYOUTS`, `ARENA_RADIUS`, and the boundary push.
 - These are code constants, not tuning panel exports, for now.
+
+### Follow-up (2026-10-16): Battered, Fish Fry, arcade demo replays
+Asked for after the first pass:
+- **Naming.** In Hunt a demolition is getting **Battered**: the splash reads BATTERED!, the points
+  feed BATTERED +100, the replay card BATTERED BY / VICTIM. Both fish battered at once is a
+  **Fish Fry** (FISH FRY! splash, FISH FRY / WITH replay card). The scoreboard column is
+  **BATTERIES**, how many fish you've battered (a battery being a beating). Code names
+  (`demolished`, `last_demo`, `StylePoints.DEMO`) are unchanged. Nature free play and the
+  Aquarium modes still say Demolition.
+- **Replays show the arcade looks.** `GoalRecorder` now keeps each fish's looks every tick
+  (`FishController.replay_fx()`, the `ReplayData.FX_*` layout: tail swing and growth, timing cue,
+  bow wave, stride bubbles, flow), and `ReplayCar` redraws them, slowed with the playback
+  (`time_scale`, also on `StrideStream`). Goal replays in the Aquarium 1v1 get this too.
+- **Shot arcade style** (`GoalReplay.arcade`, on in Hunt): a vignette that closes in with the
+  attacker's recorded flow (never less than 0.35) with speed streaks, a 0.35 s hit-stop at the
+  impact, a flash, a punch-in and a shake. The impact camera now sits a little past the hit, so
+  the attacker crosses the frame.
+- **Fish Fry replays.** These used to be skipped. They're shot from the player's side with both
+  explosions.
+- The live stride meter hides during replays.
+- `tests/demo_replay_shots` (needs a window) renders frames of a demo replay.
 
 ## Existing pieces to reuse
 - **`NatureRun`** (`scripts/nature_run.gd`) is the template for an Ocean match node:
