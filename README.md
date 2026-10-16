@@ -13,7 +13,8 @@ Pick a mode from the settings panel's *Mode* dropdown (remembered per PC, apart 
 - **Free Swim (Ocean)**: endless open water with no walls, floor or obstacles. Floating specks
   surround you wherever you go, and the water is lighter above and darker below so you can tell
   up from down.
-- **Nature**: the Ocean, with no boost and the **Extra Swishy** swim style (see below). It starts on a
+- **Nature**: the Ocean, with no boost and the **Extra Swishy** swim style (see below). The boost
+  button holds the direction lock instead (*Boost Button Locks*). It starts on a
   card; after **Play**, a calm fish waits ahead and ball cam locks onto it. Ram it nose first at 10 m/s
   or more (*Nature Demo Speed*) to demolish it, and a new one turns up 30-50 m away. Nature has its
   own tuning (`presets/nature.cfg`); leaving Nature puts your tuning from before back.

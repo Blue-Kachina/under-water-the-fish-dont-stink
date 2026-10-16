@@ -182,6 +182,9 @@ const TIME_EPSILON := 0.0001
 @export_group("Boost")
 ## Off: the boost button does nothing (and the gauge hides), e.g. in Nature.
 @export var boost_enabled := true
+## The boost button holds the direction lock instead (e.g. in Nature, where
+## there's no boost). The lock's own key still works.
+@export var boost_button_locks := false
 ## RL: 1058.3 uu/s^2 in the air.
 @export_range(0.0, 60.0, 0.01) var boost_accel := 10.58
 ## Absolute speed cap, also applied to jumps and dodges. RL: 2300 uu/s.
@@ -902,7 +905,8 @@ func _sample_input(delta: float) -> void:
 		air_roll_held = Input.is_action_pressed("air_roll")
 		boost_held = Input.is_action_pressed("boost")
 		powerslide_held = Input.is_action_pressed("powerslide")
-		direction_lock_held = Input.is_action_pressed("direction_lock")
+		var boost_locks := boost_button_locks and Input.is_action_pressed("boost")
+		direction_lock_held = Input.is_action_pressed("direction_lock") or boost_locks
 		jump_held = Input.is_action_pressed("jump")
 	# Detect the press ourselves: "just pressed" is tracked per frame and isn't
 	# reliable this early in the physics tick.

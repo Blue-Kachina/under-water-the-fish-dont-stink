@@ -47,6 +47,14 @@ func _run() -> void:
 	check(gap > 20.0 and gap < 40.0, "the target waits ahead (%.1f m)" % gap)
 	check(main._reset_label() == "Restart", "reset restarts the run")
 
+	print("boost button:")
+	Input.action_press("boost")
+	await _ticks(3)
+	check(fish.direction_lock_held and not fish.is_boosting, "boost holds the direction lock instead")
+	Input.action_release("boost")
+	await _ticks(3)
+	check(not fish.direction_lock_held, "letting go lets go of the lock")
+
 	print("slow bump:")
 	await _ram(run, 5.0)
 	check(run.demos == 0 and not run.target.demolished, "a slow bump doesn't demolish it")
@@ -94,7 +102,8 @@ func _run() -> void:
 	main.set_mode(main.FREE_SWIM)
 	await _ticks(3)
 	check(main.nature_run == null and camera.ball == null, "the run's over")
-	check(fish.swim_style == FishController.SwimStyle.ORIGINAL and fish.boost_enabled and not fish.bow_wave, "Original strokes, boost and no bow wave back")
+	check(fish.swim_style == FishController.SwimStyle.ORIGINAL and fish.boost_enabled and not fish.bow_wave and not fish.boost_button_locks,
+			"Original strokes, boost (as boost) and no bow wave back")
 	check(is_equal_approx(fish.max_speed, max_speed_before), "the tuning from before is back (max_speed %.1f)" % fish.max_speed)
 
 	print("nature_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
