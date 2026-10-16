@@ -48,6 +48,29 @@ func _run(main: Node) -> void:
 			side.make_current()
 			await _frames(4)
 			get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_%s_side.png" % [key, shot[0]]))
+		# Full flow: a big tail at its peak, swirls left behind, the arcade vignette and zoom.
+		fish.swishy.flow = fish.stride_flow_max
+		fish.speed = 34.0
+		fish._tail.scale = Vector3.ONE * (1.0 + fish.stride_tail_growth) * 1.2
+		fish._tail.rotation.y = -fish.stride_tail_swing
+		visual.set_stride_cue(1.0, 1.0, 1.0)
+		fish.bow_amount = 1.0
+		fish._update_bow_view(1.0 / 60.0)
+		var back := fish.global_basis.z
+		chase.make_current()  # the arcade effects only show through the chase camera
+		for i in 4:
+			var offset := Vector3.RIGHT * (0.5 if i % 2 == 0 else -0.5)
+			Swirl.spawn(main, fish.global_position + back * (1.2 + i * 1.6) + offset, (back + offset).normalized(), 0.4 + 0.1 * i, Vector3.ZERO, 1.0, i == 0)
+		for i in 40:
+			await RenderingServer.frame_post_draw
+		chase.make_current()
+		await _frames(2)
+		get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_flow.png" % key))
+		fish.swishy.flow = 0.0
+		for i in 40:
+			await RenderingServer.frame_post_draw
+		fish._tail.scale = Vector3.ONE
+		fish._tail.rotation = Vector3.ZERO
 		fish.freeze = false
 		fish.set_process(true)
 	get_tree().quit()

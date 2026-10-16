@@ -84,6 +84,31 @@ func _run() -> void:
 		await get_tree().physics_frame
 	check(fish.swishy.tail_swing.length() < 0.05, "it relaxes back to the middle after a stride")
 
+	print("arcade:")
+	var camera: Camera3D = main.get_node("FollowCamera")
+	input.clear()
+	fish.request_reset()
+	await _ticks(5)
+	var flip := _flip(Vector2.RIGHT, peak)
+	var t := 0.0
+	while t < 3.0:
+		input.forward = 1.0
+		input.stick = flip.call(t)
+		await get_tree().physics_frame
+		await get_tree().process_frame  # the tail and camera update per frame
+		t += get_physics_process_delta_time()
+	var swirls := main.find_children("*", "Swirl", false, false).size()
+	var tail_size: float = fish._tail.scale.x
+	var zoom: float = camera.zoom
+	check(tail_size > 1.8, "the tail grows with flow (x%.2f at flow %.2f)" % [tail_size, fish.swishy.flow])
+	check(swirls >= 3, "strides shed swirls (%d out)" % swirls)
+	check(zoom < 0.95, "the view closes in (zoom %.3f)" % zoom)
+	input.clear()
+	for i in 480:
+		await get_tree().process_frame
+	check(fish._tail.scale.x < 1.05 and camera.zoom > 0.995, "all back to normal after (tail x%.2f, zoom %.3f)" % [fish._tail.scale.x, camera.zoom])
+	check(main.find_children("*", "Swirl", false, false).is_empty(), "the swirls fade away")
+
 	print("boost:")
 	fish.request_reset()
 	await _ticks(5)

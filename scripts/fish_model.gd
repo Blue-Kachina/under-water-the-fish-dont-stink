@@ -152,6 +152,18 @@ func _setup_tail_cue() -> void:
 		_tail_cue.append(part)
 
 
+## The tail's tip in the tail pivot's space (the back of its meshes).
+func tail_tip() -> Vector3:
+	var bounds := AABB()
+	var first := true
+	for node in tail.find_children("*", "MeshInstance3D", true, false):
+		var part := node as MeshInstance3D
+		var box := _transform_in_tail(part) * part.get_aabb()
+		bounds = box if first else bounds.merge(box)
+		first = false
+	return Vector3(0.0, 0.0, bounds.end.z)
+
+
 ## `part`'s transform in the tail pivot's space.
 func _transform_in_tail(part: Node3D) -> Transform3D:
 	var xform := Transform3D.IDENTITY

@@ -101,6 +101,11 @@ func _ready() -> void:
 	_panel.mode_selected.connect(set_mode)
 	_panel.set_character(_fish.character)
 	_panel.character_selected.connect(set_character)
+	var arcade := ArcadeFx.new()
+	arcade.name = "ArcadeFx"
+	arcade.fish = _fish
+	arcade.camera = _camera
+	add_child(arcade)
 	_pause_menu = PauseMenu.new()
 	_pause_menu.name = "PauseMenu"
 	_pause_menu.settings_panel = _panel

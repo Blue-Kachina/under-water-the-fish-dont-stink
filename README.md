@@ -76,6 +76,13 @@ throttle the stick just steers, directly, as in the other modes (*Stride Needs T
 `tests/swishy_probe` measures the timings. The bottom of the screen shows how the last stride was
 timed (EARLY / PERFECT / LATE) and the flow.
 
+Strides get visibly more powerful as flow builds: the tail grows (*Stride Tail Growth*, Battletoads
+style) and swells on each stride, and each stride sheds a swirl of water from the tail, bigger and
+brighter the stronger it was, gold for a perfect one (*Stride Swirls*). The camera closes in a little
+with flow and a vignette darkens the screen's edges, warming to gold near full flow, with speed
+streaks when you're fast; a perfect stride punches the view in (camera *Arcade Zoom* / *Arcade
+Punch*; `scripts/arcade_fx.gd`).
+
 **Bow wave** (on in Nature, *Bow Wave* in the panel): speed pushes a mostly clear, torpedo-tip
 shell of water out ahead of the fish, from *Bow Start Speed* to full size at *Bow Full Speed*. It
 counts as the fish's front for demolitions, so a fast fish has a bigger target area, but it doesn't

@@ -303,6 +303,12 @@ const TIME_EPSILON := 0.0001
 ## How far the tail swings to each side on a stride (rad). A stride sweeps it
 ## across, away from the push, arriving at the far side at the peak.
 @export_range(0.0, 1.5, 0.01) var stride_tail_swing := 0.6
+## How much bigger the tail grows with flow: at full flow it's 1 + this times
+## its size (Battletoads style), and each stride swells it a little more.
+@export_range(0.0, 3.0, 0.05) var stride_tail_growth := 0.8
+## Each stride sheds a swirl of water from the tail (Swirl), bigger and
+## brighter the stronger it was.
+@export var stride_swirls := true
 
 @export_group("Bow Wave")
 ## Speed pushes a torpedo-tip shell of water out ahead of the fish, from
@@ -679,6 +685,9 @@ func _ready() -> void:
 	_hitbox_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_hitbox_view)
 	_build_bow_view()
+	strode.connect(func(timing: float, _flow: float) -> void:
+		if timing >= 0.0 and stride_swirls:
+			_shed_swirl.call_deferred(timing))
 
 	for i in _wheel_collisions.size():
 		_wheel_collisions[i].name = ["FrontWheels", "RearWheels"][i]
@@ -1979,11 +1988,14 @@ func _process(delta: float) -> void:
 		# Strides drive the tail: each sweeps it across, away from the push, to
 		# the far side at the peak (SwishySwim.tail_swing). The idle wiggle only
 		# shows between strides.
+		var growth := stride_tail_growth * swishy.flow / maxf(stride_flow_max, 0.01)
+		_tail.scale = Vector3.ONE * (1.0 + growth) * (1.0 + 0.2 * swishy.power)
 		var swing := swishy.tail_swing * stride_tail_swing
 		var idle := sin(_swim_phase) * lerpf(0.1, 0.25, effort) * (1.0 - minf(swishy.tail_swing.length(), 1.0))
 		_tail.rotation.y = swing.x + idle + tail_kick
 		_tail.rotation.x = swing.y
 	else:
+		_tail.scale = Vector3.ONE
 		# Swim strokes: the tail sweeps with the stick (side to side, or up and down like a dolphin).
 		var stroking := 1.0 if stroke_chain > 0 else 0.0
 		_tail.rotation.y = sin(_swim_phase) * lerpf(0.15, 0.45, effort) + tail_kick - input_stick.x * 0.5 * stroking
@@ -2064,3 +2076,21 @@ func _update_bow_view(delta: float) -> void:
 	_bow_flow += delta * speed * 0.8
 	_bow_material.set_shader_parameter("amount", bow_amount)
 	_bow_material.set_shader_parameter("flow", _bow_flow)
+
+
+## A stride sheds a swirl from the tail's tip, where the last stride left it,
+## jetting back and out to that side. It keeps some of the fish's speed, so at
+## speed it streams past the camera instead of vanishing behind it at once. Stronger strides (timing, flow) make
+## bigger, brighter ones; a perfect one is gold.
+func _shed_swirl(timing: float) -> void:
+	if not visible or get_parent() == null:
+		return
+	var tip := _tail.global_transform * _visual.tail_tip()
+	var body := global_basis.orthonormalized()
+	var swing := swishy.tail_swing
+	var side := body.x * swing.x - body.y * swing.y
+	var axis := (body.z + side * 0.6).normalized()  # body.z is backward
+	var push := (1.0 + swishy.flow) / (1.0 + stride_flow_max)
+	var size := 0.35 * _tail.scale.x * lerpf(0.6, 1.2, timing)
+	Swirl.spawn(get_parent(), tip, axis, size, linear_velocity * 0.6 + axis * 2.0, lerpf(0.4, 1.0, timing) * lerpf(0.5, 1.0, push),
+			timing >= SwishySwim.SWEET_SPOT)

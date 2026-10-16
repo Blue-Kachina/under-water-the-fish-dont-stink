@@ -82,9 +82,21 @@ var floor_height := -INF
 @export_range(60.0, 130.0, 1.0) var field_of_view := 109.0:
 	set(value):
 		field_of_view = value
-		fov = value
+		fov = value * zoom
 ## How quickly a ball cam toggle swings the view. RL: Transition Speed (approximate).
 @export_range(0.5, 3.0, 0.05) var transition_speed := 1.2
+
+## The field of view is field_of_view times this: under 1 closes in (ArcadeFx).
+var zoom := 1.0:
+	set(value):
+		zoom = value
+		fov = field_of_view * value
+
+@export_group("Arcade")
+## Extra Swishy's arcade feel (ArcadeFx): how much the view closes in at full
+## flow (a fraction of the field of view), and the extra punch-in on a perfect stride.
+@export_range(0.0, 0.3, 0.005) var arcade_zoom := 0.08
+@export_range(0.0, 0.2, 0.005) var arcade_punch := 0.04
 
 @export_group("Look Around")
 @export_range(0.0, 3.2, 0.05) var look_yaw_range := PI
