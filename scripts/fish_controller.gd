@@ -2012,6 +2012,10 @@ func _process(delta: float) -> void:
 	var flutter := sin(Time.get_ticks_msec() * 0.05) * 0.7 * input_reverse
 	_fin_left.rotation.z = flutter
 	_fin_right.rotation.z = -flutter
+	var striding := swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY
+	_visual.grounded = on_surface
+	_visual.stride_swing = swishy.tail_swing if striding else Vector2.ZERO
+	_visual.stride_power = swishy.power if striding else 0.0
 	_visual.react(delta, linear_velocity)
 	var cue := swishy.cue() if swim_style == SwimStyle.EXTRA_SWISHY else Vector3.ZERO
 	_visual.set_stride_cue(cue.x, cue.y, cue.z)

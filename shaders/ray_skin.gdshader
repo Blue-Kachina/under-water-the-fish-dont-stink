@@ -22,7 +22,12 @@ uniform float flap_right = 0.0;
 uniform float sweep_left = 0.0;  // tips back
 uniform float sweep_right = 0.0;
 uniform float ripple = 0.015;  // how high the swimming wave lifts the tips
+uniform float ripple_bias = 0.0;  // + the right wing's wave deeper and the left's shallower, - the reverse
 uniform float wave = 7.0;  // rad per m along the body
+// The wave grows as it runs back over the disc, from half at the nose (z, m) to
+// one and a half at the tail, as a ray's does.
+uniform float wave_from = -0.5;
+uniform float wave_to = 0.3;
 uniform float phase = 0.0;  // advances as it swims
 
 // Pale streaks back over the head (z, m) and their spacing across.
@@ -45,8 +50,21 @@ uniform float tail_length = 0.8;
 
 #include "res://shaders/stride_cue.gdshaderinc"
 uniform float tail_ripple = 0.08;
+// How far (rad) the whip bends off its root at the end of each of its four
+// links (FishModel._bend_whip): yaw (tip toward +X) and pitch (tip down).
+uniform vec4 bend_yaw = vec4(0.0);
+uniform vec4 bend_pitch = vec4(0.0);
 
 varying vec3 rest;
+
+// The whip's bend (yaw, pitch) `s` along it: 0 at the root, straight between
+// the links' ends (FishModel._whip_bend_at).
+vec2 bend_at(float s) {
+	float at = clamp(s, 0.0, 1.0) * 4.0;
+	int i = min(int(floor(at)), 3);
+	vec2 from = i > 0 ? vec2(bend_yaw[i - 1], bend_pitch[i - 1]) : vec2(0.0);
+	return mix(from, vec2(bend_yaw[i], bend_pitch[i]), at - float(i));
+}
 
 vec2 hash2(vec2 p) {
 	p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -87,6 +105,17 @@ void vertex() {
 	rest = VERTEX;
 	if (tail_mode) {
 		float s = UV.x;
+		// Bent along its length: walk the middle out from the root, each bit
+		// turned by the bend there (FishModel._whip_offset, keep in step).
+		vec3 offset = vec3(0.0);
+		float h = s / 12.0;
+		for (int k = 0; k < 12; k++) {
+			vec2 b = bend_at((float(k) + 0.5) * h);
+			offset += vec3(sin(b.x), -sin(b.y), cos(b.x) + cos(b.y) - 2.0) * h;
+		}
+		VERTEX += offset * tail_length;
+		vec2 b = bend_at(s);
+		NORMAL = normalize(vec3(NORMAL.x * cos(b.x) + NORMAL.z * sin(b.x), NORMAL.y, -NORMAL.x * sin(b.x) + NORMAL.z * cos(b.x)));
 		float a = 9.0 * s - phase * 1.4;
 		VERTEX.x += tail_ripple * s * s * sin(a);
 		VERTEX.y += tail_ripple * 0.35 * s * s * cos(a * 0.7);
@@ -97,11 +126,12 @@ void vertex() {
 		float up = rest_flap + (side > 0.0 ? flap_right : flap_left);
 		float back = side > 0.0 ? sweep_right : sweep_left;
 		float a = wave * VERTEX.z - phase;
+		float swell = ripple * (1.0 + ripple_bias * side) * mix(0.5, 1.5, smoothstep(wave_from, wave_to, VERTEX.z));
 		// Bent progressively (the angle grows along the membrane): a height and a
 		// shift back that grow with how far out squared, and their slopes for the normal.
-		float lift = up * reach * outward * outward * 0.5 + ripple * outward * outward * sin(a);
-		float lift_x = side * (up * outward + ripple * 2.0 * outward / reach * sin(a));
-		float lift_z = ripple * outward * outward * wave * cos(a);
+		float lift = up * reach * outward * outward * 0.5 + swell * outward * outward * sin(a);
+		float lift_x = side * (up * outward + swell * 2.0 * outward / reach * sin(a));
+		float lift_z = swell * outward * outward * wave * cos(a);
 		float shift = back * reach * outward * outward * 0.5;
 		float shift_x = side * back * outward;
 		VERTEX.y += lift;

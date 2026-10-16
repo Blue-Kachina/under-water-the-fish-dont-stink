@@ -10,9 +10,12 @@ render_mode cull_disabled, depth_draw_always;
 
 uniform vec4 albedo : source_color = vec4(1.0);  // at the root
 uniform vec4 edge_color : source_color = vec4(1.0);
+uniform float edge_shade = -1.0;  // 0 or more: the edge is albedo times this instead, so it follows a tint
 uniform vec4 ray_color : source_color = vec4(0.85, 0.85, 0.85, 1.0);
-uniform float rays = 12.0;  // across the fin
+uniform float rays = 12.0;  // across the fin, 0 for none
 uniform float edge_alpha = 0.45;
+uniform vec4 margin_color : source_color = vec4(0.04, 0.04, 0.06, 1.0);
+uniform float margin = 0.0;  // of the fin's depth: a solid border round its edge, 0 for none
 uniform float flutter = 0.02;  // m at the edge, idling
 uniform float waves = 1.2;  // from the root out to the edge
 uniform float tempo = 1.0;  // how fast it ripples, against the swim
@@ -29,14 +32,23 @@ void fragment() {
 		NORMAL = -NORMAL;
 	}
 	float out_part = smoothstep(0.15, 1.0, UV.y);
-	vec3 color = mix(albedo.rgb, edge_color.rgb, out_part);
-	float across = UV.x * rays;
-	float ray = abs(fract(across + 0.5) - 0.5);  // 0 on a ray
-	float width = fwidth(across);
-	ray = 1.0 - smoothstep(0.04 + width, 0.1 + width * 2.0, ray);
-	color = mix(color, ray_color.rgb, ray * 0.55 * (1.0 - 0.6 * out_part));
-	ALBEDO = color;
+	vec3 edge = edge_shade >= 0.0 ? albedo.rgb * edge_shade : edge_color.rgb;
+	vec3 color = mix(albedo.rgb, edge, out_part);
+	if (rays > 0.0) {
+		float across = UV.x * rays;
+		float ray = abs(fract(across + 0.5) - 0.5);  // 0 on a ray
+		float width = fwidth(across);
+		ray = 1.0 - smoothstep(0.04 + width, 0.1 + width * 2.0, ray);
+		color = mix(color, ray_color.rgb, ray * 0.55 * (1.0 - 0.6 * out_part));
+	}
 	ALPHA = mix(1.0, edge_alpha, out_part);
+	if (margin > 0.0) {
+		float aa = fwidth(UV.y);
+		float border = smoothstep(1.0 - margin - aa, 1.0 - margin + aa, UV.y);
+		color = mix(color, margin_color.rgb, border);
+		ALPHA = mix(ALPHA, 0.95, border);
+	}
+	ALBEDO = color;
 	ROUGHNESS = 0.35;
 	BACKLIGHT = color * 0.5;
 	// The lit part of a see-through fin firms up, so the cue reads on it too.

@@ -66,4 +66,20 @@ func _run(model: FishModel) -> void:
 		for i in 3:
 			await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_swim_%s.png" % [fish_key, view]))
+	# Mid-stride: an Extra Swishy stride pushing left (the tail swung left),
+	# nearly at its peak, turning left; then fading, a moment later.
+	model.fin_left.rotation = Vector3.ZERO
+	model.fin_right.rotation = Vector3.ZERO
+	model.tail.rotation.y = -0.6
+	model.stride_swing = Vector2(-1.0, 0.0)
+	for shot: Array in [["stride", 18, 0.0], ["recover", 12, -1.0]]:
+		for i in shot[1]:
+			model.stride_power = clampf(model.stride_power + (1.0 / 18.0 if shot[2] >= 0.0 else -1.0 / 12.0), 0.0, 1.0)
+			model.rotate_y(1.5 / 60.0)
+			model.react(1.0 / 60.0, model._body_frame() * Vector3(0.0, 0.0, -18.0))
+		camera.position = model.global_basis * Vector3(views["back"]).normalized() * reach
+		camera.look_at(Vector3.ZERO, Vector3.UP)
+		for i in 3:
+			await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_%s_back.png" % [fish_key, shot[0]]))
 	get_tree().quit()
