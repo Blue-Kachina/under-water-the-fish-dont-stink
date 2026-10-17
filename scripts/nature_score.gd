@@ -13,7 +13,9 @@ extends RefCounted
 ##   the milestone.
 ##
 ## Values come from NatureSettings, live. The run calls on_battery() for each
-## fish battered and update() every physics tick.
+## fish battered, update() every physics tick and on_strode() for each stride.
+## For a player on another machine (online co-op) there's none of that here:
+## their relayed events go to add_remote(), which keeps the scoreboard's numbers.
 
 signal awarded(event: Dictionary)
 
@@ -35,6 +37,9 @@ var best_chain := 0
 var best_spree := 0
 ## Seconds left to extend the chain (0: none going).
 var chain_left := 0.0
+## For the scoreboard: perfect strides and the top speed (m/s) this run.
+var perfect := 0
+var top_speed := 0.0
 var _slow_for := 0.0
 
 
@@ -50,6 +55,8 @@ func reset() -> void:
 	best_chain = 0
 	best_spree = 0
 	chain_left = 0.0
+	perfect = 0
+	top_speed = 0.0
 	_slow_for = 0.0
 
 
@@ -63,6 +70,7 @@ static func spree_title(milestone: int) -> String:
 
 ## The chain counts down; slow too long and the spree ends.
 func update(delta: float, speed: float, batter_speed: float) -> void:
+	top_speed = maxf(top_speed, speed)
 	if chain_left > 0.0:
 		chain_left = maxf(chain_left - delta, 0.0)
 		if chain_left == 0.0:
@@ -101,3 +109,39 @@ func on_battery() -> int:
 		points += bonus
 		awarded.emit({"type": SPREE, "title": spree_title(milestone), "milestone": milestone, "spree": spree, "points": bonus})
 	return chain
+
+
+## A stride (FishController.strode): perfect ones count.
+func on_strode(timing: float) -> void:
+	if timing >= SwishySwim.SWEET_SPOT:
+		perfect += 1
+
+
+## Another machine's player's event (relayed): its points, and the best chain,
+## spree, perfect strides and top speed it carries (see stats()).
+func add_remote(event: Dictionary) -> void:
+	points += int(event.get("points", 0))
+	if event.get("type") != SPREE:
+		best_chain = maxi(best_chain, int(event.get("chain", 0)))
+	best_spree = maxi(best_spree, int(event.get("spree", 0)))
+	perfect = maxi(perfect, int(event.get("perfect", 0)))
+	top_speed = maxf(top_speed, float(event.get("top_speed", 0.0)))
+
+
+## The scoreboard's running numbers, to send along with an event.
+func stats() -> Dictionary:
+	return {"perfect": perfect, "top_speed": top_speed}
+
+
+## Everything, for a guest joining late.
+func save() -> Dictionary:
+	return {"points": points, "chain": best_chain, "spree": best_spree, "perfect": perfect, "top_speed": top_speed}
+
+
+## save()'s numbers, here.
+func restore(saved: Dictionary) -> void:
+	points = int(saved.get("points", 0))
+	best_chain = int(saved.get("chain", 0))
+	best_spree = int(saved.get("spree", 0))
+	perfect = int(saved.get("perfect", 0))
+	top_speed = float(saved.get("top_speed", 0.0))

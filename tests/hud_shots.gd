@@ -95,6 +95,23 @@ func _run() -> void:
 		await get_tree().process_frame
 	await _shot("8_rl_replay")
 	main.stop_replay()
+
+	# Nature's scoreboard held up (made-up numbers).
+	main.set_mode(main.NATURE)
+	await _seconds(0.1)
+	main._match_card.play_requested.emit()
+	await _seconds(1.0)
+	var run: NatureRun = main.nature_run
+	var score := run.score_of(fish)
+	score.add_remote({"type": NatureScore.MULTI, "points": 1850, "chain": 4, "spree": 12, "perfect": 23, "top_speed": 14.2})
+	for i in 9:
+		run.rules.on_battery([fish])
+	run.rules.on_pearl(fish)
+	run.elapsed = 154.0
+	Input.action_press("show_scoreboard")
+	await _seconds(0.3)
+	await _shot("9_nature_scoreboard")
+	Input.action_release("show_scoreboard")
 	print("hud_shots: saved to %s" % ProjectSettings.globalize_path(out_dir))
 	get_tree().quit()
 

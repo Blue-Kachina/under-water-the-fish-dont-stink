@@ -116,6 +116,7 @@ func _host() -> void:
 	await _phase("guest_rams", {})
 	await _seconds(0.6)
 	check(awards[0] >= 1, "their points show in our feed (%d)" % awards[0])
+	check(run.score_of(guest_fish).points > 0, "...and on our scoreboard (%d)" % run.score_of(guest_fish).points)
 	await _ram_target(run)
 	check(run.target.battered, "we batter the lone fish")
 	await _phase("target_gone", {"count": run.battered_fish})
@@ -163,7 +164,7 @@ func _host() -> void:
 		await _seconds(1.5)
 		var late_school := run.schools[0]
 		await _phase("late_check", {"school": late_school.id, "alive": late_school.alive_count(), "count": run.battered_fish,
-				"pearls": run.pearls}, false, "late")
+				"pearls": run.pearls, "host_points": run.score.points}, false, "late")
 		await _wait_done("late_check", 10.0)
 		await _phase("late_leave", {}, false, "late")
 		await _wait(func() -> bool: return coop.roster.size() <= 2, 10.0)
@@ -281,6 +282,8 @@ func _late() -> void:
 	check(school != null and school.alive_count() == data.alive, "joining late: the school's battered fish are gone here too (%d left)" % (school.alive_count() if school else -1))
 	check(run.battered_fish == data.count and run.pearls == data.pearls, "...and the counts are the host's (%d fish, %d pearls)" % [run.battered_fish, run.pearls])
 	check(coop.fish_of(100) != null, "the host's fish is here")
+	var host_points := run.score_of(coop.fish_of(100)).points if coop.fish_of(100) else -1
+	check(host_points == data.host_points, "...with the host's points on our scoreboard (%d)" % host_points)
 	_send_done("late_check")
 	await _wait(func() -> bool: return _phase_name == "late_leave", 30.0)
 	NetSession.leave()

@@ -72,6 +72,24 @@ func _ready() -> void:
 	score.on_battery()
 	check(score.chain == 1, "a shorter window breaks sooner")
 
+	print("scoreboard:")
+	score.reset()
+	score.on_strode(SwishySwim.SWEET_SPOT)
+	score.on_strode(SwishySwim.SWEET_SPOT - 0.1)
+	score.on_strode(1.0)
+	check(score.perfect == 2, "perfect strides counted, the off one not (%d)" % score.perfect)
+	_wait(score, 0.1, FAST, BATTER)
+	_wait(score, 0.1, 5.0, BATTER)
+	check(is_equal_approx(score.top_speed, FAST), "top speed kept (%.1f)" % score.top_speed)
+	var remote := NatureScore.new(settings)
+	remote.add_remote({"type": NatureScore.MULTI, "points": 250, "chain": 2, "spree": 2, "perfect": 5, "top_speed": 12.0})
+	remote.add_remote({"type": NatureScore.SPREE, "points": 250, "milestone": 1, "spree": 5})
+	check(remote.points == 500 and remote.best_chain == 2 and remote.best_spree == 5 and remote.perfect == 5
+			and is_equal_approx(remote.top_speed, 12.0), "a remote player's relayed events add up")
+	var copy := NatureScore.new(settings)
+	copy.restore(remote.save())
+	check(copy.points == 500 and copy.best_chain == 2 and copy.perfect == 5, "saved and restored (a late joiner)")
+
 	print("nature_score_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)
 

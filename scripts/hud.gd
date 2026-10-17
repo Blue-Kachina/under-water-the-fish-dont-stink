@@ -15,7 +15,9 @@ extends CanvasLayer
 ##
 ## With Extra Swishy swimming (Nature), the last stride's timing and the flow
 ## (StrideMeter) sit at the bottom centre and the boost gauge hides while boost is off; in Nature
-## (set_nature) the battery count shows at the top. In Hunt (set_hunt) the
+## (set_nature) the battery count shows at the top, and the scoreboard (held)
+## each player's points, battered fish, pearls, best multi and spree, perfect
+## strides and top speed, with the run's time. In Hunt (set_hunt) the
 ## scorebug shows both fish's goals (battered fish), the clock and each fish's
 ## points; a battery gets a splash, each style point (StylePoints) a line in
 ## the points feed under the banner, the battery replay its overlay, and the
@@ -40,6 +42,11 @@ const NATURE_HEAT := [Color(0.95, 0.95, 0.9), Color(1.0, 0.82, 0.3), Color(1.0, 
 ## Hunt's scoreboard columns (as many as StatsBoard.HEADINGS).
 ## BATTERED FISH: fish battered (Battery; a battery being a beating).
 const HUNT_HEADINGS := ["POINTS", "BATTERED FISH", "CLOSE", "DODGES", "PERFECT", "BEST RUN", "TOP KM/H"]
+## Nature's scoreboard columns: BEST MULTI is the longest chain (x3: a Triple
+## Fry), BEST SPREE the most battered fish without slowing.
+const NATURE_HEADINGS := ["POINTS", "BATTERED FISH", "PEARLS", "BEST MULTI", "BEST SPREE", "PERFECT", "TOP KM/H"]
+## Nature's scoreboard panel colour (there are no teams: everyone's on one).
+const NATURE_BOARD_COLOR := Color(0.15, 0.55, 0.62)
 
 @export var fish: FishController
 ## A split-screen player who joined (LocalCoop): the hint shows their own controls.
@@ -432,12 +439,12 @@ func _update_hint() -> void:
 		_hint.text = "Start/Esc: pause, settings    F11: fullscreen"
 	elif nature_run and joined_player:
 		# A split-screen player who joined: their own few controls.
-		_hint.text = "D-pad left/right: change fish    Hold Back/View: leave"
+		_hint.text = "D-pad left/right: change fish    Hold D-pad up: scoreboard    Hold Back/View: leave"
 	else:
 		_hint.text = "Start/Esc: pause, settings    R: %s    Right stick/IJKL: look around    Y: %s cam    %s%sF11: fullscreen" % [
 				"restart kickoff" if match_1v1 else ("restart match" if hunt_match else "reset"),
 				"ring" if arena else ("fish" if nature_run or hunt_match else "ball"),
-				"Hold D-pad up/B: scoreboard    " if match_1v1 or hunt_match else "",
+				"Hold D-pad up/B: scoreboard    " if match_1v1 or hunt_match or nature_run else "",
 				"Back/View on another controller: join    " if nature_run else ""]
 
 
@@ -599,6 +606,9 @@ func _update_board() -> void:
 	if is_instance_valid(hunt_match):
 		_update_hunt_board()
 		return
+	if is_instance_valid(nature_run):
+		_update_nature_board()
+		return
 	_board.headings = BroadcastUI.StatsBoard.HEADINGS
 	var over := is_instance_valid(match_1v1) and match_1v1.phase == Match1v1.Phase.OVER
 	var result_up := over and match_1v1.over_left < Match1v1.OVER_TIME - RESULT_TIME
@@ -653,6 +663,40 @@ func _update_hunt_board() -> void:
 				counts.perfect, counts.best_streak, roundi(counts.top_speed * 3.6)]}],
 		})
 	_board.teams = teams
+
+
+## Nature's scoreboard, held up like the others: every player in the run (most
+## points first), the team's battered fish on the plate, and the run's time,
+## pearls and shared batteries underneath. Each player holds their own.
+func _update_nature_board() -> void:
+	var input: PlayerInput = fish.input_source if fish and fish.input_source else PlayerInput.everyone()
+	_board.shown = not is_instance_valid(replay) and input.pressed("show_scoreboard")
+	if not _board.shown:
+		return
+	_board.headings = NATURE_HEADINGS
+	_board.title = "RUN STATS"
+	_board.bars = []
+	var whole := floori(nature_run.elapsed)
+	var footer := "TIME  %d:%02d    ·    PEARLS  %d" % [whole / 60, whole % 60, nature_run.pearls]
+	if nature_run.players.size() > 1:
+		footer += "    ·    SHARED BATTERIES  %d" % nature_run.rules.shared_batteries
+	_board.footer = footer
+	var rows := []
+	for player: FishController in nature_run.players:
+		if not is_instance_valid(player):
+			continue
+		var score := nature_run.score_of(player)
+		rows.append({"name": _name_of(player), "focus": player == fish, "values": [
+			score.points, nature_run.rules.battered_by(player), nature_run.rules.pearls_of(player),
+			"x%d" % score.best_chain if score.best_chain > 0 else "-", score.best_spree, score.perfect,
+			roundi(score.top_speed * 3.6)]})
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.values[0] > b.values[0])
+	_board.teams = [{
+		"name": "Team" if rows.size() > 1 else "This run",
+		"score": nature_run.battered_fish,
+		"color": NATURE_BOARD_COLOR,
+		"rows": rows,
+	}]
 
 
 ## A StatsBoard bar: Blue's and Orange's shares of `values`, written at the

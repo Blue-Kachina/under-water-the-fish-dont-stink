@@ -492,6 +492,7 @@ func _on_awarded(event: Dictionary) -> void:
 		return
 	var sent := event.duplicate()
 	sent.erase("by")
+	sent.merge(run.score_of(by).stats())  # the scoreboard's numbers ride along
 	_send_all("_award", [pid_of(by), sent], true)
 
 
@@ -522,7 +523,17 @@ func _world() -> Dictionary:
 		"pearls": pearls,
 		"target": [not target.battered, target.global_transform, target.display_name, run._target_generation],
 		"counts": run.rules.save(pid_of),
+		"scores": _scores(),
 	}
+
+
+## Every player's scoreboard numbers (NatureScore.save()), by player id.
+func _scores() -> Dictionary:
+	var scores := {}
+	for fish in run.players:
+		if is_instance_valid(fish):
+			scores[pid_of(fish)] = run.score_of(fish).save()
+	return scores
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -605,6 +616,11 @@ func _welcome(host_roster: Dictionary, tuning: Dictionary, world: Dictionary) ->
 	var target: Array = world.target
 	run.apply_target_state(target[0], target[1], target[2], target[3])
 	run.rules.restore(world.counts, fish_of)
+	var scores: Dictionary = world.get("scores", {})
+	for pid: Variant in scores:
+		var fish := fish_of(pid)
+		if fish and fish.puppet:
+			run.score_of(fish).restore(scores[pid])
 	_set_status("Playing with %d others" % (roster.size() - _local_players().size()))
 
 

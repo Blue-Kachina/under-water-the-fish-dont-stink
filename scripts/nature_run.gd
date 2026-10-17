@@ -127,6 +127,8 @@ var focus: Node3D:
 var last_battery_speed := 0.0
 ## Pearls still out.
 var pearls_out: Array[Pearl] = []
+## Seconds since the run started (start()), for the scoreboard.
+var elapsed := 0.0
 var _respawn_left := -1.0
 var _lone_target := true
 ## The lone fish's respawns so far (its batteries' keys carry it).
@@ -139,6 +141,8 @@ var _next_school_id := 0
 var _scores := {}
 var _focus := {}
 var _battery_speed := {}
+## Per local player (their fish): the strode hook counting their perfect strides.
+var _stride_hooks := {}
 ## Batteries confirmed: key -> {"time": ms, "attackers": [fish]}; and those shown
 ## here already (a claim waiting on the authority, or confirmed).
 var _confirmed := {}
@@ -188,6 +192,7 @@ func start() -> void:
 	if authority:
 		restarted.emit()
 	last_battery_speed = 0.0
+	elapsed = 0.0
 	_respawn_left = -1.0
 	rules.reset()
 	for fish: FishController in _scores:
@@ -317,7 +322,11 @@ func local_players() -> Array[FishController]:
 
 
 func _join(fish: FishController) -> void:
-	score_of(fish)
+	var their := score_of(fish)
+	if not fish.puppet and not _stride_hooks.has(fish):
+		var hook := func(timing: float, _flow: float) -> void: their.on_strode(timing)
+		_stride_hooks[fish] = hook
+		fish.strode.connect(hook)
 	for other in players:
 		if other != fish and is_instance_valid(other):
 			fish.add_collision_exception_with(other)  # co-op fish pass through each other
@@ -326,8 +335,12 @@ func _join(fish: FishController) -> void:
 
 
 func _leave(fish: FishController) -> void:
+	var hook: Variant = _stride_hooks.get(fish)
+	_stride_hooks.erase(fish)
 	if not is_instance_valid(fish):
 		return
+	if hook != null and fish.strode.is_connected(hook):
+		fish.strode.disconnect(hook)
 	for other in players:
 		if other != fish and is_instance_valid(other):
 			fish.remove_collision_exception_with(other)
@@ -344,6 +357,7 @@ func _refresh_threats() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	elapsed += delta
 	if authority:
 		_update_schools(delta)
 	_batter_school_fish()
@@ -883,8 +897,12 @@ func apply_target_state(present: bool, at: Transform3D, target_name: String, gen
 		target.batter()
 
 
-## A remote player's points, for the feed (NatureScore's event, "by" their fish).
+## A remote player's points (NatureScore's event, "by" their fish, carrying
+## their NatureScore.stats()): counted for the scoreboard, and for the feed.
 func relay_award(event: Dictionary) -> void:
+	var by: Variant = event.get("by")
+	if is_instance_valid(by):
+		score_of(by).add_remote(event)
 	awarded.emit(event)
 
 
