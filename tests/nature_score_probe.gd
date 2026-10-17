@@ -1,5 +1,5 @@
 extends Node
-## NatureScore on its own, with batteries fed in at chosen times: they chain
+## NatureScore on its own, with battered fish fed in at chosen times: they chain
 ## into multis within the window and start again after it; each step scores as
 ## the settings say; a spree survives a gap while fast and ends after the grace
 ## time under the battering speed; milestones score and are named.
@@ -45,7 +45,7 @@ func _ready() -> void:
 
 	print("sprees:")
 	var sprees := events.filter(func(e: Dictionary) -> bool: return e.type == NatureScore.SPREE)
-	check(sprees.size() == 1 and sprees[0].title == "SPRING ROLL" and sprees[0].points == 250, "five batteries at speed: SPRING ROLL +250")
+	check(sprees.size() == 1 and sprees[0].title == "SPRING ROLL" and sprees[0].points == 250, "five battered fish at speed: SPRING ROLL +250")
 	check(score.spree == 8, "a gap while fast keeps the spree going (%d)" % score.spree)
 	_wait(score, settings.spree_grace * 0.5, 3.0, BATTER)
 	check(score.spree == 8, "slow for a moment: still going")

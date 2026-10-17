@@ -25,7 +25,7 @@ Every number in this plan is a **setting**, not a code constant, with wide range
 Decisions).
 
 **Naming:** the rename to **Battered** has landed across the whole game, code included: `Battery`
-(`scripts/battery.gd`), `batter()`, `battered`, `nature_batter_speed`, a count of batteries. Only
+(`scripts/battery.gd`), `batter()`, `battered`, `nature_batter_speed`, a count of battered fish. Only
 Rocket League itself (its replays and data) still says demo / demolition.
 
 ## Implementation status
@@ -44,7 +44,7 @@ Phase 1 was tested by hand first. Its tuning (3 schools of 50, fish scale 1.0, s
 - **Scoring and pearls:** `scripts/nature_score.gd` (multis and sprees), `scripts/pearl.gd` and
   `shaders/pearl_aura.gdshader`.
 - **Targeting:** `scripts/target_wheel.gd`, the school wheel and the edge arrows.
-- **Probes:** `school_probe`, `nature_schools_probe`, `nature_batteries_probe`,
+- **Probes:** `school_probe`, `nature_schools_probe`, `nature_battered_fish_probe`,
   `nature_score_probe` and `target_wheel_probe`.
 - **Tools that need a window:** `school_shots` (screenshots) and `school_bench` (frame time, draw
   calls and triangles, e.g. `-- --schools=10 --fish=50`).
@@ -52,7 +52,7 @@ Phase 1 was tested by hand first. Its tuning (3 schools of 50, fish scale 1.0, s
 **Changed:**
 - `nature_run.gd`:
   - schools and their population, `focus` / `focus_changed` / `set_focus` / `targets()`;
-  - the school-fish hitbox pool and batteries;
+  - the school-fish hitbox pool and battered fish;
   - the score, pearls and the speed cost.
 - `main.gd`:
   - ball cam follows `focus`;
@@ -67,7 +67,7 @@ Phase 1 was tested by hand first. Its tuning (3 schools of 50, fish scale 1.0, s
   are unchanged.
 - `explosion.gd`: a `particles` share, and a sparks-only pop below 1.
 - `hud.gd`:
-  - Batteries / Points / Pearls;
+  - Battered fish / Points / Pearls;
   - the multi and spree splash, hotter each step;
   - the feed lines and the chain bar.
 - `arcade_fx.gd`: `punch()`.
@@ -200,7 +200,7 @@ school is empty, so `_focus()` falls back cleanly.
   nearest other school (open question).
 - Each school gets a random character and skin from the fish models and its own name ("the
   Sardine Steves", reusing the `TARGET_NAMES` joke) for the wheel.
-- `batteries` and `last_battery_speed` stay. New: `pearls`, `best_multi`, `best_spree`.
+- `battered_fish` and `last_battery_speed` stay. New: `pearls`, `best_multi`, `best_spree`.
 
 ### 4. Hitting school fish
 `Battery.hits` takes two `FishController`s and builds new shapes on every call. With 24+ fish,
@@ -366,7 +366,7 @@ want many more fish on screen eventually. Phase 1 drew every school fish as a fu
    every few steps, instead of checking every pair each step.
 7. **Hitboxes on demand (phase 2).** Instead of an `Area3D` per fish, a small pool of hitboxes is
    placed each tick on the fish near the player, using their extrapolated positions. That's the
-   only place batteries need them.
+   only place battered fish need them.
 
 **Later, if GDScript becomes the limit** (thousands of fish): move the school step into the
 project's GDExtension (C++), or into a compute shader. The data layout above is meant to make

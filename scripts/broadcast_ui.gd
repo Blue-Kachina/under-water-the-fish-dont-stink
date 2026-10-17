@@ -39,10 +39,13 @@ static func parallelogram(rect: Rect2, slant := SLANT) -> PackedVector2Array:
 		Vector2(rect.end.x, rect.end.y), Vector2(rect.position.x, rect.end.y)])
 
 
-## `text` centred in `rect` (or aligned left/right in it).
+## `text` centred in `rect` (or aligned left/right in it), shrunk to fit its width
+## (e.g. a long column heading such as BATTERED FISH).
 static func text(canvas: CanvasItem, rect: Rect2, value: String, size: int, color: Color,
 		align := HORIZONTAL_ALIGNMENT_CENTER, weight := 700) -> void:
 	var f := font(weight)
+	while size > 8 and f.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > rect.size.x - 4.0:
+		size -= 1
 	var baseline := rect.position.y + (rect.size.y + f.get_ascent(size) - f.get_descent(size)) / 2.0
 	canvas.draw_string(f, Vector2(rect.position.x, baseline), value, align, rect.size.x, size, color)
 
@@ -510,7 +513,7 @@ class NamePlates extends Control:
 ## footer line if there's one. See-through enough to keep the play in view
 ## behind it; the type stays solid to read.
 class StatsBoard extends Control:
-	const HEADINGS := ["SCORE", "GOALS", "SHOTS", "ASSISTS", "SAVES", "BATTERIES", "TOUCHES"]
+	const HEADINGS := ["SCORE", "GOALS", "SHOTS", "ASSISTS", "SAVES", "BATTERED FISH", "TOUCHES"]
 	const PLATE_WIDTH := 52.0
 	const NAME_WIDTH := 236.0
 	const COLUMN_WIDTH := 76.0

@@ -2,7 +2,7 @@ extends CanvasLayer
 ## The game's HUD, broadcast style (see BroadcastUI): in the Aquarium Arena a
 ## scoreboard at the top, a boost gauge in the bottom right, and a splash when
 ## someone scores; in a 1v1 (set_match) also the clock, the kickoff countdown,
-## batteries, the goal replay's overlay and the result. While a Rocket League
+## battered fish, the goal replay's overlay and the result. While a Rocket League
 ## replay plays (set_replay), the same for the replay and its followed player.
 ## In both kinds of replay, each team's players are listed in the top corners
 ## with their boost, and a badge pops up beside a player for a goal, assist,
@@ -16,7 +16,7 @@ extends CanvasLayer
 ## With Extra Swishy swimming (Nature), the last stride's timing and the flow
 ## (StrideMeter) sit at the bottom centre and the boost gauge hides while boost is off; in Nature
 ## (set_nature) the battery count shows at the top. In Hunt (set_hunt) the
-## scorebug shows both fish's goals (batteries), the clock and each fish's
+## scorebug shows both fish's goals (battered fish), the clock and each fish's
 ## points; a battery gets a splash, each style point (StylePoints) a line in
 ## the points feed under the banner, the battery replay its overlay, and the
 ## scoreboard (held, or at the end) each fish's points and their make-up.
@@ -38,10 +38,12 @@ const FEED_LINES := 4
 const NATURE_HEAT := [Color(0.95, 0.95, 0.9), Color(1.0, 0.82, 0.3), Color(1.0, 0.6, 0.2),
 		Color(1.0, 0.38, 0.18), Color(0.95, 0.2, 0.35), Color(0.85, 0.25, 0.95)]
 ## Hunt's scoreboard columns (as many as StatsBoard.HEADINGS).
-## BATTERIES: fish battered (Battery; a battery being a beating).
-const HUNT_HEADINGS := ["POINTS", "BATTERIES", "CLOSE", "DODGES", "PERFECT", "BEST RUN", "TOP KM/H"]
+## BATTERED FISH: fish battered (Battery; a battery being a beating).
+const HUNT_HEADINGS := ["POINTS", "BATTERED FISH", "CLOSE", "DODGES", "PERFECT", "BEST RUN", "TOP KM/H"]
 
 @export var fish: FishController
+## A split-screen player who joined (LocalCoop): the hint shows their own controls.
+var joined_player := false
 @export var arena: Arena
 @export var aquarium: AquariumArena
 
@@ -246,7 +248,7 @@ func set_replay(new_replay: ReplayPlayer) -> void:
 	_update_hint()
 
 
-## Show a 1v1's clock, countdown, batteries and goal replays, or null when there's none.
+## Show a 1v1's clock, countdown, battered fish and goal replays, or null when there's none.
 func set_match(new_match: Match1v1) -> void:
 	match_1v1 = new_match
 	_replay_overlay.stop()
@@ -262,7 +264,7 @@ func set_match(new_match: Match1v1) -> void:
 		_update_hint()
 
 
-## Show a Nature run's batteries, or null when there's none.
+## Show a Nature run's battered fish, or null when there's none.
 func set_nature(new_run: NatureRun) -> void:
 	nature_run = new_run
 	_feed_lines.clear()
@@ -273,8 +275,9 @@ func set_nature(new_run: NatureRun) -> void:
 		nature_run.school_fish_battered.connect(func(attacker: FishController, _school: School, _at: Vector3) -> void:
 			_on_battered(attacker, null))
 		nature_run.awarded.connect(_on_nature_award)
-		nature_run.pearl_collected.connect(func(_by: FishController) -> void:
-			_feed_lines.append(["PEARL  +1", Pearl.GLOW, FEED_TIME])
+		nature_run.pearl_collected.connect(func(by: FishController) -> void:
+			var own := by == fish or not is_instance_valid(by)
+			_feed_lines.append(["PEARL  +1" if own else "%s:  PEARL  +1" % _name_of(by).to_upper(), Pearl.GLOW, FEED_TIME])
 			while _feed_lines.size() > FEED_LINES:
 				_feed_lines.pop_front())
 	if _course:
@@ -283,7 +286,7 @@ func set_nature(new_run: NatureRun) -> void:
 		_update_hint()
 
 
-## Show a Hunt's scorebug, countdown, batteries, points and battery replays, or
+## Show a Hunt's scorebug, countdown, battered fish, points and battery replays, or
 ## null when there's none.
 func set_hunt(new_match: HuntMatch) -> void:
 	hunt_match = new_match
@@ -392,7 +395,7 @@ func _on_battered(attacker: FishController, victim: FishController) -> void:
 	elif attacker == fish:
 		_banner.text = "BATTERED!"
 		if is_instance_valid(nature_run):
-			_banner.text = "BATTERED!  %s" % _speed_text(nature_run.last_battery_speed)
+			_banner.text = "BATTERED!  %s" % _speed_text(nature_run.last_battery_speed_of(fish))
 	else:
 		return
 	_banner_time_left = 2.5
@@ -402,12 +405,19 @@ func _on_battered(attacker: FishController, victim: FishController) -> void:
 ## Double Dip up, hotter each step) or a spree milestone.
 func _on_nature_award(event: Dictionary) -> void:
 	var color: Color = NATURE_HEAT[clampi(event.get("chain", 1) - 1, 0, NATURE_HEAT.size() - 1)]
+	var by: Variant = event.get("by")
+	if is_instance_valid(by) and by != fish:
+		# A teammate's: a feed line with their name, the splash is theirs.
+		_feed_lines.append(["%s:  %s  +%d" % [_name_of(by).to_upper(), event.title, event.points], Color(color, 0.85), FEED_TIME])
+		while _feed_lines.size() > FEED_LINES:
+			_feed_lines.pop_front()
+		return
 	match event.type:
 		NatureScore.MULTI:
 			_splash.play("%s!" % event.title, "x%d" % event.chain, "+%d" % event.points, color, 1.2 + 0.15 * event.chain)
 		NatureScore.SPREE:
 			color = NATURE_HEAT[-1]
-			_splash.play("%s!" % event.title, "%d batteries without slowing" % event.spree, "+%d" % event.points, color, 2.2)
+			_splash.play("%s!" % event.title, "%d battered fish without slowing" % event.spree, "+%d" % event.points, color, 2.2)
 	_feed_lines.append(["%s  +%d" % [event.title, event.points], color, FEED_TIME])
 	while _feed_lines.size() > FEED_LINES:
 		_feed_lines.pop_front()
@@ -420,11 +430,15 @@ func _update_hint() -> void:
 		_hint.text = "P/jump: play    , . / D-pad: 5 s    [ ]: goals    V/boost: camera    T G / D-pad: target    - =: speed    H: hitboxes    Y: ball cam"
 	elif fish_sitting_out:
 		_hint.text = "Start/Esc: pause, settings    F11: fullscreen"
+	elif nature_run and joined_player:
+		# A split-screen player who joined: their own few controls.
+		_hint.text = "D-pad left/right: change fish    Hold Back/View: leave"
 	else:
-		_hint.text = "Start/Esc: pause, settings    R: %s    Right stick/IJKL: look around    Y: %s cam    %sF11: fullscreen" % [
+		_hint.text = "Start/Esc: pause, settings    R: %s    Right stick/IJKL: look around    Y: %s cam    %s%sF11: fullscreen" % [
 				"restart kickoff" if match_1v1 else ("restart match" if hunt_match else "reset"),
 				"ring" if arena else ("fish" if nature_run or hunt_match else "ball"),
-				"Hold D-pad up/B: scoreboard    " if match_1v1 or hunt_match else ""]
+				"Hold D-pad up/B: scoreboard    " if match_1v1 or hunt_match else "",
+				"Back/View on another controller: join    " if nature_run else ""]
 
 
 func _process(delta: float) -> void:
@@ -483,8 +497,13 @@ func _process(delta: float) -> void:
 		else:
 			_course.text = "Swim through the yellow hoop to start    best %s" % best
 	elif is_instance_valid(nature_run):
-		_course.text = "Batteries  %d    Points  %d    Pearls  %d" % [nature_run.batteries, nature_run.score.points, nature_run.pearls]
-		var score := nature_run.score
+		var score := nature_run.score_of(fish)
+		if nature_run.players.size() > 1:
+			# Co-op: the team's counts, then this player's own.
+			_course.text = "Team  %d fish  %d pearls    ·    You  %d fish  %d pts" % [nature_run.battered_fish, nature_run.pearls,
+					nature_run.rules.battered_by(fish), score.points]
+		else:
+			_course.text = "Battered fish  %d    Points  %d    Pearls  %d" % [nature_run.battered_fish, score.points, nature_run.pearls]
 		_chain_bar.show_chain(score.chain_left / maxf(score.settings.multi_window, 0.01), score.chain,
 				NATURE_HEAT[clampi(score.chain - 1, 0, NATURE_HEAT.size() - 1)])
 	elif is_instance_valid(hunt_match):
@@ -630,7 +649,7 @@ func _update_hunt_board() -> void:
 			"score": hunt_match.scores[team],
 			"color": AquariumArena.TEAM_COLORS[team],
 			"rows": [{"name": _name_of(who), "focus": who == fish, "values": [
-				hunt_match.style.points[team], counts.batteries, counts.close_calls, counts.dodges,
+				hunt_match.style.points[team], counts.battered_fish, counts.close_calls, counts.dodges,
 				counts.perfect, counts.best_streak, roundi(counts.top_speed * 3.6)]}],
 		})
 	_board.teams = teams

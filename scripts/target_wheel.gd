@@ -20,6 +20,8 @@ const EDGE_INSET := 46.0
 
 var camera: Camera3D
 var run: NatureRun
+## Whose wheel it is (their fish): the run's first player if not set.
+var fish: FishController
 var settings := NatureSettings.shared()
 ## Open now, and the slice it's on ([node, name, fish left], or empty).
 var is_open := false
@@ -36,11 +38,17 @@ func _ready() -> void:
 	add_child(_canvas)
 
 
+## The camera's player's controls (FollowCamera.input), or everyone's.
+func _player_input() -> PlayerInput:
+	var own: Variant = camera.get("input") if camera else null
+	return own if own else PlayerInput.everyone()
+
+
 func open() -> void:
 	is_open = true
 	picked = []
 	for entry: Array in run.targets():
-		if entry[0] == run.focus:
+		if entry[0] == run.focus_of(_fish()):
 			picked = entry
 
 
@@ -50,7 +58,7 @@ func close() -> void:
 		return
 	is_open = false
 	if not picked.is_empty() and is_instance_valid(picked[0]):
-		run.set_focus(picked[0])
+		run.set_focus(picked[0], _fish())
 		if camera.has_method("set_ball_cam"):
 			camera.set_ball_cam(true)
 
@@ -60,7 +68,7 @@ func _process(_delta: float) -> void:
 		return
 	camera.wheel_hold_time = settings.wheel_hold_time
 	if is_open:
-		var stick := Input.get_vector("camera_left", "camera_right", "camera_up", "camera_down")
+		var stick := _player_input().vector("camera_left", "camera_right", "camera_up", "camera_down")
 		if stick.length() >= STICK_DEADZONE:
 			var best := INF
 			for entry: Array in run.targets():
@@ -93,7 +101,7 @@ func _draw_wheel() -> void:
 	_canvas.draw_circle(middle, RADIUS + 70.0, Color(0.02, 0.06, 0.1, 0.55))
 	_canvas.draw_arc(middle, RADIUS, 0.0, TAU, 64, Color(1, 1, 1, 0.25), 2.0)
 	BroadcastUI.text(_canvas, Rect2(middle - Vector2(120, 14), Vector2(240, 28)), "PICK A SCHOOL", 18, Color(1, 1, 1, 0.8), HORIZONTAL_ALIGNMENT_CENTER, 800)
-	var stick := Input.get_vector("camera_left", "camera_right", "camera_up", "camera_down")
+	var stick := _player_input().vector("camera_left", "camera_right", "camera_up", "camera_down")
 	if stick.length() >= STICK_DEADZONE:
 		_canvas.draw_line(middle, middle + stick.normalized() * (RADIUS - 20.0), Color(GOLD, 0.6), 3.0)
 	for entry: Array in run.targets():
@@ -102,7 +110,7 @@ func _draw_wheel() -> void:
 		var at := middle + _direction_of(node) * RADIUS
 		var color := GOLD if chosen else Color(1, 1, 1, 0.85)
 		_canvas.draw_circle(at, 13.0 if chosen else 8.0, color)
-		var distance := node.global_position.distance_to(run.player.global_position)
+		var distance := node.global_position.distance_to(_fish().global_position)
 		var detail := "%d fish · %d m" % [entry[2], roundi(distance)]
 		var box := Rect2(at + Vector2(-110, 16), Vector2(220, 44))
 		BroadcastUI.text(_canvas, Rect2(box.position, Vector2(box.size.x, 22)), str(entry[1]).to_upper(), 16 if chosen else 14, color, HORIZONTAL_ALIGNMENT_CENTER, 800)
@@ -114,7 +122,7 @@ func _draw_arrows() -> void:
 	var rect := Rect2(Vector2.ZERO, _canvas.size).grow(-EDGE_INSET)
 	for entry: Array in run.targets():
 		var node: Node3D = entry[0]
-		var is_focus: bool = node == run.focus and camera.get("ball_cam") == true
+		var is_focus: bool = node == run.focus_of(_fish()) and camera.get("ball_cam") == true
 		if not is_focus and not settings.school_arrows:
 			continue
 		var at := node.global_position
@@ -134,5 +142,9 @@ func _draw_arrows() -> void:
 		var side := direction.orthogonal()
 		_canvas.draw_colored_polygon(PackedVector2Array([tip + direction * size, tip + side * size * 0.6, tip - side * size * 0.6]), color)
 		if is_focus:
-			var distance := roundi(at.distance_to(run.player.global_position))
+			var distance := roundi(at.distance_to(_fish().global_position))
 			BroadcastUI.text(_canvas, Rect2(tip - direction * 30.0 - Vector2(40, 10), Vector2(80, 20)), "%d m" % distance, 14, color, HORIZONTAL_ALIGNMENT_CENTER, 700)
+
+
+func _fish() -> FishController:
+	return fish if is_instance_valid(fish) else run.player

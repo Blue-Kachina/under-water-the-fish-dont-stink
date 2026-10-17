@@ -34,10 +34,10 @@ const CENTER = "center"
 ## publish its rules for touches, clears and centres; these are its usual
 ## values, and the judging below a guess.
 const POINTS := {GOAL: 100, ASSIST: 50, SAVE: 50, SHOT: 20, BATTERY: 15, DEMO: 15, CLEAR: 20, CENTER: 10, TOUCH: 2}
-## A scoreboard line's columns, in RL's scoreboard's order (batteries where it
+## A scoreboard line's columns, in RL's scoreboard's order (battered fish where it
 ## has demos), and the event each counts.
-const COLUMNS := ["score", "goals", "shots", "assists", "saves", "batteries", "touches"]
-const COUNTED := {GOAL: "goals", SHOT: "shots", ASSIST: "assists", SAVE: "saves", BATTERY: "batteries", TOUCH: "touches"}
+const COLUMNS := ["score", "goals", "shots", "assists", "saves", "battered_fish", "touches"]
+const COUNTED := {GOAL: "goals", SHOT: "shots", ASSIST: "assists", SAVE: "saves", BATTERY: "battered_fish", TOUCH: "touches"}
 ## A clear sends the ball from your own third towards the other end at least
 ## this fast (m/s); a centre sends it from out wide in the other team's third
 ## towards the middle at least this fast.

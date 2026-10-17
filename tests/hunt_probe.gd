@@ -78,8 +78,8 @@ func _run() -> void:
 	check(hunt.phase == HuntMatch.Phase.BATTERED, "a pause for the explosion")
 	check(hunt.style.points[0] >= StylePoints.POINTS[StylePoints.BATTERY], "+%d points for it (%d)" % [StylePoints.POINTS[StylePoints.BATTERY], hunt.style.points[0]])
 	check(events.any(func(e: Dictionary) -> bool: return e.type == StylePoints.BATTERY and e.player == 0 and e.victim == 1), "called out as a battery")
-	check(StylePoints.TITLES[StylePoints.BATTERY] == "BATTERED" and "BATTERIES" in load("res://scripts/hud.gd").HUNT_HEADINGS,
-			"called BATTERED, counted as BATTERIES on the scoreboard")
+	check(StylePoints.TITLES[StylePoints.BATTERY] == "BATTERED" and "BATTERED FISH" in load("res://scripts/hud.gd").HUNT_HEADINGS,
+			"called BATTERED, counted as BATTERED FISH on the scoreboard")
 	fish.swishy.flow = 1.5  # to see the kickoff clear it
 	await _ticks(roundi((HuntMatch.BATTERY_PAUSE + 0.2) * 120.0))
 	check(hunt.phase == HuntMatch.Phase.REPLAY and is_instance_valid(hunt.battery_replay), "then a replay of it")

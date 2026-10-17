@@ -51,7 +51,7 @@ func _physics_process(_delta: float) -> void:
 	var throttle := pace
 	if skittish and is_instance_valid(threat) and not threat.battered:
 		var from_threat := me - threat.global_position
-		if from_threat.length() < SPOOK_RANGE and threat.linear_velocity.dot(from_threat.normalized()) > SPOOK_SPEED:
+		if from_threat.length() < SPOOK_RANGE and threat.swim_velocity().dot(from_threat.normalized()) > SPOOK_SPEED:
 			target = me + from_threat.normalized() * 10.0
 			throttle = 1.0
 	_steer_to(target)

@@ -100,15 +100,15 @@ func _run() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	game.bot_fish.boost_amount = 100.0
-	var batteries := []
-	game.battered.connect(func(attacker: FishController, victim: FishController) -> void: batteries.append([attacker, victim]))
+	var battered_fish := []
+	game.battered.connect(func(attacker: FishController, victim: FishController) -> void: battered_fish.append([attacker, victim]))
 	var top_speed := 0.0
 	waited = 0.0
-	while batteries.is_empty() and waited < 5.0:
+	while battered_fish.is_empty() and waited < 5.0:
 		await get_tree().physics_frame
 		top_speed = maxf(top_speed, game.bot_fish.speed)
 		waited += TICK
-	check(not batteries.is_empty() and batteries[0][1] == fish, "the bot batters the player (top speed %.1f m/s)" % top_speed)
+	check(not battered_fish.is_empty() and battered_fish[0][1] == fish, "the bot batters the player (top speed %.1f m/s)" % top_speed)
 	check(fish.battered and not fish.visible, "the player is out of play")
 	ram.clear()
 	await _seconds(Match1v1.RESPAWN_TIME - 0.1)
@@ -127,7 +127,7 @@ func _run() -> void:
 	ram.forward = 1.0
 	await _seconds(2.0)
 	ram.clear()
-	check(batteries.size() == 1, "a slow bump doesn't batter (bot reached %.1f m/s)" % game.bot_fish.speed)
+	check(battered_fish.size() == 1, "a slow bump doesn't batter (bot reached %.1f m/s)" % game.bot_fish.speed)
 
 	# A goal explosion blasts nearby fish.
 	aquarium.set_physics_process(true)

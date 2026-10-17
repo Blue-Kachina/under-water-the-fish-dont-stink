@@ -15,7 +15,7 @@ extends Node
 ## next kickoff. A Fish Fry is replayed too.
 ##
 ## A 5-minute clock. At 0:00 the most goals wins; level on goals, the most
-## points (StylePoints: close calls, dodges, perfect rhythm, batteries) wins;
+## points (StylePoints: close calls, dodges, perfect rhythm, battered fish) wins;
 ## level on those too, overtime from a kickoff, where the next battery wins.
 ##
 ## The arena is a sphere ARENA_RADIUS round the ocean's spawn: past its edge a
@@ -82,7 +82,7 @@ var go_time_left := 0.0
 var clock_left := MATCH_TIME
 var overtime := false
 var overtime_elapsed := 0.0
-## Goals (batteries): the player's, then the opponent's.
+## Goals (battered fish): the player's, then the opponent's.
 var scores := [0, 0]
 ## Once the match is over: 0 the player, 1 the opponent.
 var winner := -1
@@ -234,10 +234,10 @@ func _physics_process(delta: float) -> void:
 	style.live = phase == Phase.LIVE
 	style.update(delta)
 	if phase == Phase.LIVE:
-		_check_batteries()
+		_check_battered_fish()
 
 
-func _check_batteries() -> void:
+func _check_battered_fish() -> void:
 	var by_player := Battery.hits(player, opponent, batter_speed())
 	var by_opponent := Battery.hits(opponent, player, batter_speed())
 	if by_player and by_opponent:

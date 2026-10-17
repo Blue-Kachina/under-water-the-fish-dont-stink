@@ -1,11 +1,11 @@
 extends Node
-## Batteries on school fish in a Nature run: a fast ram nose first through a
+## Battered fish on school fish in a Nature run: a fast ram nose first through a
 ## school batters several of them (scoring, a multi, explosions, fewer fish); a
 ## slow pass, or one sideways, batters none; each fish costs the player speed as
 ## hit_speed_cost says, never under the battering speed with the guard on; the
 ## survivors burst away and a rush makes a school tighten; pearls drop by
 ## chance, more in a multi, and are drawn in and counted.
-##   Godot_console.exe --headless --path . res://tests/nature_batteries_probe.tscn
+##   Godot_console.exe --headless --path . res://tests/nature_battered_fish_probe.tscn
 
 var main: Node
 var fish: FishController
@@ -48,11 +48,11 @@ func _run() -> void:
 	print("slow pass:")
 	var before := school.alive_count()
 	await _ram(school, fish.nature_batter_speed * 0.5)
-	check(school.alive_count() == before and run.batteries == 0, "under the battering speed: none battered")
+	check(school.alive_count() == before and run.battered_fish == 0, "under the battering speed: none battered")
 
 	print("sideways:")
 	await _ram(school, fish.nature_batter_speed + 8.0, true)
-	check(school.alive_count() == before and run.batteries == 0, "fast but side on: none battered")
+	check(school.alive_count() == before and run.battered_fish == 0, "fast but side on: none battered")
 
 	print("fast ram:")
 	school.alarm = 0.0
@@ -60,7 +60,7 @@ func _run() -> void:
 	await _ram(school, speed_before)
 	var battered := before - school.alive_count()
 	check(battered >= 2, "a fast ram through the school batters several (%d)" % battered)
-	check(run.batteries == battered and run.score.points > 0, "counted (%d) and scored (%d points)" % [run.batteries, run.score.points])
+	check(run.battered_fish == battered and run.score.points > 0, "counted (%d) and scored (%d points)" % [run.battered_fish, run.score.points])
 	check(events.any(func(e: Dictionary) -> bool: return e.type == NatureScore.MULTI and e.title == "DOUBLE DIP"), "a multi: DOUBLE DIP")
 	check(run.score.best_chain == battered, "all one chain (%d)" % run.score.best_chain)
 	check(fish.speed >= fish.nature_batter_speed - 0.5, "the guard keeps it at the battering speed (%.1f m/s)" % fish.speed)
@@ -71,16 +71,16 @@ func _run() -> void:
 	settings.hit_cost_keeps_batter_speed = false
 	var target: School = await _fresh_school()
 	var fast := fish.nature_batter_speed + 30.0
-	var first := run.batteries
+	var first := run.battered_fish
 	var line := _aim(target)
 	fish.linear_velocity = line * fast
 	var just_before := fast
 	for i in 240:
-		if run.batteries > first:
+		if run.battered_fish > first:
 			break
 		just_before = fish.linear_velocity.length()
 		await get_tree().physics_frame
-	var hits := run.batteries - first
+	var hits := run.battered_fish - first
 	await _ticks(1)  # the push lands on the next physics step
 	var after := fish.linear_velocity.length()
 	check(hits >= 1, "battered %d" % hits)
@@ -148,7 +148,7 @@ func _run() -> void:
 	settings.school_speed = 5.5
 	main.set_mode(main.FREE_SWIM)
 	await _ticks(3)
-	print("nature_batteries_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
+	print("nature_battered_fish_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)
 
 

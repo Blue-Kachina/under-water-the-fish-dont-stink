@@ -39,9 +39,16 @@ var _status: Label
 var _mode_row: HBoxContainer
 var _mode_picker: OptionButton
 var _character_picker: OptionButton
+var _load_button: Button
+var _default_button: Button
+## Sections someone else sets (an online session's host): shown, not editable.
+var _locked := {}
 
 signal mode_selected(mode: String)
 signal character_selected(character: FishCharacter.Family)
+## Any tuning value changed (a control, a preset, a restore): whatever copies
+## the tuning (other local players' fish, an online session) can follow.
+signal tuning_changed
 
 
 func _ready() -> void:
@@ -89,8 +96,10 @@ func _build_ui() -> void:
 	var buttons := HBoxContainer.new()
 	root.add_child(buttons)
 	buttons.add_child(_button("Save...", _pick_preset.bind(true)))
-	buttons.add_child(_button("Load...", _pick_preset.bind(false)))
-	buttons.add_child(_button("Default", _restore_defaults))
+	_load_button = _button("Load...", _pick_preset.bind(false))
+	buttons.add_child(_load_button)
+	_default_button = _button("Default", _restore_defaults)
+	buttons.add_child(_default_button)
 	buttons.add_child(_button("Copy", _copy_to_clipboard))
 
 	# Hidden for now: just the one profile (Controls.DEFAULT_PROFILE).
@@ -277,6 +286,7 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 			check.button_pressed = target.get(prop)
 			check.toggled.connect(func(on: bool) -> void:
 				target.set(prop, on)
+				tuning_changed.emit()
 				_refresh_visibility())
 			editor = check
 			group_list.add_child(check)
@@ -296,6 +306,7 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 			picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			picker.item_selected.connect(func(index: int) -> void:
 				target.set(prop, picker.get_item_id(index))
+				tuning_changed.emit()
 				_refresh_visibility())
 			row.add_child(picker)
 			editor = picker
@@ -333,6 +344,7 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 
 			slider.value_changed.connect(func(value: float) -> void:
 				target.set(prop, roundi(value) if whole else value)
+				tuning_changed.emit()
 				value_label.text = _format_value(target.get(prop)))
 			editor = slider
 			_value_labels[key] = value_label
@@ -406,6 +418,7 @@ func _apply(section: String, values: Dictionary) -> void:
 			var picker := editor as OptionButton
 			picker.select(picker.get_item_index(values[prop]))
 			picker.item_selected.emit(picker.selected)  # select() doesn't emit it
+	tuning_changed.emit()
 
 
 func _to_config() -> ConfigFile:
@@ -494,6 +507,28 @@ func _load_preset(path: String) -> void:
 	if not path.begins_with("res://") and path != LEGACY_SAVE_PATH:
 		_remember_preset(path)
 	_status.text = "Loaded %s" % path.get_file()
+
+
+## Locks `sections` (shown, not editable) or unlocks them, e.g. an online
+## guest's fish and Nature tuning, which are the host's. Loading a preset or
+## the defaults would change them too, so those wait until they're unlocked.
+func set_sections_locked(sections: Array, locked: bool, note := "") -> void:
+	for section: String in sections:
+		if locked:
+			_locked[section] = true
+		else:
+			_locked.erase(section)
+	for key: String in _editors:
+		var editor: Control = _editors[key]
+		var off: bool = _locked.has(key.get_slice("/", 0))
+		if editor is BaseButton:
+			(editor as BaseButton).disabled = off
+		elif editor is Range:
+			(editor as Range).editable = not off
+	_load_button.disabled = not _locked.is_empty()
+	_default_button.disabled = not _locked.is_empty()
+	if locked and note:
+		_status.text = note
 
 
 ## Every section's tuning now, for restore_tuning().

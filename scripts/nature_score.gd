@@ -1,13 +1,13 @@
 class_name NatureScore
 extends RefCounted
 ## Nature's points, Unreal Tournament style: every fish battered scores, and
-## batteries in quick succession chain into multis, each louder than the last,
+## battered fish in quick succession chain into multis, each louder than the last,
 ## while a run of them without slowing down is a spree.
 ##
 ## - **Multi:** a battery within multi_window (s) of the last one adds to the
 ##   chain: Battered, Double Dip, Triple Fry, Fish Supper, Feeding Frenzy, then
 ##   Monster Catch. Each step past the first scores multi_bonus x (chain + 1).
-## - **Spree:** batteries since the player was last under the battering speed for
+## - **Spree:** battered fish since the player was last under the battering speed for
 ##   more than spree_grace (s). Every spree_step of them is a milestone (Spring
 ##   Roll, Riptide, Apex Predator, Unstoppable, Poseidon), worth spree_bonus x
 ##   the milestone.
@@ -22,7 +22,7 @@ const MULTI := "multi"
 const SPREE := "spree"
 ## The multi's name by chain length (1 is a plain battery; past the end, the last).
 const MULTI_TITLES := ["BATTERED", "BATTERED", "DOUBLE DIP", "TRIPLE FRY", "FISH SUPPER", "FEEDING FRENZY", "MONSTER CATCH"]
-## The spree's name by milestone (1 is the first, spree_step batteries in).
+## The spree's name by milestone (1 is the first, spree_step battered fish in).
 const SPREE_TITLES := ["", "SPRING ROLL", "RIPTIDE", "APEX PREDATOR", "UNSTOPPABLE", "POSEIDON"]
 
 var settings: NatureSettings

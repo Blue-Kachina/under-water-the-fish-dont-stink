@@ -37,7 +37,7 @@ static func shared() -> NatureSettings:
 ## Never more nose up or down than this while roaming (degrees).
 @export_range(0.0, 89.0, 1.0) var max_climb := 30.0
 ## The lone target fish from before schools (a calm full-size fish to batter)
-## swims too. On until batteries come to the schools.
+## swims too. On until battered fish come to the schools.
 @export var lone_target := true
 
 @export_group("Formation")
@@ -89,9 +89,9 @@ static func shared() -> NatureSettings:
 ## School fish cast shadows (they cost about as much as the fish themselves).
 @export var fish_shadows := false
 
-@export_group("Batteries")
+@export_group("Battered fish")
 ## School fish can be battered (rammed nose first at nature_batter_speed or faster).
-@export var school_batteries := true
+@export var batter_schools := true
 ## The share of the player's speed each school fish battered takes off it (0: none, 1: stops it dead).
 @export_range(0.0, 1.0, 0.01) var hit_speed_cost := 0.03
 ## The speed cost never takes the player below the battering speed, so one hit
@@ -121,11 +121,11 @@ static func shared() -> NatureSettings:
 @export_range(0.0, 60.0, 0.5, "or_greater") var burst_strength := 6.0
 
 @export_group("Multis & Sprees")
-## Batteries this close together (s) chain into a multi: Double Dip, Triple Fry...
+## Battered fish this close together (s) chain into a multi: Double Dip, Triple Fry...
 @export_range(0.2, 10.0, 0.1, "or_greater") var multi_window := 2.5
-## A spree (batteries without slowing down) ends after this long (s) under the battering speed.
+## A spree (battered fish without slowing down) ends after this long (s) under the battering speed.
 @export_range(0.0, 10.0, 0.1, "or_greater") var spree_grace := 1.0
-## Every this many batteries in a spree is a milestone: Spring Roll, Riptide...
+## Every this many battered fish in a spree is a milestone: Spring Roll, Riptide...
 @export_range(1, 50, 1, "or_greater") var spree_step := 5
 ## Points for each fish battered.
 @export_range(0.0, 1000.0, 5.0, "or_greater") var battery_points := 100.0

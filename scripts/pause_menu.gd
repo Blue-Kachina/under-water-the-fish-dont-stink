@@ -9,6 +9,11 @@ extends CanvasLayer
 ## that picks Resume is over before the fish runs again (no stray jump).
 
 signal reset_requested
+## The menu opened or closed (online it doesn't pause the game: see `pauses`).
+signal opened
+signal closed
+## Co-op (online) was picked.
+signal coop_requested
 
 ## The tuning panel (DebugPanel): shown by Settings, hidden on resuming.
 var settings_panel: Node
@@ -16,6 +21,9 @@ var settings_panel: Node
 ## match card). Asked every frame while open, as the mode can change from the
 ## panel.
 var reset_label := func() -> String: return ""
+## Whether opening it pauses the game (not in an online session, where the
+## world goes on for everyone else).
+var pauses := func() -> bool: return true
 
 var _menu: PanelContainer
 var _resume: Button
@@ -65,6 +73,7 @@ func _ready() -> void:
 	_settings = _button(column, "Settings", func() -> void:
 		settings_panel.set_open(not settings_panel.is_open())
 		_update_buttons())
+	_button(column, "Co-op online", func() -> void: coop_requested.emit())
 	_button(column, "Exit", func() -> void: get_tree().quit())
 	var hint := Label.new()
 	hint.text = "Start / B: resume"
@@ -83,10 +92,11 @@ func open() -> void:
 		return
 	_focus_before = get_viewport().gui_get_focus_owner()
 	_cancel_armed = false
-	get_tree().paused = true
+	get_tree().paused = pauses.call()
 	visible = true
 	_update_buttons()
 	_resume.grab_focus()
+	opened.emit()
 
 
 ## Hides the menu (and the tuning panel) and carries on.
@@ -100,6 +110,7 @@ func close() -> void:
 	if is_instance_valid(_focus_before) and _focus_before.is_visible_in_tree():
 		_focus_before.grab_focus()  # e.g. the match card's Play
 	_focus_before = null
+	closed.emit()
 
 
 func _input(event: InputEvent) -> void:

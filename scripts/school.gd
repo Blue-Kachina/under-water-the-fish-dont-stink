@@ -58,7 +58,20 @@ const MAX_STEPS := 4
 
 ## Full models built this frame, across all schools: building one takes a few ms.
 static var _built_frame := -1
+## The players' cameras (split-screen has several): detail fish go to the
+## fish nearest any of them. Empty: the viewport's camera.
+static var view_cameras: Array[Camera3D] = []
 
+## Its number in the run (NatureRun), the same on every machine in co-op.
+var id := -1
+## Everything random about it (its name, its fish's places, drift and tail
+## beats, the leader's spots) comes from this, seeded at setup(): two machines
+## given the same seed build the same school.
+var rng := RandomNumberGenerator.new()
+## Online co-op, on a machine that isn't the host: the leader and its alarm
+## follow the host's (set_net_state()) instead of roaming and taking fright
+## here. Its fish still swim to their places here, from that leader.
+var follower := false
 var settings: NatureSettings
 var character := FishCharacter.Family.OCTANE
 var display_name := ""
@@ -104,6 +117,12 @@ var _details: Array[SchoolFish] = []
 var _detailed := {}
 var _detail_left := 0.0
 var _shadows := false
+## A follower's latest from the host: the leader (moved on since, at the
+## school's speed), its heading and the alarm.
+var _net_position := Vector3.ZERO
+var _net_heading := Vector3.FORWARD
+var _net_alarm := 0.0
+var _has_net := false
 
 
 func _init() -> void:
@@ -116,11 +135,16 @@ func _ready() -> void:
 
 
 ## Puts the school at `at` heading along `heading`, with its fish in their places.
-## Call once it's in the tree.
-func setup(school_settings: NatureSettings, at: Vector3, heading: Vector3, kind: FishCharacter.Family) -> void:
+## Call once it's in the tree. `rng_seed` makes it the same school wherever it's
+## built (negative: a random one).
+func setup(school_settings: NatureSettings, at: Vector3, heading: Vector3, kind: FishCharacter.Family, rng_seed := -1) -> void:
 	settings = school_settings
 	character = kind
-	display_name = NAMES.pick_random()
+	if rng_seed >= 0:
+		rng.seed = rng_seed
+	else:
+		rng.randomize()
+	display_name = NAMES[rng.randi_range(0, NAMES.size() - 1)]
 	home = at
 	leader_position = at
 	leader_heading = _level_heading(heading)
@@ -174,8 +198,8 @@ func detail_count() -> int:
 
 ## A new spot for the leader to head for, around home.
 func pick_spot() -> void:
-	var flat := Vector2.from_angle(randf() * TAU) * randf_range(0.3, 1.0) * settings.roam_radius
-	_spot = home + Vector3(flat.x, randf_range(-1.0, 1.0) * settings.roam_height, flat.y)
+	var flat := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.3, 1.0) * settings.roam_radius
+	_spot = home + Vector3(flat.x, rng.randf_range(-1.0, 1.0) * settings.roam_height, flat.y)
 
 
 ## The school's size (along its heading): half its length, at the current spread.
@@ -216,7 +240,61 @@ func _step(delta: float) -> void:
 	_move_fish(delta)
 
 
+## Which of its fish are left (1) or battered (0), by index.
+func alive_mask() -> PackedByteArray:
+	return _alive.duplicate()
+
+
+## Its fish as `mask` has them (a guest joining late): those battered there go,
+## quietly (no burst).
+func apply_alive_mask(mask: PackedByteArray) -> void:
+	for i in mini(mask.size(), _alive.size()):
+		if mask[i] == 0 and _alive[i] == 1:
+			_alive[i] = 0
+			if _detailed.has(i):
+				_detailed[i].index = -1
+				_detailed[i].visible = false
+				_detailed.erase(i)
+
+
+## The leader and alarm as the host has them, for its followers (set_net_state()).
+func net_state() -> Array:
+	return [leader_position, leader_heading, alarm]
+
+
+## A follower's leader and alarm, from the host's net_state(), `age` seconds old.
+func set_net_state(host_position: Vector3, heading: Vector3, host_alarm: float, age := 0.0) -> void:
+	_net_heading = heading.normalized() if heading.length_squared() > 0.000001 else leader_heading
+	_net_position = host_position + _net_heading * settings.school_speed * maxf(age, 0.0)
+	_net_alarm = host_alarm
+	if not _has_net:
+		leader_position = _net_position
+		leader_heading = _net_heading
+	_has_net = true
+
+
+## A follower's leader: on the host's heading, eased onto where the host's is
+## by now (snapping back if it's strayed far).
+func _follow_leader(delta: float) -> void:
+	if _has_net:
+		_net_position += _net_heading * settings.school_speed * delta
+		leader_heading = leader_heading.slerp(_net_heading, 1.0 - exp(-10.0 * delta)).normalized()
+	leader_position += leader_heading * settings.school_speed * delta
+	if _has_net:
+		if leader_position.distance_to(_net_position) > maxf(radius() * 2.0, 8.0):
+			leader_position = _net_position
+		else:
+			leader_position = leader_position.lerp(_net_position, 1.0 - exp(-8.0 * delta))
+	_history.append(_leader_frame())
+	var keep := ceili(settings.ripple_delay / delta) + 2
+	if _history.size() > keep:
+		_history = _history.slice(_history.size() - keep)
+
+
 func _move_leader(delta: float) -> void:
+	if follower:
+		_follow_leader(delta)
+		return
 	if leader_position.distance_to(_spot) < maxf(HOME_ARRIVED, radius()):
 		pick_spot()
 	var to_spot := _spot - leader_position
@@ -272,6 +350,9 @@ func _refresh_neighbours() -> void:
 
 ## Scared (alarm rises) while a threat comes at the school fast and near.
 func _update_alarm(delta: float) -> void:
+	if follower:
+		alarm = move_toward(alarm, _net_alarm, settings.bait_rate * delta)
+		return
 	var scared := false
 	var middle := _middle()
 	for threat in threats:
@@ -280,7 +361,7 @@ func _update_alarm(delta: float) -> void:
 		var offset := middle - threat.global_position
 		var gap := offset.length()
 		if gap < settings.bait_range + radius() and gap > 0.001:
-			scared = scared or threat.linear_velocity.dot(offset / gap) >= settings.bait_speed
+			scared = scared or threat.swim_velocity().dot(offset / gap) >= settings.bait_speed
 	alarm = move_toward(alarm, 1.0 if scared else 0.0, settings.bait_rate * delta)
 
 
@@ -441,16 +522,23 @@ func _draw(delta: float) -> void:
 ## Full models for the live fish nearest the camera (up to detail_fish, within
 ## detail_distance), built at most one a frame across all schools.
 func _choose_details(blend: float) -> void:
-	var camera := get_viewport().get_camera_3d() if is_inside_tree() else null
+	var eyes := PackedVector3Array()
+	for camera in view_cameras:
+		if is_instance_valid(camera) and camera.is_inside_tree():
+			eyes.append(camera.global_position)
+	if eyes.is_empty() and is_inside_tree() and get_viewport().get_camera_3d():
+		eyes.append(get_viewport().get_camera_3d().global_position)
 	var wanted := {}
-	if camera and settings.detail_fish > 0 and settings.detail_distance > 0.0:
-		var eye := camera.global_position
+	if not eyes.is_empty() and settings.detail_fish > 0 and settings.detail_distance > 0.0:
 		var reach := settings.detail_distance * settings.detail_distance
 		var near: Array = []
 		for i in _position.size():
 			if _alive[i] == 0:
 				continue
-			var gap := eye.distance_squared_to(_last_position[i].lerp(_position[i], blend))
+			var at := _last_position[i].lerp(_position[i], blend)
+			var gap := INF
+			for eye in eyes:
+				gap = minf(gap, eye.distance_squared_to(at))
 			if gap < reach:
 				near.append([gap, i])
 		near.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
@@ -583,8 +671,8 @@ func _resize(count: int) -> void:
 		_velocity.append(-frame.basis.z * settings.school_speed)
 		_facing.append(frame.basis.get_rotation_quaternion())
 		_last_facing.append(frame.basis.get_rotation_quaternion())
-		_wander.append(Vector3(randf(), randf(), randf()) * TAU)
-		_tail.append(randf() * TAU)
+		_wander.append(Vector3(rng.randf(), rng.randf(), rng.randf()) * TAU)
+		_tail.append(rng.randf() * TAU)
 		_alive.append(1)
 		_neighbours.append(PackedInt32Array())
 	for i in _buffers.size():
@@ -597,7 +685,7 @@ func _free_slot() -> Vector3:
 	var best := Vector3.ZERO
 	var best_gap := -1.0
 	for attempt in 24:
-		var point := Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), randf_range(-1.0, 1.0))
+		var point := Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0))
 		if point.length_squared() > 1.0:
 			continue
 		var gap := INF

@@ -19,6 +19,8 @@ const ABSORB_TIME := 0.3
 const FLICKER_TIME := 3.0
 
 var settings: NatureSettings
+## Its number in the run (NatureRun), the same on every machine in co-op; -1: not the run's.
+var id := -1
 ## Fish that can collect it (the players').
 var collectors: Array[FishController] = []
 var age := 0.0
@@ -113,7 +115,7 @@ func _physics_process(delta: float) -> void:
 		# Keep up with the fish, and close in faster the nearer it is.
 		var toward := (nearest.global_position - global_position) / gap
 		var pull := settings.magnet_strength * (1.0 + 2.0 * (1.0 - gap / settings.magnet_radius))
-		velocity = nearest.linear_velocity + toward * pull
+		velocity = nearest.swim_velocity() + toward * pull
 		_base += velocity * delta
 	else:
 		velocity = velocity.lerp(Vector3.ZERO, 1.0 - exp(-2.0 * delta))

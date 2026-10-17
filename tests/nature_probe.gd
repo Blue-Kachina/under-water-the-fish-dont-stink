@@ -57,7 +57,7 @@ func _run() -> void:
 
 	print("slow bump:")
 	await _ram(run, 5.0)
-	check(run.batteries == 0 and not run.target.battered, "a slow bump doesn't batter it")
+	check(run.battered_fish == 0 and not run.target.battered, "a slow bump doesn't batter it")
 
 	print("bow wave:")
 	check(fish.bow_wave and not run.target.bow_wave, "Nature's fish has a bow wave, the target doesn't")
@@ -76,7 +76,7 @@ func _run() -> void:
 
 	print("battery:")
 	await _ram(run, fish.nature_batter_speed + 6.0)
-	check(run.batteries == 1 and run.target.battered, "a fast ram batters it (%.1f m/s)" % run.last_battery_speed)
+	check(run.battered_fish == 1 and run.target.battered, "a fast ram batters it (%.1f m/s)" % run.last_battery_speed)
 	fish.linear_velocity = Vector3.ZERO  # stop coasting off, so "nearby" means where it appeared
 	await _ticks(roundi((NatureRun.RESPAWN_TIME + 0.3) * 120.0))
 	gap = fish.global_position.distance_to(run.target.global_position)

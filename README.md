@@ -24,7 +24,7 @@ Pick a mode from the settings panel's *Mode* dropdown (remembered per PC, apart 
   bursts apart for a moment when one of its fish is battered.
 
   **Points** (`NatureScore`, Unreal Tournament style):
-  - batteries close together chain into multis: Double Dip, Triple Fry, Fish Supper, Feeding
+  - battered fish close together chain into multis: Double Dip, Triple Fry, Fish Supper, Feeding
     Frenzy, Monster Catch, with a draining bar under the counts for the time left;
   - a run of them without slowing down is a spree: Spring Roll, Riptide, Apex Predator, Unstoppable,
     Poseidon.
@@ -38,11 +38,38 @@ Pick a mode from the settings panel's *Mode* dropdown (remembered per PC, apart 
   point to schools off screen.
 
   **Tuning.** Everything is in the panel's **NATURE** section (schools, formation, reactions,
-  batteries, multis, pearls, targeting, performance) and changes live. Schools are drawn as baked
+  battered fish, multis, pearls, targeting, performance) and changes live. Schools are drawn as baked
   meshes, one per tail pose, with full models only for the few fish nearest the camera, so
   hundreds of fish stay cheap. Nature has its own tuning (`presets/nature.cfg`); leaving Nature
   puts your tuning from before back, and the changes you made in Nature are there again next time
   (until you close the game).
+
+  **Co-op** (`going_coop.md`), 2 to 4 players hunting the same schools, with a shared count of
+  fish battered and pearls, and each player's own points, multis and sprees:
+  - **Split-screen** (`LocalCoop`): during a Nature run, press **Back/View** on another controller
+    to join, with your own fish, camera, HUD and school wheel. **D-pad left/right** changes a joined
+    player's fish, and holding **Back/View** for a second leaves. The first player keeps the
+    keyboard and their own controller, and their tuning applies to everyone. Two players ramming
+    the same fish at once both get the credit. Co-op fish swim through each other.
+  - **Online** (`NetSession`, `CoopSession`): pause menu → **Co-op online**. **Host** on a port, or
+    **Join** an address (LAN, or a port-forwarded host). The host's world is everyone's: its
+    schools, lone fish, pearls and counts. Only the host tunes; a guest's fish and Nature tuning are
+    the host's and locked while they play, and come back when they leave. Your own fish has no
+    added lag; everyone else's is shown a tenth of a second behind, smoothly. A guest can't
+    restart the run (R just puts their own fish back); the host can, for everyone. The pause
+    menu doesn't pause an online game. Steam is switched off for now (`NetSession.STEAM_ENABLED`):
+    under Steam's test App ID it takes the controller over. When it's on, **Host on Steam** / **Invite friends** show up once the
+    [GodotSteam](https://godotsteam.com) addon (`addons/godotsteam`) finds Steam running: a friends-only
+    lobby over Steam's relays, no addresses or ports (test App ID 480 until the game has its own;
+    `--no-steam` keeps Steam out of a run). Steam's invite overlay only appears when Steam launched
+    the game, so the menu also shows the lobby's number with **Copy**: a friend pastes it into
+    **Lobby** and presses **Join** (or, with the game already running, uses **Join Game** in your
+    friends list).
+    Command line: `-- --host` or `-- --join=ADDRESS`, `--port=N`, and for testing a bad
+    connection `--lag=MS --jitter=MS --loss=0.05` (also in the Co-op menu).
+  - Tests: `tests/coop_local_probe`, `tests/school_sync_probe`, and `tests/coop_net.sh` (a host, a
+    laggy guest and a late joiner, each its own Godot). `tests/split_shots` (needs a window) shows
+    1-4 player split-screen and its frame times.
 - **Hunt**: a 1v1 in the Ocean on Nature's tuning against a hostile fish (`HunterBot`, Basic
   difficulty) that swims with exactly your mechanics and is out to batter you. Getting
   **Battered** is a goal here: ram the other fish nose first at *Nature Batter
@@ -55,7 +82,7 @@ Pick a mode from the settings panel's *Mode* dropdown (remembered per PC, apart 
   perfect strides in a row +10, battered +100), and level on those too, overtime's next
   batter wins. The arena reaches 90 m out from the centre: near its edge the water
   darkens, and past it you're pushed back in. Hold D-pad up / B for the scoreboard (fish battered
-  are its BATTERIES column). `tests/battery_replay_shots` (needs a window) renders a battery replay.
+  are its BATTERED FISH column). `tests/battery_replay_shots` (needs a window) renders a battery replay.
 - **Obstacle Course**: walled arena with a timed 10-hoop course, tunnel, pillars, ramps and an arch.
 - **Replays**: watch Rocket League replays in the Aquarium Arena. Pick one with **Replay...** in the
   replay bar, or drop a `.replay` / `.rlreplay.json` on the window from any mode. **Close** goes back
@@ -125,7 +152,7 @@ Punch*; `scripts/arcade_fx.gd`).
 
 **Bow wave** (on in Nature, *Bow Wave* in the panel): speed pushes a mostly clear, torpedo-tip
 shell of water out ahead of the fish, from *Bow Start Speed* to full size at *Bow Full Speed*. It
-counts as the fish's front for batteries, so a fast fish has a bigger target area, but it doesn't
+counts as the fish's front for battered fish, so a fast fish has a bigger target area, but it doesn't
 push anything. `tests/stride_shots` (needs a window) renders the tail cue and the bow wave on
 every fish.
 

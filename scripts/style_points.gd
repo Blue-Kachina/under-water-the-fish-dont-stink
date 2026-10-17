@@ -1,7 +1,7 @@
 class_name StylePoints
 extends RefCounted
-## Hunt's points, a tally beside the goals (batteries): close calls, dodges,
-## perfect rhythm and batteries, for both fish alike.
+## Hunt's points, a tally beside the goals (battered fish): close calls, dodges,
+## perfect rhythm and battered fish, for both fish alike.
 ##
 ## A fish is threatened while the other comes at it fast enough to batter it
 ## (at least batter_speed), close (THREAT_RANGE) and with it in front of its nose
@@ -52,7 +52,7 @@ var live := false
 ## Each fish's points.
 var points := [0, 0]
 ## Each fish's counts: "close_calls", "dodges", "perfect" (strides),
-## "best_streak", "batteries" and "top_speed" (m/s, live play).
+## "best_streak", "battered_fish" and "top_speed" (m/s, live play).
 var counts: Array[Dictionary] = []
 ## Each fish's current run of perfect strides.
 var streaks := [0, 0]
@@ -90,7 +90,7 @@ func reset() -> void:
 	points = [0, 0]
 	counts.clear()
 	for i in 2:
-		counts.append({"close_calls": 0, "dodges": 0, "perfect": 0, "best_streak": 0, "batteries": 0, "top_speed": 0.0})
+		counts.append({"close_calls": 0, "dodges": 0, "perfect": 0, "best_streak": 0, "battered_fish": 0, "top_speed": 0.0})
 	streaks = [0, 0]
 	clear_windows()
 
@@ -131,7 +131,7 @@ func update(delta: float) -> void:
 ## `attacker` battered `victim`: points for it, and no escape for `victim`.
 func on_battery(attacker: int, victim: int) -> void:
 	_windows[victim] = {}
-	counts[attacker].batteries += 1
+	counts[attacker].battered_fish += 1
 	_award(attacker, BATTERY, {"victim": victim})
 
 

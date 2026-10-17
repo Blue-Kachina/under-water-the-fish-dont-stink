@@ -28,7 +28,7 @@ signal physics_tick(state: PhysicsDirectBodyState3D)
 enum JumpState { READY, SECOND_JUMP, COOLDOWN }
 ## Every fish in play (the player's and bots') is in this group.
 const GROUP := &"fish"
-## RL's supersonic speed (2200 uu/s): RL's demos need it, and so do the 1v1's batteries.
+## RL's supersonic speed (2200 uu/s): RL's demos need it, and so do the 1v1's battered fish.
 const SUPERSONIC_SPEED := 22.0
 ## How quickly the bow wave grows and shrinks (its size, 0..1, per second).
 const BOW_RESPONSE := 2.5
@@ -317,7 +317,7 @@ const TIME_EPSILON := 0.0001
 @export_group("Bow Wave")
 ## Speed pushes a torpedo-tip shell of water out ahead of the fish, from
 ## bow_start_speed to full size at bow_full_speed. It counts as the fish's front
-## for batteries (Battery), and for nothing else: it doesn't push anything.
+## for battered fish (Battery), and for nothing else: it doesn't push anything.
 @export var bow_wave := false
 @export_range(0.0, 200.0, 0.5, "or_greater") var bow_start_speed := 8.0
 @export_range(1.0, 300.0, 0.5, "or_greater") var bow_full_speed := 30.0
@@ -531,6 +531,17 @@ var stroke_quality := 0.0
 ## Where this fish's input comes from instead of the player's controller, e.g.
 ## a bot's (FishBot); null for the player.
 var controls: FishInput
+## Where the player's own controls are read from (without `controls`): null
+## reads every controller and the keyboard; in local co-op each player has
+## their own controller (PlayerInput).
+var input_source: PlayerInput
+## Shown, not simulated: another machine's fish in online co-op (a remote
+## player, or the host's lone fish), placed where the network says (NetFish)
+## and drawn with its looks as sent (set_net_state). It doesn't move by itself
+## or push anything.
+var puppet := false
+var _puppet_velocity := Vector3.ZERO
+var _puppet_fx := PackedFloat32Array()
 ## No input at all while set, e.g. during a kickoff countdown.
 var controls_locked := false
 ## Boost after a reset (RL: 33.3 at a kickoff or a respawn in a match).
@@ -903,16 +914,17 @@ func _sample_input(delta: float) -> void:
 	elif controls:
 		_read_controls(controls)
 	else:
-		input_forward = Input.get_action_strength("thrust_forward")
-		input_reverse = Input.get_action_strength("thrust_reverse")
+		var source := _player_input()
+		input_forward = source.strength("thrust_forward")
+		input_reverse = source.strength("thrust_reverse")
 		input_stick = _processed_stick()
-		input_roll = Input.get_action_strength("roll_right") - Input.get_action_strength("roll_left")
-		air_roll_held = Input.is_action_pressed("air_roll")
-		boost_held = Input.is_action_pressed("boost")
-		powerslide_held = Input.is_action_pressed("powerslide")
-		var boost_locks := boost_button_locks and Input.is_action_pressed("boost")
-		direction_lock_held = Input.is_action_pressed("direction_lock") or boost_locks
-		jump_held = Input.is_action_pressed("jump")
+		input_roll = source.strength("roll_right") - source.strength("roll_left")
+		air_roll_held = source.pressed("air_roll")
+		boost_held = source.pressed("boost")
+		powerslide_held = source.pressed("powerslide")
+		var boost_locks := boost_button_locks and source.pressed("boost")
+		direction_lock_held = source.pressed("direction_lock") or boost_locks
+		jump_held = source.pressed("jump")
 	# Detect the press ourselves: "just pressed" is tracked per frame and isn't
 	# reliable this early in the physics tick.
 	if jump_held and not _jump_was_held:
@@ -951,7 +963,11 @@ func revive(spawn: Transform3D) -> void:
 		collision_mask = _saved_layers.y
 	battered = false
 	visible = true
-	freeze = false
+	freeze = puppet
+	if puppet:
+		_spawn_transform = spawn
+		global_transform = spawn
+		return
 	set_spawn(spawn)
 
 
@@ -961,13 +977,46 @@ func apply_push(velocity_change: Vector3) -> void:
 	_ball_push += velocity_change
 
 
+## The player's controls (input_source, or every controller and the keyboard).
+func _player_input() -> PlayerInput:
+	return input_source if input_source else PlayerInput.everyone()
+
+
+## How fast it's swimming (m/s, world): its body's velocity, or for a puppet
+## the velocity the network last said. Read this, not linear_velocity, for
+## any fish that may be a puppet (schools fleeing it, pearls drawn to it).
+func swim_velocity() -> Vector3:
+	return _puppet_velocity if puppet else linear_velocity
+
+
+## Shown, not simulated, from now on (see `puppet`): frozen in place as a
+## kinematic body, moved only by set_net_state().
+func make_puppet() -> void:
+	puppet = true
+	controls = _idle_input
+	freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+	freeze = true
+
+
+## A puppet where (and how fast) the network says it is now, and how it looks
+## (replay_fx()'s layout). Its telemetry follows, for the HUD and cameras.
+func set_net_state(xform: Transform3D, velocity: Vector3, fx: PackedFloat32Array) -> void:
+	global_transform = xform
+	_puppet_velocity = velocity
+	_puppet_fx = fx
+	speed = velocity.length()
+	forward_speed = velocity.dot(-xform.basis.z)
+	bow_amount = fx[ReplayData.FX_BOW] if fx.size() == ReplayData.FX_SIZE else 0.0
+
+
 ## The left stick after Rocket League's deadzone and sensitivity settings. Read
 ## raw (the input map's own stick deadzone is bypassed) so the deadzone and
 ## its shape are exactly the ones set here.
 func _processed_stick() -> Vector2:
+	var source := _player_input()
 	var raw := Vector2(
-			Input.get_action_raw_strength("stick_right") - Input.get_action_raw_strength("stick_left"),
-			Input.get_action_raw_strength("stick_down") - Input.get_action_raw_strength("stick_up"))
+			source.raw_strength("stick_right") - source.raw_strength("stick_left"),
+			source.raw_strength("stick_down") - source.raw_strength("stick_up"))
 	var stick := Vector2.ZERO
 	var keep := maxf(1.0 - controller_deadzone, 0.001)
 	if deadzone_shape == DeadzoneShape.CROSS:
@@ -1053,6 +1102,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	# Car::_PostTickUpdate), so a step itself runs at the capped value plus that
 	# tick's acceleration: a flip turns at ~7.4 rad/s although 5.5 is "the cap".
 	# Capping the last step's result here, before anything reads it, does the same.
+	if puppet:
+		return  # placed by set_net_state()
 	var spin_cap := RL_MAX_ANGULAR_SPEED if rl_roll_timing else max_angular_speed * (powerslide_turn_multiplier if is_powersliding else 1.0)
 	# The ball's contact push belongs to the step that just ran, before the caps.
 	state.linear_velocity += _ball_push
@@ -1989,6 +2040,9 @@ func _apply_physics_material() -> void:
 
 ## Placeholder animation: driven by movement state, never the other way round.
 func _process(delta: float) -> void:
+	if puppet:
+		_process_puppet(delta)
+		return
 	var effort := maxf(input_forward, 1.0 if is_boosting else 0.0)
 	_swim_phase += delta * lerpf(4.0, 18.0, effort)
 	# Powerslide: tail kicks out toward the turn, fins flare like air brakes.
@@ -2088,12 +2142,42 @@ func _build_bow_view() -> void:
 	add_child(_bow_view)
 
 
+## A puppet's looks as sent (replay_fx()'s layout), as a replay ghost shows
+## them (ReplayCar): the stride tail, its cue, the bow wave and the bubbles.
+func _process_puppet(delta: float) -> void:
+	var fx := _puppet_fx
+	if fx.size() != ReplayData.FX_SIZE or not visible:
+		_bow_view.visible = false
+		return
+	_tail.rotation = Vector3(fx[ReplayData.FX_TAIL_PITCH], fx[ReplayData.FX_TAIL_YAW], 0.0)
+	_tail.scale = Vector3.ONE * maxf(fx[ReplayData.FX_TAIL_SCALE], 0.01)
+	_visual.grounded = false
+	_visual.stride_swing = Vector2(fx[ReplayData.FX_SWING_X], fx[ReplayData.FX_SWING_Y])
+	_visual.stride_power = fx[ReplayData.FX_POWER]
+	_visual.set_stride_cue(fx[ReplayData.FX_CUE_FILL], fx[ReplayData.FX_CUE_GLOW], fx[ReplayData.FX_CUE_SWEET])
+	_visual.react(delta, _puppet_velocity)
+	_bubbles.emitting = false
+	_update_bow_view(delta)
+	_pour_rate = fx[ReplayData.FX_POUR]
+	if _pour_rate <= 0.0:
+		return
+	var tip := _tail.global_transform * _visual.tail_tip()
+	var body := global_basis.orthonormalized()
+	var swing := Vector2(fx[ReplayData.FX_SWING_X], fx[ReplayData.FX_SWING_Y])
+	var jet := (body.z + (body.x * swing.x - body.y * swing.y) * 0.4).normalized()
+	_pour_color = Color(fx[ReplayData.FX_POUR_R], fx[ReplayData.FX_POUR_G], fx[ReplayData.FX_POUR_B], fx[ReplayData.FX_POUR_A])
+	_stream.pour(delta, tip, jet, _puppet_velocity * 0.75, 0.025 * _tail.scale.x, _pour_rate, _pour_color)
+
+
 func _update_bow_view(delta: float) -> void:
 	_bow_view.visible = bow_amount > 0.005
 	if not _bow_view.visible:
 		return
 	_bow_view.position = _collision.position
-	_bow_view.scale = bow_size()
+	if puppet and _puppet_fx.size() == ReplayData.FX_SIZE:
+		_bow_view.scale = Vector3(_puppet_fx[ReplayData.FX_BOW_X], _puppet_fx[ReplayData.FX_BOW_Y], _puppet_fx[ReplayData.FX_BOW_Z])
+	else:
+		_bow_view.scale = bow_size()
 	_bow_flow += delta * speed * 0.8
 	_bow_material.set_shader_parameter("amount", bow_amount)
 	_bow_material.set_shader_parameter("flow", _bow_flow)
@@ -2127,6 +2211,8 @@ func _pour_bubbles(delta: float) -> void:
 ## bubbles, the flow), laid out as ReplayData's FX_* entries. GoalRecorder
 ## keeps it every tick so replays (ReplayCar) show it all.
 func replay_fx() -> PackedFloat32Array:
+	if puppet and _puppet_fx.size() == ReplayData.FX_SIZE:
+		return _puppet_fx.duplicate()
 	var fx := PackedFloat32Array()
 	fx.resize(ReplayData.FX_SIZE)
 	var striding := swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY

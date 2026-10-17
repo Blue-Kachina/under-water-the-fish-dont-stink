@@ -55,6 +55,9 @@ var hold_opens_wheel := false
 var wheel_hold_time := 0.3
 ## The wheel is open: the right stick picks on it instead of looking around.
 var wheel_open := false
+## Whose controls turn it (look around, ball cam): null for every controller
+## and the keyboard; in local co-op its player's own (PlayerInput).
+var input: PlayerInput
 var _ball_cam_held := -1.0
 ## Set by the environment: the camera keeps collision_margin above this
 ## (the see-through tank's floor). -INF: no floor of its own to keep above.
@@ -97,7 +100,7 @@ var floor_height := -INF
 @export_range(60.0, 130.0, 1.0) var field_of_view := 109.0:
 	set(value):
 		field_of_view = value
-		fov = value * zoom
+		_apply_fov()
 ## How quickly a ball cam toggle swings the view. RL: Transition Speed (approximate).
 @export_range(0.5, 3.0, 0.05) var transition_speed := 1.2
 
@@ -105,7 +108,7 @@ var floor_height := -INF
 var zoom := 1.0:
 	set(value):
 		zoom = value
-		fov = field_of_view * value
+		_apply_fov()
 
 @export_group("Arcade")
 ## Extra Swishy's arcade feel (ArcadeFx): how much the view closes in at full
@@ -148,7 +151,7 @@ func _ready() -> void:
 	# camera itself must not be physics-interpolated.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	keep_aspect = Camera3D.KEEP_WIDTH  # fov is horizontal, like RL's
-	fov = field_of_view
+	_apply_fov()
 	if fish:
 		_rotation = fish.global_basis.get_rotation_quaternion()
 		_up = fish.global_basis.y
@@ -183,6 +186,25 @@ func _subject() -> Variant:
 	return target if is_instance_valid(target) else fish
 
 
+## The field of view (field_of_view x zoom), horizontal as RL's. In a
+## split-screen view wider than 16:9 (two players, one above the other) it's
+## the same view's height instead, as at 16:9, so the fish isn't cropped.
+func _apply_fov() -> void:
+	var horizontal := field_of_view * zoom
+	var view := get_viewport() as SubViewport if is_inside_tree() else null
+	var aspect := float(view.size.x) / maxf(view.size.y, 1.0) if view else 0.0
+	if aspect > 16.0 / 9.0 + 0.01:
+		keep_aspect = Camera3D.KEEP_HEIGHT
+		fov = rad_to_deg(2.0 * atan(tan(deg_to_rad(horizontal) / 2.0) * 9.0 / 16.0))
+	else:
+		keep_aspect = Camera3D.KEEP_WIDTH
+		fov = horizontal
+
+
+func _player_input() -> PlayerInput:
+	return input if input else PlayerInput.everyone()
+
+
 ## Turns ball cam on or off, swinging over at the transition speed.
 func set_ball_cam(on: bool) -> void:
 	if on == ball_cam:
@@ -201,14 +223,14 @@ func _ball_cam_button(delta: float) -> void:
 		if wheel_open:
 			wheel_open = false
 			wheel_closed.emit()
-		if Input.is_action_just_pressed("ball_cam"):
+		if _player_input().just_pressed("ball_cam"):
 			set_ball_cam(not ball_cam)
 		return
-	if Input.is_action_just_pressed("ball_cam"):
+	if _player_input().just_pressed("ball_cam"):
 		_ball_cam_held = 0.0
 	if _ball_cam_held < 0.0:
 		return
-	if Input.is_action_pressed("ball_cam"):
+	if _player_input().pressed("ball_cam"):
 		_ball_cam_held += delta
 		if not wheel_open and _ball_cam_held >= wheel_hold_time:
 			wheel_open = true
@@ -223,6 +245,7 @@ func _ball_cam_button(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	_apply_fov()  # its view may have changed shape (split-screen)
 	var subject: Variant = _subject()
 	if subject == null:
 		return
@@ -289,7 +312,7 @@ func _process(delta: float) -> void:
 	up = up.rotated(forward, rolled.x - roll_error)
 	_up = up
 
-	var look_input := Input.get_vector("camera_left", "camera_right", "camera_up", "camera_down")
+	var look_input := _player_input().vector("camera_left", "camera_right", "camera_up", "camera_down")
 	if wheel_open:
 		look_input = Vector2.ZERO  # the stick is picking on the wheel
 	var look_blend := 1.0 - exp(-swivel_speed * SWIVEL_RATE * delta)

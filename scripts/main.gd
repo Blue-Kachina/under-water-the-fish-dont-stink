@@ -21,6 +21,10 @@ extends Node3D
 ## plays with it; another can be picked in the replay's controls or dropped on
 ## the window.
 
+## A Nature run started (Play, a restart doesn't count), or ended.
+signal nature_started(run: NatureRun)
+signal nature_ended
+
 ## Environment name -> script. Each script builds its own world and provides
 ## spawn_transform() and configure_environment(env).
 const ENVIRONMENTS := {
@@ -69,8 +73,13 @@ var match_1v1: Match1v1
 var nature_run: NatureRun
 ## The Hunt match being played, if any.
 var hunt_match: HuntMatch
-## Nature's school wheel and edge arrows, while a run is on.
-var _target_wheel: TargetWheel
+## The first player's school wheel and edge arrows, while a Nature run is on.
+var _target_wheel: TargetWheel:
+	get:
+		return _local.slots[0].wheel if _local and not _local.slots.is_empty() else null
+## Nature's split-screen co-op: the local players (the first is this fish,
+## camera and HUD).
+var _local: LocalCoop
 ## The tuning from before Nature's, while Nature's is on (else empty).
 var _tuning_before_nature := {}
 ## Nature's tuning as it was when last left, changes included (empty: not yet).
@@ -119,12 +128,32 @@ func _ready() -> void:
 	arcade.fish = _fish
 	arcade.camera = _camera
 	add_child(arcade)
+	var first := PlayerSlot.new()
+	first.fish = _fish
+	first.camera = _camera
+	first.hud = _hud
+	first.arcade = arcade
+	_local = LocalCoop.new()
+	_local.name = "LocalCoop"
+	_local.setup(self, first, _panel)
+	add_child(_local)
+	if nature_run:  # a Nature run already on (started before the split-screen players were set up)
+		_local.attach_run(nature_run)
 	_pause_menu = PauseMenu.new()
 	_pause_menu.name = "PauseMenu"
 	_pause_menu.settings_panel = _panel
 	_pause_menu.reset_label = _reset_label
 	_pause_menu.reset_requested.connect(reset_play)
 	add_child(_pause_menu)
+	# Online co-op: the pause menu doesn't stop the world, but holds the local players still.
+	_pause_menu.pauses = func() -> bool: return not NetSession.is_online()
+	_pause_menu.opened.connect(func() -> void: _hold_local_players(NetSession.is_online()))
+	_pause_menu.closed.connect(func() -> void: _hold_local_players(false))
+	_pause_menu.coop_requested.connect(func() -> void:
+		var menu := CoopMenu.new()
+		menu.name = "CoopMenu"
+		add_child(menu))
+	NetSession.coop.attach_main(self)
 	get_window().files_dropped.connect(func(files: PackedStringArray) -> void:
 		if files.is_empty():
 			return
@@ -216,7 +245,10 @@ func reset_play() -> void:
 		match_1v1.kickoff()
 		return
 	if nature_run:
-		nature_run.start()
+		if nature_run.authority:
+			nature_run.start()  # online, the host's restart is everyone's
+		else:
+			nature_run.respawn_local()  # a guest: just their own fish back to the start
 		return
 	if hunt_match:
 		hunt_match.restart()
@@ -501,6 +533,8 @@ func set_mode(mode: String, remember := true) -> void:
 ## Shows a match mode's card (the match starts on Play), or ends the match
 ## (or card) outside one.
 func _apply_mode() -> void:
+	if current_mode != NATURE and _local:
+		_local.drop_extras()  # split-screen co-op is Nature's
 	_use_nature_tuning(current_mode in NATURE_MODES)
 	var wanted: bool = current_mode in MATCH_MODES and current_environment == MODE_ENVIRONMENTS[current_mode]
 	if wanted:
@@ -571,41 +605,55 @@ func _start_match() -> void:
 	_hud.set_match(match_1v1)
 
 
-func _start_nature() -> void:
+## Online co-op's host: a Nature run of ours, the world run here (the one
+## going on, or a new one).
+func host_nature_run() -> void:
+	set_mode(NATURE)
+	if nature_run and nature_run.authority:
+		return
+	_end_match()
+	_close_match_card()
+	_start_nature(true)
+
+
+## Online co-op's guest: a Nature run of our players in the host's world.
+func guest_nature_run() -> void:
+	set_mode(NATURE)
+	_end_match()
+	_close_match_card()
+	_start_nature(false)
+
+
+## Back from being a guest: Nature on our own again, the world ours.
+func solo_nature_run() -> void:
+	if current_mode != NATURE:
+		return
+	_end_match()
+	_close_match_card()
+	_start_nature(true)
+
+
+## Holds the local players' fish still (online, while the pause menu's open:
+## the world doesn't stop) or lets them go.
+func _hold_local_players(hold: bool) -> void:
+	for slot in _local.slots:
+		slot.fish.controls_locked = hold
+
+
+## A Nature run with every local player (LocalCoop), the world run here
+## (`authority`) unless this is an online session's guest (CoopSession).
+func _start_nature(authority := true) -> void:
 	nature_run = NatureRun.new()
 	nature_run.name = "Nature"
+	nature_run.authority = authority
 	nature_run.setup(_environment, _fish)
-	nature_run.fish_teleported.connect(func(fish: FishController) -> void:
-		if fish == _fish:
-			_camera.snap())
+	for slot in _local.slots:
+		slot.fish.set_meta("coop_index", slot.index)
+		if slot.index > 0:
+			nature_run.players.append(slot.fish)
 	_environment.add_child(nature_run)
-	_camera.ball = nature_run.focus  # ball cam follows the fish or school to catch
-	nature_run.awarded.connect(func(event: Dictionary) -> void:
-		# Big multis and sprees punch the view in, harder each step.
-		var chain: int = event.get("chain", 0)
-		if event.type == NatureScore.SPREE or chain >= 3:
-			(get_node("ArcadeFx") as ArcadeFx).punch(1.0 if event.type == NatureScore.SPREE else minf(0.4 + 0.15 * chain, 1.2)))
-	nature_run.focus_changed.connect(func(focus: Node3D) -> void:
-		_camera.ball = focus)
-	_camera.ball_cam = true
-	# Ball cam: a tap looks at the nearest thing ahead, holding opens the school wheel.
-	_camera.hold_opens_wheel = true
-	if not _camera.ball_cam_toggled.is_connected(_on_ball_cam_toggled):
-		_camera.ball_cam_toggled.connect(_on_ball_cam_toggled)
-	_target_wheel = TargetWheel.new()
-	_target_wheel.name = "TargetWheel"
-	_target_wheel.camera = _camera
-	_target_wheel.run = nature_run
-	add_child(_target_wheel)
-	_camera.wheel_opened.connect(_target_wheel.open)
-	_camera.wheel_closed.connect(_target_wheel.close)
-	_hud.set_nature(nature_run)
-
-
-## Ball cam just went on in Nature: it looks at the nearest thing ahead.
-func _on_ball_cam_toggled(on: bool) -> void:
-	if on and nature_run:
-		nature_run.pick_focus()
+	_local.attach_run(nature_run)  # each player's ball cam, school wheel and HUD
+	nature_started.emit(nature_run)
 
 
 func _start_hunt() -> void:
@@ -630,15 +678,11 @@ func _end_match() -> void:
 		_camera.ball = null
 		_hud.set_hunt(null)
 	if nature_run:
+		_local.detach_run()
 		nature_run.end()
 		nature_run.queue_free()
 		nature_run = null
-		_camera.ball = null
-		_camera.hold_opens_wheel = false
-		if _target_wheel:
-			_target_wheel.queue_free()
-			_target_wheel = null
-		_hud.set_nature(null)
+		nature_ended.emit()
 	if match_1v1 == null:
 		return
 	match_1v1.end()

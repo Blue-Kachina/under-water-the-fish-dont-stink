@@ -9,7 +9,7 @@ extends Node
 ## A 5-minute clock runs while the ball's live; tied at 0:00 goes to overtime,
 ## where the next goal wins. After each goal, once the explosion's settled, a
 ## replay of it (GoalReplay, from a GoalRecorder) plays unless goal_replays is
-## off; it can be skipped. Goals, assists, shots, saves and batteries are called
+## off; it can be skipped. Goals, assists, shots, saves and battered fish are called
 ## out as they happen (stat_event; see MatchStats), and each fish's scoreboard
 ## line (stats) adds them up with its touches, clears and centres, RL's points
 ## and all, for the HUD's scoreboard; each team's possession, boost used and
