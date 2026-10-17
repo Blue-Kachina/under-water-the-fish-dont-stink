@@ -1,7 +1,11 @@
 class_name CoopSession
 extends Node
-## Online co-op in Nature (NetSession's child "Coop", at the same path on every
-## machine, so its RPCs meet): the game's side of a session.
+## Online co-op in Nature and Unnatural (NetSession's child "Coop", at the same
+## path on every machine, so its RPCs meet): the game's side of a session. A
+## session is in the mode the host was in when it started hosting (Unnatural if
+## it was in Unnatural, else Nature); a guest joins that mode. What's
+## Unnatural's own goes through the child UnnaturalNet; this keeps the session,
+## roster, players' fish, tuning and restarts for both.
 ##
 ## Who runs what (going_coop.md §3):
 ## - Each machine runs its own players' fish, with no added input lag, and
@@ -36,7 +40,7 @@ const SCHOOL_RATE := 10.0
 ## Tuning changes are sent this long (s) after the last one, not every slider step.
 const TUNING_DELAY := 0.25
 ## The tuning that's the host's (the camera stays each player's own).
-const TUNING_SECTIONS := ["fish", "nature"]
+const TUNING_SECTIONS := ["fish", "nature", "unnatural", "powerups"]
 ## How often (s) guests time the round trip to the host, and send any change of
 ## their players (joining, leaving, a new fish).
 const PING_INTERVAL := 1.0
@@ -45,6 +49,9 @@ const FISH_SCENE := preload("res://scenes/fish.tscn")
 ## The game (main.gd), which registers itself.
 var main: Node
 var run: NatureRun
+## The Unnatural run in the session (instead of `run`), and its messages.
+var urun: UnnaturalRun
+var unnatural_net := UnnaturalNet.new()
 ## pid -> {"pid", "peer", "name", "character", "index"}.
 var roster := {}
 ## The last status line (for the menu).
@@ -80,6 +87,8 @@ var _next_index := 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	unnatural_net.coop = self
+	add_child(unnatural_net)
 	var session := get_parent()
 	session.session_started.connect(_on_session_started)
 	session.session_ended.connect(_on_session_ended)
@@ -92,6 +101,8 @@ func attach_main(game: Node) -> void:
 	main = game
 	main.nature_started.connect(_on_nature_started)
 	main.nature_ended.connect(_on_nature_ended)
+	main.unnatural_started.connect(_on_unnatural_started)
+	main.unnatural_ended.connect(_on_unnatural_ended)
 	main._local.players_changed.connect(func(_count: int) -> void: _players_changed())
 	main._panel.tuning_changed.connect(func() -> void:
 		if _is_host():
@@ -112,6 +123,20 @@ func _is_host() -> bool:
 	return NetSession.is_host()
 
 
+## The session's run here: Nature's or Unnatural's (null: none).
+func _game_run() -> Node:
+	if urun and is_instance_valid(urun):
+		return urun
+	if run and is_instance_valid(run):
+		return run
+	return null
+
+
+## Whether this machine is in Unnatural (the mode a session it hosts is in).
+func _in_unnatural() -> bool:
+	return main != null and main.get("current_mode") == "Unnatural"
+
+
 func _set_status(text: String) -> void:
 	status = text
 	status_changed.emit(text)
@@ -130,10 +155,17 @@ func _on_session_started() -> void:
 		_welcomed = true
 		_set_status("Hosting: waiting for friends" if NetSession.backend == NetSession.Backend.STEAM
 				else "Hosting on port %d: waiting for friends" % NetSession.port)
-		main.host_nature_run()
+		var unnatural := _in_unnatural()
+		if unnatural:
+			main.host_unnatural_run()
+		else:
+			main.host_nature_run()
 		for entry in _local_players():
 			_add_to_roster(entry, 1)
-		_hook(main.nature_run)
+		if unnatural:
+			_hook_unnatural(main.unnatural_run)
+		else:
+			_hook(main.nature_run)
 	else:
 		_welcomed = false
 		_set_status("Connected: joining...")
@@ -146,7 +178,9 @@ func _on_session_ended(reason: String) -> void:
 		_set_status(reason)
 		return
 	var was_guest := _welcomed and run and not run.authority
+	var was_unnatural_guest := _welcomed and urun and is_instance_valid(urun) and not urun.authority
 	_unhook()
+	_unhook_unnatural()
 	for pid: int in _remote.keys():
 		_drop_remote(pid)
 	roster.clear()
@@ -160,6 +194,10 @@ func _on_session_ended(reason: String) -> void:
 	if was_guest:
 		_switching = true
 		main.solo_nature_run()  # back to Nature on our own, the world ours again
+		_switching = false
+	elif was_unnatural_guest:
+		_switching = true
+		main.solo_unnatural_run()
 		_switching = false
 
 
@@ -183,6 +221,53 @@ func _on_nature_ended() -> void:
 	_unhook()
 	if is_active() and not _switching:
 		NetSession.leave("Left Nature, so the session ended" if _is_host() else "Left the session")
+
+
+func _on_unnatural_started(unnatural_run: UnnaturalRun) -> void:
+	if is_active() and (_welcomed or _is_host()) and not unnatural_run.test_tank:
+		_hook_unnatural(unnatural_run)
+
+
+func _on_unnatural_ended() -> void:
+	_unhook_unnatural()
+	if is_active() and not _switching:
+		NetSession.leave("Left Unnatural, so the session ended" if _is_host() else "Left the session")
+
+
+## Wires an Unnatural run up to the session (UnnaturalNet), puppets joining it.
+func _hook_unnatural(unnatural_run: UnnaturalRun) -> void:
+	if urun == unnatural_run or unnatural_run == null:
+		return
+	_unhook_unnatural()
+	urun = unnatural_run
+	unnatural_net.hook(urun)
+	urun.restarted.connect(_on_restarted)
+	urun.fish_teleported.connect(_on_teleported)
+	for net: NetFish in _remote.values():
+		if is_instance_valid(net.fish) and net.fish.get_parent() != urun:
+			net.fish.reparent(urun)
+		urun.add_player(net.fish)
+	_sync_puppets()
+
+
+func _unhook_unnatural() -> void:
+	unnatural_net.unhook()
+	if urun == null or not is_instance_valid(urun):
+		urun = null
+		return
+	if urun.restarted.is_connected(_on_restarted):
+		urun.restarted.disconnect(_on_restarted)
+	if urun.fish_teleported.is_connected(_on_teleported):
+		urun.fish_teleported.disconnect(_on_teleported)
+	for net: NetFish in _remote.values():
+		if is_instance_valid(net.fish):
+			urun.remove_player(net.fish)
+	urun = null
+
+
+func _on_teleported(fish: FishController) -> void:
+	if not fish.puppet:
+		_teleports[fish] = _teleports.get(fish, 0) + 1
 
 
 ## Wires a run up to the session: what it does goes out, puppets join it.
@@ -316,11 +401,12 @@ func _sync_puppets() -> void:
 			_remote[pid] = net
 			net.fish.character = entry.character
 			net.fish.display_name = entry.name
-			(run if run else main).add_child(net.fish)
+			var game := _game_run()
+			(game if game else main).add_child(net.fish)
 			net.fish.make_puppet()
 			net.fish.visible = false  # until its first snapshot
-			if run:
-				run.add_player(net.fish)
+			if game:
+				game.add_player(net.fish)
 		if net.fish.character != entry.character:
 			net.fish.character = entry.character
 		net.fish.display_name = entry.name
@@ -331,8 +417,9 @@ func _drop_remote(pid: int) -> void:
 	var net: NetFish = _remote.get(pid)
 	_remote.erase(pid)
 	if net and is_instance_valid(net.fish):
-		if run:
-			run.remove_player(net.fish)
+		var game := _game_run()
+		if game:
+			game.remove_player(net.fish)
 		net.fish.queue_free()
 
 
@@ -356,6 +443,9 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if is_active() and urun and is_instance_valid(urun):
+		_unnatural_tick(delta)
+		return
 	if not is_active() or run == null or not is_instance_valid(run):
 		return
 	for net: NetFish in _remote.values():
@@ -389,6 +479,24 @@ func _physics_process(delta: float) -> void:
 			_send_all("_schools_snap", [_now(), states], false)
 
 
+## Unnatural: the puppets follow their players, ours go out, then UnnaturalNet's.
+func _unnatural_tick(delta: float) -> void:
+	for net: NetFish in _remote.values():
+		if net.has_state() and is_instance_valid(net.fish):
+			net.fish.visible = true
+			net.apply()
+	_send_left -= delta
+	if _send_left <= 0.0:
+		_send_left += 1.0 / SEND_RATE
+		var now := _now()
+		for fish in urun.local_players():
+			var pid := pid_of(fish)
+			if pid >= 0:
+				_send_all("_fish_state", [pid, now, fish.global_position, fish.global_basis.get_rotation_quaternion(),
+						fish.linear_velocity, fish.replay_fx(), _teleports.get(fish, 0)], false)
+	unnatural_net.tick(delta)
+
+
 static func _now() -> float:
 	return Time.get_ticks_usec() / 1e6
 
@@ -404,15 +512,21 @@ func _send_to(peer: int, method: StringName, args: Array, reliable: bool) -> voi
 
 
 func _send(peer: int, method: StringName, args: Array, reliable: bool) -> void:
+	send_from(self, peer, method, args, reliable)
+
+
+## Sends `node`'s RPC `method` (to everyone with `peer` 0), in the one queue
+## (so the simulated lag keeps every reliable message in order, whichever node).
+func send_from(node: Node, peer: int, method: StringName, args: Array, reliable: bool) -> void:
 	if not is_active():
 		return
 	var call := (func() -> void:
-		if not is_active():
+		if not is_active() or not is_instance_valid(node):
 			return
 		if peer == 0:
-			callv("rpc", [method] + args)
+			node.callv("rpc", [method] + args)
 		else:
-			callv("rpc_id", [peer, method] + args))
+			node.callv("rpc_id", [peer, method] + args))
 	var lag := NetSession.lag_ms
 	var jitter := NetSession.jitter_ms
 	if lag <= 0.0 and jitter <= 0.0 and NetSession.loss <= 0.0:
@@ -482,7 +596,8 @@ func _on_target_state(present: bool, at: Transform3D, target_name: String, gener
 
 
 func _on_restarted() -> void:
-	if run and run.authority:
+	var game := _game_run()
+	if game and game.get("authority"):
 		_send_all("_restart", [], true)
 
 
@@ -550,7 +665,7 @@ func _hello(version: int, players: Array) -> void:
 	for entry: Dictionary in players:
 		_add_to_roster(entry, peer)
 	_sync_puppets()
-	_send_to(peer, "_welcome", [roster, _host_tuning(), _world()], true)
+	_send_to(peer, "_welcome", [roster, _host_tuning(), unnatural_net.world() if urun and is_instance_valid(urun) else _world()], true)
 	_send_all("_roster", [roster], true)
 	_set_status("Hosting: %d playing" % roster.size())
 
@@ -601,6 +716,15 @@ func _welcome(host_roster: Dictionary, tuning: Dictionary, world: Dictionary) ->
 	_welcomed = true
 	roster = host_roster
 	_own_tuning = main._panel.tuning_snapshot()
+	if world.get("mode", "nature") == "unnatural":
+		_apply_tuning(tuning)  # before the run: it reads the host's settings as it starts
+		_switching = true
+		main.guest_unnatural_run()  # a run of our own players, the world the host's
+		_switching = false
+		_hook_unnatural(main.unnatural_run)
+		unnatural_net.apply_world(world)
+		_set_status("Playing with %d others" % (roster.size() - _local_players().size()))
+		return
 	_switching = true
 	main.guest_nature_run()  # a run of our own players, the world the host's
 	_switching = false
@@ -645,6 +769,8 @@ func _apply_tuning(sections: Dictionary) -> void:
 func _restart() -> void:
 	if run and not run.authority:
 		run.start()
+	elif urun and is_instance_valid(urun) and not urun.authority:
+		urun.start()
 
 
 @rpc("authority", "call_remote", "reliable")

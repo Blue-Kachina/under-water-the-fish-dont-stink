@@ -1,7 +1,7 @@
 class_name LocalCoop
 extends Node
-## Nature's split-screen co-op: up to MAX_PLAYERS players on one machine, a
-## controller each (PlayerSlot). While a Nature run is on, pressing Back/View
+## Split-screen co-op in Nature and Unnatural: up to MAX_PLAYERS players on one
+## machine, a controller each (PlayerSlot). While a run is on, pressing Back/View
 ## (JOIN_BUTTON) on a controller nobody's using adds a player: their own fish
 ## (a different character, which D-pad left/right changes), camera, HUD,
 ## arcade looks and school wheel, in their own part of the window
@@ -14,10 +14,11 @@ extends Node
 ## Everything tuned in the tuning panel is the first player's, and is copied
 ## to every other player's fish and camera as it changes.
 ##
-## attach_run() wires each player (and anyone joining later) into a NatureRun:
-## their ball cam on their own focus, their school wheel, their HUD's counts;
-## detach_run() undoes it. Leaving Nature drops the extra players
-## (drop_extras()).
+## attach_run() wires each player (and anyone joining later) into a run. A
+## NatureRun: their ball cam on their own focus, their school wheel, their
+## HUD's counts. An UnnaturalRun: the survivor cam and their own UnnaturalHud
+## (mode_hud; the first player's is main's). detach_run() undoes it. Leaving
+## for a mode without co-op drops the extra players (drop_extras()).
 
 signal players_changed(count: int)
 
@@ -31,8 +32,8 @@ const HUD_SCRIPT := preload("res://scripts/hud.gd")
 const CAMERA_OWN := ["fish"]
 
 var slots: Array[PlayerSlot] = []
-## The run the players are in (null: none, and no joining).
-var run: NatureRun
+## The run the players are in (a NatureRun or an UnnaturalRun; null: none, and no joining).
+var run: Node
 ## The tuning panel (DebugPanel), whose tuning every player gets.
 var panel: Node
 
@@ -98,7 +99,7 @@ func _joinable_pad(pad: int) -> bool:
 	return not (pads.size() == 1 and pads[0] == pad and slots.size() == 1)
 
 
-## Joining is open: a Nature run on, with room, and a controller to spare.
+## Joining is open: a run on, with room, and a controller to spare.
 func can_join() -> bool:
 	return is_instance_valid(run) and slots.size() < MAX_PLAYERS and not get_tree().paused
 
@@ -211,9 +212,18 @@ func drop_extras() -> void:
 			leave(slot)
 
 
-## Wires every player into `nature_run` (see the class description).
-func attach_run(nature_run: NatureRun) -> void:
-	run = nature_run
+## Wires every player into `game_run` (see the class description).
+func attach_run(game_run: Node) -> void:
+	run = game_run
+	run.fish_teleported.connect(func(fish: FishController) -> void:
+		var slot := slot_of(fish)
+		if slot:
+			slot.camera.snap())
+	if run is UnnaturalRun:
+		for slot in slots:
+			_wire(slot)
+		_refresh_views()
+		return
 	run.focus_changed.connect(func(focus: Node3D, fish: FishController) -> void:
 		var slot := slot_of(fish)
 		if slot:
@@ -224,10 +234,6 @@ func attach_run(nature_run: NatureRun) -> void:
 		var chain: int = event.get("chain", 0)
 		if slot and is_instance_valid(slot.arcade) and (event.type == NatureScore.SPREE or chain >= 3):
 			slot.arcade.punch(1.0 if event.type == NatureScore.SPREE else minf(0.4 + 0.15 * chain, 1.2)))
-	run.fish_teleported.connect(func(fish: FishController) -> void:
-		var slot := slot_of(fish)
-		if slot:
-			slot.camera.snap())
 	for slot in slots:
 		_wire(slot)
 
@@ -240,31 +246,58 @@ func detach_run() -> void:
 
 
 func _wire(slot: PlayerSlot) -> void:
+	if run is UnnaturalRun:
+		_wire_unnatural(slot)
+		return
+	var nature := run as NatureRun
 	var camera := slot.camera
-	camera.ball = run.focus_of(slot.fish)
+	camera.ball = nature.focus_of(slot.fish)
 	camera.ball_cam = true
 	# Ball cam: a tap looks at the nearest thing ahead, holding opens the school wheel.
 	camera.hold_opens_wheel = true
 	var fish := slot.fish
 	var toggled := func(on: bool) -> void:
-		if on and is_instance_valid(run):
-			run.pick_focus(fish)
+		if on and is_instance_valid(nature):
+			nature.pick_focus(fish)
 	camera.set_meta("coop_toggled", toggled)
 	camera.ball_cam_toggled.connect(toggled)
 	slot.wheel = TargetWheel.new()
 	slot.wheel.name = "TargetWheel" if slot.index == 0 else "TargetWheel%d" % (slot.index + 1)
 	slot.wheel.camera = camera
-	slot.wheel.run = run
+	slot.wheel.run = nature
 	slot.wheel.fish = fish
 	camera.get_parent().add_child(slot.wheel)
 	camera.wheel_opened.connect(slot.wheel.open)
 	camera.wheel_closed.connect(slot.wheel.close)
-	slot.hud.set_nature(run)
+	slot.hud.set_nature(nature)
+
+
+## Unnatural: the survivor cam, and (past the first player) their own HUD in their view.
+func _wire_unnatural(slot: PlayerSlot) -> void:
+	var unnatural := run as UnnaturalRun
+	slot.camera.ball = null
+	slot.camera.ball_cam = false
+	UnnaturalRun.steady_camera(slot.camera, true, unnatural.settings)
+	if slot.index > 0 and not is_instance_valid(slot.mode_hud):
+		var hud := UnnaturalHud.new()
+		hud.name = "UnnaturalHud%d" % (slot.index + 1)
+		hud.run = unnatural
+		hud.fish = slot.fish
+		slot.mode_hud = hud
+		slot.camera.get_parent().add_child(hud)
+	if slot.mode_hud is UnnaturalHud:
+		(slot.mode_hud as UnnaturalHud).player_camera = slot.camera  # its follow / free cam note
 
 
 func _unwire(slot: PlayerSlot) -> void:
 	var camera := slot.camera
 	if not is_instance_valid(camera):
+		return
+	if run is UnnaturalRun:
+		UnnaturalRun.steady_camera(camera, false, (run as UnnaturalRun).settings)
+		if slot.index > 0 and is_instance_valid(slot.mode_hud):
+			slot.mode_hud.queue_free()
+		slot.mode_hud = null
 		return
 	camera.ball = null
 	camera.hold_opens_wheel = false
@@ -295,6 +328,12 @@ func _ensure_split() -> void:
 	for node in slots[0].view_nodes():
 		node.reparent(view, false)
 	slots[0].camera.make_current()
+
+
+## Every player's views where they belong now (a node added since the split).
+func _refresh_views() -> void:
+	if _split:
+		_rebuild_views()
 
 
 ## Views in slot order again (after someone leaves); one player: the whole window.

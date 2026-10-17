@@ -29,6 +29,8 @@ var _specks_material := ShaderMaterial.new()
 var _env: Environment
 ## The fog as configured, before any edge shift: [colour, density].
 var _fog_base := []
+## How far the fog's shifted to the edge's now (0..1).
+var _edge_amount := 0.0
 
 
 func _ready() -> void:
@@ -42,6 +44,22 @@ func _process(_delta: float) -> void:
 		if boundary_radius > 0.0:
 			var inside := boundary_radius * (1.0 - EDGE_FADE)
 			_shift_fog(smoothstep(inside, boundary_radius * 1.1, camera.global_position.distance_to(boundary_center)))
+
+
+## The environment it configured (null before configure_environment()).
+func environment() -> Environment:
+	return _env
+
+
+## The fog before any edge shift: [colour, density] (empty before configure_environment()).
+func fog_base() -> Array:
+	return _fog_base.duplicate()
+
+
+## A new fog to shift from (Unnatural's blood moon), applied at once.
+func set_fog_base(color: Color, density: float) -> void:
+	_fog_base = [color, density]
+	_shift_fog(_edge_amount)
 
 
 func spawn_transform() -> Transform3D:
@@ -96,6 +114,7 @@ func _build_specks() -> void:
 
 ## Shifts the fog `amount` (0..1) of the way to the edge's.
 func _shift_fog(amount: float) -> void:
+	_edge_amount = amount
 	if _env == null or _fog_base.is_empty():
 		return
 	_env.fog_light_color = (_fog_base[0] as Color).lerp(EDGE_FOG_COLOR, amount)

@@ -544,6 +544,17 @@ var _puppet_velocity := Vector3.ZERO
 var _puppet_fx := PackedFloat32Array()
 ## No input at all while set, e.g. during a kickoff countdown.
 var controls_locked := false
+## A mode's multipliers on the tuned swimming (Unnatural's swim speed and
+## stride power upgrades): on max_speed and forward_accel, and on stride_force.
+## Not tuning, so never saved with it.
+var speed_scale := 1.0
+var stride_scale := 1.0
+## Likewise on the bow wave's length and girth (Unnatural's Bow Grow Bow).
+var bow_scale := 1.0
+## Likewise on turning in water (turn rate and spin cap) and on the water's
+## drag (linear and overspeed): Unnatural's Nimble and Glide twists.
+var turn_scale := 1.0
+var drag_scale := 1.0
 ## Boost after a reset (RL: 33.3 at a kickoff or a respawn in a match).
 var spawn_boost := 100.0
 ## Tints the body in a team's colour; fully transparent for the character's own.
@@ -989,6 +1000,12 @@ func swim_velocity() -> Vector3:
 	return _puppet_velocity if puppet else linear_velocity
 
 
+## Shows or hides just its model (Unnatural's i-frame flicker), not the fish.
+func set_model_visible(on: bool) -> void:
+	if _visual:
+		_visual.visible = on
+
+
 ## Shown, not simulated, from now on (see `puppet`): frozen in place as a
 ## kinematic body, moved only by set_net_state().
 func make_puppet() -> void:
@@ -1104,7 +1121,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	# Capping the last step's result here, before anything reads it, does the same.
 	if puppet:
 		return  # placed by set_net_state()
-	var spin_cap := RL_MAX_ANGULAR_SPEED if rl_roll_timing else max_angular_speed * (powerslide_turn_multiplier if is_powersliding else 1.0)
+	var spin_cap := RL_MAX_ANGULAR_SPEED if rl_roll_timing else max_angular_speed * (powerslide_turn_multiplier if is_powersliding else 1.0) * turn_scale
 	# The ball's contact push belongs to the step that just ran, before the caps.
 	state.linear_velocity += _ball_push
 	state.angular_velocity += _ball_twist
@@ -1225,9 +1242,9 @@ func _apply_thrust(velocity: Vector3, forward: Vector3, dt: float) -> Vector3:
 	# brake the dodge; it pauses until the flip is over. Boost never pauses: it
 	# always pushes the way the fish is facing, as in Rocket League.
 	if not is_dodging:
-		if input_forward > 0.0 and along < max_speed:
+		if input_forward > 0.0 and along < max_speed * speed_scale:
 			var thrust_scale := powerslide_thrust_scale if is_powersliding else 1.0
-			accel += forward_accel * input_forward * thrust_scale
+			accel += forward_accel * speed_scale * input_forward * thrust_scale
 		if input_reverse > 0.0:
 			if along > 0.5:
 				accel -= brake_accel * input_reverse
@@ -1651,11 +1668,12 @@ func _apply_water(velocity: Vector3, forward: Vector3, dt: float) -> Vector3:
 	var current := velocity.length()
 	var stroking := swishy.power > 0.0 if swim_style == SwimStyle.EXTRA_SWISHY else stroke_chain >= 2
 	var swimming := input_forward > 0.0 or is_boosting or stroking
-	if swimming and current > max_speed:
+	var cruise := max_speed * speed_scale
+	if swimming and current > cruise:
 		# Only the speed earned above cruise fades; cruise itself is held.
-		velocity *= (max_speed + (current - max_speed) * exp(-overspeed_drag * dt)) / current
+		velocity *= (cruise + (current - cruise) * exp(-overspeed_drag * drag_scale * dt)) / current
 	else:
-		velocity *= exp(-linear_drag * dt)
+		velocity *= exp(-linear_drag * drag_scale * dt)
 	var slip := velocity - forward * velocity.dot(forward)
 	velocity -= slip * (1.0 - exp(-_effective_lateral_drag(dt) * dt))
 	velocity.y += buoyancy * dt
@@ -1869,7 +1887,7 @@ func _apply_rotation(local_spin: Vector3, dt: float) -> Vector3:
 	var pitch_rate := local_spin.x
 	var yaw_rate := -local_spin.y
 	var roll_rate := -local_spin.z
-	var turn := powerslide_turn_multiplier if is_powersliding else 1.0
+	var turn := (powerslide_turn_multiplier if is_powersliding else 1.0) * turn_scale
 	var water := exp(-angular_drag * dt)
 	if direction_lock_held:
 		# Locked: no turning; just hold the nose on the locked direction
@@ -2088,8 +2106,8 @@ func _process(delta: float) -> void:
 ## for a convex shape. Its size: (half width, half height, reach ahead).
 func bow_size() -> Vector3:
 	var half := (_collision.shape as BoxShape3D).size / 2.0
-	var girth := lerpf(1.1, bow_girth, bow_amount)
-	return Vector3(half.x, maxf(half.y, half.x * 0.7), 0.0) * girth + Vector3(0.0, 0.0, half.z + lerpf(0.1, bow_length, bow_amount))
+	var girth := lerpf(1.1, bow_girth * bow_scale, bow_amount)
+	return Vector3(half.x, maxf(half.y, half.x * 0.7), 0.0) * girth + Vector3(0.0, 0.0, half.z + lerpf(0.1, bow_length * bow_scale, bow_amount))
 
 
 func bow_points() -> PackedVector3Array:

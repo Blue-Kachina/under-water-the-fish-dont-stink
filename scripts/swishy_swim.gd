@@ -201,4 +201,4 @@ func apply(velocity: Vector3, basis: Basis, dt: float) -> Vector3:
 	var sweep := basis.x * _dir.x - basis.y * _dir.y
 	var angle := deg_to_rad(fish.stride_side_angle)
 	var push := forward * cos(angle) - sweep.normalized() * sin(angle)
-	return velocity + push * fish.stride_force * power * strength * reach_scale() * room * dt
+	return velocity + push * fish.stride_force * fish.stride_scale * power * strength * reach_scale() * room * dt

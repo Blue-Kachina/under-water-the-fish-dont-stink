@@ -16,6 +16,8 @@ var camera: Camera3D
 var hud: CanvasLayer
 var arcade: ArcadeFx
 var wheel: TargetWheel
+## The mode's own HUD for this player (Unnatural's UnnaturalHud), if any.
+var mode_hud: CanvasLayer
 ## How long (s) the leave button's been held (players past the first leave by holding it).
 var leave_held := 0.0
 
@@ -23,7 +25,7 @@ var leave_held := 0.0
 ## The nodes drawn in the slot's view.
 func view_nodes() -> Array[Node]:
 	var nodes: Array[Node] = []
-	for node: Node in [camera, hud, arcade, wheel]:
+	for node: Node in [camera, hud, arcade, wheel, mode_hud]:
 		if is_instance_valid(node):
 			nodes.append(node)
 	return nodes

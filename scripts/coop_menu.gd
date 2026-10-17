@@ -50,7 +50,8 @@ func _ready() -> void:
 	_panel.add_child(column)
 
 	var title := Label.new()
-	title.text = "CO-OP ONLINE  ·  NATURE"
+	var game: Node = NetSession.coop.main
+	title.text = "CO-OP ONLINE  ·  %s" % ("UNNATURAL" if game and game.get("current_mode") == "Unnatural" else "NATURE")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 24)
 	column.add_child(title)

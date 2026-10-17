@@ -7,7 +7,9 @@ extends Node3D
 ## and within absorb_radius it's absorbed, streaming into the fish (collected).
 ## Left alone, it flickers through its last seconds and fades.
 ##
-## Values come from NatureSettings, live. For now pearls are only counted.
+## Values come from NatureSettings, live. In Nature pearls are only counted;
+## in Unnatural (UnnaturalRun) they're XP pearls, worth `value` XP, and with
+## hundreds out their lights go off (set_light()).
 
 signal collected(pearl: Pearl, by: FishController)
 
@@ -27,6 +29,8 @@ var age := 0.0
 var velocity := Vector3.ZERO
 ## Being absorbed into this fish (null: not yet).
 var absorbing: FishController
+## What it's worth (Unnatural's XP).
+var value := 1.0
 
 var _body := MeshInstance3D.new()
 var _aura := MeshInstance3D.new()
@@ -81,6 +85,11 @@ func _init(pearl_settings: NatureSettings) -> void:
 func _ready() -> void:
 	_base = global_position
 	_resize()
+
+
+## Its own light on or off (the glow and aura stay).
+func set_light(on: bool) -> void:
+	_light.visible = on
 
 
 ## Seconds before it fades away.

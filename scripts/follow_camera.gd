@@ -9,6 +9,17 @@ extends Camera3D
 ## with a level horizon. It falls back to the normal view while there's no ball.
 ## On the obstacle course the same toggle is ring cam: it aims at the next hoop.
 ##
+## A mode can steady it (steady_heading, Unnatural's survivor cam): it then
+## follows the way the fish swims (its velocity, smoothed over heading_rate)
+## rather than its facing, so stride sweeps don't swing the view, with its
+## climb damped (heading_climb), and sits extra_distance further back,
+## extra_height higher and extra_angle more tilted than the tuned view.
+## The survivor cam has two modes, swapped with the ball cam button:
+## - follow cam: turns with the way the fish swims, but while hold_on_throttle
+##   it holds its direction as long as accelerate or reverse is held;
+## - free cam (free_cam): only the right stick turns it, and it stays where
+##   it's put (free_follow_rate can still drift it round behind the fish).
+##
 ## As in Rocket League, it keeps its full distance in the match tank instead of
 ## pulling in at the walls, so it can end up outside them: the tank's walls are
 ## see-through glass (AquariumArena.SEE_THROUGH_GROUP). It still keeps above
@@ -35,6 +46,8 @@ signal ball_cam_toggled(on: bool)
 ## again (hold_opens_wheel).
 signal wheel_opened
 signal wheel_closed
+## The survivor cam swapped between follow cam and free cam (its button).
+signal survivor_cam_swapped(free: bool)
 
 @export var fish: FishController
 ## Followed instead of the fish while set, e.g. a replay's ghost (ReplayCar),
@@ -59,6 +72,24 @@ var wheel_open := false
 ## and the keyboard; in local co-op its player's own (PlayerInput).
 var input: PlayerInput
 var _ball_cam_held := -1.0
+## Set by a mode (see the class description); not tuning, so never saved.
+var steady_heading := false
+var heading_rate := 2.5
+var heading_climb := 0.5
+var extra_distance := 0.0
+var extra_height := 0.0
+var extra_angle := 0.0
+## The survivor cam's modes (see the class description).
+var free_cam := false
+var hold_on_throttle := true
+## Free cam: the right stick's turn rate at full tilt (rad/s), how far it can
+## look up or down (rad), and its drift round to the way the fish swims (1/s).
+var free_turn_speed := 2.6
+var free_pitch_limit := 1.2
+var free_follow_rate := 0.0
+## The smoothed way the fish swims, while steady_heading (free cam: where the
+## stick has put the view).
+var _heading := Vector3.FORWARD
 ## Set by the environment: the camera keeps collision_margin above this
 ## (the see-through tank's floor). -INF: no floor of its own to keep above.
 var floor_height := -INF
@@ -173,6 +204,7 @@ func snap() -> void:
 	if absf(forward.dot(_up)) > 0.99:
 		_up = xform.basis.y
 	_rotation = Basis.looking_at(forward, _up).get_rotation_quaternion()
+	_heading = forward
 	_spin = Vector3.ZERO
 	_lag = Vector3.ZERO
 	_lag_speed = Vector3.ZERO
@@ -218,6 +250,12 @@ func set_ball_cam(on: bool) -> void:
 ## toggles on a short press's release instead, and holding it wheel_hold_time
 ## opens the wheel until it's let go.
 func _ball_cam_button(delta: float) -> void:
+	if steady_heading and not hold_opens_wheel:
+		# The survivor cam has no ball: the button swaps its modes instead.
+		if _player_input().just_pressed("ball_cam"):
+			free_cam = not free_cam
+			survivor_cam_swapped.emit(free_cam)
+		return
 	if not hold_opens_wheel:
 		_ball_cam_held = -1.0
 		if wheel_open:
@@ -268,12 +306,14 @@ func _process(delta: float) -> void:
 	# (Holding, the camera's own turning eases to a stop.)
 	var target_rotation := _rotation
 	var rate := rotation_stiffness
-	if tracking_ball or (_follows_rotation(subject) and (follow_dodge_spin or not subject.is_flipping())):
+	# The survivor cam steers by its own heading, swimming or not: RL's hold in
+	# the air would freeze it for a whole swim (the open sea counts as air).
+	if tracking_ball or steady_heading or (_follows_rotation(subject) and (follow_dodge_spin or not subject.is_flipping())):
 		# Aim where the fish faces, but with the camera's own (levelled) up
 		# rather than the fish's full orientation. Turning to face backwards
 		# after a half flip is then a level swing around, not a tumble over the
 		# top, which would flip the view as it passed straight up.
-		var target_forward := to_ball.normalized() if tracking_ball else -fish_xform.basis.z
+		var target_forward := to_ball.normalized() if tracking_ball else _chase_forward(subject, fish_xform, delta)
 		var frame_up := fish_up if surface_roll and absf(target_forward.dot(fish_up)) < 0.95 else _target_up(target_forward, fish_up, tracking_ball, _up)
 		target_rotation = Basis.looking_at(target_forward, frame_up).get_rotation_quaternion()
 		# A ball cam toggle swings over at the transition speed instead.
@@ -313,8 +353,8 @@ func _process(delta: float) -> void:
 	_up = up
 
 	var look_input := _player_input().vector("camera_left", "camera_right", "camera_up", "camera_down")
-	if wheel_open:
-		look_input = Vector2.ZERO  # the stick is picking on the wheel
+	if wheel_open or (steady_heading and free_cam):
+		look_input = Vector2.ZERO  # the stick is picking on the wheel, or turning the free cam
 	var look_blend := 1.0 - exp(-swivel_speed * SWIVEL_RATE * delta)
 	_look_yaw = lerpf(_look_yaw, -look_input.x * look_yaw_range, look_blend)
 	_look_pitch = lerpf(_look_pitch, -look_input.y * look_pitch_range, look_blend)
@@ -329,9 +369,9 @@ func _process(delta: float) -> void:
 		var lagged := _spring_step(lag_error[axis], _lag_speed[axis], 2.0 * LAG_RATE, delta)
 		_lag[axis] = lag_target[axis] + lagged.x
 		_lag_speed[axis] = lagged.y
-	var anchor := fish_xform.origin + view.y * height
-	var eye := fish_xform.origin + view * Vector3(0.0, height, distance) + _lag
-	var look_basis := view * Basis(Vector3.RIGHT, deg_to_rad(angle))
+	var anchor := fish_xform.origin + view.y * (height + extra_height)
+	var eye := fish_xform.origin + view * Vector3(0.0, height + extra_height, distance + extra_distance) + _lag
+	var look_basis := view * Basis(Vector3.RIGHT, deg_to_rad(angle + extra_angle))
 
 	# Keep clear of solid walls (not the see-through tank): sweep a sphere from the fish up to the anchor (which
 	# can be inside a wall or ceiling the fish is up against), then from there
@@ -343,6 +383,56 @@ func _process(delta: float) -> void:
 	eye.y = maxf(eye.y, floor_height + collision_margin)
 
 	global_transform = Transform3D(look_basis.orthonormalized(), eye)
+
+
+## Where the chase view faces: the fish's nose, or while steady_heading the
+## way it swims, smoothed, its climb damped (follow cam; held while the fish
+## is driven, with hold_on_throttle), or where the right stick puts it (free cam).
+func _chase_forward(subject: Variant, fish_xform: Transform3D, delta: float) -> Vector3:
+	var facing := -fish_xform.basis.z
+	if not steady_heading:
+		return facing
+	if free_cam:
+		if free_follow_rate > 0.0:
+			_ease_heading(subject, facing, free_follow_rate, delta)
+		return _free_heading(delta)
+	if hold_on_throttle and _throttle_held():
+		return _heading
+	_ease_heading(subject, facing, heading_rate, delta)
+	return _heading
+
+
+## Turns _heading toward the way the fish swims (its nose when slow), its climb
+## damped by heading_climb, at `rate` (1/s).
+func _ease_heading(subject: Variant, facing: Vector3, rate: float, delta: float) -> void:
+	var velocity: Vector3 = subject.linear_velocity
+	var wanted := velocity if velocity.length() > 2.0 else facing
+	wanted.y *= heading_climb
+	if wanted.length_squared() < 0.0001:
+		return
+	wanted = wanted.normalized()
+	if _heading.dot(wanted) < -0.999:
+		_heading = (_heading + Vector3(0.01, 0.0, 0.01)).normalized()  # dead behind: any way round
+	_heading = _heading.slerp(wanted, 1.0 - exp(-rate * delta)).normalized()
+
+
+## The free cam: the right stick turns _heading (yaw and pitch, the pitch
+## within free_pitch_limit), and it stays put when the stick's let go.
+func _free_heading(delta: float) -> Vector3:
+	var stick := Vector2.ZERO if wheel_open else _player_input().vector("camera_left", "camera_right", "camera_up", "camera_down")
+	var flat := Vector3(_heading.x, 0.0, _heading.z)
+	var yaw := atan2(-flat.x, -flat.z) if flat.length_squared() > 1e-8 else 0.0
+	var pitch := asin(clampf(_heading.y, -1.0, 1.0))
+	yaw -= stick.x * free_turn_speed * delta
+	pitch = clampf(pitch - stick.y * free_turn_speed * delta, -free_pitch_limit, free_pitch_limit)
+	_heading = Vector3.FORWARD.rotated(Vector3.RIGHT, pitch).rotated(Vector3.UP, yaw)
+	return _heading
+
+
+## Accelerate or reverse is held (the follow cam holds its direction meanwhile).
+func _throttle_held() -> bool:
+	var controls := _player_input()
+	return controls.strength("thrust_forward") > 0.1 or controls.strength("thrust_reverse") > 0.1
 
 
 ## What ball cam aims at: the ball, or on the course its next hoop (ring cam).

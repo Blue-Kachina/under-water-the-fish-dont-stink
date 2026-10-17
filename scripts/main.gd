@@ -4,11 +4,12 @@ extends Node3D
 ## panel. The mode (picked in the tuning panel) decides the environment: Free Play and
 ## 1v1 (against a bot, Match1v1) in the Aquarium Arena, Free Swim and Nature
 ## (Extra Swishy strides after a fish to batter, NatureRun) and Hunt (a 1v1
-## on Nature's tuning against a hostile fish, HuntMatch) in the Ocean, the
-## Obstacle Course, and Replays.
+## on Nature's tuning against a hostile fish, HuntMatch) and Unnatural (zombie
+## fish under a blood moon, a survivors mode on Nature's tuning, UnnaturalRun)
+## in the Ocean, the Obstacle Course, and Replays.
 ##
 ## Match modes (MATCH_MODES) start on a card (MatchCard) with the fish sitting
-## out; its Play starts the match (play_match). Nature and Hunt play on Nature's
+## out; its Play starts the match (play_match). Nature, Hunt and Unnatural play on Nature's
 ## tuning (NATURE_PRESET), and leaving them puts the tuning from before back.
 ## Changes made to the tuning while in them are kept for the next time (until
 ## the game closes).
@@ -24,6 +25,8 @@ extends Node3D
 ## A Nature run started (Play, a restart doesn't count), or ended.
 signal nature_started(run: NatureRun)
 signal nature_ended
+signal unnatural_started(run: UnnaturalRun)
+signal unnatural_ended
 
 ## Environment name -> script. Each script builds its own world and provides
 ## spawn_transform() and configure_environment(env).
@@ -38,13 +41,15 @@ const ONE_V_ONE := "1v1"
 const FREE_SWIM := "Free Swim (Ocean)"
 const NATURE := "Nature"
 const HUNT := "Hunt"
+const UNNATURAL := "Unnatural"
+const TEST_TANK := "Test Tank"
 const OBSTACLE_COURSE := "Obstacle Course"
 const REPLAYS := "Replays"
-const MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, NATURE, HUNT, OBSTACLE_COURSE, REPLAYS]
+const MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, NATURE, HUNT, UNNATURAL, TEST_TANK, OBSTACLE_COURSE, REPLAYS]
 ## Modes played as a match, which wait on a card for Play.
-const MATCH_MODES := [ONE_V_ONE, NATURE, HUNT]
+const MATCH_MODES := [ONE_V_ONE, NATURE, HUNT, UNNATURAL, TEST_TANK]
 ## Modes played on Nature's tuning.
-const NATURE_MODES := [NATURE, HUNT]
+const NATURE_MODES := [NATURE, HUNT, UNNATURAL, TEST_TANK]
 ## Nature's tuning: Extra Swishy strides, no boost.
 const NATURE_PRESET := "res://presets/nature.cfg"
 ## Mode -> the environment it's played in.
@@ -54,6 +59,8 @@ const MODE_ENVIRONMENTS := {
 	FREE_SWIM: "Ocean",
 	NATURE: "Ocean",
 	HUNT: "Ocean",
+	UNNATURAL: "Ocean",
+	TEST_TANK: "Ocean",
 	OBSTACLE_COURSE: "Obstacle Course",
 	REPLAYS: "Aquarium Arena",
 }
@@ -73,6 +80,9 @@ var match_1v1: Match1v1
 var nature_run: NatureRun
 ## The Hunt match being played, if any.
 var hunt_match: HuntMatch
+## The Unnatural run being played, if any, and its HUD.
+var unnatural_run: UnnaturalRun
+var _unnatural_hud: UnnaturalHud
 ## The first player's school wheel and edge arrows, while a Nature run is on.
 var _target_wheel: TargetWheel:
 	get:
@@ -221,6 +231,8 @@ func set_character(character: FishCharacter.Family) -> void:
 		nature_run.start()
 	elif hunt_match:
 		hunt_match.kickoff()
+	elif unnatural_run:
+		unnatural_run.start()
 	else:
 		_fish.set_spawn(_environment.spawn_transform())
 	_panel.set_character(character)
@@ -233,6 +245,9 @@ func set_character(character: FishCharacter.Family) -> void:
 func _process(_delta: float) -> void:
 	if Input.is_action_just_pressed("reset"):
 		reset_play()
+	if unnatural_run:
+		for slot in _local.slots:
+			UnnaturalRun.steady_camera(slot.camera, true, unnatural_run.settings)  # live from the panel
 
 
 ## R or the pause menu's reset: a 1v1 back to a kickoff, otherwise the fish
@@ -253,6 +268,10 @@ func reset_play() -> void:
 	if hunt_match:
 		hunt_match.restart()
 		return
+	if unnatural_run:
+		if unnatural_run.authority:
+			unnatural_run.start()  # online, the host's restart is everyone's
+		return
 	_fish.set_spawn(_environment.spawn_transform())  # re-read: the aquarium's depends on the ball type
 	if _environment is Arena:
 		(_environment as Arena).reset_course()
@@ -268,6 +287,8 @@ func _reset_label() -> String:
 		return "Restart kickoff"
 	if hunt_match:
 		return "Restart match"
+	if unnatural_run:
+		return "Reset the tank" if unnatural_run.test_tank else "Restart run"
 	return "Restart" if nature_run else "Reset"
 
 
@@ -477,6 +498,10 @@ static func _match_card_text(mode: String) -> String:
 			return "Swim like a fish: no boost here. Hold throttle and sweep the stick from side to side (any direction, as long as each sweep goes back the other way). Each stride builds to a peak, when its glow flashes; sweep back right then and the next stride pushes harder. Keep it up and the push builds. Ram the fish your camera's locked on fast enough to batter it."
 		HUNT:
 			return "Hunt: 1v1 in open water, %d minutes on the clock. Batter your opponent (ram it nose first, fast) to score, and watch out: it's out to batter you too. Batter each other at once and it's a Fish Fry. Close calls, dodges and runs of perfect strides earn points, and level on goals, points decide it." % int(HuntMatch.MATCH_TIME / 60.0)
+		TEST_TANK:
+			return "Test Tank: Unnatural's shooting range. Immortal dummies wait ahead (a cluster, and lines at 10, 20 and 40 m) and the DPS readout shows each damage source. Set your level, every stat, the dummies and a chasing horde in the tuning panel's UNNATURAL > Test Tank. R resets."
+		UNNATURAL:
+				return "Unnatural: there's a blood moon tonight, and every fish in the sea has turned but you. Survive the zombie horde. Your fish bites on its own: huge ghost jaws snap on whatever's ahead. Ram them at speed to batter them too (it doesn't hurt you), but any other touch does. Swim through the XP pearls they drop to level up."
 	return mode
 
 
@@ -533,8 +558,8 @@ func set_mode(mode: String, remember := true) -> void:
 ## Shows a match mode's card (the match starts on Play), or ends the match
 ## (or card) outside one.
 func _apply_mode() -> void:
-	if current_mode != NATURE and _local:
-		_local.drop_extras()  # split-screen co-op is Nature's
+	if current_mode not in [NATURE, UNNATURAL] and _local:
+		_local.drop_extras()  # split-screen co-op is Nature's and Unnatural's
 	_use_nature_tuning(current_mode in NATURE_MODES)
 	var wanted: bool = current_mode in MATCH_MODES and current_environment == MODE_ENVIRONMENTS[current_mode]
 	if wanted:
@@ -560,7 +585,7 @@ func _apply_mode() -> void:
 
 ## A match, a Nature run or a Hunt is on.
 func _playing() -> bool:
-	return match_1v1 != null or nature_run != null or hunt_match != null
+	return match_1v1 != null or nature_run != null or hunt_match != null or unnatural_run != null
 
 
 ## The mode of the match being played ("" when none).
@@ -569,6 +594,8 @@ func _playing_mode() -> String:
 		return ONE_V_ONE
 	if nature_run:
 		return NATURE
+	if unnatural_run:
+		return TEST_TANK if unnatural_run.test_tank else UNNATURAL
 	return HUNT if hunt_match else ""
 
 
@@ -593,6 +620,9 @@ func _start_match() -> void:
 		return
 	if current_mode == HUNT:
 		_start_hunt()
+		return
+	if current_mode in [UNNATURAL, TEST_TANK]:
+		_start_unnatural(current_mode == TEST_TANK)
 		return
 	match_1v1 = Match1v1.new()
 	match_1v1.name = "Match"
@@ -670,7 +700,72 @@ func _start_hunt() -> void:
 	_hud.set_hunt(hunt_match)
 
 
+## Online co-op's host in Unnatural: a run of ours, the world run here.
+func host_unnatural_run() -> void:
+	set_mode(UNNATURAL)
+	if unnatural_run and unnatural_run.authority and not unnatural_run.test_tank:
+		return
+	_end_match()
+	_close_match_card()
+	_start_unnatural(false, true)
+
+
+## Online co-op's guest in Unnatural: a run of our players in the host's world.
+func guest_unnatural_run() -> void:
+	set_mode(UNNATURAL)
+	_end_match()
+	_close_match_card()
+	_start_unnatural(false, false)
+
+
+## Back from being a guest: Unnatural on our own again, the world ours.
+func solo_unnatural_run() -> void:
+	if current_mode != UNNATURAL:
+		return
+	_end_match()
+	_close_match_card()
+	_start_unnatural(false, true)
+
+
+## Unnatural (or its Test Tank): the run with every local player (LocalCoop),
+## its HUD, and the survivor cam. The world's run here (`authority`) unless
+## this is an online session's guest.
+func _start_unnatural(test_tank := false, authority := true) -> void:
+	unnatural_run = UnnaturalRun.new()
+	unnatural_run.name = "TestTank" if test_tank else "Unnatural"
+	unnatural_run.test_tank = test_tank
+	unnatural_run.authority = authority
+	unnatural_run.setup(_environment as Ocean, _fish)
+	for slot in _local.slots:
+		slot.fish.set_meta("coop_index", slot.index)
+		if slot.index > 0:
+			unnatural_run.players.append(slot.fish)
+	_environment.add_child(unnatural_run)
+	_camera.ball = null
+	_camera.ball_cam = false
+	UnnaturalRun.steady_camera(_camera, true, unnatural_run.settings)
+	_camera.snap()
+	_unnatural_hud = UnnaturalHud.new()
+	_unnatural_hud.name = "UnnaturalHud"
+	_unnatural_hud.run = unnatural_run
+	_unnatural_hud.fish = _fish
+	add_child(_unnatural_hud)
+	_local.slots[0].mode_hud = _unnatural_hud
+	_local.attach_run(unnatural_run)  # each player's survivor cam and HUD
+	unnatural_started.emit(unnatural_run)
+
+
 func _end_match() -> void:
+	if unnatural_run:
+		_local.detach_run()
+		_local.slots[0].mode_hud = null
+		UnnaturalRun.steady_camera(_camera, false, unnatural_run.settings)
+		unnatural_run.end()
+		unnatural_run.queue_free()
+		unnatural_run = null
+		_unnatural_hud.queue_free()
+		_unnatural_hud = null
+		unnatural_ended.emit()
 	if hunt_match:
 		hunt_match.end()
 		hunt_match.queue_free()

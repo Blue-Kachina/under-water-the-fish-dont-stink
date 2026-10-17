@@ -1,0 +1,787 @@
+class_name Horde
+extends Node3D
+## Unnatural's zombie fish at scale (planning_unnatural.md §2): a sibling of
+## School, minus the formation. Thousands of enemies, so no node per enemy: the
+## zombies are a struct of arrays, pre-sized to `capacity` and reused (dead
+## slots go on a free list), stepped at settings.sim_rate and drawn between
+## the last two steps every frame through one MultiMesh per kind per tail pose
+## (SchoolLook's baked looks), with a rot overlay (zombie_overlay.gdshader)
+## whose per-instance data carries the hit flash, the death fade and the elite
+## glow.
+##
+## Each step every zombie seeks its target (the nearest chaseable player in
+## `targets`, re-picked every RETARGET_STEPS steps) its kind's way
+## (EnemyKind.Behaviour): swarmers weave as they come, rays glide wide and cut
+## across the player's path (leading them), swordfish stalk to lunge_range,
+## telegraph (a red glow, slowing), lunge in a straight line and rest; the
+## rest chase. Each pushes apart from the
+## others in its grid bucket (HordeGrid, rebuilt each step) so the horde
+## spreads into a wall, drifts a little (wander) and stays in the arena's
+## disc and depth band. Zombies far from every player (far_distance) steer only
+## every far_update_divisor-th step. The grid also answers the attacks' and
+## contact damage's queries (query_sphere(), nearest_in_cone()).
+##
+## damage() hurts one; at 0 hp it dies (killed), fades over DYING_TIME and its
+## slot is freed. Immortal zombies (all of them with `immortal`, or one
+## spawned so: the Test Tank's dummies) take hits but never die: a hit that
+## would have killed one says so (would_kill) and its hp starts again.
+##
+## Proxies (spawn_proxy()) are a boss's body parts: undying, unsteered and
+## undrawn slots their boss moves (place()), so every attack, battery and
+## powerup finds the boss through the grid like any zombie. UnnaturalRun.hit()
+## hands their damage to the boss.
+##
+## Online (planning_unnatural.md §9) every zombie has a net id, the same on
+## every machine (the host's spawn() picks it, guests are told it):
+## index_of_net(), net_id_of(). spawned and removed tell the host's
+## UnnaturalNet what to send; kill() and correct() apply what a guest is told.
+##
+## Written to port straight to the GDExtension (a HordeSim on the same packed
+## arrays) once GDScript is the limit.
+
+## A zombie died: its slot, kind (index into `kinds`), where, and what killed it.
+signal killed(index: int, kind: int, at: Vector3, source: String, by: Object)
+## An immortal zombie took a hit that would have killed it.
+signal would_kill(index: int, kind: int, source: String, by: Object)
+## A zombie came (any way: packs, events, a boss's call), or was taken away quietly.
+signal spawned(index: int)
+signal removed(index: int)
+
+enum State { FREE, ALIVE, DYING }
+## A lunging zombie's stages.
+enum Lunge { STALK, TELEGRAPH, LUNGE, REST }
+
+const OVERLAY_SHADER := preload("res://shaders/zombie_overlay.gdshader")
+## Never more than this many steps in one physics tick (after a hitch).
+const MAX_STEPS := 4
+## Each zombie picks its target again every this many steps (staggered).
+const RETARGET_STEPS := 30
+## Separation looks at no more than this many others in its bucket, a
+## different few each step (so a crowded bucket still spreads out).
+const MAX_NEIGHBOURS := 8
+## How quickly a zombie turns to face the way it swims (1/s).
+const FACE_RATE := 7.0
+## A dead zombie shrinks away over this long (s).
+const DYING_TIME := 0.25
+## How quickly the hit flash fades (1/s).
+const FLASH_FADE := 7.0
+## Elites: this much bigger, this many times the hp.
+const ELITE_SIZE := 1.6
+const ELITE_HP := 5.0
+## Floats per instance in a look's buffer: a 3x4 transform, then custom data.
+const STRIDE := 16
+
+var settings: UnnaturalSettings
+var kinds: Array[EnemyKind] = []
+var capacity := 0
+## Take hits but never die (the Test Tank's dummies).
+var immortal := false
+## Where the players are now (set every tick), how they're moving, and which
+## may be chased (1; 0: down, or invisible while picking a card or opening a chest).
+var targets := PackedVector3Array()
+var target_velocities := PackedVector3Array()
+var chaseable := PackedByteArray()
+## The arena: zombies stay within arena_radius of this, in the depth band.
+var arena_centre := Vector3.ZERO
+var bounded := true
+var grid := HordeGrid.new()
+## The live zombies as of the last step (indices).
+var alive := PackedInt32Array()
+## Everything random about them (wander phases, tail beats).
+var rng := RandomNumberGenerator.new()
+
+var _state := PackedByteArray()
+var _kind := PackedInt32Array()
+var _position := PackedVector3Array()
+var _last_position := PackedVector3Array()
+var _velocity := PackedVector3Array()
+## Their facing, as basis columns (x right, y up, z back: the nose is -z).
+var _axis_x := PackedVector3Array()
+var _axis_y := PackedVector3Array()
+var _axis_z := PackedVector3Array()
+var _hp := PackedFloat32Array()
+var _max_hp := PackedFloat32Array()
+var _size := PackedFloat32Array()
+var _radius := PackedFloat32Array()
+var _flash := PackedFloat32Array()
+var _dying := PackedFloat32Array()
+var _tail := PackedFloat32Array()
+var _phase := PackedFloat32Array()
+var _target := PackedInt32Array()
+var _elite := PackedByteArray()
+var _immortal := PackedByteArray()
+var _proxy := PackedByteArray()
+var _proxy_count := 0
+var _net := PackedInt32Array()
+## Net id -> slot, for the live and dying.
+var _by_net := {}
+## The next net id spawn() gives (the host's).
+var next_net_id := 1
+## Seconds until it can be battered again (Batteries' repeat guard).
+var _cooldown := PackedFloat32Array()
+## Its behaviour's stage (Lunge) and time left in it, and a lunge's direction.
+var _mode := PackedByteArray()
+var _mode_left := PackedFloat32Array()
+var _lunge := PackedVector3Array()
+var _free := PackedInt32Array()
+## Slots below this have been used (FREE, ALIVE or DYING); above, never.
+var _high := 0
+var _alive_count := 0
+var _max_radius := 1.0
+var _kind_speed := PackedFloat32Array()
+var _kind_accel := PackedFloat32Array()
+var _kind_behaviour := PackedInt32Array()
+var _since_step := 0.0
+var _steps := 0
+var _time := 0.0
+## Per look (kind * 3 + pose): its MultiMesh, and the buffer drawn into it.
+var _looks: Array[MultiMeshInstance3D] = []
+var _buffers: Array[PackedFloat32Array] = []
+var _overlays: Array[ShaderMaterial] = []
+var _shadows := false
+
+
+func _init() -> void:
+	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF  # drawn every frame
+
+
+## Ready for up to `max_enemies` zombies of `horde_kinds`. Call once it's in the tree.
+func setup(horde_settings: UnnaturalSettings, horde_kinds: Array[EnemyKind], max_enemies: int, rng_seed := -1) -> void:
+	settings = horde_settings
+	kinds = horde_kinds
+	capacity = maxi(max_enemies, 1)
+	if rng_seed >= 0:
+		rng.seed = rng_seed
+	else:
+		rng.randomize()
+	_kind.resize(capacity)
+	_target.resize(capacity)
+	_position.resize(capacity)
+	_last_position.resize(capacity)
+	_velocity.resize(capacity)
+	_axis_x.resize(capacity)
+	_axis_y.resize(capacity)
+	_axis_z.resize(capacity)
+	_hp.resize(capacity)
+	_max_hp.resize(capacity)
+	_size.resize(capacity)
+	_radius.resize(capacity)
+	_flash.resize(capacity)
+	_dying.resize(capacity)
+	_tail.resize(capacity)
+	_phase.resize(capacity)
+	_cooldown.resize(capacity)
+	_state.resize(capacity)
+	_elite.resize(capacity)
+	_immortal.resize(capacity)
+	_proxy.resize(capacity)
+	_net.resize(capacity)
+	_mode.resize(capacity)
+	_mode_left.resize(capacity)
+	_lunge.resize(capacity)
+	grid = HordeGrid.new(2.0, 4096, capacity)
+	_kind_speed.resize(kinds.size())
+	_kind_accel.resize(kinds.size())
+	_kind_behaviour.resize(kinds.size())
+	_max_radius = 0.5
+	for k in kinds.size():
+		_max_radius = maxf(_max_radius, kinds[k].radius() * ELITE_SIZE)
+	clear()
+	_build_looks()
+
+
+## Every zombie gone at once (no deaths).
+func clear() -> void:
+	_state.fill(State.FREE)
+	_free.clear()
+	_high = 0
+	_alive_count = 0
+	_proxy_count = 0
+	_by_net.clear()
+	alive.clear()
+	grid.build(_position, alive)
+
+
+## A new zombie of kind `kind` at `at`, heading along `heading`. Returns its
+## slot, or -1 with the horde full.
+func spawn(kind: int, at: Vector3, heading := Vector3.ZERO, elite := false, undying := false, net_id := 0) -> int:
+	var i := -1
+	if not _free.is_empty():
+		i = _free[_free.size() - 1]
+		_free.resize(_free.size() - 1)
+	elif _high < capacity:
+		i = _high
+		_high += 1
+	if i < 0:
+		return -1
+	var info := kinds[kind]
+	_state[i] = State.ALIVE
+	_kind[i] = kind
+	_position[i] = at
+	_last_position[i] = at
+	var facing := heading.normalized() if heading.length_squared() > 0.0001 else Vector3.FORWARD
+	_velocity[i] = facing * info.speed * 0.5
+	_set_facing(i, facing)
+	var hp := info.hp * settings.enemy_hp_scale * (ELITE_HP if elite else 1.0)
+	_hp[i] = maxf(hp, 1.0)
+	_max_hp[i] = _hp[i]
+	_size[i] = info.size * (ELITE_SIZE if elite else 1.0)
+	_radius[i] = info.radius() * (ELITE_SIZE if elite else 1.0)
+	_elite[i] = 1 if elite else 0
+	_immortal[i] = 1 if undying else 0
+	_proxy[i] = 0
+	if net_id <= 0:
+		net_id = next_net_id
+		next_net_id += 1
+	_by_net.erase(_net[i])
+	_net[i] = net_id
+	_by_net[net_id] = i
+	_flash[i] = 0.0
+	_dying[i] = 0.0
+	_cooldown[i] = 0.0
+	_tail[i] = rng.randf() * TAU
+	_phase[i] = rng.randf() * TAU
+	_target[i] = -1
+	_mode[i] = Lunge.STALK
+	_mode_left[i] = 0.0
+	_alive_count += 1
+	spawned.emit(i)
+	return i
+
+
+## `count` zombies of kind `kind` in a loose ball `spread` m round `at`, each
+## elite by `elite_chance`. Returns how many there was room for.
+func spawn_pack(kind: int, count: int, at: Vector3, spread: float, heading := Vector3.ZERO, elite_chance := 0.0) -> int:
+	var made := 0
+	for n in count:
+		var offset := Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-0.5, 0.5), rng.randf_range(-1.0, 1.0)) * spread
+		if spawn(kind, at + offset, heading, rng.randf() < elite_chance) < 0:
+			break
+		made += 1
+	return made
+
+
+## A boss's body part: an undying slot `radius` m round at `at` that nothing
+## steers or draws (move it with place()). Returns its slot, or -1.
+func spawn_proxy(at: Vector3, radius: float, net_id := 0) -> int:
+	var i := spawn(0, at, Vector3.ZERO, false, true, net_id)
+	if i < 0:
+		return -1
+	_proxy[i] = 1
+	_proxy_count += 1
+	_radius[i] = radius
+	_size[i] = radius * 2.0
+	_hp[i] = 1.0e9
+	_max_hp[i] = 1.0e9
+	_velocity[i] = Vector3.ZERO
+	_max_radius = maxf(_max_radius, radius)
+	return i
+
+
+## Moves proxy `index` to `at`, facing `forward` (if given).
+func place(index: int, at: Vector3, forward := Vector3.ZERO) -> void:
+	_position[index] = at
+	_last_position[index] = at
+	if forward.length_squared() > 0.0001:
+		_set_facing(index, forward.normalized())
+
+
+## The slot of the zombie with net id `net_id` (-1: none here).
+func index_of_net(net_id: int) -> int:
+	return _by_net.get(net_id, -1)
+
+
+func net_id_of(index: int) -> int:
+	return _net[index] if index >= 0 and index < _high else 0
+
+
+## Kills zombie `index` now, immortal or not (a guest told of the host's kill).
+func kill(index: int, source: String, by: Object = null) -> void:
+	if not is_alive(index):
+		return
+	_hp[index] = 0.0
+	_state[index] = State.DYING
+	_dying[index] = DYING_TIME
+	_alive_count -= 1
+	killed.emit(index, _kind[index], enemy_position(index), source, by)
+
+
+## Moves zombie `index` toward where the host has it: snapped if it's more
+## than `snap` m off, else a `blend` share of the way; and its velocity.
+func correct(index: int, at: Vector3, velocity: Vector3, blend := 0.3, snap := 4.0) -> void:
+	if not is_alive(index) or _proxy[index] == 1:
+		return
+	var off := at - _position[index]
+	if off.length_squared() > snap * snap:
+		_position[index] = at
+		_last_position[index] = at
+	else:
+		_position[index] += off * blend
+	_velocity[index] = velocity
+
+
+func is_proxy(index: int) -> bool:
+	return index >= 0 and index < _high and _proxy[index] == 1
+
+
+## Live zombies, not counting proxies.
+func alive_count() -> int:
+	return _alive_count - _proxy_count
+
+
+func is_alive(index: int) -> bool:
+	return index >= 0 and index < _high and _state[index] == State.ALIVE
+
+
+## Where zombie `index` is now (m), between steps.
+func enemy_position(index: int) -> Vector3:
+	return _position[index] + _velocity[index] * _since_step
+
+
+func enemy_velocity(index: int) -> Vector3:
+	return _velocity[index]
+
+
+func enemy_radius(index: int) -> float:
+	return _radius[index]
+
+
+func enemy_size(index: int) -> float:
+	return _size[index]
+
+
+func enemy_kind(index: int) -> EnemyKind:
+	return kinds[_kind[index]]
+
+
+func enemy_kind_index(index: int) -> int:
+	return _kind[index]
+
+
+func enemy_hp(index: int) -> float:
+	return _hp[index]
+
+
+func is_elite(index: int) -> bool:
+	return _elite[index] == 1
+
+
+func is_immortal(index: int) -> bool:
+	return immortal or _immortal[index] == 1
+
+
+## Its behaviour's stage (Lunge; STALK for kinds that don't lunge).
+func enemy_mode(index: int) -> int:
+	return _mode[index]
+
+
+## Which player (index into `targets`) zombie `index` is after (-1: none).
+func enemy_target(index: int) -> int:
+	return _target[index]
+
+
+## The biggest zombie's hit radius (m): queries reach this much further.
+func max_radius() -> float:
+	return _max_radius
+
+
+func cooldown(index: int) -> float:
+	return _cooldown[index] - _time
+
+
+func set_cooldown(index: int, seconds: float) -> void:
+	_cooldown[index] = _time + seconds
+
+
+## Hurts zombie `index` by `amount` from `source` (e.g. "bite", "battery"),
+## knocked back along `push` (unit, or zero). Returns whether that killed it.
+func damage(index: int, amount: float, source: String, by: Object = null, push := Vector3.ZERO) -> bool:
+	if not is_alive(index):
+		return false
+	_flash[index] = 1.0
+	if push != Vector3.ZERO and settings.knockback > 0.0:
+		_velocity[index] += push * settings.knockback / maxf(_size[index], 0.3)
+	_hp[index] -= amount
+	if _hp[index] > 0.0:
+		return false
+	if immortal or _immortal[index] == 1:
+		_hp[index] = _max_hp[index]
+		would_kill.emit(index, _kind[index], source, by)
+		return false
+	_state[index] = State.DYING
+	_dying[index] = DYING_TIME
+	_alive_count -= 1
+	killed.emit(index, _kind[index], enemy_position(index), source, by)
+	return true
+
+
+## Takes zombie `index` away quietly (no death).
+func remove(index: int) -> void:
+	if index < 0 or index >= _high or _state[index] == State.FREE:
+		return
+	if _state[index] == State.ALIVE:
+		_alive_count -= 1
+		if _proxy[index] == 1:
+			_proxy_count -= 1
+	_proxy[index] = 0
+	_state[index] = State.FREE
+	_by_net.erase(_net[index])
+	removed.emit(index)
+	_free.append(index)
+
+
+## Moves zombie `index` to `at` (the leash: ahead of the players, not killed).
+func relocate(index: int, at: Vector3) -> void:
+	_position[index] = at
+	_last_position[index] = at
+	_velocity[index] = Vector3.ZERO
+	_target[index] = -1
+	_mode[index] = Lunge.STALK
+
+
+## The live zombies whose hit spheres reach within `reach` of `centre`.
+func query_sphere(centre: Vector3, reach: float) -> PackedInt32Array:
+	var found := PackedInt32Array()
+	var starts := grid.starts
+	var entries := grid.entries
+	for b in grid.buckets_near(centre, reach + _max_radius):
+		for e in range(starts[b], starts[b + 1]):
+			var j := entries[e]
+			if _state[j] != State.ALIVE:
+				continue
+			var within := reach + _radius[j]
+			if _position[j].distance_squared_to(centre) <= within * within:
+				found.append(j)
+	return found
+
+
+## The live zombie nearest `origin` within `reach`, no more than acos(min_cos)
+## off `forward` (unit), or -1.
+func nearest_in_cone(origin: Vector3, forward: Vector3, reach: float, min_cos: float) -> int:
+	var best := -1
+	var best_gap := INF
+	for j in query_sphere(origin, reach):
+		var offset := enemy_position(j) - origin
+		var gap := offset.length()
+		if gap > 0.001 and offset.dot(forward) / gap < min_cos:
+			continue
+		if gap < best_gap:
+			best_gap = gap
+			best = j
+	return best
+
+
+func _physics_process(delta: float) -> void:
+	if settings == null:
+		return
+	var step := 1.0 / maxf(settings.sim_rate, 1.0)
+	_since_step += delta
+	var steps := 0
+	while _since_step >= step and steps < MAX_STEPS:
+		_since_step -= step
+		step_once(step)
+		steps += 1
+	_since_step = minf(_since_step, step)
+
+
+func _process(delta: float) -> void:
+	if settings == null:
+		return
+	_draw_horde(delta)
+
+
+## One step of every zombie: steer, move, then the live list and grid again.
+func step_once(delta: float) -> void:
+	_time += delta
+	_steps += 1
+	_last_position = _position.duplicate()
+	for k in kinds.size():
+		_kind_speed[k] = kinds[k].speed * settings.enemy_speed_scale
+		_kind_accel[k] = kinds[k].accel * maxf(settings.enemy_speed_scale, 0.2)
+		_kind_behaviour[k] = kinds[k].behaviour
+	_steer(delta)
+	# The dying finish, and their slots free up.
+	for i in _high:
+		if _state[i] == State.DYING:
+			_dying[i] -= delta
+			if _dying[i] <= 0.0:
+				_state[i] = State.FREE
+				_by_net.erase(_net[i])
+				_free.append(i)
+	alive.resize(_alive_count)
+	var n := 0
+	for i in _high:
+		if _state[i] == State.ALIVE:
+			alive[n] = i
+			n += 1
+	alive.resize(n)
+	grid.build(_position, alive)
+
+
+func _steer(delta: float) -> void:
+	var count := targets.size()
+	var far_squared := settings.far_distance * settings.far_distance
+	var divisor := maxi(settings.far_update_divisor, 1)
+	var separation := settings.separation
+	var strength := settings.separation_strength
+	var wander := settings.wander
+	var starts := grid.starts
+	var entries := grid.entries
+	var buckets := grid.bucket_of
+	var radius := settings.arena_radius
+	var floor_y := arena_centre.y + settings.arena_floor + 1.0
+	var ceiling_y := arena_centre.y + settings.arena_ceiling
+	var turn := 1.0 - exp(-FACE_RATE * delta)
+	for i in alive:
+		if _proxy[i] == 1:
+			continue  # its boss moves it
+		var at := _position[i]
+		var velocity := _velocity[i]
+		# Its target: the nearest chaseable player, every so often (or when it's gone).
+		var target := _target[i]
+		if target < 0 or target >= count or chaseable[target] == 0 or (_steps + i) % RETARGET_STEPS == 0:
+			target = _nearest_target(at)
+			_target[i] = target
+		var toward := Vector3.ZERO
+		var gap_squared := INF
+		if target >= 0:
+			toward = targets[target] - at
+			gap_squared = toward.length_squared()
+		var far := gap_squared > far_squared
+		if not far or (_steps + i) % divisor == 0:
+			var dt := delta * divisor if far else delta
+			var kind := _kind[i]
+			var speed := _kind_speed[kind]
+			var accel := _kind_accel[kind]
+			if speed <= 0.0:
+				# A kind that doesn't swim (the Test Tank's dummies): it drifts back to rest.
+				_velocity[i] = velocity.move_toward(Vector3.ZERO, maxf(accel, 6.0) * dt)
+				_position[i] = at + _velocity[i] * delta
+				continue
+			var wanted: Vector3
+			var phase := _phase[i] + _time * 0.8
+			if target >= 0 and gap_squared > 0.0001:
+				var gap := sqrt(gap_squared)
+				var ahead := toward / gap
+				match _kind_behaviour[kind]:
+					EnemyKind.Behaviour.SWARM:
+						# Weaving in as they come.
+						var side := Vector3.UP.cross(ahead)
+						wanted = (ahead + side * sin(_time * 3.0 + _phase[i]) * 0.45).normalized() * speed
+					EnemyKind.Behaviour.GLIDE:
+						# Wide arcs across where the player's going.
+						var lead := toward
+						if target < target_velocities.size():
+							lead += target_velocities[target] * settings.glide_lead
+						var across := Vector3.UP.cross(ahead)
+						lead += across * sin(_time * 0.5 + _phase[i]) * settings.glide_sweep * clampf(gap / 30.0, 0.2, 1.0)
+						wanted = lead.normalized() * speed
+						accel *= 0.6
+					EnemyKind.Behaviour.LUNGE:
+						wanted = _lunge_step(i, ahead, gap, speed, dt)
+						if _mode[i] == Lunge.LUNGE:
+							accel = 200.0
+					_:
+						wanted = ahead * speed
+			else:
+				wanted = -_axis_z[i] * speed * 0.35  # nobody to chase: mill about
+				_mode[i] = Lunge.STALK
+			wanted += Vector3(sin(phase), 0.5 * sin(phase * 1.3), cos(phase * 0.9)) * wander
+			var push := Vector3.ZERO
+			if separation > 0.0 and strength > 0.0:
+				var b := buckets[i]
+				var first := starts[b]
+				var in_bucket := starts[b + 1] - first
+				var own := _radius[i] + separation
+				var looks := mini(in_bucket, MAX_NEIGHBOURS)
+				var offset := (i * 7 + _steps * 13) % maxi(in_bucket, 1)
+				for n in looks:
+					var j := entries[first + (offset + n) % in_bucket]
+					if j == i:
+						continue
+					var apart := at - _position[j]
+					var reach := own + _radius[j]
+					var d_squared := apart.length_squared()
+					if d_squared < reach * reach:
+						if d_squared < 0.000001:
+							apart = Vector3(sin(_phase[i]), 0.3, cos(_phase[i]))  # on top of each other: any way out
+							d_squared = 0.0001
+						var d := sqrt(d_squared)
+						push += apart / d * (1.0 - d / reach) * (float(in_bucket) / looks if in_bucket > looks else 1.0)
+			velocity = velocity.move_toward(wanted, accel * dt) + push * strength * dt
+			if bounded:
+				var flat := Vector2(at.x - arena_centre.x, at.z - arena_centre.z)
+				var out := flat.length()
+				if out > radius and out > 0.001:
+					var inward := -flat / out * minf(out - radius, 10.0) * 4.0 * dt
+					velocity += Vector3(inward.x, 0.0, inward.y)
+				if at.y < floor_y:
+					velocity.y += minf(floor_y - at.y, 5.0) * 6.0 * dt
+				elif at.y > ceiling_y:
+					velocity.y -= minf(at.y - ceiling_y, 5.0) * 6.0 * dt
+			var top := speed * 1.5 + 2.0 if _mode[i] != Lunge.LUNGE else settings.lunge_speed * 1.1
+			if velocity.length_squared() > top * top:
+				velocity = velocity.normalized() * top
+			_velocity[i] = velocity
+			if velocity.length_squared() > 0.04:
+				var back := _axis_z[i].lerp(-velocity.normalized(), turn).normalized()
+				_set_back(i, back)
+		_position[i] = at + velocity * delta
+
+
+## A lunging zombie's stages, toward its target (`ahead`, unit, `gap` m off):
+## the velocity it wants now.
+func _lunge_step(i: int, ahead: Vector3, gap: float, speed: float, dt: float) -> Vector3:
+	_mode_left[i] -= dt
+	match _mode[i]:
+		Lunge.STALK:
+			if gap < settings.lunge_range and settings.lunge_speed > 0.0:
+				_mode[i] = Lunge.TELEGRAPH
+				_mode_left[i] = settings.lunge_telegraph
+			return ahead * speed * 0.8
+		Lunge.TELEGRAPH:
+			_lunge[i] = ahead  # still aiming
+			if _mode_left[i] <= 0.0:
+				_mode[i] = Lunge.LUNGE
+				_mode_left[i] = settings.lunge_time
+				_velocity[i] = ahead * settings.lunge_speed
+			return ahead * 0.5
+		Lunge.LUNGE:
+			if _mode_left[i] <= 0.0:
+				_mode[i] = Lunge.REST
+				_mode_left[i] = settings.lunge_rest
+			return _lunge[i] * settings.lunge_speed
+		_:
+			if _mode_left[i] <= 0.0:
+				_mode[i] = Lunge.STALK
+			return ahead * speed * 0.3
+
+
+## The nearest chaseable target to `at` (-1: none).
+func _nearest_target(at: Vector3) -> int:
+	var best := -1
+	var best_gap := INF
+	for t in targets.size():
+		if t < chaseable.size() and chaseable[t] == 0:
+			continue
+		var gap := targets[t].distance_squared_to(at)
+		if gap < best_gap:
+			best_gap = gap
+			best = t
+	return best
+
+
+func _set_facing(index: int, forward: Vector3) -> void:
+	_set_back(index, -forward)
+
+
+## Its facing from its back axis (z; the nose is -z), kept upright.
+func _set_back(index: int, back: Vector3) -> void:
+	var up := Vector3.UP if absf(back.y) < 0.98 else Vector3.BACK
+	var x := up.cross(back).normalized()
+	_axis_x[index] = x
+	_axis_y[index] = back.cross(x)
+	_axis_z[index] = back
+
+
+## Draws every zombie where it is now, between the last two steps.
+func _draw_horde(delta: float) -> void:
+	if settings.enemy_shadows != _shadows:
+		_shadows = settings.enemy_shadows
+		for look in _looks:
+			look.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for overlay in _overlays:
+		overlay.set_shader_parameter("rot", settings.rot)
+		overlay.set_shader_parameter("eye_glow", settings.eye_glow)
+	var step := 1.0 / maxf(settings.sim_rate, 1.0)
+	var blend := clampf(_since_step / step, 0.0, 1.0)
+	var used := PackedInt32Array()
+	used.resize(_looks.size())
+	var grown := PackedByteArray()
+	grown.resize(_looks.size())
+	var fade := delta * FLASH_FADE
+	for i in _high:
+		var state := _state[i]
+		if state == State.FREE or _proxy[i] == 1:
+			continue
+		var at := _last_position[i].lerp(_position[i], blend)
+		var size := _size[i]
+		var dead := 0.0
+		if state == State.DYING:
+			dead = 1.0 - clampf(_dying[i] / DYING_TIME, 0.0, 1.0)
+			size *= 1.0 - dead * 0.85
+		var flash := maxf(_flash[i] - fade, 0.0)
+		_flash[i] = flash
+		var effort := clampf(_velocity[i].length() / 10.0, 0.0, 1.0)
+		var tail := fmod(_tail[i] + delta * lerpf(5.0, 15.0, effort), TAU)
+		_tail[i] = tail
+		var look := _kind[i] * 3 + SchoolLook.pose_for(tail)
+		var k := used[look] * STRIDE
+		used[look] += 1
+		var buffer := _buffers[look]
+		if k + STRIDE > buffer.size():
+			buffer.resize(maxi(buffer.size() * 2, STRIDE * 64))
+			_buffers[look] = buffer
+			grown[look] = 1
+		var x := _axis_x[i] * size
+		var y := _axis_y[i] * size
+		var z := _axis_z[i] * size
+		buffer[k] = x.x
+		buffer[k + 1] = y.x
+		buffer[k + 2] = z.x
+		buffer[k + 3] = at.x
+		buffer[k + 4] = x.y
+		buffer[k + 5] = y.y
+		buffer[k + 6] = z.y
+		buffer[k + 7] = at.y
+		buffer[k + 8] = x.z
+		buffer[k + 9] = y.z
+		buffer[k + 10] = z.z
+		buffer[k + 11] = at.z
+		buffer[k + 12] = flash
+		buffer[k + 13] = dead
+		buffer[k + 14] = float(_elite[i])
+		buffer[k + 15] = (0.6 + 0.4 * sin(_time * 30.0)) if _mode[i] == Lunge.TELEGRAPH else 0.0
+	for look in _looks.size():
+		var multimesh := _looks[look].multimesh
+		var buffer := _buffers[look]
+		if grown[look] == 1 or multimesh.instance_count * STRIDE != buffer.size():
+			multimesh.instance_count = buffer.size() / STRIDE
+		multimesh.visible_instance_count = used[look]
+		if used[look] > 0:
+			multimesh.buffer = buffer
+
+
+## One MultiMesh per kind per tail pose, with the rot overlay; the arena's size as bounds.
+func _build_looks() -> void:
+	for look in _looks:
+		look.queue_free()
+	_looks.clear()
+	_buffers.clear()
+	_overlays.clear()
+	var bounds := AABB(arena_centre - Vector3(1.0, 1.0, 1.0) * (settings.arena_radius + 50.0),
+			Vector3(2.0, 2.0, 2.0) * (settings.arena_radius + 50.0))
+	for k in kinds.size():
+		var overlay := ShaderMaterial.new()
+		overlay.shader = OVERLAY_SHADER
+		overlay.set_shader_parameter("rot_color", kinds[k].tint)
+		_overlays.append(overlay)
+		var meshes := SchoolLook.meshes(kinds[k].family)
+		for pose in meshes.size():
+			var multimesh := MultiMesh.new()
+			multimesh.transform_format = MultiMesh.TRANSFORM_3D
+			multimesh.use_custom_data = true
+			multimesh.mesh = meshes[pose]
+			var buffer := PackedFloat32Array()
+			buffer.resize(STRIDE * 64)
+			multimesh.instance_count = 64
+			multimesh.visible_instance_count = 0
+			var look := MultiMeshInstance3D.new()
+			look.name = "%s%d" % [kinds[k].id.capitalize(), pose]
+			look.multimesh = multimesh
+			look.material_overlay = overlay
+			look.custom_aabb = bounds
+			look.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(look)
+			_looks.append(look)
+			_buffers.append(buffer)

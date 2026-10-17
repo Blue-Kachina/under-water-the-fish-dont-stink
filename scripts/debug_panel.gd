@@ -54,7 +54,8 @@ signal tuning_changed
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 7  # over the pause menu's dimming
-	_targets = {"fish": fish, "camera": follow_camera, "ball": ball_settings, "nature": NatureSettings.shared()}
+	_targets = {"fish": fish, "camera": follow_camera, "ball": ball_settings, "nature": NatureSettings.shared(),
+			"unnatural": UnnaturalSettings.shared(), "powerups": PowerupSettings.shared()}
 	for section: String in _targets:
 		_defaults[section] = _snapshot(_targets[section])
 	_build_ui()
