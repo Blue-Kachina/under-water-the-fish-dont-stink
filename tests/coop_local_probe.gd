@@ -85,12 +85,12 @@ func _run() -> void:
 	check(second.fish.character != was, "D-pad changes a joined player's fish")
 
 	print("controllers:")
-	Input.parse_input_event(_axis(PADS[0], JOY_AXIS_TRIGGER_RIGHT, 1.0))
+	_send(_axis(PADS[0], JOY_AXIS_TRIGGER_RIGHT, 1.0))
 	await _ticks(3)
 	check(second.input.strength("thrust_forward") > 0.9, "a joined player's trigger reads on their input (%.2f)" % second.input.strength("thrust_forward"))
 	check(second.fish.input_forward > 0.9, "...and swims their fish")
 	check(fish.input_forward < 0.01 and local.slots[2].fish.input_forward < 0.01, "...and nobody else's")
-	Input.parse_input_event(_axis(PADS[0], JOY_AXIS_TRIGGER_RIGHT, 0.0))
+	_send(_axis(PADS[0], JOY_AXIS_TRIGGER_RIGHT, 0.0))
 	await _ticks(3)
 
 	print("batteries:")
@@ -104,6 +104,11 @@ func _run() -> void:
 	var school: School = run.schools[0]
 	var index := _alive_index(school)
 	var before := run.battered_fish
+	# Only that fish left in its school, so a packed neighbour can't be battered too.
+	var only := PackedByteArray()
+	only.resize(school.fish_count())
+	only[index] = 1
+	school.apply_alive_mask(only)
 	await _ram_school_fish_together(run, school, index, [fish, second.fish])
 	check(not school.is_alive(index), "two players ram one school fish at once: it's battered")
 	check(run.battered_fish == before + 1, "one fish for the team (%d -> %d)" % [before, run.battered_fish])
@@ -123,7 +128,10 @@ func _run() -> void:
 	var pearl_before := run.pearls
 	var mine_before := run.rules.pearls_of(collector)
 	run.settings.pearl_chance = 1.0
-	school = run.schools[0]
+	for other in run.schools:
+		if other.alive_count() > 0:
+			school = other  # not the one emptied above
+			break
 	index = _alive_index(school)
 	await _ram_school_fish_together(run, school, index, [collector])
 	run.settings.pearl_chance = NatureSettings.new().pearl_chance
@@ -147,9 +155,9 @@ func _run() -> void:
 	print("leaving:")
 	var leaving: PlayerSlot = local.slots[1]
 	var leaving_fish := leaving.fish
-	Input.parse_input_event(_button(PADS[0], LocalCoop.JOIN_BUTTON, true))
+	_send(_button(PADS[0], LocalCoop.JOIN_BUTTON, true))
 	await _ticks(roundi((LocalCoop.LEAVE_HOLD + 0.2) * 120.0))
-	Input.parse_input_event(_button(PADS[0], LocalCoop.JOIN_BUTTON, false))
+	_send(_button(PADS[0], LocalCoop.JOIN_BUTTON, false))
 	await _ticks(3)
 	check(local.count() == 3 and split.count() == 3 and run.players.size() == 3, "holding Back/View leaves (three left)")
 	check(not is_instance_valid(leaving_fish), "their fish goes")
@@ -169,8 +177,8 @@ func _run() -> void:
 
 
 func _press(pad: int, button: JoyButton) -> void:
-	Input.parse_input_event(_button(pad, button, true))
-	Input.parse_input_event(_button(pad, button, false))
+	_send(_button(pad, button, true))
+	_send(_button(pad, button, false))
 
 
 func _button(pad: int, button: JoyButton, pressed: bool) -> InputEventJoypadButton:
@@ -229,3 +237,11 @@ func _ram_school_fish_together(run: NatureRun, school: School, index: int, attac
 func _ticks(n: int) -> void:
 	for i in n:
 		await get_tree().physics_frame
+
+
+## Sends a made-up controller event and delivers it now. Godot hands input over
+## once per frame, and a busy headless run can step several physics ticks in one
+## frame, so waiting a few ticks alone may never see it.
+func _send(event: InputEvent) -> void:
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
