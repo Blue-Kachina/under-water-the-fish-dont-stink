@@ -1,7 +1,7 @@
 class_name HunterBot
 extends Node
 ## Hunt's opponent: a hostile fish that swims Extra Swishy like the player and
-## tries to demolish it. It drives its fish only through
+## tries to batter it. It drives its fish only through
 ## FishController.controls (a FishInput), like FishBot and WanderBot, and never
 ## touches its velocity: its speed comes from its own strides, timed off its own
 ## stride envelope with the error its BotDifficulty allows.
@@ -71,8 +71,8 @@ var fish: FishController
 ## The fish it's after (the player's).
 var target: FishController
 var difficulty := BotDifficulty.basic()
-## The slowest ram that demolishes (m/s).
-var demo_speed := 10.0
+## The slowest ram that batters (m/s).
+var batter_speed := 10.0
 ## The arena it should stay in.
 var arena_center := Vector3.ZERO
 var arena_radius := INF
@@ -129,7 +129,7 @@ func _physics_process(delta: float) -> void:
 	if not is_instance_valid(fish) or not is_instance_valid(target):
 		return
 	_remember_target()
-	if fish.demolished or fish.controls_locked:
+	if fish.battered or fish.controls_locked:
 		_stride_seen = -1
 		return
 	if _dodge_tick >= 0:
@@ -164,18 +164,18 @@ func _think(delta: float) -> void:
 
 	if _mode_left > 0.0 and (mode == Mode.EVADE or mode == Mode.RECOVER):
 		return
-	var fast := fish.speed >= demo_speed + difficulty.commit_speed_margin * 0.5
+	var fast := fish.speed >= batter_speed + difficulty.commit_speed_margin * 0.5
 	var ahead := to_target.normalized().dot(_heading) > 0.5
 	if mode == Mode.COMMIT:
-		if fish.speed >= demo_speed and ahead and distance < COMMIT_RANGE:
+		if fish.speed >= batter_speed and ahead and distance < COMMIT_RANGE:
 			return
 	elif fast and ahead and distance < maxf(fish.speed * COMMIT_TIME, 6.0):
 		mode = Mode.COMMIT
 		return
 	mode = Mode.HUNT
 	var behind := to_target.dot(-fish.global_basis.z) < 0.0
-	var slow := fish.speed < demo_speed + difficulty.commit_speed_margin
-	if (behind and distance < COMMIT_RANGE * 0.6) or (slow and distance < COMMIT_RANGE and not behind and fish.speed < demo_speed):
+	var slow := fish.speed < batter_speed + difficulty.commit_speed_margin
+	if (behind and distance < COMMIT_RANGE * 0.6) or (slow and distance < COMMIT_RANGE and not behind and fish.speed < batter_speed):
 		mode = Mode.RECOVER
 		_mode_left = RECOVER_TIME
 		var away := (me - (seen[1] as Vector3))
@@ -188,7 +188,7 @@ func _think(delta: float) -> void:
 ## The player coming at it fast and nose on (as it saw it).
 func _threatened(seen: Array, distance: float) -> bool:
 	var velocity: Vector3 = seen[2]
-	if distance > THREAT_RANGE or velocity.length() < demo_speed or target.demolished:
+	if distance > THREAT_RANGE or velocity.length() < batter_speed or target.battered:
 		return false
 	var from_target := (fish.global_position - (seen[1] as Vector3)).normalized()
 	return (seen[3] as Vector3).dot(from_target) > 0.8 and velocity.dot(from_target) > 3.0

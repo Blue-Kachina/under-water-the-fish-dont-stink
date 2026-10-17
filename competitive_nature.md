@@ -1,15 +1,15 @@
 # Plan: Competitive Nature (1v1 in the Ocean)
 
 ## Context
-Nature currently has one mode, a free play: the player strides Extra Swishy after a calm target fish (`NatureRun` + `WanderBot`), and ramming it fast enough demolishes it.
+Nature currently has one mode, a free play: the player strides Extra Swishy after a calm target fish (`NatureRun` + `WanderBot`), and ramming it fast enough batters it.
 
 Next is a **1v1 Nature match** against a **hostile** fish:
 - The opponent has the same mechanics as the player by default: the same Nature tuning, Extra Swishy strides, bow wave and no boost. It gets no shortcuts.
 - The first opponent is a **basic** difficulty bot.
 - A match lasts **5 minutes**.
-- **A demolition counts as a goal.**
+- **A battery counts as a goal.**
 - **Points** are awarded for **close calls**, **dodges** and **perfect rhythm**.
-- After a demo, both fish go back to their starting positions, as at a kickoff.
+- After a battery, both fish go back to their starting positions, as at a kickoff.
 
 Mode name: **Hunt** (see Decisions).
 
@@ -25,9 +25,9 @@ All phases are implemented and pass headless probes. A build is ready for manual
 - **New probes:** `tests/hunt_probe`, `tests/hunter_bot_probe`, `tests/style_points_probe`.
 - **Changed:**
   - `main.gd`: the `HUNT` mode and `NATURE_MODES`. Switching straight from Nature to Hunt ends the run and shows Hunt's card.
-  - `hud.gd`: scorebug, points feed, demo splash, scoreboard and replay overlay.
+  - `hud.gd`: scorebug, points feed, battery splash, scoreboard and replay overlay.
   - `broadcast_ui.gd`: StatsBoard headings and replay overlay labels can now be set.
-  - `goal_replay.gd`: demolition replays (`victim`, `in_arena`, `explosion_radius`, an impact camera).
+  - `goal_replay.gd`: battery replays (`victim`, `in_arena`, `explosion_radius`, an impact camera).
   - `ocean.gd`: `boundary_radius` fog shift.
   - `README.md`.
 
@@ -49,14 +49,15 @@ All phases are implemented and pass headless probes. A build is ready for manual
 - `KICKOFF_DISTANCE` / `KICKOFF_LAYOUTS`, `ARENA_RADIUS`, and the boundary push.
 - These are code constants, not tuning panel exports, for now.
 
-### Follow-up (2026-10-16): Battered, Fish Fry, arcade demo replays
+### Follow-up (2026-10-16): Battered, Fish Fry, arcade battery replays
 Asked for after the first pass:
-- **Naming.** In Hunt a demolition is getting **Battered**: the splash reads BATTERED!, the points
+- **Naming.** In Hunt a battery is getting **Battered**: the splash reads BATTERED!, the points
   feed BATTERED +100, the replay card BATTERED BY / VICTIM. Both fish battered at once is a
   **Fish Fry** (FISH FRY! splash, FISH FRY / WITH replay card). The scoreboard column is
   **BATTERIES**, how many fish you've battered (a battery being a beating). Code names
-  (`demolished`, `last_demo`, `StylePoints.DEMO`) are unchanged. Nature free play and the
-  Aquarium modes still say Demolition.
+  were left alone at first; a later pass (same day) made **Battered** the word everywhere, code
+  included (`Battery`, `batter()`, `battered`, `nature_batter_speed`, `StylePoints.BATTERY`),
+  except for Rocket League itself (its replays and data keep demo / demolition).
 - **Replays show the arcade looks.** `GoalRecorder` now keeps each fish's looks every tick
   (`FishController.replay_fx()`, the `ReplayData.FX_*` layout: tail swing and growth, timing cue,
   bow wave, stride bubbles, flow), and `ReplayCar` redraws them, slowed with the playback
@@ -68,7 +69,7 @@ Asked for after the first pass:
 - **Fish Fry replays.** These used to be skipped. They're shot from the player's side with both
   explosions.
 - The live stride meter hides during replays.
-- `tests/demo_replay_shots` (needs a window) renders frames of a demo replay.
+- `tests/battery_replay_shots` (needs a window) renders frames of a battery replay.
 
 ## Existing pieces to reuse
 - **`NatureRun`** (`scripts/nature_run.gd`) is the template for an Ocean match node:
@@ -77,9 +78,9 @@ Asked for after the first pass:
   - `Match1v1.copy_tuning(player, other)`;
   - `_announce_teleport` so cameras snap;
   - `Explosion.spawn`;
-  - `demolish()` / `revive()`;
+  - `batter()` / `revive()`;
   - the `LEASH` idea.
-- **`Demolition.hits(attacker, victim, min_speed)`** (`scripts/demolition.gd`): the demo test. The bow wave already counts as the front, so it works in both directions as is.
+- **`Battery.hits(attacker, victim, min_speed)`** (`scripts/battery.gd`): the battery test. The bow wave already counts as the front, so it works in both directions as is.
 - **`Match1v1`** (`scripts/match_1v1.gd`):
   - `MATCH_TIME = 300` and the clock, overtime and `_time_up` / `_finish_match`;
   - the countdown (`COUNTDOWN_TIME`, `GO_TIME`, `controls_locked`);
@@ -102,7 +103,7 @@ Asked for after the first pass:
 - **`WanderBot._steer_to`**: the 3D steering math (yaw/pitch from a local target, roll back upright) for a bot driving a `FishInput`.
 - **HUD**:
   - `set_nature` / `set_match` (typed `NatureRun` / `Match1v1`);
-  - `_on_demolished`;
+  - `_on_battered`;
   - the broadcast scoreboard and clock from the broadcast UI pass;
   - ArcadeFx (zoom, vignette, punch on a perfect stride).
 - **Camera**: `_camera.ball = <opponent>` with `ball_cam = true`, as in Nature. The opponent is the fish to watch.
@@ -114,7 +115,7 @@ Asked for after the first pass:
 ### 1. Mode and flow (`main.gd`)
 - Add `HUNT := "Hunt"` to `MODES` and `MATCH_MODES`, and set `MODE_ENVIRONMENTS[HUNT] = "Ocean"`.
 - Nature tuning (`presets/nature.cfg`) applies to both Nature modes. `_use_nature_tuning(current_mode in [NATURE, HUNT])`.
-- Card text, e.g.: "1v1 in open water: 5 minutes. Demolish your opponent to score; they're out to demolish you too. Close calls, dodges and perfect strides earn points."
+- Card text, e.g.: "1v1 in open water: 5 minutes. Batter your opponent to score; they're out to batter you too. Close calls, dodges and perfect strides earn points."
 - `_start_match` dispatches to a new `_start_hunt()`. It creates a `NatureDuel`, points the camera's ball cam at the opponent, and calls `_hud.set_nature_duel(...)`.
 - `reset_play` restarts the match. Its label is "Restart match", since a kickoff reset mid-match would be a free escape.
 - `set_character` returns to a kickoff, as in the 1v1.
@@ -122,9 +123,9 @@ Asked for after the first pass:
 ### 2. `NatureDuel` (`scripts/nature_duel.gd`, new)
 It lives under the Ocean and has the same shape as `NatureRun`.
 
-**Signals:** `fish_teleported`, `demolished(attacker, victim)`, `stat_event(event)`, `match_over(winner)`.
+**Signals:** `fish_teleported`, `battered(attacker, victim)`, `stat_event(event)`, `match_over(winner)`.
 
-**Phases:** COUNTDOWN → PLAY → DEMOED (a short pause) → COUNTDOWN … → OVER. Overtime starts if the score is tied at 0:00.
+**Phases:** COUNTDOWN → PLAY → BATTERED (a short pause) → COUNTDOWN … → OVER. Overtime starts if the score is tied at 0:00.
 
 **Setup:**
 - Spawn the opponent fish on team 1. The player is team 0. Use team colours, never blue/orange naming.
@@ -141,16 +142,16 @@ It lives under the Ocean and has the same shape as `NatureRun`.
   - The offset stops kickoffs from always being a pure head-on joust.
   - Pick at random among a few mirrored layouts, as in the 1v1's `KICKOFF_SPOTS`, so kickoffs aren't solved.
 
-**Demo = goal:** checked every physics tick in PLAY:
-- `Demolition.hits(player, opponent, demo_speed)` and the reverse.
-- Use `player.nature_demo_speed` for both: the opponent has a copy, so it's the same value.
+**Battery = goal:** checked every physics tick in PLAY:
+- `Battery.hits(player, opponent, batter_speed)` and the reverse.
+- Use `player.nature_batter_speed` for both: the opponent has a copy, so it's the same value.
 - If only one hits, the attacker's team scores. Then:
   - explosion in the victim's team colour;
-  - `victim.demolish()`;
-  - announce `{"type": "demo", ...}`;
-  - DEMOED pause (about 2 s, so the explosion and banner read);
+  - `victim.batter()`;
+  - announce `{"type": "battery", ...}`;
+  - BATTERED pause (about 2 s, so the explosion and banner read);
   - `kickoff()`.
-- If both hit on the same tick (a head-on joust), the faster fish wins. An exact speed tie demos both, with no goal.
+- If both hit on the same tick (a head-on joust), the faster fish wins. An exact speed tie batters both, with no goal.
 
 **Arena bounds:** the open ocean has no walls, so a fish could run away for good.
 - Add a **soft boundary sphere** (`ARENA_RADIUS`, about 90 m) around the centre.
@@ -161,7 +162,7 @@ It lives under the Ocean and has the same shape as `NatureRun`.
 **Clock:** the same rules as `Match1v1`:
 - 5:00 counting down;
 - the winner is decided at 0:00;
-- on a tied score, more style points wins; if the points are tied too, sudden-death overtime: the next demo wins.
+- on a tied score, more style points wins; if the points are tied too, sudden-death overtime: the next battery wins.
 - Consider moving the clock and countdown into a small shared helper (`MatchClock`) instead of copying them out of `Match1v1`. Do it only if the copy turns out to be more than about 30 lines.
 
 **End:**
@@ -179,8 +180,8 @@ It drives its fish only through `FishController.controls` (a `FishInput`), like 
   - Reuse `WanderBot._steer_to` for the bias direction and roll.
 
 **Behaviour states:**
-- **Hunt:** head for the player's predicted position (lead = distance / own speed, scaled by `lead_skill`). Keep striding to build flow, and commit when its speed is at or above the demo speed and it is roughly aimed.
-- **Evade:** when the player is within `threat_range`, at or above the demo speed, and closing on it with its nose pointed at it:
+- **Hunt:** head for the player's predicted position (lead = distance / own speed, scaled by `lead_skill`). Keep striding to build flow, and commit when its speed is at or above the batter speed and it is roughly aimed.
+- **Evade:** when the player is within `threat_range`, at or above the batter speed, and closing on it with its nose pointed at it:
   - turn hard across the player's line, perpendicular to it;
   - sometimes use a dodge input (jump & dodge stay on in Nature).
   - `evade_chance` sets how often it reacts at all.
@@ -197,21 +198,21 @@ It drives its fish only through `FishController.controls` (a `FishInput`), like 
 | `aim_error` | 8° | random offset on its intercept heading |
 | `lead_skill` | 0.3 | how much of the intercept lead it uses (0 means it chases the player's current position) |
 | `evade_chance` | 0.35 | chance it reacts to a threat at all |
-| `commit_speed_margin` | +3 m/s | how far over the demo speed it wants to be before it commits |
+| `commit_speed_margin` | +3 m/s | how far over the batter speed it wants to be before it commits |
 
 ### 4. Style points (`scripts/style_points.gd`, new)
 Points are a separate tally from goals.
 - A per-match node watches both fish and emits `stat_event`s (`"close_call"`, `"dodge"`, `"perfect_rhythm"`). The HUD feed shows each one with a popup, e.g. "CLOSE CALL +25".
 - It applies to both fish. The bot can earn points too, which also makes the system easy to probe.
 - Values are exports or consts on `StylePoints`, to tune later.
-- A demo is also worth +100 points to the attacker, as well as the goal, so the points tally reflects the whole game.
+- A battery is also worth +100 points to the attacker, as well as the goal, so the points tally reflects the whole game.
 
 **Threat window:** the shared idea behind close calls and dodges. Fish A threatens fish B when all of these hold:
-- A's speed is at least `demo_speed`;
+- A's speed is at least `batter_speed`;
 - B is within `threat_range` (about 6 m);
-- B is in A's front cone (`dot ≥ Demolition.FRONT`).
+- B is in A's front cone (`dot ≥ Battery.FRONT`).
 
-A threat window opens when those conditions start and closes when they end. If it closes **without a demo**:
+A threat window opens when those conditions start and closes when they end. If it closes **without a battery**:
 
 - **Close call (B earns about +25):**
   - the closest approach during the window was under `close_call_distance` (about 2.5 m between hitbox surfaces, or the bow wave tip);
@@ -232,7 +233,7 @@ A threat window opens when those conditions start and closes when they end. If i
 - `set_nature_duel(duel)`:
   - the broadcast scoreboard (team 0 / team 1 goals and the clock);
   - the points tally under each name;
-  - the demolition banner (the existing `_on_demolished`);
+  - the battery banner (the existing `_on_battered`);
   - the countdown splash;
   - style point popups from `stat_event`.
 - Alternatively, give the HUD a small common interface for "a match with a clock and a score" (`Match1v1` and `NatureDuel` both satisfy it), instead of a third `set_*` path. Decide when implementing, once it's clear how much of `set_match` carries over unchanged.
@@ -259,35 +260,35 @@ A threat window opens when those conditions start and closes when they end. If i
 ## Phases
 Follow the usual workflow for each phase: develop, run headless probes, build, then hand off.
 
-1. **Match skeleton.** Mode, card, `NatureDuel` with kickoff, clock, two-way demos as goals, kickoff after a demo, overtime and results. Use a stand-in opponent (`WanderBot`) so the flow can be tested before the AI exists.
+1. **Match skeleton.** Mode, card, `NatureDuel` with kickoff, clock, two-way batteries as goals, kickoff after a battery, overtime and results. Use a stand-in opponent (`WanderBot`) so the flow can be tested before the AI exists.
 2. **HunterBot (Basic).**
    - Striding and steering through `FishInput`.
    - Hunt, evade and recover.
    - `BotDifficulty`.
 3. **Style points.** Threat windows, close calls, dodges and perfect-rhythm streaks, plus HUD popups and the tally.
-4. **HUD polish, the boundary and the demo replay.** Scoreboard, results panel, the fog-shift edge cue, and a short replay after each demo (see Decisions 9).
+4. **HUD polish, the boundary and the battery replay.** Scoreboard, results panel, the fog-shift edge cue, and a short replay after each battery (see Decisions 9).
 5. **Build and manual testing.** Expect tuning loops on the bot difficulty, the point values and thresholds, the kickoff distance and the arena radius.
 
 ## Verification (headless probes)
 **`hunter_bot_probe`:** the bot alone, Nature tuning.
-- It reaches `nature_demo_speed` within N seconds from a standstill using only its own inputs. This is the key risk, so check it first.
+- It reaches `nature_batter_speed` within N seconds from a standstill using only its own inputs. This is the key risk, so check it first.
 - Its average stride timing sits near the Basic target: worse than perfect, better than mashing.
-- It demolishes a stationary player fish within T seconds of a kickoff.
+- It batters a stationary player fish within T seconds of a kickoff.
 - With evade forced on, it gets out of a scripted straight-line ram at least sometimes, and never when `evade_chance = 0`.
 - It never writes velocity: every gain comes from strides. Assert this by checking that speed only rises while a stride has power.
 
 **`nature_duel_probe`:**
 - The card shows. Play starts the countdown, and both fish are locked until GO.
-- A scripted player ram above the demo speed scores 1–0, explodes the opponent and starts a kickoff that puts both back at their start positions with flow reset.
+- A scripted player ram above the batter speed scores 1–0, explodes the opponent and starts a kickoff that puts both back at their start positions with flow reset.
 - A slow bump doesn't score.
 - A scripted bot ram scores 0–1.
-- The clock is paused during the countdown. At 0:00 a tied score goes to overtime, and the next demo ends it.
+- The clock is paused during the countdown. At 0:00 a tied score goes to overtime, and the next battery ends it.
 - Leaving the mode restores the tuning from before.
 
 **`style_points_probe`:**
 - A scripted fast pass at 1.5 m awards a close call to the passed fish. With a sharp turn during the window, it awards a dodge instead.
 - A pass at 5 m awards nothing, and a slow pass awards nothing.
-- A demo awards no close call.
+- A battery awards no close call.
 - The cooldown stops repeat awards.
 - 4 perfect strides in a row award a streak, and a late stride resets it.
 
@@ -295,19 +296,19 @@ Follow the usual workflow for each phase: develop, run headless probes, build, t
 
 ## Decisions (user interview, 2026-10-15)
 These replace the earlier open questions. Where a section above differs, these win.
-1. **Winner:** goals (demos) decide the match. If the score is tied at 0:00, **more style points wins**. Sudden-death overtime happens only if the points are tied as well.
-2. **Head-on jousts:** the faster fish wins. Only an exact speed tie demos both, with no goal.
+1. **Winner:** goals (batteries) decide the match. If the score is tied at 0:00, **more style points wins**. Sudden-death overtime happens only if the points are tied as well.
+2. **Head-on jousts:** the faster fish wins. Only an exact speed tie batters both, with no goal.
 3. **Dodge:** either one counts: a dodge-button input or a sharp evasive turn (over ~35°) during a threat window. Jump & dodge stay on in Nature.
 4. **Point values:**
    - close call +25;
    - dodge +50;
    - perfect-rhythm streak +10 every 4 perfect strides in a row;
-   - **a demo is also worth +100 points** (as well as the goal).
+   - **a battery is also worth +100 points** (as well as the goal).
 5. **Kickoff:** facing each other with a small sideways offset (~40 m out, ~6 m apart), picked at random from a few mirrored layouts.
 6. **Arena:** a soft boundary sphere of ~90 m that nudges fish back in. The edge is shown by **a fog shift only**: the water darkens or tints toward the edge. There is no bubble curtain or reef ring.
 7. **Mode name: "Hunt".** `HUNT := "Hunt"` is used throughout the plan above. The match node can stay `NatureDuel`, or be renamed `HuntMatch` when implementing.
 8. **Opponent fish:** a **random character and skin each match**, chosen from the fish models (shark, swordfish, clownfish, koi…), in team 1's colour.
-9. **Demo replay: yes, in v1.** After a demo, show a short replay before the kickoff, like the 1v1's goal replays (`GoalReplay`, `REPLAY_BEFORE` / `REPLAY_AFTER`, the `goal_replays` UI setting, and skip to kickoff). This adds work to phase 4.
+9. **Battery replay: yes, in v1.** After a battery, show a short replay before the kickoff, like the 1v1's goal replays (`GoalReplay`, `REPLAY_BEFORE` / `REPLAY_AFTER`, the `goal_replays` UI setting, and skip to kickoff). This adds work to phase 4.
    - Check how tied `GoalReplay` is to the aquarium and the ball. It probably needs to accept "no ball" and the Ocean environment, and the camera should follow the attacker into the victim.
-   - Add a `hunt_replay_probe` (or extend `nature_duel_probe`): a demo starts the replay, the replay ends at the kickoff, and skipping it works.
-   - The DEMOED pause becomes: explosion and banner, then the replay (if enabled), then the kickoff.
+   - Add a `hunt_replay_probe` (or extend `nature_duel_probe`): a battery starts the replay, the replay ends at the kickoff, and skipping it works.
+   - The BATTERED pause becomes: explosion and banner, then the replay (if enabled), then the kickoff.

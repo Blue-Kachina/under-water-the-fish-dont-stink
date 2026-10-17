@@ -67,7 +67,7 @@ func _run() -> void:
 	if is_instance_valid(game.goal_replay):
 		game.goal_replay.skip()
 	# The scoreboard held up, back in live play (made-up numbers on the bot's line).
-	for type in [MatchStats.SHOT, MatchStats.SAVE, MatchStats.SAVE, MatchStats.DEMO, MatchStats.TOUCH, MatchStats.TOUCH]:
+	for type in [MatchStats.SHOT, MatchStats.SAVE, MatchStats.SAVE, MatchStats.BATTERY, MatchStats.TOUCH, MatchStats.TOUCH]:
 		MatchStats.tally(game.stats[1], type)
 	await _seconds(4.0)
 	Input.action_press("show_scoreboard")

@@ -2,23 +2,23 @@ extends CanvasLayer
 ## The game's HUD, broadcast style (see BroadcastUI): in the Aquarium Arena a
 ## scoreboard at the top, a boost gauge in the bottom right, and a splash when
 ## someone scores; in a 1v1 (set_match) also the clock, the kickoff countdown,
-## demolitions, the goal replay's overlay and the result. While a Rocket League
+## batteries, the goal replay's overlay and the result. While a Rocket League
 ## replay plays (set_replay), the same for the replay and its followed player.
 ## In both kinds of replay, each team's players are listed in the top corners
 ## with their boost, and a badge pops up beside a player for a goal, assist,
-## shot, save or demo (MatchStats). Live, the lists stay hidden (they'd give
-## away the opponents' boost); the other fish get name plates instead, with
-## boost shown for teammates only. Holding D-pad up (or B) in a 1v1 holds up
+## shot, save or battery (a demo in a Rocket League replay; MatchStats). Live,
+## the lists stay hidden (they'd give away the opponents' boost); the other
+## fish get name plates instead, with boost shown for teammates only. Holding D-pad up (or B) in a 1v1 holds up
 ## its scoreboard (BroadcastUI.StatsBoard), each fish's points and stats and
 ## the teams' possession, boost and territory. It comes up by itself at the end
 ## of the match, once the winner's splash has been.
 ##
 ## With Extra Swishy swimming (Nature), the last stride's timing and the flow
 ## (StrideMeter) sit at the bottom centre and the boost gauge hides while boost is off; in Nature
-## (set_nature) the demolition count shows at the top. In Hunt (set_hunt) the
-## scorebug shows both fish's goals (demolitions), the clock and each fish's
-## points; a demolition gets a splash, each style point (StylePoints) a line in
-## the points feed under the banner, the demo replay its overlay, and the
+## (set_nature) the battery count shows at the top. In Hunt (set_hunt) the
+## scorebug shows both fish's goals (batteries), the clock and each fish's
+## points; a battery gets a splash, each style point (StylePoints) a line in
+## the points feed under the banner, the battery replay its overlay, and the
 ## scoreboard (held, or at the end) each fish's points and their make-up.
 ##
 ## Two tuning aids show only when switched on in the tuning panel's UI section
@@ -33,8 +33,12 @@ const NAME_PLATE_HEIGHT := 0.9
 ## How long a line stays in the points feed (s), and the most lines it shows.
 const FEED_TIME := 2.5
 const FEED_LINES := 4
+## Nature's multis get hotter each step: Battered, Double Dip, Triple Fry,
+## Fish Supper, Feeding Frenzy, Monster Catch (and sprees, the hottest).
+const NATURE_HEAT := [Color(0.95, 0.95, 0.9), Color(1.0, 0.82, 0.3), Color(1.0, 0.6, 0.2),
+		Color(1.0, 0.38, 0.18), Color(0.95, 0.2, 0.35), Color(0.85, 0.25, 0.95)]
 ## Hunt's scoreboard columns (as many as StatsBoard.HEADINGS).
-## BATTERIES: fish battered (Hunt's demolitions; a battery being a beating).
+## BATTERIES: fish battered (Battery; a battery being a beating).
 const HUNT_HEADINGS := ["POINTS", "BATTERIES", "CLOSE", "DODGES", "PERFECT", "BEST RUN", "TOP KM/H"]
 
 @export var fish: FishController
@@ -73,6 +77,8 @@ var _stride_meter: StrideMeter
 ## Hunt's points feed: each line [text, colour, seconds left], newest last.
 var _feed: RichTextLabel
 var _feed_lines: Array = []
+## Nature: how long is left to extend a multi, under the counts.
+var _chain_bar: ChainBar
 ## Replays mode before a replay's picked: the live fish sits out, so its
 ## boost, the scorebug and the ball countdown are hidden.
 var fish_sitting_out := false:
@@ -136,6 +142,15 @@ func _ready() -> void:
 	_feed.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	_feed.add_theme_constant_override("outline_size", 6)
 	add_child(_feed)
+	_chain_bar = ChainBar.new()
+	_chain_bar.anchor_left = 0.5
+	_chain_bar.anchor_right = 0.5
+	_chain_bar.offset_left = -110.0
+	_chain_bar.offset_right = 110.0
+	_chain_bar.offset_top = 58.0
+	_chain_bar.offset_bottom = 84.0
+	_chain_bar.visible = false
+	add_child(_chain_bar)
 	_countdown = _centred_label(0.0, 120)
 	_countdown.anchor_top = 0.5
 	_countdown.anchor_bottom = 0.5
@@ -231,13 +246,13 @@ func set_replay(new_replay: ReplayPlayer) -> void:
 	_update_hint()
 
 
-## Show a 1v1's clock, countdown, demolitions and goal replays, or null when there's none.
+## Show a 1v1's clock, countdown, batteries and goal replays, or null when there's none.
 func set_match(new_match: Match1v1) -> void:
 	match_1v1 = new_match
 	_replay_overlay.stop()
 	_splash.hide_now()
 	if match_1v1:
-		match_1v1.demolished.connect(_on_demolished)
+		match_1v1.battered.connect(_on_battered)
 		match_1v1.goal_replay_started.connect(_on_goal_replay_started)
 		match_1v1.goal_replay_ended.connect(_replay_overlay.stop)
 		match_1v1.match_over.connect(_on_match_over)
@@ -247,18 +262,28 @@ func set_match(new_match: Match1v1) -> void:
 		_update_hint()
 
 
-## Show a Nature run's demolitions, or null when there's none.
+## Show a Nature run's batteries, or null when there's none.
 func set_nature(new_run: NatureRun) -> void:
 	nature_run = new_run
+	_feed_lines.clear()
+	_chain_bar.visible = false
+	_splash.hide_now()
 	if nature_run:
-		nature_run.demolished.connect(_on_demolished)
+		nature_run.battered.connect(_on_battered)
+		nature_run.school_fish_battered.connect(func(attacker: FishController, _school: School, _at: Vector3) -> void:
+			_on_battered(attacker, null))
+		nature_run.awarded.connect(_on_nature_award)
+		nature_run.pearl_collected.connect(func(_by: FishController) -> void:
+			_feed_lines.append(["PEARL  +1", Pearl.GLOW, FEED_TIME])
+			while _feed_lines.size() > FEED_LINES:
+				_feed_lines.pop_front())
 	if _course:
 		_course.text = ""
 	if _hint:
 		_update_hint()
 
 
-## Show a Hunt's scorebug, countdown, demolitions, points and demo replays, or
+## Show a Hunt's scorebug, countdown, batteries, points and battery replays, or
 ## null when there's none.
 func set_hunt(new_match: HuntMatch) -> void:
 	hunt_match = new_match
@@ -266,9 +291,9 @@ func set_hunt(new_match: HuntMatch) -> void:
 	_splash.hide_now()
 	_feed_lines.clear()
 	if hunt_match:
-		hunt_match.demolished.connect(_on_hunt_demolished)
-		hunt_match.demo_replay_started.connect(_on_demo_replay_started)
-		hunt_match.demo_replay_ended.connect(_replay_overlay.stop)
+		hunt_match.battered.connect(_on_hunt_battered)
+		hunt_match.battery_replay_started.connect(_on_battery_replay_started)
+		hunt_match.battery_replay_ended.connect(_replay_overlay.stop)
 		hunt_match.match_over.connect(_on_hunt_over)
 		hunt_match.stat_event.connect(_on_hunt_event)
 	if _countdown:
@@ -279,12 +304,12 @@ func set_hunt(new_match: HuntMatch) -> void:
 		_update_hint()
 
 
-func _on_hunt_demolished(attacker: FishController, _victim: FishController) -> void:
+func _on_hunt_battered(attacker: FishController, _victim: FishController) -> void:
 	if attacker == null:
 		_splash.play("FISH FRY!", "Both battered  ·  nobody scores", "", BroadcastUI.GOLD, SPLASH_TIME)
 		return
 	var team := hunt_match._team_of(attacker)
-	_splash.play("BATTERED!", _name_of(attacker), _speed_text(hunt_match.last_demo.speed),
+	_splash.play("BATTERED!", _name_of(attacker), _speed_text(hunt_match.last_battery.speed),
 			AquariumArena.TEAM_COLORS[team], SPLASH_TIME)
 	_scorebug.flash(team)
 
@@ -317,20 +342,20 @@ func _update_feed(delta: float) -> void:
 	_feed.text = "[center]%s[/center]" % "\n".join(lines)
 
 
-func _on_demo_replay_started(demo_replay: GoalReplay) -> void:
-	var demo := hunt_match.last_demo
+func _on_battery_replay_started(battery_replay: GoalReplay) -> void:
+	var battery := hunt_match.last_battery
 	_splash.hide_now()
 	_feed_lines.clear()
-	var speed := _speed_text(demo.get("speed", 0.0))
-	if demo.get("double", false):
-		_replay_overlay.start(demo_replay, _name_of(hunt_match.player), _name_of(hunt_match.opponent), speed,
+	var speed := _speed_text(battery.get("speed", 0.0))
+	if battery.get("fish_fry", false):
+		_replay_overlay.start(battery_replay, _name_of(hunt_match.player), _name_of(hunt_match.opponent), speed,
 				BroadcastUI.GOLD, "FISH FRY", "WITH")
 		return
-	var attacker: FishController = demo.get("attacker")
-	var victim: FishController = demo.get("victim")
-	_replay_overlay.start(demo_replay, _name_of(attacker) if is_instance_valid(attacker) else "",
+	var attacker: FishController = battery.get("attacker")
+	var victim: FishController = battery.get("victim")
+	_replay_overlay.start(battery_replay, _name_of(attacker) if is_instance_valid(attacker) else "",
 			_name_of(victim) if is_instance_valid(victim) else "", speed,
-			AquariumArena.TEAM_COLORS[maxi(demo.get("team", 0), 0)], "BATTERED BY", "VICTIM")
+			AquariumArena.TEAM_COLORS[maxi(battery.get("team", 0), 0)], "BATTERED BY", "VICTIM")
 
 
 func _on_hunt_over(winner: int) -> void:
@@ -361,16 +386,31 @@ func _update_hunt_scorebug() -> void:
 			_scorebug.caption = "OVERTIME" if hunt_match.overtime else "HUNT"
 
 
-func _on_demolished(attacker: FishController, victim: FishController) -> void:
+func _on_battered(attacker: FishController, victim: FishController) -> void:
 	if victim == fish:
-		_banner.text = "DEMOLISHED!  Respawning..."
+		_banner.text = "BATTERED!  Respawning..."
 	elif attacker == fish:
-		_banner.text = "DEMOLITION!"
+		_banner.text = "BATTERED!"
 		if is_instance_valid(nature_run):
-			_banner.text = "DEMOLITION!  %s" % _speed_text(nature_run.last_demo_speed)
+			_banner.text = "BATTERED!  %s" % _speed_text(nature_run.last_battery_speed)
 	else:
 		return
 	_banner_time_left = 2.5
+
+
+## Nature's points: a feed line for each, and the splash for a multi (from a
+## Double Dip up, hotter each step) or a spree milestone.
+func _on_nature_award(event: Dictionary) -> void:
+	var color: Color = NATURE_HEAT[clampi(event.get("chain", 1) - 1, 0, NATURE_HEAT.size() - 1)]
+	match event.type:
+		NatureScore.MULTI:
+			_splash.play("%s!" % event.title, "x%d" % event.chain, "+%d" % event.points, color, 1.2 + 0.15 * event.chain)
+		NatureScore.SPREE:
+			color = NATURE_HEAT[-1]
+			_splash.play("%s!" % event.title, "%d batteries without slowing" % event.spree, "+%d" % event.points, color, 2.2)
+	_feed_lines.append(["%s  +%d" % [event.title, event.points], color, FEED_TIME])
+	while _feed_lines.size() > FEED_LINES:
+		_feed_lines.pop_front()
 
 
 func _update_hint() -> void:
@@ -443,7 +483,10 @@ func _process(delta: float) -> void:
 		else:
 			_course.text = "Swim through the yellow hoop to start    best %s" % best
 	elif is_instance_valid(nature_run):
-		_course.text = "Demolitions  %d" % nature_run.demos
+		_course.text = "Batteries  %d    Points  %d    Pearls  %d" % [nature_run.batteries, nature_run.score.points, nature_run.pearls]
+		var score := nature_run.score
+		_chain_bar.show_chain(score.chain_left / maxf(score.settings.multi_window, 0.01), score.chain,
+				NATURE_HEAT[clampi(score.chain - 1, 0, NATURE_HEAT.size() - 1)])
 	elif is_instance_valid(hunt_match):
 		_update_hunt_scorebug()
 		_course.text = ""
@@ -526,7 +569,7 @@ func _update_player_lists() -> void:
 		_lists[team].rows.assign(rows[team])
 
 
-## A 1v1's goal replay or a Hunt's demo replay is playing.
+## A 1v1's goal replay or a Hunt's battery replay is playing.
 func _in_live_replay() -> bool:
 	return (is_instance_valid(match_1v1) and match_1v1.phase == Match1v1.Phase.REPLAY) \
 			or (is_instance_valid(hunt_match) and hunt_match.phase == HuntMatch.Phase.REPLAY)
@@ -587,7 +630,7 @@ func _update_hunt_board() -> void:
 			"score": hunt_match.scores[team],
 			"color": AquariumArena.TEAM_COLORS[team],
 			"rows": [{"name": _name_of(who), "focus": who == fish, "values": [
-				hunt_match.style.points[team], counts.demos, counts.close_calls, counts.dodges,
+				hunt_match.style.points[team], counts.batteries, counts.close_calls, counts.dodges,
 				counts.perfect, counts.best_streak, roundi(counts.top_speed * 3.6)]}],
 		})
 	_board.teams = teams
@@ -612,7 +655,7 @@ func _update_name_plates() -> void:
 	var live := not is_instance_valid(replay) and not _in_live_replay()
 	if live and camera and fish:
 		for other: FishController in get_tree().get_nodes_in_group(FishController.GROUP):
-			if other == fish or not other.is_visible_in_tree() or other.demolished:
+			if other == fish or not other.is_visible_in_tree() or other.battered:
 				continue
 			var above := other.global_position + Vector3.UP * NAME_PLATE_HEIGHT
 			if camera.is_position_behind(above):
@@ -906,3 +949,27 @@ class StrideMeter extends Control:
 		draw_rect(bar, DIM, false, 1.5)
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * swim.flow / maxf(fish.stride_flow_max, 0.01), bar.size.y)), FLOW)
 		draw_string(font, Vector2(0, 64), "FLOW  x%.1f" % (1.0 + swim.flow), HORIZONTAL_ALIGNMENT_CENTER, width, 14, Color.WHITE)
+
+
+## Nature's multi timer: a bar under the counts that drains over the time left
+## to extend the chain, with the chain so far ("x3").
+class ChainBar extends Control:
+	var share := 0.0
+	var chain := 0
+	var color := Color.WHITE
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func show_chain(new_share: float, new_chain: int, new_color: Color) -> void:
+		share = new_share
+		chain = new_chain
+		color = new_color
+		visible = chain > 0 and share > 0.0
+		queue_redraw()
+
+	func _draw() -> void:
+		var bar := Rect2(0.0, size.y - 8.0, size.x, 6.0)
+		draw_rect(bar, Color(0, 0, 0, 0.45))
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * share, bar.size.y)), color)
+		BroadcastUI.text(self, Rect2(0.0, 0.0, size.x, size.y - 10.0), "x%d" % chain, 16, color, HORIZONTAL_ALIGNMENT_CENTER, 800)

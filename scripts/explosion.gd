@@ -15,6 +15,12 @@ var radius := 10.0
 var blast := 0.0
 ## Where it goes off (world).
 var origin := Vector3.ZERO
+## How many sparks and bubbles, against a full one: e.g. a school fish's small
+## pop (Nature), when many go off at once right in front of the camera.
+var particle_share := 1.0
+## Just a pop: sparks and a flash, no shockwave shell or bubble cloud (which
+## fill the view when the camera swims straight through them).
+var pop := false
 
 var _shell := MeshInstance3D.new()
 var _shell_material := StandardMaterial3D.new()
@@ -23,12 +29,14 @@ var _age := 0.0
 
 
 ## Sets one off at `at` (world) under `parent`.
-static func spawn(parent: Node, at: Vector3, explosion_color: Color, reach: float, blast_speed := 0.0) -> Explosion:
+static func spawn(parent: Node, at: Vector3, explosion_color: Color, reach: float, blast_speed := 0.0, particles := 1.0) -> Explosion:
 	var explosion := Explosion.new()
 	explosion.color = explosion_color
 	explosion.radius = reach
 	explosion.blast = blast_speed
 	explosion.origin = at
+	explosion.particle_share = particles
+	explosion.pop = particles < 1.0
 	parent.add_child(explosion)
 	return explosion
 
@@ -55,14 +63,16 @@ func _ready() -> void:
 	_shell.mesh = sphere
 	_shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_shell.scale = Vector3.ONE * 0.1
+	_shell.visible = not pop
 	add_child(_shell)
 
-	add_child(_particles(_spark_mesh(), 160, radius * 2.2, 0.6, Vector3.ZERO, 1.2))
-	add_child(_particles(_bubble_mesh(), 140, radius * 1.1, 2.0, Vector3(0, 3.0, 0), 2.2))
+	add_child(_particles(_spark_mesh(), maxi(roundi(160 * particle_share), 1), radius * 2.2, 0.6, Vector3.ZERO, 1.2))
+	if not pop:
+		add_child(_particles(_bubble_mesh(), maxi(roundi(140 * particle_share), 1), radius * 1.1, 2.0, Vector3(0, 3.0, 0), 2.2))
 
 	if blast > 0.0:
 		for fish: FishController in get_tree().get_nodes_in_group(FishController.GROUP):
-			if fish.demolished:
+			if fish.battered:
 				continue
 			var away := fish.global_position - global_position
 			var falloff := 1.0 - away.length() / radius
@@ -75,7 +85,7 @@ func _process(delta: float) -> void:
 	var shock := clampf(_age / 0.45, 0.0, 1.0)
 	_shell.scale = Vector3.ONE * maxf(radius * (1.0 - pow(1.0 - shock, 3.0)), 0.1)
 	_shell_material.albedo_color.a = 0.35 * (1.0 - shock)
-	_shell.visible = shock < 1.0
+	_shell.visible = shock < 1.0 and not pop
 	_light.light_energy = FLASH_ENERGY * exp(-_age * 5.0)
 	if _age >= LIFETIME:
 		queue_free()

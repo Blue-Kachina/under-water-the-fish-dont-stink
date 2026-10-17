@@ -29,6 +29,13 @@ const TRANSITION_TIME := 0.5
 ## and ends gently instead of with a lurch.
 const MAX_TURN_ACCEL := 40.0
 
+## Ball cam was turned on or off (by its button or set_ball_cam()).
+signal ball_cam_toggled(on: bool)
+## The ball cam button was held long enough to open the wheel, and let go of
+## again (hold_opens_wheel).
+signal wheel_opened
+signal wheel_closed
+
 @export var fish: FishController
 ## Followed instead of the fish while set, e.g. a replay's ghost (ReplayCar),
 ## which offers the fish's fields the camera reads: on_surface,
@@ -41,6 +48,14 @@ var ball: Node3D
 var course: Arena
 ## Ball cam, or ring cam on the course.
 var ball_cam := false
+## Set by the mode (Nature): holding the ball cam button opens a wheel (its
+## school wheel, TargetWheel) instead, and a short press toggles on release.
+var hold_opens_wheel := false
+## How long (s) the button must be held to open the wheel.
+var wheel_hold_time := 0.3
+## The wheel is open: the right stick picks on it instead of looking around.
+var wheel_open := false
+var _ball_cam_held := -1.0
 ## Set by the environment: the camera keeps collision_margin above this
 ## (the see-through tank's floor). -INF: no floor of its own to keep above.
 var floor_height := -INF
@@ -168,14 +183,51 @@ func _subject() -> Variant:
 	return target if is_instance_valid(target) else fish
 
 
+## Turns ball cam on or off, swinging over at the transition speed.
+func set_ball_cam(on: bool) -> void:
+	if on == ball_cam:
+		return
+	ball_cam = on
+	_transition_left = TRANSITION_TIME / transition_speed
+	ball_cam_toggled.emit(ball_cam)
+
+
+## The ball cam button: a press toggles ball cam. With hold_opens_wheel, it
+## toggles on a short press's release instead, and holding it wheel_hold_time
+## opens the wheel until it's let go.
+func _ball_cam_button(delta: float) -> void:
+	if not hold_opens_wheel:
+		_ball_cam_held = -1.0
+		if wheel_open:
+			wheel_open = false
+			wheel_closed.emit()
+		if Input.is_action_just_pressed("ball_cam"):
+			set_ball_cam(not ball_cam)
+		return
+	if Input.is_action_just_pressed("ball_cam"):
+		_ball_cam_held = 0.0
+	if _ball_cam_held < 0.0:
+		return
+	if Input.is_action_pressed("ball_cam"):
+		_ball_cam_held += delta
+		if not wheel_open and _ball_cam_held >= wheel_hold_time:
+			wheel_open = true
+			wheel_opened.emit()
+		return
+	_ball_cam_held = -1.0
+	if wheel_open:
+		wheel_open = false
+		wheel_closed.emit()
+	else:
+		set_ball_cam(not ball_cam)
+
+
 func _process(delta: float) -> void:
 	var subject: Variant = _subject()
 	if subject == null:
 		return
 
-	if Input.is_action_just_pressed("ball_cam"):
-		ball_cam = not ball_cam
-		_transition_left = TRANSITION_TIME / transition_speed
+	_ball_cam_button(delta)
 	_transition_left = maxf(_transition_left - delta, 0.0)
 
 	var fish_xform: Transform3D = subject.get_global_transform_interpolated()
@@ -238,6 +290,8 @@ func _process(delta: float) -> void:
 	_up = up
 
 	var look_input := Input.get_vector("camera_left", "camera_right", "camera_up", "camera_down")
+	if wheel_open:
+		look_input = Vector2.ZERO  # the stick is picking on the wheel
 	var look_blend := 1.0 - exp(-swivel_speed * SWIVEL_RATE * delta)
 	_look_yaw = lerpf(_look_yaw, -look_input.x * look_yaw_range, look_blend)
 	_look_pitch = lerpf(_look_pitch, -look_input.y * look_pitch_range, look_blend)

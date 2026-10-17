@@ -2,21 +2,21 @@ class_name HuntMatch
 extends Node
 ## Hunt: a 1v1 in the Ocean against a hostile fish (a HunterBot) with the
 ## player's own tuning (Nature's: Extra Swishy strides, no boost, bow wave).
-## A demolition (in Hunt, the victim's been "Battered") is a goal: ramming
-## the other fish nose first at nature_demo_speed or faster scores for the
+## A battery (Battery) is a goal: ramming
+## the other fish nose first at nature_batter_speed or faster scores for the
 ## rammer. Both fish ramming each other at once: the faster one scores; at the
 ## same speed both are battered (a "Fish Fry") and nobody scores.
 ##
 ## Each play starts from a kickoff: the fish facing each other down parallel
 ## lanes KICKOFF_DISTANCE out from the centre, a little offset (one of
 ## KICKOFF_LAYOUTS, mirrored for team 1), frozen through a 3-2-1 countdown, the
-## clock stopped. After a demolition, a moment for the explosion, then a replay
-## of it (GoalReplay, shot arcade style) unless demo_replays is off, then the
+## clock stopped. After a battery, a moment for the explosion, then a replay
+## of it (GoalReplay, shot arcade style) unless battery_replays is off, then the
 ## next kickoff. A Fish Fry is replayed too.
 ##
 ## A 5-minute clock. At 0:00 the most goals wins; level on goals, the most
-## points (StylePoints: close calls, dodges, perfect rhythm, demolitions) wins;
-## level on those too, overtime from a kickoff, where the next demolition wins.
+## points (StylePoints: close calls, dodges, perfect rhythm, batteries) wins;
+## level on those too, overtime from a kickoff, where the next battery wins.
 ##
 ## The arena is a sphere ARENA_RADIUS round the ocean's spawn: past its edge a
 ## fish is pushed back in, and the Ocean's fog shifts as the camera nears it.
@@ -26,18 +26,18 @@ extends Node
 
 ## A kickoff has moved `fish` (cameras following it can snap).
 signal fish_teleported(fish: FishController)
-## `attacker` null: both fish demolished each other at the same speed (a Fish Fry).
-signal demolished(attacker: FishController, victim: FishController)
-signal demo_replay_started(replay: GoalReplay)
-signal demo_replay_ended
+## `attacker` null: both fish battered each other at the same speed (a Fish Fry).
+signal battered(attacker: FishController, victim: FishController)
+signal battery_replay_started(replay: GoalReplay)
+signal battery_replay_ended
 ## The clock ran out with a winner, or someone scored in overtime.
 signal match_over(winner: int)
-## A demolition (a goal), close call, dodge or perfect-rhythm streak: "type"
+## A battery (a goal), close call, dodge or perfect-rhythm streak: "type"
 ## (StylePoints' types), "player" (0 the player, 1 the opponent), "team",
 ## "points", "title", and the type's extras ("victim", "streak", "distance").
 signal stat_event(event: Dictionary)
 
-enum Phase { COUNTDOWN, LIVE, DEMOED, REPLAY, OVER }
+enum Phase { COUNTDOWN, LIVE, BATTERED, REPLAY, OVER }
 
 const FISH_SCENE := preload("res://scenes/fish.tscn")
 const COUNTDOWN_TIME := 3.0
@@ -45,9 +45,9 @@ const COUNTDOWN_TIME := 3.0
 const GO_TIME := 0.8
 ## The game clock (s).
 const MATCH_TIME := 300.0
-## After a demolition, this long (s) for the explosion before the replay.
-const DEMO_PAUSE := 1.6
-## The replay starts this long before the demolition and runs on this long after it.
+## After a battery, this long (s) for the explosion before the replay.
+const BATTERY_PAUSE := 1.6
+## The replay starts this long before the battery and runs on this long after it.
 const REPLAY_BEFORE := 4.0
 const REPLAY_AFTER := 1.0
 ## How long the result shows before a new match kicks off (R sooner).
@@ -66,7 +66,7 @@ const BOUNDARY_OUTWARD := 2.0
 const BOUNDARY_MAX := 30.0
 ## Rams this close in speed (m/s) count as the same speed.
 const SAME_SPEED := 0.05
-const DEMO_EXPLOSION := 6.0
+const BATTERY_EXPLOSION := 6.0
 ## The opponent's name, picked at random each match.
 const OPPONENT_NAMES := ["Moray", "Piranha", "Barracuda", "Muskie", "Gar", "Wolffish", "Lionfish", "Stonefish", "Bluefish", "Snakehead"]
 
@@ -82,27 +82,27 @@ var go_time_left := 0.0
 var clock_left := MATCH_TIME
 var overtime := false
 var overtime_elapsed := 0.0
-## Goals (demolitions): the player's, then the opponent's.
+## Goals (batteries): the player's, then the opponent's.
 var scores := [0, 0]
 ## Once the match is over: 0 the player, 1 the opponent.
 var winner := -1
 ## Once the match is over: seconds until the next one.
 var over_left := 0.0
-## Replays each demolition before the next kickoff.
-var demo_replays := true
-## The demo replay playing, if any.
-var demo_replay: GoalReplay
+## Replays each battery before the next kickoff.
+var battery_replays := true
+## The battery replay playing, if any.
+var battery_replay: GoalReplay
 var style := StylePoints.new()
-## The last demolition: "attacker" and "victim" (both null for a Fish Fry),
-## "speed", "team" (-1 for a Fish Fry) and "double".
-var last_demo := {}
+## The last battery: "attacker" and "victim" (both null for a Fish Fry),
+## "speed", "team" (-1 for a Fish Fry) and "fish_fry".
+var last_battery := {}
 ## The arena's centre (the ocean's spawn).
 var center := Vector3.ZERO
 
-var _demo_left := 0.0
+var _battery_left := 0.0
 var _recorder := GoalRecorder.new()
-## The recorder's time at the last demolition.
-var _demo_record_time := 0.0
+## The recorder's time at the last battery.
+var _battery_record_time := 0.0
 
 
 func setup(hunt_ocean: Ocean, player_fish: FishController) -> void:
@@ -149,9 +149,9 @@ func end() -> void:
 	player.team_color = Color.TRANSPARENT
 	player.team = -1
 	player.controls_locked = false
-	player.visible = not player.demolished  # a replay hides it
-	player.freeze = player.demolished
-	if player.demolished:
+	player.visible = not player.battered  # a replay hides it
+	player.freeze = player.battered
+	if player.battered:
 		player.revive(player.global_transform)
 
 
@@ -170,7 +170,7 @@ func kickoff() -> void:
 	phase = Phase.COUNTDOWN
 	countdown_left = COUNTDOWN_TIME
 	go_time_left = 0.0
-	_demo_left = 0.0
+	_battery_left = 0.0
 	Match1v1.copy_tuning(player, opponent)  # tuning changes since the last kickoff apply to it too
 	var layout: Vector2 = KICKOFF_LAYOUTS.pick_random()
 	for team in 2:
@@ -191,9 +191,9 @@ func kickoff_transform(layout: Vector2, team: int) -> Transform3D:
 	return Transform3D(Basis.looking_at(Vector3(0.0, 0.0, -flip), Vector3.UP), at)
 
 
-## The slowest ram that demolishes (m/s): the player's tuning, which the opponent shares.
-func demo_speed() -> float:
-	return player.nature_demo_speed
+## The slowest ram that batters (m/s): the player's tuning, which the opponent shares.
+func batter_speed() -> float:
+	return player.nature_batter_speed
 
 
 func _physics_process(delta: float) -> void:
@@ -213,11 +213,11 @@ func _physics_process(delta: float) -> void:
 				if clock_left <= 0.0:
 					_time_up()
 					return
-		Phase.DEMOED:
-			_demo_left -= delta
-			if _demo_left <= 0.0:
-				if not (demo_replays and _start_replay()):
-					_after_demo()
+		Phase.BATTERED:
+			_battery_left -= delta
+			if _battery_left <= 0.0:
+				if not (battery_replays and _start_replay()):
+					_after_battery()
 				return
 		Phase.REPLAY:
 			return  # everything waits for the replay
@@ -227,59 +227,59 @@ func _physics_process(delta: float) -> void:
 				kickoff()
 				return
 	go_time_left = maxf(go_time_left - delta, 0.0)
-	if phase == Phase.LIVE or phase == Phase.DEMOED:
+	if phase == Phase.LIVE or phase == Phase.BATTERED:
 		_recorder.record(delta)
 	_keep_in_arena(delta)
-	style.demo_speed = demo_speed()
+	style.batter_speed = batter_speed()
 	style.live = phase == Phase.LIVE
 	style.update(delta)
 	if phase == Phase.LIVE:
-		_check_demolitions()
+		_check_batteries()
 
 
-func _check_demolitions() -> void:
-	var by_player := Demolition.hits(player, opponent, demo_speed())
-	var by_opponent := Demolition.hits(opponent, player, demo_speed())
+func _check_batteries() -> void:
+	var by_player := Battery.hits(player, opponent, batter_speed())
+	var by_opponent := Battery.hits(opponent, player, batter_speed())
 	if by_player and by_opponent:
 		if absf(player.speed - opponent.speed) < SAME_SPEED:
-			_double_demo()
+			_fish_fry()
 			return
 		by_player = player.speed > opponent.speed
 		by_opponent = not by_player
 	if by_player:
-		_demo(player, opponent)
+		_batter(player, opponent)
 	elif by_opponent:
-		_demo(opponent, player)
+		_batter(opponent, player)
 
 
-func _demo(attacker: FishController, victim: FishController) -> void:
+func _batter(attacker: FishController, victim: FishController) -> void:
 	var team := _team_of(attacker)
 	scores[team] += 1
-	last_demo = {"attacker": attacker, "victim": victim, "speed": attacker.speed, "team": team, "double": false}
-	Explosion.spawn(ocean, victim.global_position, AquariumArena.TEAM_COLORS[1 - team], DEMO_EXPLOSION)
-	victim.demolish()
-	style.on_demo(team, 1 - team)
-	_demo_record_time = _recorder.time
-	phase = Phase.DEMOED
-	_demo_left = DEMO_PAUSE
-	demolished.emit(attacker, victim)
+	last_battery = {"attacker": attacker, "victim": victim, "speed": attacker.speed, "team": team, "fish_fry": false}
+	Explosion.spawn(ocean, victim.global_position, AquariumArena.TEAM_COLORS[1 - team], BATTERY_EXPLOSION)
+	victim.batter()
+	style.on_battery(team, 1 - team)
+	_battery_record_time = _recorder.time
+	phase = Phase.BATTERED
+	_battery_left = BATTERY_PAUSE
+	battered.emit(attacker, victim)
 
 
 ## Both at once at the same speed: a Fish Fry. Both explode, nobody scores.
-func _double_demo() -> void:
-	last_demo = {"attacker": null, "victim": null, "speed": player.speed, "team": -1, "double": true}
+func _fish_fry() -> void:
+	last_battery = {"attacker": null, "victim": null, "speed": player.speed, "team": -1, "fish_fry": true}
 	for team in 2:
 		var fish := _fish_of(team)
-		Explosion.spawn(ocean, fish.global_position, AquariumArena.TEAM_COLORS[team], DEMO_EXPLOSION)
-		fish.demolish()
-	_demo_record_time = _recorder.time
-	phase = Phase.DEMOED
-	_demo_left = DEMO_PAUSE
-	demolished.emit(null, null)
+		Explosion.spawn(ocean, fish.global_position, AquariumArena.TEAM_COLORS[team], BATTERY_EXPLOSION)
+		fish.batter()
+	_battery_record_time = _recorder.time
+	phase = Phase.BATTERED
+	_battery_left = BATTERY_PAUSE
+	battered.emit(null, null)
 
 
-## After a demolition (and its replay): the next kickoff, or in overtime the end.
-func _after_demo() -> void:
+## After a battery (and its replay): the next kickoff, or in overtime the end.
+func _after_battery() -> void:
 	if overtime and scores[0] != scores[1]:
 		_finish_match()
 	else:
@@ -304,7 +304,7 @@ func _finish_match() -> void:
 		winner = 0 if style.points[0] > style.points[1] else 1
 	over_left = OVER_TIME
 	style.live = false
-	# Both back out (from a demolition or the replay), the player free to swim
+	# Both back out (from a battery or the replay), the player free to swim
 	# about; the opponent waits.
 	var layout: Vector2 = KICKOFF_LAYOUTS[0]
 	for team in 2:
@@ -327,7 +327,7 @@ func _new_match() -> void:
 	overtime = false
 	overtime_elapsed = 0.0
 	winner = -1
-	last_demo = {}
+	last_battery = {}
 	style.reset()
 	_pick_opponent()
 
@@ -338,58 +338,58 @@ func _pick_opponent() -> void:
 	opponent.display_name = OPPONENT_NAMES.pick_random()
 
 
-## Starts the replay of the demolition just made. False when there's too
+## Starts the replay of the battery just made. False when there's too
 ## little recorded to show.
 func _start_replay() -> bool:
-	if last_demo.is_empty():
+	if last_battery.is_empty():
 		return false
-	var double: bool = last_demo.double
+	var fish_fry: bool = last_battery.fish_fry
 	# A Fish Fry is shot from the player's side, the opponent standing in as the victim.
-	var attacker: FishController = player if double else last_demo.attacker
-	var victim: FishController = opponent if double else last_demo.victim
-	var from := maxf(_recorder.start_time(), _demo_record_time - REPLAY_BEFORE)
-	var clip := _recorder.clip(from, _demo_record_time + REPLAY_AFTER)
+	var attacker: FishController = player if fish_fry else last_battery.attacker
+	var victim: FishController = opponent if fish_fry else last_battery.victim
+	var from := maxf(_recorder.start_time(), _battery_record_time - REPLAY_BEFORE)
+	var clip := _recorder.clip(from, _battery_record_time + REPLAY_AFTER)
 	if clip.times.size() < 30:
 		return false
 	var fish := [player, opponent]
-	demo_replay = GoalReplay.new()
-	demo_replay.name = "DemoReplay"
+	battery_replay = GoalReplay.new()
+	battery_replay.name = "BatteryReplay"
 	# Each explosion in the victim's own team colour, as live.
-	demo_replay.setup(clip, _demo_record_time - from, fish.find(attacker), null,
+	battery_replay.setup(clip, _battery_record_time - from, fish.find(attacker), null,
 			AquariumArena.TEAM_COLORS[_team_of(victim)], ReplayBall.RADIUS)
-	demo_replay.victim = fish.find(victim)
-	demo_replay.double = double
-	demo_replay.scorer_color = AquariumArena.TEAM_COLORS[_team_of(attacker)]
-	demo_replay.explosion_radius = DEMO_EXPLOSION
-	demo_replay.in_arena = false
-	demo_replay.arcade = true
-	demo_replay.finished.connect(func() -> void:
+	battery_replay.victim = fish.find(victim)
+	battery_replay.fish_fry = fish_fry
+	battery_replay.scorer_color = AquariumArena.TEAM_COLORS[_team_of(attacker)]
+	battery_replay.explosion_radius = BATTERY_EXPLOSION
+	battery_replay.in_arena = false
+	battery_replay.arcade = true
+	battery_replay.finished.connect(func() -> void:
 		_stop_replay()
-		_after_demo())
+		_after_battery())
 	phase = Phase.REPLAY
 	# The live fish wait out of sight; the next kickoff (revive) brings them back.
 	for f: FishController in fish:
 		f.controls_locked = true
 		f.visible = false
 		f.freeze = true
-	add_child(demo_replay)
-	demo_replay_started.emit(demo_replay)
+	add_child(battery_replay)
+	battery_replay_started.emit(battery_replay)
 	return true
 
 
 func _stop_replay() -> void:
-	if demo_replay == null:
+	if battery_replay == null:
 		return
-	demo_replay.restore_camera()
-	demo_replay.queue_free()
-	demo_replay = null
-	demo_replay_ended.emit()
+	battery_replay.restore_camera()
+	battery_replay.queue_free()
+	battery_replay = null
+	battery_replay_ended.emit()
 
 
 ## Past the arena's edge: a push back in, harder the further out and the faster outward.
 func _keep_in_arena(delta: float) -> void:
 	for fish: FishController in [player, opponent]:
-		if fish.demolished or fish.freeze:
+		if fish.battered or fish.freeze:
 			continue
 		var out := fish.global_position - center
 		var past := out.length() - ARENA_RADIUS

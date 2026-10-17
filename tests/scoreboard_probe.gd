@@ -141,11 +141,11 @@ func _check_column() -> void:
 func _check_rules() -> void:
 	var line := MatchStats.new_line()
 	check(line.keys() == MatchStats.COLUMNS, "a line has RL's columns, in order")
-	for type in [MatchStats.GOAL, MatchStats.ASSIST, MatchStats.SAVE, MatchStats.SHOT, MatchStats.DEMO, MatchStats.TOUCH,
+	for type in [MatchStats.GOAL, MatchStats.ASSIST, MatchStats.SAVE, MatchStats.SHOT, MatchStats.BATTERY, MatchStats.TOUCH,
 			MatchStats.CLEAR, MatchStats.CENTER]:
 		MatchStats.tally(line, type)
 	check(line.score == 100 + 50 + 50 + 20 + 15 + 2 + 20 + 10, "RL's points add up (%d)" % line.score)
-	check(line.goals == 1 and line.assists == 1 and line.saves == 1 and line.shots == 1 and line.demos == 1 and line.touches == 1,
+	check(line.goals == 1 and line.assists == 1 and line.saves == 1 and line.shots == 1 and line.batteries == 1 and line.touches == 1,
 			"each counted once; clears and centres only score (%s)" % str(line))
 	# Blue defends +Z.
 	check(MatchStats.classify_play(0, Vector3(0, 1, 40), Vector3(0, 0, -20)) == MatchStats.CLEAR, "Blue clears out of its own third")

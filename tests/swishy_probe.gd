@@ -63,7 +63,7 @@ func _run() -> void:
 	check(results["smooth analog sweeps, at the peak"].speed > on_peak.speed * 0.8, "smooth analog sweeps stride as well as flicks")
 	check(results["circling the stick (2 turns/s)"].strides <= 2, "circling doesn't stride (%d)" % results["circling the stick (2 turns/s)"].strides)
 	check(results["at the peak, direction lock"].side < 2.0, "the weave cancels sideways under a lock (%.2f m off the line)" % results["at the peak, direction lock"].side)
-	check(on_peak.peak >= fish.nature_demo_speed, "good strides reach demo speed (%.1f of %.1f)" % [on_peak.peak, fish.nature_demo_speed])
+	check(on_peak.peak >= fish.nature_batter_speed, "good strides reach batter speed (%.1f of %.1f)" % [on_peak.peak, fish.nature_batter_speed])
 
 	print("tail:")
 	input.clear()

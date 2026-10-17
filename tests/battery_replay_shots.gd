@@ -1,15 +1,15 @@
 extends Node
-## Renders Hunt's demo replay (needs a window): a HunterBot drives the player's
+## Renders Hunt's battery replay (needs a window): a HunterBot drives the player's
 ## fish at the opponent (left still) until it batters it, then frames of the
 ## arcade replay are saved: the ghosts' stride tails, bow waves and bubbles,
 ## the vignette, the hit-stop. Pass the folder to save into after `--`.
-##   Godot_console.exe --path . res://tests/demo_replay_shots.tscn -- <out dir>
+##   Godot_console.exe --path . res://tests/battery_replay_shots.tscn -- <out dir>
 
 ## Clip times (s before the impact; negative after it) to save a frame at.
 const SHOTS := [2.0, 1.2, 0.6, 0.25, 0.05, -0.02, -0.3]
 
 var main: Node
-var out_dir := "user://demo_replay_shots"
+var out_dir := "user://battery_replay_shots"
 
 
 func _ready() -> void:
@@ -28,7 +28,7 @@ func _run() -> void:
 	main._match_card.play_requested.emit()
 	await _frames(5)
 	var hunt: HuntMatch = main.hunt_match
-	hunt.demo_replays = true
+	hunt.battery_replays = true
 	# The opponent waits; a second hunter swims the player's fish at it.
 	hunt.bot.process_mode = Node.PROCESS_MODE_DISABLED
 	hunt.bot.input.clear()
@@ -48,12 +48,12 @@ func _run() -> void:
 		await get_tree().process_frame
 	Engine.time_scale = 1.0
 	if hunt.phase != HuntMatch.Phase.REPLAY:
-		print("demo_replay_shots: no demolition to replay")
+		print("battery_replay_shots: no battery to replay")
 		get_tree().quit(1)
 		return
-	var replay := hunt.demo_replay
+	var replay := hunt.battery_replay
 	var next := 0
-	while is_instance_valid(replay) and hunt.demo_replay == replay and next < SHOTS.size():
+	while is_instance_valid(replay) and hunt.battery_replay == replay and next < SHOTS.size():
 		if replay.time >= replay.goal_time - SHOTS[next]:
 			await RenderingServer.frame_post_draw
 			var path := out_dir.path_join("replay_%d.png" % next)
@@ -62,7 +62,7 @@ func _run() -> void:
 			next += 1
 			continue
 		await get_tree().process_frame
-	print("demo_replay_shots: %d frames" % next)
+	print("battery_replay_shots: %d frames" % next)
 	get_tree().quit(0)
 
 

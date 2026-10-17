@@ -16,11 +16,36 @@ Pick a mode from the settings panel's *Mode* dropdown (remembered per PC, apart 
 - **Nature**: the Ocean, with no boost and the **Extra Swishy** swim style (see below). The boost
   button holds the direction lock instead (*Boost Button Locks*). It starts on a
   card; after **Play**, a calm fish waits ahead and ball cam locks onto it. Ram it nose first at 10 m/s
-  or more (*Nature Demo Speed*) to demolish it, and a new one turns up 30-50 m away. Nature has its
-  own tuning (`presets/nature.cfg`); leaving Nature puts your tuning from before back.
+  or more (*Nature Batter Speed*) to batter it, and a new one turns up 30-50 m away.
+
+  **Schools.** Harmless fish (`School`) swim around you in schools, together and mostly in unison:
+  three schools of fifty by default. Ram through one at speed to batter as many as you can; each
+  costs you a little speed. A school tightens into a bait ball and swerves when you rush it, and
+  bursts apart for a moment when one of its fish is battered.
+
+  **Points** (`NatureScore`, Unreal Tournament style):
+  - batteries close together chain into multis: Double Dip, Triple Fry, Fish Supper, Feeding
+    Frenzy, Monster Catch, with a draining bar under the counts for the time left;
+  - a run of them without slowing down is a spree: Spring Roll, Riptide, Apex Predator, Unstoppable,
+    Poseidon.
+
+  **Pearls.** Battered fish sometimes leave a glowing pearl, more often deeper into a multi. Swim
+  over or near one and it's drawn in; for now they're only counted.
+
+  **Ball cam (Y).** A tap looks at whatever is nearest ahead, the lone fish or a school. Hold it to
+  open the **school wheel**: a slice for each school, placed the way it lies from you, with its
+  fish and distance. Pick one with the right stick (IJKL) and let go. Arrows at the screen's edge
+  point to schools off screen.
+
+  **Tuning.** Everything is in the panel's **NATURE** section (schools, formation, reactions,
+  batteries, multis, pearls, targeting, performance) and changes live. Schools are drawn as baked
+  meshes, one per tail pose, with full models only for the few fish nearest the camera, so
+  hundreds of fish stay cheap. Nature has its own tuning (`presets/nature.cfg`); leaving Nature
+  puts your tuning from before back, and the changes you made in Nature are there again next time
+  (until you close the game).
 - **Hunt**: a 1v1 in the Ocean on Nature's tuning against a hostile fish (`HunterBot`, Basic
-  difficulty) that swims with exactly your mechanics and is out to batter you. In Hunt a demolition
-  is called getting **Battered**, and it's a goal: ram the other fish nose first at *Nature Demo
+  difficulty) that swims with exactly your mechanics and is out to batter you. Getting
+  **Battered** is a goal here: ram the other fish nose first at *Nature Batter
   Speed* or faster. Rammed by each other at once, the faster fish scores (the same speed: both are
   battered, a **Fish Fry**, and nobody scores). After each one, a replay (unless *Goal replays* is
   off), shot arcade style: the fish show their stride tails, bow waves and bubbles as they were, the
@@ -30,7 +55,7 @@ Pick a mode from the settings panel's *Mode* dropdown (remembered per PC, apart 
   perfect strides in a row +10, battered +100), and level on those too, overtime's next
   batter wins. The arena reaches 90 m out from the centre: near its edge the water
   darkens, and past it you're pushed back in. Hold D-pad up / B for the scoreboard (fish battered
-  are its BATTERIES column). `tests/demo_replay_shots` (needs a window) renders a demo replay.
+  are its BATTERIES column). `tests/battery_replay_shots` (needs a window) renders a battery replay.
 - **Obstacle Course**: walled arena with a timed 10-hoop course, tunnel, pillars, ramps and an arch.
 - **Replays**: watch Rocket League replays in the Aquarium Arena. Pick one with **Replay...** in the
   replay bar, or drop a `.replay` / `.rlreplay.json` on the window from any mode. **Close** goes back
@@ -100,7 +125,7 @@ Punch*; `scripts/arcade_fx.gd`).
 
 **Bow wave** (on in Nature, *Bow Wave* in the panel): speed pushes a mostly clear, torpedo-tip
 shell of water out ahead of the fish, from *Bow Start Speed* to full size at *Bow Full Speed*. It
-counts as the fish's front for demolitions, so a fast fish has a bigger target area, but it doesn't
+counts as the fish's front for batteries, so a fast fish has a bigger target area, but it doesn't
 push anything. `tests/stride_shots` (needs a window) renders the tail cue and the bow wave on
 every fish.
 

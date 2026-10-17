@@ -165,7 +165,7 @@ func is_flipping() -> bool:
 	return flags & ReplayData.FLAG_DODGE != 0
 
 
-## The demolition burst, where the car was.
+## The burst where the car was: an RL demo, or in a goal replay of ours a battery.
 func explode() -> void:
 	_burst.global_position = global_position
 	_burst.restart()

@@ -1,7 +1,7 @@
 extends Node
 ## Nature mode: its card with the fish sitting out and Nature's tuning on;
 ## Play starts a run with a target fish that ball cam locks onto; a fast ram
-## demolishes it and a new one turns up nearby, a slow bump doesn't; leaving
+## batters it and a new one turns up nearby, a slow bump doesn't; leaving
 ## Nature puts the tuning from before back.
 ##   Godot_console.exe --headless --path . res://tests/nature_probe.tscn
 
@@ -41,7 +41,7 @@ func _run() -> void:
 	await _ticks(5)
 	var run: NatureRun = main.nature_run
 	check(run != null and main._match_card == null and fish.visible, "Play starts the run, fish back")
-	check(is_instance_valid(run.target) and run.target.visible and not run.target.demolished, "a target fish is out")
+	check(is_instance_valid(run.target) and run.target.visible and not run.target.battered, "a target fish is out")
 	check(camera.ball == run.target and camera.ball_cam, "ball cam locked on the target")
 	var gap := fish.global_position.distance_to(run.target.global_position)
 	check(gap > 20.0 and gap < 40.0, "the target waits ahead (%.1f m)" % gap)
@@ -57,7 +57,7 @@ func _run() -> void:
 
 	print("slow bump:")
 	await _ram(run, 5.0)
-	check(run.demos == 0 and not run.target.demolished, "a slow bump doesn't demolish it")
+	check(run.batteries == 0 and not run.target.battered, "a slow bump doesn't batter it")
 
 	print("bow wave:")
 	check(fish.bow_wave and not run.target.bow_wave, "Nature's fish has a bow wave, the target doesn't")
@@ -67,20 +67,20 @@ func _run() -> void:
 	# Centres apart by the hitboxes' length plus 0.8 m: beyond them, within a full bow.
 	fish.global_transform = Transform3D(Basis.looking_at(heading, Vector3.UP), target.global_position - heading * (half * 2.0 + 0.8))
 	fish.bow_amount = 0.0
-	check(not Demolition.touching(fish, target), "0.8 m short: the hitboxes don't touch")
+	check(not Battery.touching(fish, target), "0.8 m short: the hitboxes don't touch")
 	fish.bow_amount = 1.0
-	check(Demolition.touching(fish, target), "...but a full bow wave does")
+	check(Battery.touching(fish, target), "...but a full bow wave does")
 	fish.bow_amount = 0.0
 	await _ticks(3)
 	fish.linear_velocity = Vector3.ZERO
 
-	print("demolition:")
-	await _ram(run, fish.nature_demo_speed + 6.0)
-	check(run.demos == 1 and run.target.demolished, "a fast ram demolishes it (%.1f m/s)" % run.last_demo_speed)
+	print("battery:")
+	await _ram(run, fish.nature_batter_speed + 6.0)
+	check(run.batteries == 1 and run.target.battered, "a fast ram batters it (%.1f m/s)" % run.last_battery_speed)
 	fish.linear_velocity = Vector3.ZERO  # stop coasting off, so "nearby" means where it appeared
 	await _ticks(roundi((NatureRun.RESPAWN_TIME + 0.3) * 120.0))
 	gap = fish.global_position.distance_to(run.target.global_position)
-	check(not run.target.demolished and run.target.visible, "a new one turns up")
+	check(not run.target.battered and run.target.visible, "a new one turns up")
 	check(gap >= NatureRun.RESPAWN_DISTANCE.x - 2.0 and gap <= NatureRun.RESPAWN_DISTANCE.y + 2.0, "nearby (%.1f m)" % gap)
 
 	print("wandering:")

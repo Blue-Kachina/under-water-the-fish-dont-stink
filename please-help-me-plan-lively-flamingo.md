@@ -7,14 +7,14 @@ We want a new mode, **Nature**, built to make players *swim like a fish*. That w
 - a well-timed alternation compounds speed;
 - a visual cue shows when to alternate.
 
-The player gets a "begin" prompt, then is placed in open ocean near a non-hostile target fish. Ball cam locks onto that fish, and hitting it fast enough demolishes it.
+The player gets a "begin" prompt, then is placed in open ocean near a non-hostile target fish. Ball cam locks onto that fish, and hitting it fast enough batters it.
 
 The existing **Original** style stays exactly as it is for all other modes, since swim strokes are never removed. Extra Swishy is expected to need several feel-tuning loops, so every number goes through `@export` values. Those values show in the tuning panel and are saved in presets automatically.
 
 Decisions already made:
 - **Physics base:** the Water preset.
 - **Cue:** both on the fish and on the HUD.
-- **After a demo:** a new target spawns nearby.
+- **After a battery:** a new target spawns nearby.
 - **Stride input:** physics-based. Any sweep direction counts, diagonals included; it should feel like cutting through water.
 
 ## Existing pieces to reuse
@@ -22,7 +22,7 @@ Decisions already made:
   - stroke detection in `_detect_strokes` / `_register_stroke`;
   - `_apply_strokes` and `_apply_water`;
   - boost in `_update_boost`;
-  - `demolish()` / `revive()`;
+  - `batter()` / `revive()`;
   - the `stroked` signal;
   - `is_option_active` (hides tuning options that don't apply).
 - `main.gd`:
@@ -33,13 +33,13 @@ Decisions already made:
 - `Match1v1` (`scripts/match_1v1.gd`):
   - the template for spawning a second fish (`_ready` 132–144);
   - `copy_tuning`;
-  - `_check_demolition` / `_touching` (demo logic);
+  - `_check_battery` / `_touching` (battery logic);
   - the respawn timers.
 - `FishBot._celebrate()` (`scripts/fish_bot.gd`): a non-hostile wander pattern, and `_drive` has the steering math. Bots drive fish through a `FishInput`.
 - `follow_camera.gd`:
   - `_focus()` returns `ball` (typed `Node3D`); a fish works as a target.
   - `_sweep` already ignores the `fish` group.
-- `Explosion.spawn`, the HUD `_on_demolished` banner, the `xray_outline` shader (target visible through things), and `presets/water.cfg`.
+- `Explosion.spawn`, the HUD `_on_battered` banner, the `xray_outline` shader (target visible through things), and `presets/water.cfg`.
 
 ## Design
 
@@ -105,7 +105,7 @@ Decisions already made:
 ### 4. Nature mode flow (main.gd)
 - Add `NATURE := "Nature"` to `MODES` and `MODE_ENVIRONMENTS[NATURE] = "Ocean"`. It is a card mode (prompt to begin).
 - Generalise `_sit_out` / `_come_back` so they only touch the AquariumArena ball when the environment is an AquariumArena.
-- Add `_match_card_text` for Nature, e.g. "Swim like a fish. Sweep the stick back and forth, and alternate at each stroke's peak. Ram the fish to demo it."
+- Add `_match_card_text` for Nature, e.g. "Swim like a fish. Sweep the stick back and forth, and alternate at each stroke's peak. Ram the fish to batter it."
 - `play_match` dispatches by mode: it creates a new `NatureRun` node instead of `Match1v1`.
 - When entering Nature, apply `presets/nature.cfg` to the player fish.
 - When leaving, restore the previous tuning. Snapshot it with `copy_tuning` into a stash, or reload the active preset.
@@ -117,10 +117,10 @@ Decisions already made:
   - it is calm and slow, never chases the player;
   - optionally it makes a gentle dodge or flee turn when the player gets close fast. Off by default, as a tunable.
 - **Ball cam:** set `_camera.ball = target`, with the HUD hint label reading "fish cam". Add `xray_outline` to the target so it stays readable in fog.
-- **Demo:** move `_check_demolition` / `_touching` into a shared static helper (`scripts/demolition.gd`), so that `Match1v1` and `NatureRun` both call it. NatureRun passes `nature_demo_speed` (an export, defaulting to roughly the supersonic speed of 22 m/s and tuned with Extra Swishy), so a demo requires a good stride chain.
-- **On a demo:**
-  - `Explosion.spawn`, `victim.demolish()`, and the HUD banner "DEMOLITION! 27 m/s";
-  - a demo counter ticks up;
+- **Battery:** move `_check_battery` / `_touching` into a shared static helper (`scripts/battery.gd`), so that `Match1v1` and `NatureRun` both call it. NatureRun passes `nature_batter_speed` (an export, defaulting to roughly the supersonic speed of 22 m/s and tuned with Extra Swishy), so a battery requires a good stride chain.
+- **On a battery:**
+  - `Explosion.spawn`, `victim.batter()`, and the HUD banner "BATTERED! 27 m/s";
+  - a battery counter ticks up;
   - after about 1.5 s a new target `revive`s 30–50 m away in a random direction, and the camera re-targets.
 - **Ending:** `end()` frees the target and returns control.
 
@@ -135,11 +135,11 @@ Decisions already made:
   - `scripts/fish_model.gd`: tail and glow cue;
   - `scripts/hud.gd`: stride meter, hide gauge, labels;
   - `scripts/main.gd`: mode, card, dispatch, generalised sit-out, preset swap;
-  - `scripts/match_1v1.gd`: use the shared demo helper;
+  - `scripts/match_1v1.gd`: use the shared battery helper;
   - `scripts/follow_camera.gd`: only if the hint or label needs a "fish" focus;
   - `README.md`: a modes section;
   - `tests/modes_probe.gd`: the new mode.
-- **New:** `scripts/swishy_swim.gd`, `scripts/nature_run.gd`, `scripts/wander_bot.gd`, `scripts/demolition.gd`, `presets/nature.cfg`, `tests/swishy_probe.gd/.tscn`, `tests/nature_probe.gd/.tscn`.
+- **New:** `scripts/swishy_swim.gd`, `scripts/nature_run.gd`, `scripts/wander_bot.gd`, `scripts/battery.gd`, `presets/nature.cfg`, `tests/swishy_probe.gd/.tscn`, `tests/nature_probe.gd/.tscn`.
 
 ## Verification
 Run headless probes with `Godot_v4.7.2-stable_win64_console.exe --headless --path . res://tests/<probe>.tscn`.
@@ -155,10 +155,10 @@ Run headless probes with `Godot_v4.7.2-stable_win64_console.exe --headless --pat
 **`nature_probe`:**
 - `set_mode(NATURE)` shows the card, and the fish sits out;
 - `play_match` spawns the target, sets the camera focus to the target, and turns boost off;
-- ramming the target above the demo speed demos it, and a new target appears;
-- a slow bump does not demo it;
+- ramming the target above the batter speed batters it, and a new target appears;
+- a slow bump does not batter it;
 - leaving Nature restores the previous tuning and Original style.
 
 **Other checks:**
-- Re-run all existing probes (they should all still pass), especially `modes_probe`, `match_probe` (shared demo helper) and `momentum_probe`.
-- Build, then hand off for manual feel testing. Expect several tuning loops on `stride_peak_time`, `stride_fade_time`, `flow_gain`, `stride_side_angle`, drag and the demo speed. All are live in the tuning panel.
+- Re-run all existing probes (they should all still pass), especially `modes_probe`, `match_probe` (shared battery helper) and `momentum_probe`.
+- Build, then hand off for manual feel testing. Expect several tuning loops on `stride_peak_time`, `stride_fade_time`, `flow_gain`, `stride_side_angle`, drag and the batter speed. All are live in the tuning panel.

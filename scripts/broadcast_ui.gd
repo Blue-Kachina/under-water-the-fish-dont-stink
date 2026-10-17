@@ -265,7 +265,7 @@ class ReplayOverlay extends Control:
 		visible = false
 
 	## `credit` and `second`: the card's heading over the name and its left
-	## column (Hunt's demolition replay: "BATTERED BY" and "VICTIM").
+	## column (Hunt's battery replay: "BATTERED BY" and "VICTIM").
 	func start(goal_replay: GoalReplay, scorer_name: String, assister_name: String, speed: String, team_color: Color,
 			credit := "SCORED BY", second := "ASSIST") -> void:
 		replay = goal_replay
@@ -330,10 +330,10 @@ class PlayerList extends Control:
 	const GAP := 6.0
 	const BADGE := 30.0
 	const BADGE_TIME := 3.5
-	const LABELS := {"goal": "GOAL", "assist": "ASSIST", "save": "SAVE", "shot": "SHOT", "demo": "DEMO"}
+	const LABELS := {"goal": "GOAL", "assist": "ASSIST", "save": "SAVE", "shot": "SHOT", "battery": "BATTERED", "demo": "DEMO"}
 
 	var team := 0
-	## Each: "name", "boost" (0-100), "present" (false: dimmed, e.g. demolished)
+	## Each: "name", "boost" (0-100), "present" (false: dimmed, e.g. battered)
 	## and "focus" (outlined: the player being watched).
 	var rows: Array[Dictionary] = []
 	## Row -> [type, age] of its badge.
@@ -406,7 +406,7 @@ class PlayerList extends Control:
 		draw_rect(Rect2(centre - Vector2(half, half), Vector2(half, half) * 2.0), Color(color if plate else BroadcastUI.INK, fade))
 		draw_rect(Rect2(centre - Vector2(half, half), Vector2(half, half) * 2.0), Color(color, fade), false, 2.0)
 		_draw_glyph(type, centre, half * 0.62, Color(1, 1, 1, fade))
-		var label := Rect2(at.x - 72.0 if right else at.x + BADGE + 6.0, at.y, 66.0, BADGE)
+		var label := Rect2(at.x - 90.0 if right else at.x + BADGE + 6.0, at.y, 84.0, BADGE)
 		BroadcastUI.text(self, label, LABELS[type], 14, Color(BroadcastUI.GOLD, fade * pop_in),
 				HORIZONTAL_ALIGNMENT_RIGHT if right else HORIZONTAL_ALIGNMENT_LEFT, 800)
 
@@ -429,7 +429,7 @@ class PlayerList extends Control:
 				for a in 4:
 					var d := Vector2.from_angle(a * PI / 2.0)
 					draw_line(c + d * r * 0.5, c + d * r * 1.1, ink, 2.0, true)
-			"demo":
+			"battery", "demo":
 				var points := PackedVector2Array()
 				for k in 16:
 					points.append(c + Vector2.from_angle(k * TAU / 16.0 - PI / 2.0) * (r if k % 2 == 0 else r * 0.45))
@@ -510,7 +510,7 @@ class NamePlates extends Control:
 ## footer line if there's one. See-through enough to keep the play in view
 ## behind it; the type stays solid to read.
 class StatsBoard extends Control:
-	const HEADINGS := ["SCORE", "GOALS", "SHOTS", "ASSISTS", "SAVES", "DEMOS", "TOUCHES"]
+	const HEADINGS := ["SCORE", "GOALS", "SHOTS", "ASSISTS", "SAVES", "BATTERIES", "TOUCHES"]
 	const PLATE_WIDTH := 52.0
 	const NAME_WIDTH := 236.0
 	const COLUMN_WIDTH := 76.0

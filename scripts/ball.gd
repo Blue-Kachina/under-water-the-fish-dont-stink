@@ -272,7 +272,7 @@ func remove_player(player: FishController) -> void:
 ## the ball at `centre`: {fish, normal (fish -> ball), depth (overlap, negative
 ## while still just apart)}, or empty when it isn't touching (or is out of play).
 func _fish_contact(centre: Vector3, who: FishController) -> Dictionary:
-	if not is_instance_valid(who) or who.demolished or popped:
+	if not is_instance_valid(who) or who.battered or popped:
 		return {}
 	var best := {}
 	var fish_state := who.physics_state()  # not who.global_transform, which may be last tick's

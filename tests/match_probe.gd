@@ -1,7 +1,7 @@
 extends Node
 ## The 1v1 mode: switching into it, the kickoff countdown, the bot playing
 ## (touching the ball, scoring on an idle player), the reset after a goal,
-## a demolition and the respawn after it, and switching back to Free Play.
+## a battery and the respawn after it, and switching back to Free Play.
 ##   Godot_console.exe --headless --fixed-fps 120 --path . res://tests/match_probe.tscn
 
 const TICK := 1.0 / 120.0
@@ -85,7 +85,7 @@ func _run() -> void:
 
 	ball.touched.disconnect(count_touch)
 
-	# Demolition: the bot (driven by the probe) rams the parked player at full boost.
+	# Battery: the bot (driven by the probe) rams the parked player at full boost.
 	game.bot.set_physics_process(false)
 	ball.pop()
 	aquarium.set_physics_process(false)
@@ -100,34 +100,34 @@ func _run() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	game.bot_fish.boost_amount = 100.0
-	var demos := []
-	game.demolished.connect(func(attacker: FishController, victim: FishController) -> void: demos.append([attacker, victim]))
+	var batteries := []
+	game.battered.connect(func(attacker: FishController, victim: FishController) -> void: batteries.append([attacker, victim]))
 	var top_speed := 0.0
 	waited = 0.0
-	while demos.is_empty() and waited < 5.0:
+	while batteries.is_empty() and waited < 5.0:
 		await get_tree().physics_frame
 		top_speed = maxf(top_speed, game.bot_fish.speed)
 		waited += TICK
-	check(not demos.is_empty() and demos[0][1] == fish, "the bot demolishes the player (top speed %.1f m/s)" % top_speed)
-	check(fish.demolished and not fish.visible, "the player is out of play")
+	check(not batteries.is_empty() and batteries[0][1] == fish, "the bot batters the player (top speed %.1f m/s)" % top_speed)
+	check(fish.battered and not fish.visible, "the player is out of play")
 	ram.clear()
 	await _seconds(Match1v1.RESPAWN_TIME - 0.1)
-	check(fish.demolished, "still out just before %.0f s" % Match1v1.RESPAWN_TIME)
-	while fish.demolished:
+	check(fish.battered, "still out just before %.0f s" % Match1v1.RESPAWN_TIME)
+	while fish.battered:
 		await get_tree().physics_frame
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	check(not fish.demolished and fish.visible, "and back after %.0f s" % Match1v1.RESPAWN_TIME)
+	check(not fish.battered and fish.visible, "and back after %.0f s" % Match1v1.RESPAWN_TIME)
 	check(fish.global_position.z > 40.0 and absf(fish.global_position.x) > 20.0, "at a respawn spot (%.1f, %.1f)" % [fish.global_position.x, fish.global_position.z])
 	check(absf(fish.boost_amount - Match1v1.SPAWN_BOOST) < 0.5, "with 33 boost (%.1f)" % fish.boost_amount)
 
-	# A slow bump doesn't demolish.
+	# A slow bump doesn't batter.
 	game.bot_fish.set_spawn(Transform3D(Basis.looking_at(Vector3(0, 0, 1)), Vector3(0.0, spawn_height, -16.0)))
 	fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(0.0, spawn_height, -10.0)))
 	ram.forward = 1.0
 	await _seconds(2.0)
 	ram.clear()
-	check(demos.size() == 1, "a slow bump doesn't demolish (bot reached %.1f m/s)" % game.bot_fish.speed)
+	check(batteries.size() == 1, "a slow bump doesn't batter (bot reached %.1f m/s)" % game.bot_fish.speed)
 
 	# A goal explosion blasts nearby fish.
 	aquarium.set_physics_process(true)

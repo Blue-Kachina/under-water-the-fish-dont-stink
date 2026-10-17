@@ -1,7 +1,7 @@
 extends Node
-## HunterBot (Hunt's opponent, Basic): it gets up to demolition speed from a
+## HunterBot (Hunt's opponent, Basic): it gets up to batter speed from a
 ## standstill on its own strides alone (it only writes its FishInput), its
-## stride timing is loose but far from mashing, it demolishes a player sitting
+## stride timing is loose but far from mashing, it batters a player sitting
 ## still, and set to always evade it gets out of the way of straight rams that
 ## catch it when it never evades.
 ##   Godot_console.exe --headless --path . res://tests/hunter_bot_probe.tscn
@@ -38,7 +38,7 @@ func _run() -> void:
 	main._match_card.play_requested.emit()
 	await _ticks(5)
 	var hunt: HuntMatch = main.hunt_match
-	hunt.demo_replays = false
+	hunt.battery_replays = false
 	var opponent := hunt.opponent
 	var bot := hunt.bot
 	check(opponent.controls == bot.input, "it drives its fish through its FishInput")
@@ -56,9 +56,9 @@ func _run() -> void:
 	for i in 600:
 		await get_tree().physics_frame
 		top = maxf(top, opponent.speed)
-		if reached < 0.0 and opponent.speed >= hunt.demo_speed():
+		if reached < 0.0 and opponent.speed >= hunt.batter_speed():
 			reached = i / 120.0
-	check(reached >= 0.0 and reached < 4.0, "it reaches demolition speed (%.1f m/s) in %.2f s" % [hunt.demo_speed(), reached])
+	check(reached >= 0.0 and reached < 4.0, "it reaches batter speed (%.1f m/s) in %.2f s" % [hunt.batter_speed(), reached])
 	check(top > opponent.max_speed + 2.0, "faster than throttle alone (%.1f m/s top, throttle caps at %.1f)" % [top, opponent.max_speed])
 	check(timings.size() >= 10, "on strides (%d of them in 5 s)" % timings.size())
 	var mean := 0.0
@@ -81,7 +81,7 @@ func _run() -> void:
 		if hunt.scores[1] > 0:
 			scored_at = i / 120.0
 			break
-	check(scored_at >= 0.0, "it demolishes a player sitting still (after %.1f s)" % scored_at)
+	check(scored_at >= 0.0, "it batters a player sitting still (after %.1f s)" % scored_at)
 
 	print("evading:")
 	var sharp := BotDifficulty.basic()

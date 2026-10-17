@@ -1,11 +1,11 @@
 class_name StylePoints
 extends RefCounted
-## Hunt's points, a tally beside the goals (demolitions): close calls, dodges,
-## perfect rhythm and demolitions, for both fish alike.
+## Hunt's points, a tally beside the goals (batteries): close calls, dodges,
+## perfect rhythm and batteries, for both fish alike.
 ##
-## A fish is threatened while the other comes at it fast enough to demolish it
-## (at least demo_speed), close (THREAT_RANGE) and with it in front of its nose
-## (Demolition.FRONT). When that ends without a demolition, the threatened fish
+## A fish is threatened while the other comes at it fast enough to batter it
+## (at least batter_speed), close (THREAT_RANGE) and with it in front of its nose
+## (Battery.FRONT). When that ends without a battery, the threatened fish
 ## gets points if it came within CLOSE_CALL_DISTANCE:
 ## - a dodge if it did something about it: a dodge, or turned DODGE_TURN or more
 ##   from the way it was heading just before (its heading a moment ago,
@@ -19,17 +19,17 @@ extends RefCounted
 ## stride starts the count again. A point per stride would swamp everything else.
 ##
 ## The match calls update() every physics tick while play is live (live on),
-## on_demo() for a demolition, and detach() when it's done.
+## on_battery() for a battery, and detach() when it's done.
 
 signal awarded(index: int, type: String, points: int, extra: Dictionary)
 
 const CLOSE_CALL := "close_call"
 const DODGE := "dodge"
 const PERFECT_RHYTHM := "perfect_rhythm"
-const DEMO := "demo"
-const POINTS := {CLOSE_CALL: 25, DODGE: 50, PERFECT_RHYTHM: 10, DEMO: 100}
+const BATTERY := "battery"
+const POINTS := {CLOSE_CALL: 25, DODGE: 50, PERFECT_RHYTHM: 10, BATTERY: 100}
 ## What the callouts say.
-const TITLES := {CLOSE_CALL: "CLOSE CALL", DODGE: "DODGE", PERFECT_RHYTHM: "PERFECT RHYTHM", DEMO: "BATTERED"}
+const TITLES := {CLOSE_CALL: "CLOSE CALL", DODGE: "DODGE", PERFECT_RHYTHM: "PERFECT RHYTHM", BATTERY: "BATTERED"}
 ## How close (m, centre to centre) a fast fish must come for it to be a threat.
 const THREAT_RANGE := 6.0
 ## How near (m, between hitboxes) a miss must be to score.
@@ -45,14 +45,14 @@ const STREAK_STEP := 4
 
 ## The two fish: index 0 the player's, 1 the opponent's.
 var fish: Array[FishController] = []
-## The slowest ram that demolishes (m/s).
-var demo_speed := 10.0
-## Off between plays (countdowns, after a demolition): nothing scores.
+## The slowest ram that batters (m/s).
+var batter_speed := 10.0
+## Off between plays (countdowns, after a battery): nothing scores.
 var live := false
 ## Each fish's points.
 var points := [0, 0]
 ## Each fish's counts: "close_calls", "dodges", "perfect" (strides),
-## "best_streak", "demos" and "top_speed" (m/s, live play).
+## "best_streak", "batteries" and "top_speed" (m/s, live play).
 var counts: Array[Dictionary] = []
 ## Each fish's current run of perfect strides.
 var streaks := [0, 0]
@@ -90,7 +90,7 @@ func reset() -> void:
 	points = [0, 0]
 	counts.clear()
 	for i in 2:
-		counts.append({"close_calls": 0, "dodges": 0, "perfect": 0, "best_streak": 0, "demos": 0, "top_speed": 0.0})
+		counts.append({"close_calls": 0, "dodges": 0, "perfect": 0, "best_streak": 0, "batteries": 0, "top_speed": 0.0})
 	streaks = [0, 0]
 	clear_windows()
 
@@ -128,21 +128,21 @@ func update(delta: float) -> void:
 			_judge_escape(victim, window)
 
 
-## `attacker` demolished `victim`: points for it, and no escape for `victim`.
-func on_demo(attacker: int, victim: int) -> void:
+## `attacker` battered `victim`: points for it, and no escape for `victim`.
+func on_battery(attacker: int, victim: int) -> void:
 	_windows[victim] = {}
-	counts[attacker].demos += 1
-	_award(attacker, DEMO, {"victim": victim})
+	counts[attacker].batteries += 1
+	_award(attacker, BATTERY, {"victim": victim})
 
 
 ## Whether `attacker` is coming at `victim` fast enough, close enough and nose on.
 func threatens(attacker: FishController, victim: FishController) -> bool:
-	if attacker.demolished or victim.demolished or attacker.speed < demo_speed:
+	if attacker.battered or victim.battered or attacker.speed < batter_speed:
 		return false
 	var offset := victim.global_position - attacker.global_position
 	if offset.length() > THREAT_RANGE:
 		return false
-	return offset.normalized().dot(-attacker.global_basis.z) >= Demolition.FRONT
+	return offset.normalized().dot(-attacker.global_basis.z) >= Battery.FRONT
 
 
 ## About how far apart (m) two fish's hitboxes are: 0 when they touch.
@@ -168,7 +168,7 @@ static func _heading(f: FishController) -> Vector3:
 
 
 func _judge_escape(victim: int, window: Dictionary) -> void:
-	if fish[victim].demolished or window.closest > CLOSE_CALL_DISTANCE or _cooldown[victim] > 0.0:
+	if fish[victim].battered or window.closest > CLOSE_CALL_DISTANCE or _cooldown[victim] > 0.0:
 		return
 	_cooldown[victim] = AWARD_COOLDOWN
 	if window.dodged or window.turn >= DODGE_TURN:

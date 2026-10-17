@@ -1,8 +1,9 @@
 class_name MatchStats
 extends RefCounted
-## The moments the HUD's player lists call out (goal, assist, save, shot,
-## demo), worked out the same way for the live 1v1 and for Rocket League
-## replays (whose files only carry goals, demos and touches):
+## The moments the HUD's player lists call out (goal, assist, save, shot, and a
+## battery in our matches or a demo in a Rocket League replay), worked out the
+## same way for the live 1v1 and for Rocket League replays (whose files only
+## carry goals, demos and touches):
 ##   shot: a touch that puts the ball on course for the other team's net;
 ##   save: a touch that takes it off course for the toucher's own net;
 ##   assist: see AquariumArena.goal_credit (a teammate's touch before the scorer's).
@@ -11,7 +12,7 @@ extends RefCounted
 ## inside the mouth?
 ##
 ## Events are dictionaries like ReplayData's: "type", "time", "player" (an index)
-## and "team"; a demo also has "victim".
+## and "team"; a battery or demo also has "victim".
 ##
 ## The live 1v1 also keeps a scoreboard line per player (new_line, tally): RL's
 ## points for each of those, plus every touch, clears out of your own third and
@@ -22,17 +23,21 @@ const GOAL = "goal"
 const ASSIST = "assist"
 const SAVE = "save"
 const SHOT = "shot"
+## A fish battered by another (our matches).
+const BATTERY = "battery"
+## A car demolished by another (a Rocket League replay's own event).
 const DEMO = "demo"
 const TOUCH = "touch"
 const CLEAR = "clear"
 const CENTER = "center"
-## Rocket League's points for each. RL doesn't publish its rules for touches,
-## clears and centres; these are its usual values, and the judging below a guess.
-const POINTS := {GOAL: 100, ASSIST: 50, SAVE: 50, SHOT: 20, DEMO: 15, CLEAR: 20, CENTER: 10, TOUCH: 2}
-## A scoreboard line's columns, as RL's scoreboard orders them, and the event
-## each counts.
-const COLUMNS := ["score", "goals", "shots", "assists", "saves", "demos", "touches"]
-const COUNTED := {GOAL: "goals", SHOT: "shots", ASSIST: "assists", SAVE: "saves", DEMO: "demos", TOUCH: "touches"}
+## Rocket League's points for each (a battery scores as RL's demo). RL doesn't
+## publish its rules for touches, clears and centres; these are its usual
+## values, and the judging below a guess.
+const POINTS := {GOAL: 100, ASSIST: 50, SAVE: 50, SHOT: 20, BATTERY: 15, DEMO: 15, CLEAR: 20, CENTER: 10, TOUCH: 2}
+## A scoreboard line's columns, in RL's scoreboard's order (batteries where it
+## has demos), and the event each counts.
+const COLUMNS := ["score", "goals", "shots", "assists", "saves", "batteries", "touches"]
+const COUNTED := {GOAL: "goals", SHOT: "shots", ASSIST: "assists", SAVE: "saves", BATTERY: "batteries", TOUCH: "touches"}
 ## A clear sends the ball from your own third towards the other end at least
 ## this fast (m/s); a centre sends it from out wide in the other team's third
 ## towards the middle at least this fast.

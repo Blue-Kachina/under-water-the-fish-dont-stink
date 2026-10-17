@@ -55,7 +55,7 @@ func record(delta: float) -> void:
 	_ball.append(_body_state(ball, is_instance_valid(ball) and not ball.popped))
 	for i in fish.size():
 		var f := fish[i]
-		var state := _body_state(f, is_instance_valid(f) and not f.demolished)
+		var state := _body_state(f, is_instance_valid(f) and not f.battered)
 		if is_instance_valid(f):
 			var flags := 0
 			if f.is_boosting:

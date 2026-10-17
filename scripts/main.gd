@@ -3,13 +3,15 @@ extends Node3D
 ## and the pause menu (PauseMenu, on Start), whose Settings shows the tuning
 ## panel. The mode (picked in the tuning panel) decides the environment: Free Play and
 ## 1v1 (against a bot, Match1v1) in the Aquarium Arena, Free Swim and Nature
-## (Extra Swishy strides after a fish to demolish, NatureRun) and Hunt (a 1v1
+## (Extra Swishy strides after a fish to batter, NatureRun) and Hunt (a 1v1
 ## on Nature's tuning against a hostile fish, HuntMatch) in the Ocean, the
 ## Obstacle Course, and Replays.
 ##
 ## Match modes (MATCH_MODES) start on a card (MatchCard) with the fish sitting
 ## out; its Play starts the match (play_match). Nature and Hunt play on Nature's
 ## tuning (NATURE_PRESET), and leaving them puts the tuning from before back.
+## Changes made to the tuning while in them are kept for the next time (until
+## the game closes).
 ##
 ## Replays mode plays Rocket League replays in the Aquarium Arena (load_replay):
 ## pick one with the replay card's Open, drop a file on the window (from any
@@ -67,8 +69,12 @@ var match_1v1: Match1v1
 var nature_run: NatureRun
 ## The Hunt match being played, if any.
 var hunt_match: HuntMatch
+## Nature's school wheel and edge arrows, while a run is on.
+var _target_wheel: TargetWheel
 ## The tuning from before Nature's, while Nature's is on (else empty).
 var _tuning_before_nature := {}
+## Nature's tuning as it was when last left, changes included (empty: not yet).
+var _nature_tuning := {}
 ## Shown in a match mode until Play starts the match.
 var _match_card: MatchCard
 var _environment: Node3D
@@ -436,7 +442,7 @@ static func _match_card_text(mode: String) -> String:
 		ONE_V_ONE:
 			return "1v1 against a bot: %d minutes on the clock, overtime on a tie." % int(Match1v1.MATCH_TIME / 60.0)
 		NATURE:
-			return "Swim like a fish: no boost here. Hold throttle and sweep the stick from side to side (any direction, as long as each sweep goes back the other way). Each stride builds to a peak, when its glow flashes; sweep back right then and the next stride pushes harder. Keep it up and the push builds. Ram the fish your camera's locked on fast enough to demolish it."
+			return "Swim like a fish: no boost here. Hold throttle and sweep the stick from side to side (any direction, as long as each sweep goes back the other way). Each stride builds to a peak, when its glow flashes; sweep back right then and the next stride pushes harder. Keep it up and the push builds. Ram the fish your camera's locked on fast enough to batter it."
 		HUNT:
 			return "Hunt: 1v1 in open water, %d minutes on the clock. Batter your opponent (ram it nose first, fast) to score, and watch out: it's out to batter you too. Batter each other at once and it's a Fish Fry. Close calls, dodges and runs of perfect strides earn points, and level on goals, points decide it." % int(HuntMatch.MATCH_TIME / 60.0)
 	return mode
@@ -539,7 +545,10 @@ func _use_nature_tuning(on: bool) -> void:
 	if on:
 		_tuning_before_nature = _panel.tuning_snapshot()
 		_panel.load_mode_preset(NATURE_PRESET)
+		if not _nature_tuning.is_empty():
+			_panel.restore_tuning(_nature_tuning)
 	else:
+		_nature_tuning = _panel.tuning_snapshot()
 		_panel.restore_tuning(_tuning_before_nature)
 		_tuning_before_nature = {}
 
@@ -570,16 +579,40 @@ func _start_nature() -> void:
 		if fish == _fish:
 			_camera.snap())
 	_environment.add_child(nature_run)
-	_camera.ball = nature_run.target  # ball cam follows the fish to catch
+	_camera.ball = nature_run.focus  # ball cam follows the fish or school to catch
+	nature_run.awarded.connect(func(event: Dictionary) -> void:
+		# Big multis and sprees punch the view in, harder each step.
+		var chain: int = event.get("chain", 0)
+		if event.type == NatureScore.SPREE or chain >= 3:
+			(get_node("ArcadeFx") as ArcadeFx).punch(1.0 if event.type == NatureScore.SPREE else minf(0.4 + 0.15 * chain, 1.2)))
+	nature_run.focus_changed.connect(func(focus: Node3D) -> void:
+		_camera.ball = focus)
 	_camera.ball_cam = true
+	# Ball cam: a tap looks at the nearest thing ahead, holding opens the school wheel.
+	_camera.hold_opens_wheel = true
+	if not _camera.ball_cam_toggled.is_connected(_on_ball_cam_toggled):
+		_camera.ball_cam_toggled.connect(_on_ball_cam_toggled)
+	_target_wheel = TargetWheel.new()
+	_target_wheel.name = "TargetWheel"
+	_target_wheel.camera = _camera
+	_target_wheel.run = nature_run
+	add_child(_target_wheel)
+	_camera.wheel_opened.connect(_target_wheel.open)
+	_camera.wheel_closed.connect(_target_wheel.close)
 	_hud.set_nature(nature_run)
+
+
+## Ball cam just went on in Nature: it looks at the nearest thing ahead.
+func _on_ball_cam_toggled(on: bool) -> void:
+	if on and nature_run:
+		nature_run.pick_focus()
 
 
 func _start_hunt() -> void:
 	hunt_match = HuntMatch.new()
 	hunt_match.name = "Hunt"
 	hunt_match.setup(_environment as Ocean, _fish)
-	hunt_match.demo_replays = UISettings.goal_replays
+	hunt_match.battery_replays = UISettings.goal_replays
 	hunt_match.fish_teleported.connect(func(fish: FishController) -> void:
 		if fish == _fish:
 			_camera.snap())
@@ -601,6 +634,10 @@ func _end_match() -> void:
 		nature_run.queue_free()
 		nature_run = null
 		_camera.ball = null
+		_camera.hold_opens_wheel = false
+		if _target_wheel:
+			_target_wheel.queue_free()
+			_target_wheel = null
 		_hud.set_nature(null)
 	if match_1v1 == null:
 		return

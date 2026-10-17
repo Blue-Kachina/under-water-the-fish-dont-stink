@@ -47,7 +47,7 @@ signal character_selected(character: FishCharacter.Family)
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 7  # over the pause menu's dimming
-	_targets = {"fish": fish, "camera": follow_camera, "ball": ball_settings}
+	_targets = {"fish": fish, "camera": follow_camera, "ball": ball_settings, "nature": NatureSettings.shared()}
 	for section: String in _targets:
 		_defaults[section] = _snapshot(_targets[section])
 	_build_ui()
@@ -281,7 +281,7 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 			editor = check
 			group_list.add_child(check)
 			_rows[key] = check
-		elif property.type == TYPE_INT:  # enum
+		elif property.hint == PROPERTY_HINT_ENUM:
 			var row := HBoxContainer.new()
 			var name_label := Label.new()
 			name_label.text = prop.capitalize()
@@ -310,10 +310,16 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 			row.add_child(name_label)
 
 			var range_parts: PackedStringArray = property.hint_string.split(",")
+			var whole: bool = property.type == TYPE_INT
 			var slider := HSlider.new()
 			slider.min_value = range_parts[0].to_float()
 			slider.max_value = range_parts[1].to_float()
-			slider.step = range_parts[2].to_float() if range_parts.size() > 2 else 0.01
+			slider.step = 1.0 if whole else 0.01
+			if range_parts.size() > 2 and range_parts[2].is_valid_float():
+				slider.step = range_parts[2].to_float()
+			# "or_greater" / "or_less": a preset's value can lie past the slider's end.
+			slider.allow_greater = "or_greater" in range_parts
+			slider.allow_lesser = "or_less" in range_parts
 			slider.value = target.get(prop)
 			slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -322,12 +328,12 @@ func _build_section(list: VBoxContainer, section: String, target: Object) -> voi
 			var value_label := Label.new()
 			value_label.custom_minimum_size.x = 56.0
 			value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			value_label.text = "%.2f" % slider.value
+			value_label.text = _format_value(target.get(prop))
 			row.add_child(value_label)
 
 			slider.value_changed.connect(func(value: float) -> void:
-				target.set(prop, value)
-				value_label.text = "%.2f" % value)
+				target.set(prop, roundi(value) if whole else value)
+				value_label.text = _format_value(target.get(prop)))
 			editor = slider
 			_value_labels[key] = value_label
 			group_list.add_child(row)
@@ -351,7 +357,12 @@ func _refresh_visibility() -> void:
 		group_panel.visible = _group_panels[group_panel].any(func(key: String) -> bool: return _rows[key].visible)
 
 
-## Script variables exported as a float range, a bool or an enum, tagged with their @export_group.
+## A slider's value as its label shows it: whole numbers without decimals.
+static func _format_value(value: Variant) -> String:
+	return str(value) if value is int else "%.2f" % value
+
+
+## Script variables exported as a float or int range, a bool or an enum, tagged with their @export_group.
 func _tunable_properties(target: Object) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var group := ""
@@ -361,7 +372,7 @@ func _tunable_properties(target: Object) -> Array[Dictionary]:
 			continue
 		if not (property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE) or not (property.usage & PROPERTY_USAGE_EDITOR):
 			continue
-		var is_range: bool = property.type == TYPE_FLOAT and property.hint == PROPERTY_HINT_RANGE
+		var is_range: bool = property.type in [TYPE_FLOAT, TYPE_INT] and property.hint == PROPERTY_HINT_RANGE
 		var is_enum: bool = property.type == TYPE_INT and property.hint == PROPERTY_HINT_ENUM
 		if is_range or is_enum or property.type == TYPE_BOOL:
 			var entry: Dictionary = property.duplicate()
@@ -383,9 +394,12 @@ func _apply(section: String, values: Dictionary) -> void:
 		var editor: Control = _editors.get(key)
 		if editor is HSlider:
 			# Set the target directly: the slider would round to its step (33.33 -> 33.5).
-			_targets[section].set(prop, values[prop])
-			(editor as HSlider).set_value_no_signal(values[prop])
-			_value_labels[key].text = "%.2f" % values[prop]
+			var value: Variant = values[prop]
+			if _targets[section].get(prop) is int:
+				value = roundi(value)
+			_targets[section].set(prop, value)
+			(editor as HSlider).set_value_no_signal(value)
+			_value_labels[key].text = _format_value(_targets[section].get(prop))
 		elif editor is CheckBox:
 			(editor as CheckBox).button_pressed = values[prop]
 		elif editor is OptionButton:

@@ -82,7 +82,7 @@ func _process(delta: float) -> void:
 
 func _physics_process(delta: float) -> void:
 	for fish: FishController in get_tree().get_nodes_in_group(FishController.GROUP):
-		if fish.demolished or fish.freeze or not fish.is_visible_in_tree():
+		if fish.battered or fish.freeze or not fish.is_visible_in_tree():
 			continue
 		var push := lift(fish.global_position, fish.linear_velocity, fish.buoyancy, delta)
 		if push != Vector3.ZERO:

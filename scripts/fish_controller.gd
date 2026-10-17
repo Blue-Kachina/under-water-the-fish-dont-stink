@@ -28,7 +28,7 @@ signal physics_tick(state: PhysicsDirectBodyState3D)
 enum JumpState { READY, SECOND_JUMP, COOLDOWN }
 ## Every fish in play (the player's and bots') is in this group.
 const GROUP := &"fish"
-## RL's supersonic speed (2200 uu/s): demolitions need it.
+## RL's supersonic speed (2200 uu/s): RL's demos need it, and so do the 1v1's batteries.
 const SUPERSONIC_SPEED := 22.0
 ## How quickly the bow wave grows and shrinks (its size, 0..1, per second).
 const BOW_RESPONSE := 2.5
@@ -170,13 +170,13 @@ const TIME_EPSILON := 0.0001
 
 @export_group("Thrust")
 ## RL: air throttle, 66.7 uu/s^2.
-@export_range(0.0, 60.0, 0.01) var forward_accel := 0.67
+@export_range(0.0, 200.0, 0.01, "or_greater") var forward_accel := 0.67
 @export_range(0.0, 60.0, 0.01) var reverse_accel := 0.67
 ## Deceleration when holding reverse while still swimming forward.
 @export_range(0.0, 120.0, 0.01) var brake_accel := 0.67
 ## Keep below max_boost_speed so boosting raises top speed. Throttle alone can
 ## never pass forward_accel / linear_drag (drag balances thrust there).
-@export_range(0.0, 60.0, 0.5) var max_speed := 23.0
+@export_range(0.0, 200.0, 0.5, "or_greater") var max_speed := 23.0
 @export_range(0.0, 30.0, 0.5) var max_reverse_speed := 23.0
 
 @export_group("Boost")
@@ -198,14 +198,14 @@ const TIME_EPSILON := 0.0001
 
 @export_group("Water")
 ## Fraction of speed lost per second.
-@export_range(0.0, 3.0, 0.01) var linear_drag := 0.0
+@export_range(0.0, 10.0, 0.01, "or_greater") var linear_drag := 0.0
 ## Momentum above max_speed (from dodges, swim strokes or boost) fades at this
 ## rate while you keep swimming (throttle, boost or a stroke rhythm), like
 ## holding throttle above top speed in Rocket League. Applies to the extra speed
 ## only: 0.5 halves it in about 1.4 s. Coasting uses linear_drag as normal.
-@export_range(0.0, 3.0, 0.01) var overspeed_drag := 0.0
+@export_range(0.0, 10.0, 0.01, "or_greater") var overspeed_drag := 0.0
 ## Extra drag on sideways/vertical slip. 0 = free drift, high = carves like it's on rails.
-@export_range(0.0, 10.0, 0.05) var lateral_drag := 0.0
+@export_range(0.0, 50.0, 0.05, "or_greater") var lateral_drag := 0.0
 @export_range(0.0, 5.0, 0.05) var angular_drag := 0.0
 ## Upward acceleration. 0 = neutral buoyancy, negative sinks. RL: gravity, -650 uu/s^2.
 @export_range(-30.0, 10.0, 0.01) var buoyancy := -6.5
@@ -282,33 +282,33 @@ const TIME_EPSILON := 0.0001
 ## How opposite the next sweep must be (cosine): 0.5 = within 60° of straight back.
 @export_range(0.0, 1.0, 0.05) var stride_reversal := 0.5
 ## Push at a stride's peak (m/s²), before flow and timing.
-@export_range(0.0, 150.0, 0.5) var stride_force := 40.0
+@export_range(0.0, 500.0, 0.5, "or_greater") var stride_force := 40.0
 ## Time from a stride's start to its peak: alternate here for full timing.
-@export_range(0.05, 1.5, 0.01) var stride_peak_time := 0.35
+@export_range(0.01, 5.0, 0.01, "or_greater") var stride_peak_time := 0.35
 ## Time from the peak until the stride has faded to nothing.
-@export_range(0.05, 2.0, 0.01) var stride_fade_time := 0.6
+@export_range(0.01, 6.0, 0.01, "or_greater") var stride_fade_time := 0.6
 ## A stride with nothing before it (or after a mistimed one) pushes this much.
 @export_range(0.0, 1.0, 0.05) var stride_fresh := 0.6
 ## How far off straight ahead each stride pushes, away from the sweep (degrees).
-@export_range(0.0, 45.0, 0.5) var stride_side_angle := 12.0
+@export_range(0.0, 90.0, 0.5) var stride_side_angle := 12.0
 ## Strides fade out approaching this forward speed.
-@export_range(1.0, 120.0, 0.5) var stride_max_speed := 45.0
+@export_range(1.0, 400.0, 0.5, "or_greater") var stride_max_speed := 45.0
 ## Flow gained by a perfectly timed stride (lost by one timed at zero).
-@export_range(0.0, 2.0, 0.01) var stride_flow_gain := 0.3
+@export_range(0.0, 10.0, 0.01, "or_greater") var stride_flow_gain := 0.3
 ## Most flow: strides push up to 1 + this times as hard.
-@export_range(0.0, 6.0, 0.1) var stride_flow_max := 2.0
+@export_range(0.0, 30.0, 0.1, "or_greater") var stride_flow_max := 2.0
 ## Flow lost per second while no stride is pushing.
-@export_range(0.0, 10.0, 0.1) var stride_flow_decay := 1.5
+@export_range(0.0, 30.0, 0.1, "or_greater") var stride_flow_decay := 1.5
 ## Off a surface, the stick steers through a smoothing of this long (s), so
 ## alternating sweeps mostly cancel out while a held direction still turns.
 ## 0 = the stick steers directly, sweeps and all.
 @export_range(0.0, 1.0, 0.01) var stride_steer_smoothing := 0.35
 ## How far the tail swings to each side on a stride (rad). A stride sweeps it
 ## across, away from the push, arriving at the far side at the peak.
-@export_range(0.0, 1.5, 0.01) var stride_tail_swing := 0.6
+@export_range(0.0, 5.0, 0.01, "or_greater") var stride_tail_swing := 0.6
 ## How much bigger the tail grows with flow: at full flow it's 1 + this times
 ## its size (Battletoads style), and each stride swells it a little more.
-@export_range(0.0, 3.0, 0.05) var stride_tail_growth := 0.8
+@export_range(0.0, 10.0, 0.05, "or_greater") var stride_tail_growth := 0.8
 ## While a stride pushes, the tail pours a stream of tiny bubbles
 ## (StrideStream), like a boost trail: denser and brighter as the stride builds
 ## and with flow, coloured by its timing. It stops once out of stride.
@@ -317,19 +317,19 @@ const TIME_EPSILON := 0.0001
 @export_group("Bow Wave")
 ## Speed pushes a torpedo-tip shell of water out ahead of the fish, from
 ## bow_start_speed to full size at bow_full_speed. It counts as the fish's front
-## for demolitions (Demolition), and for nothing else: it doesn't push anything.
+## for batteries (Battery), and for nothing else: it doesn't push anything.
 @export var bow_wave := false
-@export_range(0.0, 60.0, 0.5) var bow_start_speed := 8.0
-@export_range(1.0, 80.0, 0.5) var bow_full_speed := 30.0
+@export_range(0.0, 200.0, 0.5, "or_greater") var bow_start_speed := 8.0
+@export_range(1.0, 300.0, 0.5, "or_greater") var bow_full_speed := 30.0
 ## How far its tip reaches ahead of the hitbox's front at full size (m).
-@export_range(0.0, 5.0, 0.05) var bow_length := 1.0
+@export_range(0.0, 20.0, 0.05, "or_greater") var bow_length := 1.0
 ## How wide it is at full size, as a multiple of the hitbox's width. It's
 ## rounder than the hitbox: at least 0.7 times as tall as it is wide.
-@export_range(1.0, 4.0, 0.05) var bow_girth := 1.8
+@export_range(0.5, 10.0, 0.05, "or_greater") var bow_girth := 1.8
 
 @export_group("Nature")
-## The slowest ram that demolishes Nature's target fish (m/s). RL's supersonic: 22.
-@export_range(5.0, 60.0, 0.5) var nature_demo_speed := 22.0
+## The slowest ram that batters Nature's target fish (m/s). RL's supersonic: 22.
+@export_range(0.0, 200.0, 0.5, "or_greater") var nature_batter_speed := 22.0
 
 @export_group("Jump & Dodge")
 ## Instant push along the fish's up axis on pressing jump. A double jump is this alone.
@@ -540,8 +540,8 @@ var team_color := Color.TRANSPARENT:
 	set(value):
 		team_color = value
 		_apply_team_color()
-## Out of play (see demolish()).
-var demolished := false
+## Out of play (see batter()).
+var battered := false
 ## The team it plays for in a match (0 Blue, 1 Orange), or -1 outside one.
 var team := -1
 ## Its name on the scoreboard and goal announcements.
@@ -933,10 +933,10 @@ func _read_controls(source: FishInput) -> void:
 	jump_held = source.jump
 
 
-## Out of play after a demolition: hidden, frozen where it was and touching
+## Out of play after a battery: hidden, frozen where it was and touching
 ## nothing (not the ball, not other fish) until revive().
-func demolish() -> void:
-	demolished = true
+func batter() -> void:
+	battered = true
 	visible = false
 	_saved_layers = Vector2i(collision_layer, collision_mask)
 	collision_layer = 0
@@ -944,12 +944,12 @@ func demolish() -> void:
 	set_deferred("freeze", true)
 
 
-## Back in play after demolish(), at `spawn`.
+## Back in play after batter(), at `spawn`.
 func revive(spawn: Transform3D) -> void:
-	if demolished:
+	if battered:
 		collision_layer = _saved_layers.x
 		collision_mask = _saved_layers.y
-	demolished = false
+	battered = false
 	visible = true
 	freeze = false
 	set_spawn(spawn)

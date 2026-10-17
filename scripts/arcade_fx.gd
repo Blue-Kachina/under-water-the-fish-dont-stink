@@ -33,6 +33,12 @@ func _ready() -> void:
 			_punch = 1.0)
 
 
+## Punches the view in and flashes the rim, as a perfect stride does: e.g. a
+## big multi in Nature (amount 0..1+).
+func punch(amount := 1.0) -> void:
+	_punch = maxf(_punch, amount)
+
+
 func _process(delta: float) -> void:
 	var active := fish.swim_strokes and fish.swim_style == FishController.SwimStyle.EXTRA_SWISHY \
 			and fish.is_visible_in_tree() and camera.current

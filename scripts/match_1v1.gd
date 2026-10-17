@@ -5,11 +5,11 @@ extends Node
 ## kickoff spots with 33 boost, frozen through a 3-2-1 countdown; after a goal
 ## (and its explosion, see AquariumArena) a few seconds' celebration, then the
 ## next kickoff. A supersonic fish that rams an opponent with its front
-## demolishes it: it explodes and respawns at the back of its own half 3 s later.
+## batters it: it explodes and respawns at the back of its own half 3 s later.
 ## A 5-minute clock runs while the ball's live; tied at 0:00 goes to overtime,
 ## where the next goal wins. After each goal, once the explosion's settled, a
 ## replay of it (GoalReplay, from a GoalRecorder) plays unless goal_replays is
-## off; it can be skipped. Goals, assists, shots, saves and demos are called
+## off; it can be skipped. Goals, assists, shots, saves and batteries are called
 ## out as they happen (stat_event; see MatchStats), and each fish's scoreboard
 ## line (stats) adds them up with its touches, clears and centres, RL's points
 ## and all, for the HUD's scoreboard; each team's possession, boost used and
@@ -24,13 +24,13 @@ extends Node
 
 ## A kickoff or respawn has moved `fish` (cameras following it can snap).
 signal fish_teleported(fish: FishController)
-signal demolished(attacker: FishController, victim: FishController)
+signal battered(attacker: FishController, victim: FishController)
 signal goal_replay_started(replay: GoalReplay)
 signal goal_replay_ended
 ## The clock ran out with a winner, or someone scored in overtime.
 signal match_over(winner: int)
-## A goal, assist, shot, save or demo (MatchStats): "type", "player" (0 the
-## player, 1 the bot), "team", and for a demo "victim".
+## A goal, assist, shot, save or battery (MatchStats): "type", "player" (0 the
+## player, 1 the bot), "team", and for a battery "victim".
 signal stat_event(event: Dictionary)
 
 enum Phase { COUNTDOWN, LIVE, GOAL, REPLAY, OVER }
@@ -62,7 +62,7 @@ const KICKOFF_SPOTS := [
 	[Vector2(2.56, 38.40), false],
 	[Vector2(0.0, 46.08), false],
 ]
-## RL's respawn spots after a demolition, for the team defending +Z (mirrored likewise).
+## RL's respawn spots after a demo (ours after a battery), for the team defending +Z (mirrored likewise).
 const RESPAWN_SPOTS := [Vector2(-23.04, 46.08), Vector2(-26.88, 46.08), Vector2(23.04, 46.08), Vector2(26.88, 46.08)]
 
 var arena: AquariumArena
@@ -104,7 +104,7 @@ var _shot_on := [false, false]
 ## The recorder's time when the last goal went in.
 var _goal_record_time := 0.0
 
-## Demolished fish -> seconds until it respawns.
+## Battered fish -> seconds until it respawns.
 var _respawn_left := {}
 ## Touches waiting a tick to see where they sent the ball: [fish, ball position
 ## and velocity before].
@@ -162,10 +162,10 @@ func end() -> void:
 	player.team_color = Color.TRANSPARENT
 	player.team = -1
 	player.controls_locked = false
-	player.visible = not player.demolished  # a goal replay hides it
-	player.freeze = player.demolished
+	player.visible = not player.battered  # a goal replay hides it
+	player.freeze = player.battered
 	player.spawn_boost = 100.0
-	if player.demolished:
+	if player.battered:
 		player.revive(arena.spawn_transform() if is_instance_valid(arena) else player.global_transform)
 
 
@@ -246,8 +246,8 @@ func _physics_process(delta: float) -> void:
 			_announce_teleport([fish])
 
 	if phase != Phase.COUNTDOWN and phase != Phase.OVER:
-		_check_demolition(player, bot_fish)
-		_check_demolition(bot_fish, player)
+		_check_battery(player, bot_fish)
+		_check_battery(bot_fish, player)
 
 
 func _on_goal_scored(team: int) -> void:
@@ -350,7 +350,7 @@ func _finish_match() -> void:
 
 
 ## The end of the match: a bubble column at centre field in the winners'
-## colour, both fish at the foot of it (back from a demolition or a replay too),
+## colour, both fish at the foot of it (back from a battery or a replay too),
 ## free to swim on unlimited boost (off a surface, boost is what really moves a
 ## fish, as in RL), the bot looping about in it.
 func _celebrate() -> void:
@@ -425,15 +425,15 @@ func _stop_replay() -> void:
 	goal_replay_ended.emit()
 
 
-## `attacker` demolishes `victim` if it's supersonic and its front is touching it.
-func _check_demolition(attacker: FishController, victim: FishController) -> void:
-	if not Demolition.hits(attacker, victim):
+## `attacker` batters `victim` if it's supersonic and its front is touching it.
+func _check_battery(attacker: FishController, victim: FishController) -> void:
+	if not Battery.hits(attacker, victim):
 		return
 	Explosion.spawn(arena, victim.global_position, AquariumArena.TEAM_COLORS[_team_of(victim)], 6.0)
-	victim.demolish()
+	victim.batter()
 	_respawn_left[victim] = RESPAWN_TIME
-	_announce(MatchStats.DEMO, attacker, {"victim": 0 if victim == player else 1})
-	demolished.emit(attacker, victim)
+	_announce(MatchStats.BATTERY, attacker, {"victim": 0 if victim == player else 1})
+	battered.emit(attacker, victim)
 
 
 ## Fish the cameras should snap to once they've actually moved (resets land on

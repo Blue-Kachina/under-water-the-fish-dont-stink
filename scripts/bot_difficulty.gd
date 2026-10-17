@@ -20,7 +20,7 @@ extends Resource
 ## Chance an evasion uses a dodge (jump, then jump with the stick) instead of
 ## only turning away. A dodge breaks its stride chain, as it does yours.
 @export_range(0.0, 1.0, 0.01) var dodge_chance := 0.25
-## How far over the demolition speed it wants to be before it goes in close (m/s).
+## How far over the batter speed it wants to be before it goes in close (m/s).
 @export_range(0.0, 15.0, 0.1) var commit_speed_margin := 3.0
 
 

@@ -42,14 +42,14 @@ func pick_spot() -> void:
 
 func _physics_process(_delta: float) -> void:
 	input.clear()
-	if not is_instance_valid(fish) or fish.demolished or fish.controls_locked:
+	if not is_instance_valid(fish) or fish.battered or fish.controls_locked:
 		return
 	var me := fish.global_position
 	if me.distance_to(_spot) < ARRIVED:
 		pick_spot()
 	var target := _spot
 	var throttle := pace
-	if skittish and is_instance_valid(threat) and not threat.demolished:
+	if skittish and is_instance_valid(threat) and not threat.battered:
 		var from_threat := me - threat.global_position
 		if from_threat.length() < SPOOK_RANGE and threat.linear_velocity.dot(from_threat.normalized()) > SPOOK_SPEED:
 			target = me + from_threat.normalized() * 10.0

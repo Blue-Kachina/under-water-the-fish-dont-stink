@@ -2,7 +2,7 @@ extends Node
 ## Hunt's style points (StylePoints), with the two fish held still and moved
 ## by hand through scripted passes: a fast near miss is a close call for the
 ## fish passed, a dodge if it turned away (or dodged) as it came; a wide pass
-## or a slow one scores nothing, nor does a pass that ends in a demolition;
+## or a slow one scores nothing, nor does a pass that ends in a battery;
 ## a fish scores at most once per cooldown; every fourth perfect stride in a
 ## row scores, and a mistimed one starts the count again.
 ##   Godot_console.exe --headless --path . res://tests/style_points_probe.tscn
@@ -47,7 +47,7 @@ func _run() -> void:
 	await _ticks(2)
 	style.reset()
 	style.live = true
-	style.demo_speed = 10.0
+	style.batter_speed = 10.0
 	style.awarded.connect(func(index: int, type: String, points: int, _extra: Dictionary) -> void: awards.append([index, type, points]))
 
 	print("close call:")
@@ -77,11 +77,11 @@ func _run() -> void:
 	await _pass(1.5, 6.0)
 	check(awards.is_empty(), "a slow pass (6 m/s) scores nothing %s" % [awards])
 
-	print("demolition:")
+	print("battery:")
 	style.points = [0, 0]
 	await _pass(0.05, 15.0, 0.0, false, true)
-	check(awards.size() == 1 and awards[0] == [1, StylePoints.DEMO, StylePoints.POINTS[StylePoints.DEMO]],
-			"a pass that ends in a demolition: the demo's points, no close call %s" % [awards])
+	check(awards.size() == 1 and awards[0] == [1, StylePoints.BATTERY, StylePoints.POINTS[StylePoints.BATTERY]],
+			"a pass that ends in a battery: the battery's points, no close call %s" % [awards])
 	_cool_down()
 
 	print("perfect rhythm:")
@@ -111,9 +111,9 @@ func _run() -> void:
 ## The opponent swims past the player at `speed` (m/s), its hitbox `miss` (m)
 ## to one side of the player's at the closest, from 10 m before to 10 m after.
 ## `turn`: the player turns this far (degrees) away over the pass. `press`: it
-## dodges as the opponent closes in. `demo`: the opponent demolishes it when
+## dodges as the opponent closes in. `battery`: the opponent batters it when
 ## it as it touches instead of passing.
-func _pass(miss: float, speed: float, turn := 0.0, press := false, demo := false) -> void:
+func _pass(miss: float, speed: float, turn := 0.0, press := false, batter := false) -> void:
 	awards.clear()
 	var at := hunt.center + Vector3(0.0, 20.0, 0.0)
 	fish.global_transform = Transform3D(Basis.IDENTITY, at)  # nose to -Z
@@ -129,11 +129,11 @@ func _pass(miss: float, speed: float, turn := 0.0, press := false, demo := false
 		if turn > 0.0 and travelled > -6.0 and turned < turn:
 			turned = minf(turned + 400.0 * STEP, turn)
 			fish.global_basis = Basis(Vector3.UP, deg_to_rad(turned))
-		if demo and StylePoints.gap(opponent, fish) < 0.1:
-			style.on_demo(1, 0)
-			fish.demolished = true
+		if batter and StylePoints.gap(opponent, fish) < 0.1:
+			style.on_battery(1, 0)
+			fish.battered = true
 			style.update(STEP)
-			fish.demolished = false
+			fish.battered = false
 			break
 		style.update(STEP)
 		travelled = snappedf(travelled + speed * STEP, 0.0001)

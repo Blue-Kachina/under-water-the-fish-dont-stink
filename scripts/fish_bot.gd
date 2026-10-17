@@ -45,7 +45,7 @@ func _physics_process(delta: float) -> void:
 	if celebrating and is_instance_valid(fish) and not fish.controls_locked:
 		_celebrate(delta)
 		return
-	if not is_instance_valid(fish) or not is_instance_valid(ball) or fish.demolished or fish.controls_locked:
+	if not is_instance_valid(fish) or not is_instance_valid(ball) or fish.battered or fish.controls_locked:
 		_dodge_tick = -1
 		return
 	if _dodge_tick >= 0:

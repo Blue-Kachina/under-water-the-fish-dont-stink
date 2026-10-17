@@ -8,12 +8,12 @@ extends Node3D
 ## corner of the net as the ball comes in. Playback eases into slow motion for
 ## the finish, holds it through the goal explosion, and speeds back up.
 ##
-## A demolition replays the same way (Hunt): set `victim` and leave the net
+## A battery replays the same way (Hunt): set `victim` and leave the net
 ## out. The victim stands in for the ball (the chase camera rides with the
 ## attacker toward it), the second shot is a camera off to the side of where
-## they meet, and the explosion is a demolition's. In open water (in_arena
+## they meet, and the explosion is a battery's. In open water (in_arena
 ## off) the cameras aren't kept inside the aquarium's walls. Both fish
-## battered at once (a Fish Fry, `double`): the scorer stands for one, the
+## battered at once (a Fish Fry, `fish_fry`): the scorer stands for one, the
 ## victim the other, and both explode.
 ##
 ## `arcade` (Hunt) shoots it like an arcade fighter's finisher: a vignette
@@ -67,14 +67,14 @@ var goal: Goal
 ## The scoring team's colour (the explosion's).
 var color := Color.WHITE
 var ball_radius := ReplayBall.RADIUS
-## A demolition replay: the victim's player index in `data` (-1 for a goal).
+## A battery replay: the victim's player index in `data` (-1 for a goal).
 var victim := -1
-## The explosion's size at the goal (or demolition).
+## The explosion's size at the goal (or battery).
 var explosion_radius := AquariumArena.GOAL_EXPLOSION_RADIUS
 ## Keep the cameras inside the aquarium (off in open water).
 var in_arena := true
 ## A Fish Fry: the scorer was battered too (explodes in scorer_color).
-var double := false
+var fish_fry := false
 var scorer_color := Color.WHITE
 ## Shot like an arcade finisher (see the class description).
 var arcade := false
@@ -176,7 +176,7 @@ func _process(delta: float) -> void:
 	if not _exploded and time >= goal_time:
 		_exploded = true
 		Explosion.spawn(self, _ball_position, color, explosion_radius)  # no blast: just the show
-		if double:
+		if fish_fry:
 			Explosion.spawn(self, _scorer_position, scorer_color, explosion_radius)
 		if arcade:
 			_freeze_left = IMPACT_FREEZE
@@ -212,7 +212,7 @@ func _show(t: float) -> void:
 	for i in cars.size():
 		cars[i].apply(data.sample_car(i, t, _sample))
 		if i == victim and _sample.present:
-			_ball_position = _sample.position  # after the demolition: where it was hit
+			_ball_position = _sample.position  # after the battery: where it was hit
 		if i == scorer and _sample.present:
 			_scorer_position = _sample.position
 
@@ -295,7 +295,7 @@ func _net_camera_spot() -> Vector3:
 	return goal.to_global(Vector3(across * (goal.width / 2.0 - 1.5), -goal.height / 2.0 + 1.7, goal.depth - 3.0))
 
 
-## For a demolition: off to the side of where the attacker meets the victim,
+## For a battery: off to the side of where the attacker meets the victim,
 ## a little above and a little past it, so the attacker crosses the frame into it.
 func _impact_camera_spot() -> Vector3:
 	var at := maxf(goal_time - 0.05, 0.0)
