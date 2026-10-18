@@ -132,6 +132,7 @@ func _drop(at: Vector3) -> void:
 	patch.position = at
 	run.add_child(patch)
 	patches.append(patch)
+	Sfx.loop_for("pw/greek_fire_loop", patch)
 
 
 func on_removed() -> void:

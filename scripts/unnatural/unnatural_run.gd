@@ -114,6 +114,12 @@ signal chest_buried(chest: TreasureChest)
 signal drop_taken(kind: int, by: FishController)
 ## The Sunken Idol took a stack of powerup `id` from `fish` (a stage event).
 signal powerup_lost(fish: FishController, id: String)
+## A zombie (or a boss's body) was hurt, by whatever source (the hits' one door,
+## hit(), and a guest's claimed hits): its slot, the damage, who, with what, and
+## the powerups that led to it (a chain).
+signal zombie_hit(index: int, amount: float, by: FishController, source: String, chain: Array)
+## A local player took a pearl (the currency).
+signal pearl_collected(by: FishController)
 
 ## Players spawn side by side, this far apart (m).
 const SPAWN_SPACING := 3.0
@@ -785,6 +791,7 @@ func hit(index: int, amount: float, by: FishController, source: String, push := 
 		boss.take(amount, by, source)
 	else:
 		horde.damage(index, amount, source, by, push)
+	zombie_hit.emit(index, amount, by, source, chain)
 	if not authority and by and not by.puppet:
 		hit_claimed.emit(horde.net_id_of(index), amount, source, by)
 	if by and _powerups.has(by):
@@ -805,6 +812,7 @@ func apply_claimed_hit(index: int, amount: float, by: FishController, source: St
 		boss.take(amount, by, source)
 	else:
 		horde.damage(index, amount, source, by)
+	zombie_hit.emit(index, amount, by, source, [])
 
 
 ## Every zombie `fish`'s front touches at its battering speed or faster (the
@@ -1305,6 +1313,7 @@ func _burst(at: Vector3, radius: float) -> void:
 	add_child(cloud)
 	cloud.tree_exiting.connect(func() -> void: _clouds.erase(cloud))
 	_clouds.append(cloud)
+	Sfx.play_at("fx/burst_cloud", at)
 
 
 ## A pearl worth `value` at `at` (past max_pearls, the nearest takes its worth
@@ -1347,6 +1356,7 @@ func _on_pearl_collected(pearl: Pearl, by: FishController) -> void:
 	if is_instance_valid(by):
 		stats_of(by).pearls += worth
 		add_pearls(by, worth)
+		pearl_collected.emit(by)
 	if authority:
 		pearl_taken.emit(pearl.id)
 	else:

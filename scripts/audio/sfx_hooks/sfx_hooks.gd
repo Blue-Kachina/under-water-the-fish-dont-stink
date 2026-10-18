@@ -20,6 +20,10 @@ const RANKS := {"ui/move": 0, "ui/back": 1, "ui/select": 2}
 const QUIET := ["ui/move", "ui/back", "ui/mode_picker_close"]
 const QUIET_MS := 150
 
+## Every fish in the game (FishController), for the sounds that watch them all.
+var fish: Array[FishController] = []
+
+var _coop: LocalCoop
 var _pending := ""
 var _pending_step := -1
 var _last_ui_ms := -100000
@@ -29,6 +33,9 @@ var _coop_players := 1
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	var space := SpaceSounds.new()
+	space.name = "Space"
+	add_child(space)
 	get_tree().node_added.connect(_on_node_added)
 	get_viewport().gui_focus_changed.connect(func(_focus: Control) -> void: request("ui/move"))
 	NetSession.peer_joined.connect(func(_id: int) -> void: request("ui/player_join"))
@@ -46,6 +53,7 @@ func _hook_existing(node: Node) -> void:
 
 
 func _process(_delta: float) -> void:
+	_refresh_ears()
 	# Menus take ui_cancel in their _input and set it handled, so it's read here.
 	if _had_focus and Input.is_action_just_pressed("ui_cancel"):
 		request("ui/back")
@@ -84,14 +92,30 @@ func _rank(id: String) -> int:
 
 
 func _on_node_added(node: Node) -> void:
+	if node is Arena or node is AquariumArena or node is Ocean:
+		_attach.call_deferred(node, BedSounds.new(), &"sfx_bed")
+	elif node is BubbleColumn:
+		_loop_for_deferred.call_deferred(node, "arena/bubble_column_loop")
 	if node is FishController:
+		_track(node)
 		_attach.call_deferred(node, FishSounds.new())
 	elif node is Ball:
 		_attach.call_deferred(node, BallSounds.new())
 	elif node is AquariumArena:
 		_attach.call_deferred(node, ArenaSounds.new())
-	elif node is Match1v1:
-		_attach.call_deferred(node, MatchSounds.new())
+	elif node is Match1v1 or node is HuntMatch:
+		_attach.call_deferred(node, MatchSounds.new(), &"sfx_hook")
+		_attach.call_deferred(node, BatteredSounds.new(), &"sfx_battered")
+	elif node is NatureRun:
+		_attach.call_deferred(node, NatureSounds.new())
+	elif node is UnnaturalRun:
+		_attach.call_deferred(node, UnnaturalSounds.new())
+	elif node is Boss:
+		_attach.call_deferred(node, BossSounds.new())
+	elif node is FishAttack:
+		_watch(node, (node as FishAttack).fired, _on_attack_fired.bind(node))
+	elif node is TargetWheel:
+		_attach.call_deferred(node, WheelSounds.new())
 	elif node is BaseButton:
 		_watch(node, (node as BaseButton).pressed, _on_button_pressed.bind(node))
 	elif node is Slider:
@@ -107,17 +131,41 @@ func _on_node_added(node: Node) -> void:
 	elif node is MatchCard:
 		request("ui/match_card")
 	elif node is LocalCoop:
+		_coop = node
 		_watch(node, (node as LocalCoop).players_changed, _on_players_changed)
 
 
 ## Adds sound node `hook` to `node`, once (a node can leave the tree and come back).
-func _attach(node: Node, hook: Node) -> void:
-	if not is_instance_valid(node) or not node.is_inside_tree() or node.has_meta(&"sfx_hook"):
+func _attach(node: Node, hook: Node, key := &"sfx_hook") -> void:
+	if not is_instance_valid(node) or not node.is_inside_tree() or node.has_meta(key):
 		hook.free()
 		return
-	node.set_meta(&"sfx_hook", hook)
-	hook.name = "Sounds"
+	node.set_meta(key, hook)
+	hook.name = "Sounds" if key == &"sfx_hook" else String(hook.get_script().get_global_name())
 	node.add_child(hook)
+
+
+## A loop for as long as `node` is in the tree (a bubble column).
+func _loop_for_deferred(node: Node3D, id: String) -> void:
+	if is_instance_valid(node) and node.is_inside_tree() and not node.has_meta(&"sfx_loop"):
+		node.set_meta(&"sfx_loop", Sfx.loop_for(id, node))
+
+
+func _track(tracked: FishController) -> void:
+	if tracked not in fish:
+		fish.append(tracked)
+		tracked.tree_exiting.connect(func() -> void: fish.erase(tracked))
+
+
+## Every local player's fish when there's more than one (split-screen): a world
+## sound is as loud as it is for the nearest (Sfx.ears).
+func _refresh_ears() -> void:
+	var list: Array[Node3D] = []
+	if is_instance_valid(_coop) and _coop.slots.size() > 1:
+		for slot in _coop.slots:
+			if is_instance_valid(slot.fish):
+				list.append(slot.fish)
+	Sfx.ears = list
 
 
 func _watch(node: Node, which: Signal, callback: Callable) -> void:
@@ -134,6 +182,12 @@ func _on_button_pressed(button: BaseButton) -> void:
 	var id: String = button.get_meta(&"sfx", "ui/select")
 	if id != "":
 		request(id)
+
+
+## An Unnatural attack goes off: its own sound, from the fish's place.
+func _on_attack_fired(attack: FishAttack) -> void:
+	if is_instance_valid(attack.fish) and not attack.fish.puppet:
+		Sfx.play_at("unnatural/%s_fire" % attack.source(), attack.fish.global_position)
 
 
 func _on_slider_changed(value: float, slider: Slider) -> void:

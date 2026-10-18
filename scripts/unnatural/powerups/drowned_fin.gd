@@ -13,6 +13,7 @@ var _cool := 0.0
 var _dash_left := 0.0
 var _heading := Vector3.FORWARD
 var _hit := {}
+var _loop := 0
 
 
 func cooldown() -> float:
@@ -35,6 +36,9 @@ func on_tick(delta: float) -> void:
 	if _dash_left > 0.0:
 		_dash_left -= delta
 		_dash_step()
+		if _dash_left <= 0.0:
+			Sfx.stop_loop(_loop)
+			_loop = 0
 	else:
 		_cool = maxf(_cool - delta, 0.0)
 		if is_ready() and not fish.puppet and fish._player_input().just_pressed("boost"):
@@ -56,6 +60,9 @@ func dash() -> void:
 	if health:
 		health.shield(settings.fin_dash_time + 0.1)
 	PowerupFx.ring(run, fish.global_position, 1.5, color(id), _heading, 0.3)
+	Sfx.play_at("pw/drowned_fin_dash", fish.global_position)
+	Sfx.stop_loop(_loop)
+	_loop = Sfx.start_loop("pw/drowned_fin_charge_loop")
 
 
 func _dash_step() -> void:

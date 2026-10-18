@@ -58,6 +58,8 @@ signal would_kill(index: int, kind: int, source: String, by: Object)
 ## A zombie came (any way: packs, events, a boss's call), or was taken away quietly.
 signal spawned(index: int)
 signal removed(index: int)
+## A lunger entered a stage (Lunge.TELEGRAPH: it winds up; Lunge.LUNGE: it strikes).
+signal lunge_stage(index: int, stage: int)
 
 enum State { FREE, ALIVE, DYING }
 ## A lunging zombie's stages.
@@ -809,6 +811,7 @@ func _lunge_step(i: int, ahead: Vector3, gap: float, speed: float, dt: float) ->
 			if gap < settings.lunge_range and settings.lunge_speed > 0.0:
 				_mode[i] = Lunge.TELEGRAPH
 				_mode_left[i] = settings.lunge_telegraph
+				lunge_stage.emit(i, Lunge.TELEGRAPH)
 			return ahead * speed * 0.8
 		Lunge.TELEGRAPH:
 			_lunge[i] = ahead  # still aiming
@@ -816,6 +819,7 @@ func _lunge_step(i: int, ahead: Vector3, gap: float, speed: float, dt: float) ->
 				_mode[i] = Lunge.LUNGE
 				_mode_left[i] = settings.lunge_time
 				_velocity[i] = ahead * settings.lunge_speed
+				lunge_stage.emit(i, Lunge.LUNGE)
 			return ahead * 0.5
 		Lunge.LUNGE:
 			if _mode_left[i] <= 0.0:

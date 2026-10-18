@@ -5,6 +5,11 @@ Status: **phase 0 (foundation) built 2026-10-18** (10:24 build). **Phase 1 (core
 their sounds (Â§4 lists what's in and what's left). Before this, the only audio was
 `ReplayAudio`, which plays a soundtrack beside a replay.
 
+**Phases 2, 3 and 4 built 2026-10-18** (Battered, Nature and Hunt; Unnatural; space and
+ambience). Every event in the catalog is now asked for by the game, bar the few listed under
+"Left for later" in §4.2–4.4. Phase 5 (music) is still open. All of it is silent until a
+profile has the files: the sheet (Settings > Audio > Write recording sheet) lists what to record.
+
 Goal: every meaningful moment in the game gets a sound. The sounds come from a **Sound
 Profile**, which is a folder of files with fixed names. You can make as many profiles as you
 like ("A Cappella", "Synth", "Foley", ...), switch between them in Settings, and swap
@@ -380,6 +385,7 @@ Seahorse) only need the card-pick sound. The active ones each get their own:
 |---|---|
 | `stage/ring_warn`, `stage/ring` (THE RING CLOSES) | P1 |
 | `stage/miniboss_warn` (THE DROWNED SHARK RISES) | P1 |
+| `stage/boss_warn` (THE BLOOD LEVIATHAN WAKES; added in phase 3) | P1 |
 | `stage/stampede_warn`, `stage/stampede` | P1 |
 | `stage/tide_warn`, `stage/tide` | P1 |
 | `stage/blood_moon` (rises), `stage/blood_moon_loop` | P2 |
@@ -412,11 +418,11 @@ Seahorse) only need the card-pick sound. The active ones each get their own:
 
 | Event id | Where | P |
 |---|---|---|
-| `amb/arena_loop` | Free Play / 1v1 arena | P2 |
-| `amb/aquarium_loop` | aquarium arena | P2 |
-| `amb/ocean_loop` | open water (Nature, Free Swim) | P2 |
-| `amb/seabed_loop` | Unnatural seabed | P2 |
-| `amb/murk_loop` | crossfades in as murk thickens | P3 |
+| `amb/arena_loop` | the obstacle course | P2 |
+| `amb/aquarium_loop` | the aquarium arena (Free Play, 1v1) | P2 |
+| `amb/ocean_loop` | open water (Nature, Free Swim, Hunt) | P2 |
+| `amb/seabed_loop` | Unnatural seabed (and the Test Tank's) | P2 |
+| `amb/murk_loop` | crossfades in as the water thickens | P3 |
 | `amb/surface_loop` | above the waterline | P3 |
 
 ### 3.10 Music (optional, `music/`)
@@ -437,9 +443,9 @@ list.
 |---|---|---|
 | **0. Foundation** | Buses, `SoundCatalog`, `SoundProfile`, `Sfx` autoload with the built-in silent **`None` profile selected by default**, Settings (volumes + sound profile picker + music picker), debug "Beep for missing sounds", Sound Board + Reload, recording sheet, built-in Beeps profile, `audio_probe.gd` | **Built 2026-10-18**: audio_probe passes (66 checks), ui/modes/pause/controls probes pass. Build 10:24 |
 | **1. Core feel** | UI, fish movement (strokes, stride, jump, dodge, boost), ball, goals, match flow | **Built 2026-10-18** (12:05 build): `audio_hooks_probe` passes. See Â§4.1 |
-| **2. Battered, Nature, Hunt** | §3.5, §3.6, Hunt rows | |
-| **3. Unnatural** | attacks, zombies (with aggregation), pickups, cards, powerups, stage events, bosses | 3-player split-screen bench shows no frame-rate cost from audio (`split_bench`) |
-| **4. Space** | underwater bus filter, surface breach, murk, ambience loops, bubble columns, split-screen listener (A3) | |
+| **2. Battered, Nature, Hunt** | §3.5, §3.6, Hunt rows | **Built 2026-10-18**: `audio_hooks2_probe` passes. See §4.2 |
+| **3. Unnatural** | attacks, zombies (with aggregation), pickups, cards, powerups, stage events, bosses | **Built 2026-10-18**: `audio_hooks3_probe` passes; `split_bench` (3 players, 2000 zombies) with and without the hooks is the same within noise (about 21 ms either way). See §4.3 |
+| **4. Space** | underwater bus filter, surface breach, murk, ambience loops, bubble columns, split-screen listener (A3) | **Built 2026-10-18**: `audio_hooks4_probe` passes. See §4.4 |
 | **5. Music** (if wanted) | | |
 
 ### 4.1 Phase 1: how it's hooked up
@@ -475,6 +481,110 @@ plays twice until phase 4's shared mix (A3).
 
 From phase 1 on, you can record in parallel: each phase's events appear on the Sound
 Board and in the sheet as they're hooked up.
+
+### 4.2 Phase 2: Battered, Nature, Hunt
+
+`SfxHooks` adds: `BatteredSounds` to every `Match1v1` and `HuntMatch` (`battered`, with a null
+attacker for a Fish Fry), `MatchSounds` now also to a Hunt (the countdown, last ten seconds,
+buzzer, replays and result read off the same state), `NatureSounds` to every `NatureRun`,
+`WheelSounds` to every `TargetWheel`, and `FishSounds` hears two fish touching.
+
+- **Battered:** `battered/battery` (you land one: 3D at the victim, harder by speed) or
+  `battered/battered` (you take one), then `battered/out` 0.35 s later. A Fish Fry is
+  `battered/fish_fry` plus `voice/fish_fry`, and both fish go out.
+- **Nature:** `nature/battery` (school fish and the lone fish, harder by speed),
+  `nature/pearl_drop`, `nature/pearl` (pitched: each pearl within 2 s of the last climbs a
+  step), `nature/style` for multis and sprees (bigger awards are harder), the multi's Fish Fry
+  (a double is `battered/fish_fry` + `voice/fish_fry`; a triple and up is
+  `battered/fish_fry_more`, climbing with the count), `nature/target_respawn` when the lone
+  fish turns up, `nature/school_loop` on the nearest three schools within 70 m (swelling as you
+  near, faster when they're scared) and `nature/school_scatter` when one startles.
+- **Target wheel:** `nature/target_cycle` as the stick moves to another slice,
+  `nature/target_lock` when it closes on one.
+- **Hunt:** the hunter locking on (`hunt/target_spotted`: `StylePoints.is_threatened(0)` is
+  new), batter you (`hunt/caught`) and your close calls and dodges (`hunt/escaped`). The
+  descriptions in the catalog changed to say so.
+- **Fish bumps:** `fish/bump` for two fish touching that didn't batter each other (judged one
+  physics step later, so a battery's own sound isn't doubled).
+
+**Left for later:** `fish/teleport` (nothing moves a fish mid-play; kickoffs and resets have
+their own sounds, so it stays in the catalog marked reserved). Online, an opponent's puppet
+fish still makes no sound of its own, but every event above comes off a signal that fires on
+both machines.
+
+### 4.3 Phase 3: Unnatural
+
+`SfxHooks` adds `UnnaturalSounds` to every `UnnaturalRun` (which covers the Test Tank) and
+`BossSounds` to every `Boss`, and watches every `FishAttack`. The gameplay code gained a few
+signals: `UnnaturalRun.zombie_hit` (hit(), the one door every hit goes through, and a guest's
+claimed hits) and `pearl_collected`, `Horde.lunge_stage`, and `FishAttack.fired`. The powerups
+play their own sounds (`Sfx.play_at(...)` next to their effect), because each has several
+moments of its own; `Sfx.loop_for(id, node)` gives a loop that lasts as long as a node does.
+
+- **Gathered per frame:** zombie deaths (by behaviour, `unnatural/zombie_die_<chase|swarm|tank|lunge|glide>`),
+  hits, boss hits and spawns make one sound each per frame, at their middle, harder (the @
+  layers) the more there were: 40 kills in a frame are one crunch.
+- **Your hits by source:** an attack's `<kind>_hit`; a battery is `battered/battery`; a
+  powerup's own (`pw/greek_fire_burn`, `pw/remora_nip`, `pw/jelly_sting`, `pw/coil_hit`;
+  Chain Lightning's `pw/chain_zap` climbs a step per jump); a boss's body is `boss/hit`;
+  anything else (a blast, a ring) is `unnatural/zombie_hit`. Every attack falls back to
+  `unnatural/attack_own_fire` / `attack_own_hit`, so one recording covers all of them until you
+  want each its own.
+- **XP:** there are no orbs (kills pay XP straight to the team), so `unnatural/xp` is a
+  pitched sound once a frame a kill of yours lands, climbing while kills keep coming (1 s window).
+- **You and your team:** hurt, downed, revived, level-up (`voice/level_up` too), cards fanning
+  out then the rarest card's reveal 0.3 s later, the card picked (and `pw/cursed_take` for a
+  cursed one), the three pickups, pearls (pitched streak), chests buried and opened, a powerup
+  lost.
+- **Loops (looked after five times a second):** `unnatural/zombie_moan_loop` (volume with the
+  zombies within 35 m), `unnatural/low_hp_loop` (under a quarter of your hp, faster as it
+  drops), `unnatural/revive_loop`, `unnatural/magnet_pull_loop` (2 s after the magnet).
+- **Beds:** `amb/seabed_loop`, `stage/blood_moon_loop` and `stage/blood_moon` when the run starts.
+- **Stage:** each event's `stage/<event>_warn` and `stage/<event>` (and `voice/<event>_warn`
+  where there is one) off `stage_warned` / `stage_event`; `stage/boss_warn` is new. Boss
+  arrivals (`boss/shark_arrive`, `boss/leviathan_arrive`, `voice/boss_arrive`), rage,
+  defeat, the stage complete, a run over. A boss's moves are `BossSounds`: the Shark's
+  wind-up and charge (read off its mode), the Leviathan's phases and spit.
+- **Powerups** (in the powerup scripts): torpedoes launch, run (a loop that swells with how many
+  are flying) and blast (`fx/explosion`); depth charges drop, arm and blast; the lure drops
+  (with a glowing loop), bursts; the Tsunami Heart's wave; the Eel's ring; the Puffer's spines;
+  the Drowned Fin's dash (with a loop while it lasts, standing in for the charge); Bubble Wrap
+  ready and pop; Greek Fire patches, the Jellyfish Halo and Leviathan's Coil loop. A burst
+  cloud is `fx/burst_cloud`.
+
+**Left for later:** the generic `fx/shock`, `fx/ring`, `fx/flash`, `fx/spikes` and `fx/pop`
+(the powerups have their own sounds, so these stay unplayed), and Traversal's leap burst. A
+puppet's powerups (an online guest's copy of another player) make no sound; the player on
+their own machine hears them.
+
+### 4.4 Phase 4: Space
+
+- **Beds:** `BedSounds` on each environment: `amb/arena_loop` (the obstacle course),
+  `amb/aquarium_loop` (Free Play, 1v1), `amb/ocean_loop` (Free Swim, Nature, Hunt). An
+  Unnatural run has its own seabed, so the Ocean's bed gives way to it. A replay has none (it
+  has its own soundtrack).
+- **Murk:** the Ocean's fog density above the scene's clear water (0.012) swells
+  `amb/murk_loop` and closes the World bus's low-pass from 4200 Hz toward 1500 Hz (0.072 is the
+  thickest). Unnatural's murk and an arena's edge both do it.
+- **The surface:** `Sfx.water_surface` (INF where a place has none). A fish crossing it up
+  breaches (`fish/breach`) and down splashes (`fish/splash`, harder by vertical speed); a
+  camera above it opens the low-pass to 18 kHz and fades `amb/surface_loop` in. **Nothing in
+  the game reaches the surface yet** (Unnatural sets it to the blood moon's water line, which
+  sits above the arena's ceiling), so this waits for a place with a real waterline.
+- **Bubble columns:** `arena/bubble_column_loop` on each, for as long as it stands.
+- **Scraping and the bow wave:** `fish/scrape_loop` (sliding along a surface faster than
+  3 m/s, louder and higher with speed) and `fish/bow_wave_loop` (volume with the bow wave's
+  size, so louder with Bow Grow Bow), both following the fish. `arena/hoop_rim` for clipping a hoop.
+- **Split-screen (A3):** only the first player has ears, so `Sfx.heard_at()` moves a world sound
+  in along its line to the nearest player's distance: as loud as it is for whoever is nearest.
+  `SfxHooks` keeps `Sfx.ears` (the local fish when there's more than one).
+- **Underwater filter (A4):** the World bus's low-pass and reverb were already there from phase
+  0; a profile with `underwater_filter=false` switches them off.
+
+**Left for later:** `ui/denied` (nothing in the menus refuses a press), `fish/teleport`.
+
+**Tools:** `tests/audio_hooks2_probe`, `audio_hooks3_probe` and `audio_hooks4_probe`; `split_bench`
+takes `--no-sfx-hooks` to compare frame times.
 
 ---
 

@@ -25,6 +25,7 @@ func on_hurt(amount: float, from: int) -> void:
 				settings.spine_proc, [id])
 	bursts += 1
 	PowerupFx.spikes(run, at, settings.spine_burst_radius, color(id), 0.22)
+	Sfx.play_at("pw/puffer_spines", at)
 	for i in run.horde.query_sphere(at, settings.spine_burst_radius):
 		var push := run.horde.enemy_position(i) - at
 		run.hit(i, burst(), fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP, settings.spine_proc, [id])

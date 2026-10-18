@@ -158,6 +158,8 @@ func start(direction: Vector3, again := false) -> void:
 	bites += 1
 	uses += 0 if again else 1
 	snapped_again += 1 if again else 0
+	if not again and not is_echo:
+		fired.emit()
 	visible = true
 	_place(0.0)
 	if is_echo or milestones <= 0:

@@ -14,6 +14,7 @@ var fired := 0
 var blasts := 0
 
 var _swarm: TorpedoSwarm
+var _loop := 0
 ## Blast visuals left to show this second (torpedo_fx_rate): past it, a blast
 ## still hurts, but goes off unseen.
 var _fx_left := 0.0
@@ -62,6 +63,19 @@ func launch(chain: Array) -> void:
 		var velocity := (-fish.global_basis.z * 0.6 + spread * 0.4).normalized() * settings.torpedo_speed * 0.5
 		_swarm.add(from + spread * 0.6, velocity, nearest[n % nearest.size()] if not nearest.is_empty() else -1, from_chain)
 		fired += 1
+	Sfx.play_at("pw/torpedo_launch", from)
+
+
+## The running sound: one loop at the fish while any are flying, louder with more.
+func on_tick(_delta: float) -> void:
+	var flying := in_flight()
+	if flying > 0 and _loop == 0:
+		_loop = Sfx.start_loop("pw/torpedo_loop", fish)
+	elif flying == 0 and _loop != 0:
+		Sfx.stop_loop(_loop)
+		_loop = 0
+	if _loop != 0:
+		Sfx.set_loop(_loop, clampf(flying / 6.0, 0.3, 1.0))
 
 
 ## Up to `k` live zombies within `reach` of `at`, the nearest first (a
@@ -89,12 +103,15 @@ func on_removed() -> void:
 	if is_instance_valid(_swarm):
 		_swarm.queue_free()
 	_swarm = null
+	Sfx.stop_loop(_loop)
+	_loop = 0
 
 
 ## A torpedo's blast at `at`.
 func explode(at: Vector3, chain: Array) -> void:
 	blasts += 1
 	var reach := blast()
+	Sfx.play_at("fx/explosion", at, clampf(reach / 6.0, 0.0, 1.0))
 	var now := Time.get_ticks_msec() / 1000.0
 	_fx_left = minf(_fx_left + (now - _fx_time) * settings.torpedo_fx_rate, settings.torpedo_fx_rate * 0.5)
 	_fx_time = now

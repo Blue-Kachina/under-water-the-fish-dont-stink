@@ -31,6 +31,7 @@ var stings := 0
 ## Stings that jumped on (the fourth milestone), for the probes.
 var jumps := 0
 var _halo: Node3D
+var _loop := 0
 var _turn := 0.0
 var _sting_left := 0.0
 var _pulse_age := 0.0
@@ -69,6 +70,8 @@ func on_removed() -> void:
 	if is_instance_valid(_halo):
 		_halo.queue_free()
 	_halo = null
+	Sfx.stop_loop(_loop)
+	_loop = 0
 
 
 ## Where jelly `k` is now (`lag` radians behind: its ghost; `outer`: the third
@@ -83,6 +86,8 @@ func on_tick(delta: float) -> void:
 	var outer := milestone(3)
 	if not is_instance_valid(_halo) or _built != Vector3i(count(), 1 if trail else 0, 1 if outer else 0):
 		_build()
+	if _loop == 0:
+		_loop = Sfx.start_loop("pw/jelly_halo_loop", fish)
 	_turn = fmod(_turn + spin() * TAU * delta, TAU)
 	_pulse_age = fmod(_pulse_age + delta, PULSE_EVERY)
 	var n := count()

@@ -128,6 +128,11 @@ func update(delta: float) -> void:
 			_judge_escape(victim, window)
 
 
+## Whether fish `index` is being come at now (a threat window is open).
+func is_threatened(index: int) -> bool:
+	return not _windows[index].is_empty()
+
+
 ## `attacker` battered `victim`: points for it, and no escape for `victim`.
 func on_battery(attacker: int, victim: int) -> void:
 	_windows[victim] = {}

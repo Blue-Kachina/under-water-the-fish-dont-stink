@@ -19,7 +19,10 @@ func is_ready() -> bool:
 
 
 func on_tick(delta: float) -> void:
+	var was_ready := is_ready()
 	_untouched += delta
+	if is_ready() and not was_ready and stacks > 0:
+		Sfx.play("pw/bubble_wrap_ready")
 	if _worn and is_instance_valid(_worn):
 		_worn.visible = is_ready()
 		_worn.scale = Vector3.ONE  # it fits the fish, whatever the stacks
@@ -33,6 +36,7 @@ func blocks_hit(_amount: float) -> bool:
 	if _worn and is_instance_valid(_worn):
 		_worn.visible = false
 	PowerupFx.pop(run, fish.global_position, fish.hitbox_length * 0.75, color(id), 0.3)
+	Sfx.play("pw/bubble_wrap_pop")
 	return true
 
 

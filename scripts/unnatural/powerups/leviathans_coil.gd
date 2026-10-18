@@ -35,6 +35,7 @@ var _drawn := PackedVector3Array()
 var _tick_left := 0.0
 var _snap_left := SNAP_EVERY
 var _tail_left := TAIL_EVERY
+var _loop := 0
 
 
 func count() -> int:
@@ -57,12 +58,16 @@ func on_removed() -> void:
 	if is_instance_valid(_coils):
 		_coils.queue_free()
 	_coils = null
+	Sfx.stop_loop(_loop)
+	_loop = 0
 	trail.clear()
 	_drawn.clear()
 
 
 func on_tick(delta: float) -> void:
 	var at := fish.global_position
+	if _loop == 0:
+		_loop = Sfx.start_loop("pw/coil_loop", fish)
 	if trail.is_empty():
 		trail.append(at)
 	elif at.distance_to(trail[0]) >= settings.coil_spacing:

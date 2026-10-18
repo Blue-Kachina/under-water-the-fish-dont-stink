@@ -11,6 +11,7 @@ extends Node
 ## lightning, fire, bubbles, spines, jellyfish, eel, depth charges), and the
 ## director keeps the horde at --count.
 ## --seconds=S how long to measure (default 4); --profile: each script's process times after.
+## --no-sfx-hooks: without the sound hooks (SfxHooks), for comparing frame times.
 
 const PADS := [11, 12, 13]
 
@@ -40,6 +41,8 @@ func _ready() -> void:
 			powers = arg.trim_prefix("--powers=").to_int()
 		elif arg == "--profile":
 			profile = true
+		elif arg == "--no-sfx-hooks":  # the same run with none of the sound nodes (planning_audio.md phase 3)
+			Sfx.hooks.queue_free()
 		elif arg.begins_with("--seconds="):
 			seconds = arg.trim_prefix("--seconds=").to_float()
 	get_window().size = Vector2i(1920, 1080)

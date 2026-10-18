@@ -90,6 +90,9 @@ func on_tick(delta: float) -> void:
 				mine.queue_free()
 			continue
 		var armed := mine.age >= arm_time()
+		if armed and not mine.has_meta(&"armed"):
+			mine.set_meta(&"armed", true)
+			Sfx.play_at("pw/depth_charge_arm", mine.global_position)
 		if armed and milestone(3):
 			_drift(mine, delta)
 		if mine.age >= life() or (armed and not run.horde.query_sphere(mine.global_position, settings.charge_trigger).is_empty()):
@@ -132,6 +135,7 @@ func drop() -> void:
 	mine.global_position = fish.global_position + fish.global_basis.z * (fish.hitbox_length * 0.6)
 	mines.append(mine)
 	dropped += 1
+	Sfx.play_at("pw/depth_charge_drop", mine.global_position)
 
 
 func explode(at: Vector3) -> void:
@@ -147,6 +151,7 @@ func _blast(at: Vector3, reach: float, amount: float, aftershock := false) -> vo
 	if milestone(4) and not aftershock:
 		_aftershocks.append([AFTERSHOCK_AFTER, at, reach, amount * AFTERSHOCK_SHARE])
 	Explosion.spawn(run.ocean, at, color(id), reach, 0.0, 0.3)
+	Sfx.play_at("fx/explosion", at, clampf(reach / 6.0, 0.0, 1.0))
 	for i in run.horde.query_sphere(at, reach):
 		var push := run.horde.enemy_position(i) - at
 		run.hit(i, amount, fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP, settings.charge_proc, [id])

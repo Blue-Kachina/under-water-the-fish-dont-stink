@@ -40,6 +40,10 @@ const DEFAULTS := {"profile": NONE, "music_profile": SAME, "master_volume": 100,
 		"voice_volume": 100, "beep_missing": false}
 ## Pitch jitter (±) for one-shots whose profile doesn't set one: no two the same.
 const DEFAULT_JITTER := 0.03
+## The World bus's low-pass cutoff (Hz): in clear water, in the thickest murk, in the open air.
+const WATER_HZ := 4200.0
+const MURK_HZ := 1500.0
+const OPEN_HZ := 18000.0
 
 ## The sound profile heard (a folder name, NONE or BEEPS).
 var profile: String = DEFAULTS.profile
@@ -62,6 +66,12 @@ var loose_root := "" if OS.has_feature("editor") else OS.get_executable_path().g
 var keep_settings_off_disk := false
 ## Plays the game's sounds off its signals and state (SfxHooks).
 var hooks: SfxHooks
+## Where the water's surface is (world y); INF where there is none. Fish crossing
+## it breach and splash, and a camera above it hears the open air.
+var water_surface := INF
+## Split-screen: every local player's fish, the first being the one with the ears
+## (empty alone). A world sound is as loud as it is for whichever is nearest.
+var ears: Array[Node3D] = []
 
 var _profile: SoundProfile
 var _beeps: SoundProfile
@@ -78,6 +88,8 @@ var _loops := {}
 var _next_loop := 1
 var _warned := {}
 var _rng := RandomNumberGenerator.new()
+var _murk := 0.0
+var _open := 0.0
 
 
 func _ready() -> void:
@@ -102,7 +114,7 @@ func _process(_delta: float) -> void:
 	for handle: int in _loops:
 		var loop: Dictionary = _loops[handle]
 		if loop.player is AudioStreamPlayer3D and is_instance_valid(loop.follow) and loop.follow is Node3D:
-			(loop.player as AudioStreamPlayer3D).global_position = (loop.follow as Node3D).global_position
+			(loop.player as AudioStreamPlayer3D).global_position = heard_at((loop.follow as Node3D).global_position)
 
 
 # --- Playing ---------------------------------------------------------------------
@@ -132,11 +144,17 @@ func ui(id: String, step := -1) -> void:
 
 ## Starts looping event `id`, following `follow` (a Node3D) if given. A handle
 ## for set_loop / stop_loop; it keeps going (silent) when the profile has no
-## sound for it, and picks one up on a reload.
+## sound for it, and picks one up on a reload. At the event's `voices=` loops
+## already going, it starts none and returns 0 (which set_loop and stop_loop ignore).
 func start_loop(id: String, follow: Node = null) -> int:
 	_check_id(id)
 	requested.emit(id)
 	var info := SoundCatalog.info(id)
+	var going := 0
+	for loop: Dictionary in _loops.values():
+		going += 1 if loop.id == id else 0
+	if going >= int(info.get("voices", SoundCatalog.DEFAULT_VOICES)):
+		return 0
 	var player: Node
 	if info.get("is_3d", false):
 		player = AudioStreamPlayer3D.new()
@@ -150,6 +168,15 @@ func start_loop(id: String, follow: Node = null) -> int:
 	_loops[handle] = {"id": id, "player": player, "follow": follow, "volume": 1.0, "pitch": 1.0}
 	_fill_loop(handle)
 	_process(0.0)
+	return handle
+
+
+## A loop that lasts as long as `node` does: it follows it and fades out when
+## `node` leaves the tree (a burning patch, a decoy).
+func loop_for(id: String, node: Node3D) -> int:
+	var handle := start_loop(id, node)
+	if handle:
+		node.tree_exiting.connect(stop_loop.bind(handle, 0.2), CONNECT_ONE_SHOT)
 	return handle
 
 
@@ -391,7 +418,7 @@ func _play_from(from: SoundProfile, event: String, id: String, intensity: float,
 	player.pitch_scale = picked.pitch * (1.0 + _rng.randf_range(-jitter, jitter))
 	player.volume_db = float(trims.get("volume_db", 0.0)) + picked.volume_db
 	if at != null:
-		(player as AudioStreamPlayer3D).global_position = at
+		(player as AudioStreamPlayer3D).global_position = heard_at(at)
 	player.set_meta("sfx_id", id)
 	player.play()
 	playing.append(player)
@@ -496,7 +523,7 @@ func _make_buses() -> void:
 	var world := AudioServer.get_bus_index("World")
 	if AudioServer.get_bus_effect_count(world) == 0:
 		var low_pass := AudioEffectLowPassFilter.new()
-		low_pass.cutoff_hz = 4200.0
+		low_pass.cutoff_hz = WATER_HZ
 		low_pass.resonance = 0.5
 		AudioServer.add_bus_effect(world, low_pass)
 		var reverb := AudioEffectReverb.new()
@@ -520,6 +547,52 @@ func _apply_underwater() -> void:
 	var world := AudioServer.get_bus_index("World")
 	for i in AudioServer.get_bus_effect_count(world):
 		AudioServer.set_bus_effect_enabled(world, i, on)
+
+
+## How thick the water is now, 0 (clear) to 1 (murk at its worst): the underwater
+## low-pass closes down as it thickens.
+func set_murk(amount: float) -> void:
+	_murk = clampf(amount, 0.0, 1.0)
+	_apply_cutoff()
+
+
+## How much of the open air a camera above the surface hears, 0 (underwater)
+## to 1: the low-pass opens right up.
+func set_open_air(amount: float) -> void:
+	_open = clampf(amount, 0.0, 1.0)
+	_apply_cutoff()
+
+
+## The World bus's low-pass cutoff now (Hz).
+func underwater_cutoff() -> float:
+	return lerpf(lerpf(WATER_HZ, MURK_HZ, _murk), OPEN_HZ, _open)
+
+
+func _apply_cutoff() -> void:
+	var world := AudioServer.get_bus_index("World")
+	for i in AudioServer.get_bus_effect_count(world):
+		var effect := AudioServer.get_bus_effect(world, i)
+		if effect is AudioEffectLowPassFilter:
+			(effect as AudioEffectLowPassFilter).cutoff_hz = underwater_cutoff()
+
+
+## Where a world sound at `at` is placed so it's as loud as it is for the
+## nearest local player: with several (split-screen) only the first has ears, so
+## a sound far from them but near another player is moved in along the same
+## line, to that player's distance.
+func heard_at(at: Vector3) -> Vector3:
+	if ears.size() < 2 or not is_instance_valid(ears[0]):
+		return at
+	var from := ears[0].global_position
+	var nearest := from.distance_to(at)
+	for ear in ears:
+		if is_instance_valid(ear):
+			nearest = minf(nearest, ear.global_position.distance_to(at))
+	var to := at - from
+	var gap := to.length()
+	if gap <= nearest + 0.001:
+		return at
+	return from + to / gap * nearest
 
 
 func _beeps_profile() -> SoundProfile:

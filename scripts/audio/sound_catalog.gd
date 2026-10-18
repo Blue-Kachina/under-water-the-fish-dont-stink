@@ -63,13 +63,13 @@ const ROWS := [
 	["fish/bow_wave_loop", 3, "3d loop", "The bow wave in front of you at speed (louder with Bow Grow Bow)."],
 	["fish/bump", 2, "3d layers cd=0.1", "Bumping another fish (not a battery)."],
 	["fish/reset", 2, "3d", "Reset / respawn."],
-	["fish/teleport", 2, "3d", "Teleported."],
+	["fish/teleport", 2, "3d", "Teleported (reserved: nothing moves a fish mid-play yet; kickoffs and resets have their own sounds)."],
 
 	# Ball and arena.
 	["ball/hit", 1, "3d layers voices=3", "A fish hits the ball, soft to smash. The most-heard sound in Free Play and 1v1."],
 	["ball/bounce", 1, "3d layers voices=3 cd=0.05", "The ball bounces off the floor, a wall or the ceiling."],
 	["ball/reset", 2, "3d", "The ball respawns."],
-	["arena/hoop_rim", 2, "3d", "Clipping a hoop's rim (obstacle course)."],
+	["arena/hoop_rim", 2, "3d cd=0.2", "Clipping a hoop's rim (obstacle course)."],
 	["arena/hoop_through", 2, "3d", "Swimming through the next hoop (obstacle course)."],
 	["arena/goal_net", 1, "3d layers", "The ball hits the back of the net."],
 	["arena/bubble_column_loop", 2, "3d loop voices=6", "A bubble column."],
@@ -87,9 +87,9 @@ const ROWS := [
 	["match/win", 1, "", "You won."],
 	["match/lose", 1, "", "You lost."],
 	["match/draw", 1, "", "A draw."],
-	["hunt/target_spotted", 2, "", "Hunt: the quarry is seen."],
-	["hunt/caught", 2, "", "Hunt: caught it."],
-	["hunt/escaped", 2, "", "Hunt: it got away."],
+	["hunt/target_spotted", 2, "", "Hunt: the hunter locks on and comes at you."],
+	["hunt/caught", 2, "", "Hunt: the hunter batters you."],
+	["hunt/escaped", 2, "", "Hunt: you got away (a close call or a dodge)."],
 
 	# Battered.
 	["battered/battery", 1, "3d layers", "You batter something; harder at higher speed."],
@@ -110,8 +110,8 @@ const ROWS := [
 	["nature/target_respawn", 3, "3d", "A new target is placed."],
 
 	# Unnatural: your attacks.
-	["unnatural/attack_own_fire", 1, "3d voices=3", "Your fish's own attack fires."],
-	["unnatural/attack_own_hit", 1, "3d voices=3 cd=0.03", "Your fish's own attack lands."],
+	["unnatural/attack_own_fire", 1, "3d voices=3", "Any attack fires (every attack falls back to this one, so a single recording covers them all)."],
+	["unnatural/attack_own_hit", 1, "3d voices=3 cd=0.03", "Any attack lands (every attack falls back to this one)."],
 	["unnatural/sting_fire", 1, "3d voices=3", "Anemone Sting fires."],
 	["unnatural/sting_hit", 1, "3d voices=3 cd=0.03", "Anemone Sting lands."],
 	["unnatural/bite_fire", 1, "3d voices=3", "Ghost Bite fires."],
@@ -127,7 +127,7 @@ const ROWS := [
 	# Unnatural: zombies.
 	["unnatural/zombie_spawn", 3, "3d voices=2 cd=0.2", "A zombie rises from the seabed (heavily rate-limited)."],
 	["unnatural/zombie_moan_loop", 2, "loop voices=1", "The horde's moan: one loop, louder the more are near."],
-	["unnatural/zombie_hit", 1, "3d layers voices=3 cd=0.04", "Zombies take damage (gathered per frame: more hits, harder layer)."],
+	["unnatural/zombie_hit", 1, "3d layers voices=3 cd=0.04", "Zombies take damage from something with no sound of its own (a blast, a ring). Gathered per frame: more hits, harder layer."],
 	["unnatural/zombie_die", 1, "3d layers voices=4 cd=0.04", "Zombies die (gathered per frame: one big crunch for many)."],
 	["unnatural/zombie_die_chase", 3, "3d layers voices=4 cd=0.04", "A chaser dies (falls back to unnatural/zombie_die)."],
 	["unnatural/zombie_die_swarm", 3, "3d layers voices=4 cd=0.04", "A swarmer dies (falls back to unnatural/zombie_die)."],
@@ -142,7 +142,7 @@ const ROWS := [
 	["unnatural/downed", 1, "", "You go down."],
 	["unnatural/revive_loop", 2, "loop voices=1", "Being revived (co-op)."],
 	["unnatural/revived", 1, "", "Back up."],
-	["unnatural/xp", 1, "pitched voices=3 cd=0.03", "An XP orb collected: climbs on a streak."],
+	["unnatural/xp", 1, "pitched voices=3 cd=0.03", "XP from your kills: once a frame a kill lands, climbing the scale while the kills keep coming."],
 	["unnatural/level_up", 1, "", "Level up."],
 	["unnatural/cards_offered", 1, "", "The level-up cards fan out."],
 	["unnatural/card_reveal_common", 2, "", "A common card shows."],
@@ -191,6 +191,7 @@ const ROWS := [
 	["stage/ring_warn", 1, "", "Warning: the ring is about to close."],
 	["stage/ring", 1, "", "THE RING CLOSES."],
 	["stage/miniboss_warn", 1, "", "Warning: THE DROWNED SHARK RISES."],
+	["stage/boss_warn", 1, "", "Warning: THE BLOOD LEVIATHAN WAKES."],
 	["stage/stampede_warn", 1, "", "Warning: a stampede is coming."],
 	["stage/stampede", 1, "", "STAMPEDE."],
 	["stage/tide_warn", 1, "", "Warning: the tide is turning."],
@@ -221,12 +222,12 @@ const ROWS := [
 	["fx/pop", 3, "3d voices=3", "Generic pop effect."],
 
 	# Ambience.
-	["amb/arena_loop", 2, "loop voices=1", "Free Play / 1v1 arena bed."],
-	["amb/aquarium_loop", 2, "loop voices=1", "The aquarium arena's bed."],
-	["amb/ocean_loop", 2, "loop voices=1", "Open water (Nature, Free Swim)."],
-	["amb/seabed_loop", 2, "loop voices=1", "Unnatural's seabed."],
-	["amb/murk_loop", 3, "loop voices=1", "Crossfades in as the murk thickens."],
-	["amb/surface_loop", 3, "loop voices=1", "Above the waterline."],
+	["amb/arena_loop", 2, "loop voices=1", "The obstacle course's bed."],
+	["amb/aquarium_loop", 2, "loop voices=1", "The aquarium arena's bed (Free Play, 1v1)."],
+	["amb/ocean_loop", 2, "loop voices=1", "Open water (Free Swim, Nature, Hunt)."],
+	["amb/seabed_loop", 2, "loop voices=1", "Unnatural's seabed (and the Test Tank's)."],
+	["amb/murk_loop", 3, "loop voices=1", "Crossfades in as the water thickens (Unnatural's murk, an arena's edge)."],
+	["amb/surface_loop", 3, "loop voices=1", "Above the waterline (the camera out of the water)."],
 
 	# Callouts (optional, the Voice bus).
 	["voice/go", 3, "", "Callout: go!"],
@@ -237,6 +238,7 @@ const ROWS := [
 	["voice/level_up", 3, "", "Callout: level up."],
 	["voice/ring_warn", 3, "", "Callout: the ring closes."],
 	["voice/miniboss_warn", 3, "", "Callout: the Drowned Shark rises."],
+	["voice/boss_warn", 3, "", "Callout: the Blood Leviathan wakes."],
 	["voice/stampede_warn", 3, "", "Callout: stampede."],
 	["voice/tide_warn", 3, "", "Callout: the tide turns."],
 	["voice/boss_arrive", 3, "", "Callout: a boss arrives."],
@@ -258,6 +260,18 @@ const FALLBACKS := {
 	"unnatural/zombie_die_tank": "unnatural/zombie_die",
 	"unnatural/zombie_die_lunge": "unnatural/zombie_die",
 	"unnatural/zombie_die_glide": "unnatural/zombie_die",
+	"unnatural/sting_fire": "unnatural/attack_own_fire",
+	"unnatural/bite_fire": "unnatural/attack_own_fire",
+	"unnatural/lash_fire": "unnatural/attack_own_fire",
+	"unnatural/thrust_fire": "unnatural/attack_own_fire",
+	"unnatural/bubbles_fire": "unnatural/attack_own_fire",
+	"unnatural/spines_fire": "unnatural/attack_own_fire",
+	"unnatural/sting_hit": "unnatural/attack_own_hit",
+	"unnatural/bite_hit": "unnatural/attack_own_hit",
+	"unnatural/lash_hit": "unnatural/attack_own_hit",
+	"unnatural/thrust_hit": "unnatural/attack_own_hit",
+	"unnatural/bubbles_hit": "unnatural/attack_own_hit",
+	"unnatural/spines_hit": "unnatural/attack_own_hit",
 }
 
 static var _events := {}

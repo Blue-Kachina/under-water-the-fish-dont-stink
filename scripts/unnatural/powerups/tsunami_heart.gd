@@ -42,6 +42,7 @@ func send(heading: Vector3) -> void:
 	wave.speed = settings.tsunami_speed
 	run.add_child(wave)
 	wave.global_position = fish.global_position
+	Sfx.play_at("pw/tsunami_wave", fish.global_position)
 	wave.look_at(fish.global_position + wave.heading, Vector3.UP if absf(wave.heading.y) < 0.98 else Vector3.BACK)
 
 

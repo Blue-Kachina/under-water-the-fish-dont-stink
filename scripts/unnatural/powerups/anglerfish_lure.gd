@@ -54,11 +54,15 @@ func drop() -> void:
 	lures.append(lure)
 	run.decoys.append(lure)
 	dropped += 1
+	Sfx.play_at("pw/lure_drop", lure.global_position)
+	Sfx.loop_for("pw/lure_loop", lure)
 
 
 func pop(at: Vector3) -> void:
 	burst += 1
 	Explosion.spawn(run.ocean, at, color(id), settings.lure_blast, 0.0, 0.3)
+	Sfx.play_at("pw/lure_burst", at)
+	Sfx.play_at("fx/explosion", at, clampf(settings.lure_blast / 6.0, 0.0, 1.0))
 	for i in run.horde.query_sphere(at, settings.lure_blast):
 		var push := run.horde.enemy_position(i) - at
 		run.hit(i, damage(), fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP, settings.lure_proc, [id])

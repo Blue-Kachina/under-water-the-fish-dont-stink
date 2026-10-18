@@ -13,6 +13,9 @@ extends Node3D
 ## (GhostBite.bow_reach) at its biggest: aiming in 3D water is hard, and
 ## otherwise ramming would do the same job (D8).
 
+## The attack went off (fire() returned true).
+signal fired
+
 enum Kind { OWN, STING, BITE, LASH, THRUST, BUBBLES, SPINES }
 ## Each fish's own.
 const FOR_FAMILY := {
@@ -138,6 +141,7 @@ func update(delta: float, active := true) -> void:
 	if fire():
 		cooldown_left = cooldown()
 		uses += 1
+		fired.emit()
 
 
 ## Fires if there's something to fire at; returns whether it did.
