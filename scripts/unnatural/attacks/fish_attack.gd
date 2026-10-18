@@ -49,7 +49,7 @@ var damage_scale := 1.0
 var extra_projectiles := 0
 var projectile_speed := 1.0
 ## Its weapon facets on top (Weapons, set by UnnaturalRun._apply_stats): how
-## hard it knocks zombies back, and the milestones it has reached (0, 1 or 2).
+## hard it knocks zombies back, and the milestones it has reached (0 to 4).
 var knock_scale := 1.0
 var milestones := 0
 var cooldown_left := 0.0

@@ -9,11 +9,15 @@ extends FishAttack
 ##
 ## As a weapon (Weapons): at its first milestone the spears pierce one more
 ## zombie; at its second, a spear that flies its full range bursts, hurting
-## every zombie within BURST_REACH (times area) for BURST_SHARE of its damage.
+## every zombie within BURST_REACH (times area) for BURST_SHARE of its damage;
+## at its third, MORE_SPEARS more spears fan out with each thrust; at its
+## fourth, they pierce everything in their way.
 
 const COLOR := Color(0.55, 0.85, 1.0, 0.9)
 const BURST_REACH := 2.5
 const BURST_SHARE := 0.6
+const MORE_SPEARS := 2
+const PIERCE_ALL := 9999
 
 var spears := ProjectileSwarm.new()
 
@@ -62,7 +66,8 @@ func fire() -> bool:
 	if target < 0:
 		return false
 	var aim := toward(at, target, ahead)
-	var count := 1 + extra_projectiles
+	var count := 1 + extra_projectiles + (MORE_SPEARS if milestones >= 3 else 0)
+	var pierce := PIERCE_ALL if milestones >= 4 else settings.thrust_pierce + (1 if milestones >= 1 else 0)
 	var side := aim.cross(Vector3.UP if absf(aim.y) < 0.98 else Vector3.BACK).normalized()
 	var up := side.cross(aim)
 	var tip := at + ahead * fish.hitbox_length * 0.5
@@ -70,5 +75,5 @@ func fire() -> bool:
 		var offset := (n - (count - 1) * 0.5) * deg_to_rad(settings.thrust_spread)
 		var direction := aim.rotated(up, offset)
 		spears.fire(tip, direction * speed(), settings.thrust_damage, settings.thrust_size * area_scale,
-				settings.thrust_range / settings.thrust_speed, settings.thrust_pierce + (1 if milestones >= 1 else 0))
+				settings.thrust_range / settings.thrust_speed, pierce)
 	return true

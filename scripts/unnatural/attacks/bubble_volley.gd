@@ -7,7 +7,9 @@ extends FishAttack
 ##
 ## As a weapon (Weapons): at its first milestone the bubbles pop WIDE_POP
 ## times as wide; at its second, every volley ends with one big bubble
-## (BIG_SIZE times the size, BIG_DAMAGE times the damage).
+## (BIG_SIZE times the size, BIG_DAMAGE times the damage); at its third, each
+## volley blows twice as many bubbles; at its fourth, it ends with BIG_MANY
+## big bubbles.
 
 const COLOR := Color(0.75, 0.95, 1.0, 0.45)
 ## Each pop can hit several.
@@ -15,6 +17,7 @@ const PROC := 0.6
 const WIDE_POP := 1.6
 const BIG_SIZE := 2.5
 const BIG_DAMAGE := 3.0
+const BIG_MANY := 3
 
 var bubbles := ProjectileSwarm.new()
 
@@ -67,7 +70,7 @@ func fire() -> bool:
 	var sorted := Array(near)
 	sorted.sort_custom(func(a: int, b: int) -> bool:
 		return horde.enemy_position(a).distance_squared_to(at) < horde.enemy_position(b).distance_squared_to(at))
-	var count := settings.bubble_count + extra_projectiles
+	var count := (settings.bubble_count + extra_projectiles) * (2 if milestones >= 3 else 1)
 	var basis := fish.global_basis
 	var speed := settings.bubble_speed * projectile_speed
 	for n in count:
@@ -77,7 +80,10 @@ func fire() -> bool:
 		var out := (-basis.z + basis.x * spread * 1.2 + basis.y * (0.3 + 0.2 * absf(spread))).normalized()
 		bubbles.fire(at + out * 0.8, out * speed, settings.bubble_damage, settings.bubble_size, settings.bubble_life, 1, target)
 	if milestones >= 2:
-		var up := (-basis.z + basis.y * 0.5).normalized()
-		bubbles.fire(at + up * 0.8, up * speed * 0.8, settings.bubble_damage * BIG_DAMAGE, settings.bubble_size * BIG_SIZE,
-				settings.bubble_life, 1, sorted[0])
+		var big := BIG_MANY if milestones >= 4 else 1
+		for n in big:
+			var spread := (n - (big - 1) * 0.5) * 0.6
+			var up := (-basis.z + basis.y * 0.5 + basis.x * spread).normalized()
+			bubbles.fire(at + up * 0.8, up * speed * 0.8, settings.bubble_damage * BIG_DAMAGE, settings.bubble_size * BIG_SIZE,
+					settings.bubble_life, 1, sorted[n % sorted.size()])
 	return true

@@ -198,9 +198,9 @@ func _check_settings() -> void:
 	await _frames(3)
 	var focus := get_viewport().gui_get_focus_owner()
 	check(panel.is_open() and focus == panel._section_buttons["game"], "open on the sections, Game focused")
-	for i in 4:
+	for i in 5:
 		await _trigger(JOY_AXIS_TRIGGER_RIGHT)
-	check(panel._section == "fish" and panel._title.text == "Fish", "RT ×4: the Fish section")
+	check(panel._section == "fish" and panel._title.text == "Fish", "RT ×5: the Fish section")
 	var fish_tabs: Array = panel._tabs["fish"].map(func(tab: Dictionary) -> String: return tab.title)
 	check(fish_tabs.size() >= 3 and panel._tab_bar.visible, "Fish has tabs across the top: %s" % [fish_tabs])
 	check(panel._tabs["game"].is_empty() and not _tab_bar_shown_for(panel, "game"), "Game has none")

@@ -3,7 +3,7 @@ extends Node
 ## the level-up cards' pools follow the slots (new weapons and tomes only while
 ## a slot is free; capped ones gone; fallback cards when nothing's left);
 ## facet rolls match the rarity table over 10,000 rolls; tome cards add their
-## StatBlock steps; milestones switch on at Lv 5 and 10 (on chest weapons and
+## StatBlock steps; milestones switch on at Lv 5, 10, 15 and 20 (on chest weapons and
 ## the fish's attack); chests offer items only; a boss weapon with full slots
 ## asks which weapon to swap; level overrides lift a weapon for testing.
 ##   Godot_console.exe --headless --path . res://tests/slots_probe.tscn
@@ -122,7 +122,25 @@ func _run() -> void:
 	loadout._levels["greek_fire"] = 10
 	run.powerups_of(fish).refresh()
 	check(fire.milestone(2), "the second at Lv 10")
+	loadout._levels["greek_fire"] = 15
+	run.powerups_of(fish).refresh()
+	check(fire.milestone(3) and not fire.milestone(4), "the third at Lv 15")
+	loadout._levels["greek_fire"] = 20
+	run.powerups_of(fish).refresh()
+	check(fire.milestone(4), "the fourth at Lv 20")
+	loadout._levels["greek_fire"] = 10
+	run.powerups_of(fish).refresh()
+	var lined := true
+	for key: Variant in Weapons.MILESTONES:
+		lined = lined and (Weapons.MILESTONES[key] as Array).size() == 4
+	check(lined, "every weapon has four milestone lines")
 	var bite := run.bite_of(fish)
+	loadout._levels[Weapons.ATTACK] = 15
+	run._apply_stats(fish)
+	check(bite.milestones == 3, "the bite's third at Lv 15")
+	loadout._levels[Weapons.ATTACK] = 20
+	run._apply_stats(fish)
+	check(bite.milestones == 4, "the bite's fourth at Lv 20")
 	loadout._levels[Weapons.ATTACK] = 4
 	run._apply_stats(fish)
 	check(bite.milestones == 0, "the bite: none at Lv 4")

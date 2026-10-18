@@ -8,15 +8,23 @@ extends Powerup
 ## MultiMesh for them all. Milestones: at the first, the coils slow what they
 ## touch (SLOW_SHARE of its speed); at the second, the head snaps at the
 ## nearest zombie within SNAP_REACH every SNAP_EVERY s, for SNAP_DAMAGE hits'
-## worth.
+## worth; at the third, the tail end lashes out in a shock ring every TAIL_EVERY
+## s (TAIL_REACH m, TAIL_DAMAGE hits' worth); at the fourth, the coil is
+## LONG_SCALE times as long.
 
 const SLOW_SHARE := 0.5
 const SNAP_EVERY := 1.5
 const SNAP_REACH := 5.0
 const SNAP_DAMAGE := 5.0
+const TAIL_EVERY := 2.0
+const TAIL_REACH := 4.5
+const TAIL_DAMAGE := 3.0
+const LONG_SCALE := 2
 
 ## Hits so far, for the probes.
 var hits := 0
+## Tail lashes so far (the third milestone), for the probes.
+var lashes := 0
 ## Where the fish has been, newest first, coil_spacing m apart.
 var trail := PackedVector3Array()
 var _coils: MultiMeshInstance3D
@@ -26,10 +34,11 @@ var _spine_material: StandardMaterial3D
 var _drawn := PackedVector3Array()
 var _tick_left := 0.0
 var _snap_left := SNAP_EVERY
+var _tail_left := TAIL_EVERY
 
 
 func count() -> int:
-	return settings.coil_segments + facet_count("count")
+	return (settings.coil_segments + facet_count("count")) * (LONG_SCALE if milestone(4) else 1)
 
 
 func damage() -> float:
@@ -70,6 +79,17 @@ func on_tick(delta: float) -> void:
 				var to := run.horde.enemy_position(target)
 				PowerupFx.flash(run, to, 0.9, color(id), 0.2)
 				run.hit(target, damage() * SNAP_DAMAGE, fish, id, (to - trail[1]).normalized(), settings.coil_proc, [id])
+	if milestone(3) and trail.size() > 2:
+		_tail_left -= delta
+		if _tail_left <= 0.0:
+			_tail_left = TAIL_EVERY
+			lashes += 1
+			var end := trail[trail.size() - 1]
+			PowerupFx.shock(run, end, TAIL_REACH, color(id), Vector3.UP, 0.35)
+			for i in run.horde.query_sphere(end, TAIL_REACH):
+				var out := run.horde.enemy_position(i) - end
+				run.hit(i, damage() * TAIL_DAMAGE, fish, id, out.normalized() if out.length_squared() > 0.0001 else Vector3.UP,
+						settings.coil_proc, [id])
 	_tick_left -= delta
 	if _tick_left > 0.0:
 		return

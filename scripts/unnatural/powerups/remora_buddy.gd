@@ -6,20 +6,30 @@ extends Powerup
 ## coefficient remora_proc); they take turns, so the nips come evenly.
 ## Milestones: at the first, a nip latches on, biting LATCH_BITES more times
 ## (LATCH_SHARE of the damage); at the second, a remora's kill splits one off
-## for SPLIT_TIME s (up to as many more as there are).
+## for SPLIT_TIME s (up to as many more as there are); at the third, each nip
+## tears into every other zombie within TEAR_REACH for TEAR_SHARE of it; at
+## the fourth, a remora's kill heals its fish HEAL_SHARE of its max hp (at
+## most once every HEAL_GAP s).
 
 const LATCH_BITES := 3
 const LATCH_GAP := 0.3
 const LATCH_SHARE := 0.5
 const SPLIT_TIME := 6.0
+const TEAR_REACH := 2.5
+const TEAR_SHARE := 0.5
+const HEAL_SHARE := 0.01
+const HEAL_GAP := 0.25
 
 ## Nips so far, for the probes.
 var nips := 0
+## Tears into the zombies round a nip (the third milestone), for the probes.
+var tears := 0
 var _next := 0.0
 ## The first milestone's latched bites: [zombie, bites left, s to the next].
 var _latched: Array = []
 ## The second's split-off remoras: when each goes (s left).
 var _splits := PackedFloat32Array()
+var _heal_left := 0.0
 
 
 func count() -> int:
@@ -43,6 +53,7 @@ func on_stacks_changed() -> void:
 
 
 func on_tick(delta: float) -> void:
+	_heal_left -= delta
 	_tick_splits(delta)
 	_tick_latched(delta)
 	var n := count()
@@ -60,14 +71,24 @@ func on_tick(delta: float) -> void:
 		return
 	nips += 1
 	var to := run.horde.enemy_position(target)
-	PowerupFx.flash(run, to, 0.45, color(id), 0.18)
+	PowerupFx.flash(run, to, 0.8, color(id), 0.2)
 	run.hit(target, damage(), fish, id, (to - at).normalized(), settings.remora_proc, [id])
+	if milestone(3):
+		for i in run.horde.query_sphere(to, TEAR_REACH):
+			if i != target:
+				tears += 1
+				run.hit(i, damage() * TEAR_SHARE, fish, id, (run.horde.enemy_position(i) - to).normalized(), settings.remora_proc * TEAR_SHARE, [id])
 	if milestone(1) and run.horde.is_alive(target):
 		_latched.append([target, LATCH_BITES, LATCH_GAP])
 
 
 ## The second milestone: a remora's kill splits one off for a while.
 func on_kill(_at: Vector3, source: String) -> void:
+	if source == id and milestone(4) and _heal_left <= 0.0:
+		var health := run.health_of(fish)
+		if health and not health.down:
+			_heal_left = HEAL_GAP
+			health.heal(health.max_hp * HEAL_SHARE)
 	if source == id and milestone(2) and _splits.size() < settings.remora_count + facet_count("count"):
 		_splits.append(SPLIT_TIME)
 		wear()
@@ -116,21 +137,22 @@ func wear() -> void:
 		super.wear()
 
 
-## The remoras stuck under the belly, nose to tail.
+## The remoras stuck low on the flanks, nose to tail, where the follow cam
+## (behind and above) can see them past the body: pale, with a faint glow in
+## the powerup's colour so they read in the murk.
 func make_worn() -> Node3D:
 	var school := Node3D.new()
 	school.name = "Remoras"
-	var skin := StandardMaterial3D.new()
-	skin.albedo_color = Color(0.5, 0.55, 0.62)
-	skin.roughness = 0.6
+	var skin := worn_material(0.35)
+	skin.albedo_color = Color(0.78, 0.82, 0.9)
 	var n := mini(count(), 8)
 	for k in n:
 		var body := CapsuleMesh.new()
-		body.radius = 0.05
-		body.height = 0.3
+		body.radius = 0.09
+		body.height = 0.55
 		body.radial_segments = 8
 		body.rings = 2
-		var side := (k % 2) * 2.0 - 1.0 if n > 1 else 0.0
-		var at := Vector3(side * fish.hitbox_width * 0.3, -fish.hitbox_height * 0.5, (k / 2) * 0.22 - 0.1)
+		var side := (k % 2) * 2.0 - 1.0 if n > 1 else 1.0
+		var at := Vector3(side * fish.hitbox_width * 0.5, -fish.hitbox_height * 0.3, (k / 2) * 0.4 - 0.15)
 		school.add_child(worn_mesh(body, skin, at, Vector3(PI / 2.0, 0.0, 0.0)))
 	return school

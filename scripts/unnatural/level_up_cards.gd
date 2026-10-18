@@ -187,10 +187,9 @@ func _draw() -> void:
 func _milestone_line(id: String, level: int) -> String:
 	var lines := Weapons.milestones(id, attack_kind)
 	var settings := UnnaturalSettings.shared()
-	if lines.size() >= 1 and level == settings.milestone_first:
-		return lines[0]
-	if lines.size() >= 2 and level == settings.milestone_second:
-		return lines[1]
+	for n in mini(lines.size(), 4):
+		if level == settings.milestone_level(n + 1):
+			return lines[n]
 	return ""
 
 

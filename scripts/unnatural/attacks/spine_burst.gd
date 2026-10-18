@@ -6,7 +6,8 @@ extends FishAttack
 ##
 ## As a weapon (Weapons): at its first milestone the spines fly FAR_REACH
 ## times as far; at its second, a second ring (half as many) follows each
-## burst SECOND_AFTER s later.
+## burst SECOND_AFTER s later; at its third, the spines pierce MORE_PIERCE more
+## zombies; at its fourth, a third ring (a full one) follows the second.
 
 const COLOR := Color(1.0, 0.8, 0.4, 0.85)
 ## A burst hits many at once.
@@ -15,10 +16,13 @@ const PROC := 0.4
 const LEVEL_SHARE := 0.65
 const FAR_REACH := 1.4
 const SECOND_AFTER := 0.25
+const MORE_PIERCE := 2
 
 var spines := ProjectileSwarm.new()
 var _turn := 0.0
 var _second_left := -1.0
+## Rings still to follow this burst (the second, and the fourth milestone's third).
+var _rings_left := 0
 
 
 func _init() -> void:
@@ -62,7 +66,8 @@ func fire() -> bool:
 	if horde.query_sphere(origin(), reach()).is_empty():
 		return false
 	_burst(count())
-	if milestones >= 2:
+	_rings_left = (1 if milestones >= 2 else 0) + (1 if milestones >= 4 else 0)
+	if _rings_left > 0:
 		_second_left = SECOND_AFTER
 	return true
 
@@ -72,7 +77,11 @@ func _animate(delta: float) -> void:
 		_second_left -= delta
 		if _second_left < 0.0:
 			_turn += 0.35  # between the first ring's spines
-			_burst(maxi(count() / 2, 1))
+			var third := _rings_left == 1 and milestones >= 4
+			_burst(count() if third else maxi(count() / 2, 1))
+			_rings_left -= 1
+			if _rings_left > 0:
+				_second_left = SECOND_AFTER
 
 
 ## `n` spines out, now.
@@ -99,4 +108,4 @@ func _burst(n: int) -> void:
 			var angle := k * PI * (3.0 - sqrt(5.0)) + _turn
 			out = Vector3(cos(angle) * ring, y, sin(angle) * ring)
 		out = (basis * out).normalized()
-		spines.fire(at + out * 0.6, out * speed, settings.spine_damage, settings.spine_size * area_scale, far / speed, settings.spine_pierce)
+		spines.fire(at + out * 0.6, out * speed, settings.spine_damage, settings.spine_size * area_scale, far / speed, settings.spine_pierce + (MORE_PIERCE if milestones >= 3 else 0))

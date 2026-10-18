@@ -9,7 +9,9 @@ extends FishAttack
 ## As a weapon (Weapons): at its first milestone a second pulse (an echo, its
 ## own AnemoneSting) follows ECHO_AFTER s later, ECHO_SIZE times as big for
 ## ECHO_DAMAGE of the damage; at its second, every sting takes SLOW_SHARE of
-## the zombie's speed.
+## the zombie's speed; at its third, each pulse draws the zombies within
+## PULL_REACH times its radius toward the fish (PULL_SPEED m/s); at its
+## fourth, the echo has an echo of its own (a third pulse, bigger again).
 
 ## The pulse grows to full size, hurts there, then fades.
 const GROW_TIME := 0.1
@@ -22,8 +24,12 @@ const ECHO_AFTER := 0.15
 const ECHO_SIZE := 1.5
 const ECHO_DAMAGE := 0.5
 const SLOW_SHARE := 0.6
+const PULL_REACH := 2.0
+const PULL_SPEED := 8.0
 
 var is_echo := false
+## 0: the pulse itself; 1: its echo; 2: the echo's echo (the fourth milestone).
+var echo_depth := 0
 var _echo: AnemoneSting
 var _echo_left := -1.0
 var _age := -1.0
@@ -99,9 +105,11 @@ func fire() -> bool:
 	return true
 
 
-## One pulse, now.
+## One pulse, now (an echo's, at the fourth milestone, has its own echo).
 func pulse() -> void:
 	_age = 0.0
+	if echo_depth == 1 and milestones >= 4:
+		_echo_left = ECHO_AFTER
 	visible = true
 	_place(0.0)
 
@@ -123,6 +131,11 @@ func _animate(delta: float) -> void:
 			strike(i, settings.sting_damage, toward(at, i, nose()))
 			if milestones >= 2:
 				horde.shove(i, -horde.enemy_velocity(i) * SLOW_SHARE)
+		if milestones >= 3:
+			for i in horde.query_sphere(at, radius() * PULL_REACH):
+				var inward := at - horde.enemy_position(i)
+				if inward.length_squared() > 0.01:
+					horde.shove(i, inward.normalized() * PULL_SPEED)
 	if _age >= GROW_TIME + FADE_TIME:
 		_age = -1.0
 		visible = false
@@ -135,6 +148,7 @@ func _make_echo() -> AnemoneSting:
 	if not is_instance_valid(_echo):
 		_echo = AnemoneSting.new()
 		_echo.is_echo = true
+		_echo.echo_depth = echo_depth + 1
 		_echo.top_level = true
 		_echo.fish = fish
 		_echo.horde = horde

@@ -39,7 +39,7 @@ const PREVIEW_DIR := "res://assets/ui/previews"
 
 ## The sections in order: [id, title]. Game, Display and Controls are
 ## UISettings and Controls; the rest are tuning targets.
-const SECTIONS := [["game", "Game"], ["display", "Display"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"],
+const SECTIONS := [["game", "Game"], ["display", "Display"], ["audio", "Audio"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"],
 		["ball", "Ball"], ["nature", "Nature"], ["unnatural", "Unnatural"], ["powerups", "Powerups"]]
 ## Who each tuning section is for ("Used by ...").
 const USED_BY := {
@@ -63,6 +63,15 @@ const GAME_OPTIONS := {
 	"display/show_stats": ["Stats panel", "Tuning aids", "A readout of the fish's speed, forward speed, drift and more, for tuning.", "the HUD"],
 	"display/show_input_overlay": ["Controller overlay", "Tuning aids", "Shows the controller's sticks, triggers and buttons live on screen.", "the HUD"],
 	"controls/profile": ["Controller profile", "Controller", "Which controller buttons do what. The sticks, triggers and keyboard are the same in every profile.", "your controller"],
+	"audio/profile": ["Sound profile", "Sound", "Which set of sounds plays. None is silent; Beeps is a placeholder beep for every sound. The rest are the folders in audio/profiles (see its README).", "every mode"],
+	"audio/music_profile": ["Music", "Sound", "Whose music plays: the sound profile's, or another profile's.", "every mode"],
+	"audio/master_volume": ["Master volume", "Volume", "Everything.", "every mode"],
+	"audio/sfx_volume": ["Sound effects volume", "Volume", "The game's sounds and the menus'.", "every mode"],
+	"audio/music_volume": ["Music volume", "Volume", "The music.", "every mode"],
+	"audio/voice_volume": ["Callouts volume", "Volume", "Spoken or sung callouts (\"Fish Fry!\"), in profiles that have them.", "every mode"],
+	"audio/beep_missing": ["Beep for missing sounds", "Making sounds", "A sound the profile doesn't have plays its placeholder beep instead of nothing, to hear where the gaps are.", "making sound profiles"],
+	"audio/reload": ["Reload sounds", "Making sounds", "Reads the sound profile's files again, so a file just saved is heard. Running from the project, files load straight from disk.", "making sound profiles"],
+	"audio/sheet": ["Write recording sheet", "Making sounds", "Writes audio/sound_sheet.csv: every sound, what it's for, how it plays and which profiles have it.", "making sound profiles"],
 }
 ## The big sections' tabs, across the top: section -> [[title, [@export_group
 ## names]], ...]. A group not listed gets a tab of its own after these.
@@ -87,6 +96,7 @@ const TABS := {
 	"powerups": [["General", []], ["Weapons", []], ["Common", []], ["Uncommon", []], ["Rare", []], ["Epic", []], ["Legendary", []], ["Boss", []],
 			["Cursed", []]],
 	"controls": [["Keyboard & Mouse", []], ["Controller", []]],
+	"audio": [["Sound", []], ["Sound Board", []]],
 }
 ## A held left/right repeats after this, this often (s).
 const REPEAT_DELAY := 0.38
@@ -496,6 +506,8 @@ func _tab_for(key: String, group: String) -> String:
 	match key.get_slice("/", 0):
 		"controls":
 			return "Keyboard & Mouse" if key.begins_with("controls/kb:") else "Controller"
+		"audio":
+			return "Sound Board" if key.begins_with("audio/board:") else "Sound"
 		"powerups":
 			if group == "Cursed":
 				return "Cursed"
@@ -596,9 +608,45 @@ func _build_game_options() -> void:
 				for profile: String in Controls.profile_names():
 					profiles.append([profile, profile])
 				meta["choices"] = profiles
+			"audio/profile":
+				meta["kind"] = "enum"
+				meta["choices"] = Sfx.profile_choices()
+			"audio/music_profile":
+				meta["kind"] = "enum"
+				meta["choices"] = Sfx.music_choices()
+			"audio/master_volume", "audio/sfx_volume", "audio/music_volume", "audio/voice_volume":
+				meta.merge({"kind": "range", "min": 0.0, "max": 100.0, "step": 5.0, "whole": true,
+						"allow_greater": false, "allow_lesser": false})
+			"audio/reload", "audio/sheet":
+				meta["kind"] = "action"
 			_:
 				meta["kind"] = "action" if key.begins_with("game/preset_") else "bool"
 		_add_row(key, meta, heading)
+	_build_sound_board()
+
+
+## Settings > Audio's Sound Board: a row per sound event (SoundCatalog), under
+## its category, saying whether the sound profile has it; A plays it.
+func _build_sound_board() -> void:
+	for category: String in SoundCatalog.CATEGORIES:
+		var ids := SoundCatalog.ids_in(category)
+		if ids.is_empty():
+			continue
+		var group: String = SoundCatalog.CATEGORIES[category]
+		var heading := _heading(_list_for("audio/board:" + ids[0], group), group)
+		for id in ids:
+			_add_row("audio/board:" + id, {"group": group, "kind": "action", "title": id, "event": id}, heading)
+	Sfx.profile_loaded.connect(_refresh_audio_rows)
+
+
+## The Sound Board's rows and the profile pickers, after a profile (re)loads.
+func _refresh_audio_rows() -> void:
+	if _meta.has("audio/profile"):
+		_meta["audio/profile"]["choices"] = Sfx.profile_choices()
+		_meta["audio/music_profile"]["choices"] = Sfx.music_choices()
+	for key: String in _rows:
+		if key.begins_with("audio/"):
+			_refresh_row(key)
 
 
 ## The Controls section's rebinds (Controls.REBINDABLE): a row for each
@@ -683,6 +731,8 @@ func _value(key: String) -> Variant:
 			return Controls.current_profile
 	if section in ["game", "display"]:
 		return UISettings.get(prop) if prop in UISettings.KEYS else null
+	if section == "audio":
+		return Sfx.get(prop) if prop in Sfx.KEYS else null
 	return _targets[section].get(prop) if _targets.has(section) else null
 
 
@@ -704,6 +754,8 @@ func _default(key: String) -> Variant:
 			return false
 		"controls/profile":
 			return Controls.DEFAULT_PROFILE
+	if section == "audio":
+		return Sfx.DEFAULTS.get(prop)
 	return _defaults[section].get(prop) if _defaults.has(section) else null
 
 
@@ -724,6 +776,10 @@ func _set_value(key: String, value: Variant) -> void:
 		_:
 			if section in ["game", "display"]:
 				UISettings.set_value(prop, value)
+			elif section == "audio":
+				Sfx.set_value(prop, roundi(value) if _meta[key].get("whole", false) else value)
+				if prop == "profile":
+					show_status(Sfx.summary())
 			elif _targets.has(section):
 				var meta: Dictionary = _meta[key]
 				if meta.get("whole", false):
@@ -788,8 +844,11 @@ func _reset_option(key: String) -> void:
 		show_status("%s back to its default" % _title_of(key))
 
 
-## Runs action `key` (the tuning preset rows).
+## Runs action `key` (the tuning preset rows, the audio ones).
 func _act(key: String) -> void:
+	if key.begins_with("audio/"):
+		_act_audio(key)
+		return
 	if not is_editable(key):
 		show_status("The host sets the tuning while you're online")
 		return
@@ -805,6 +864,23 @@ func _act(key: String) -> void:
 		"controls/kb:reset_all", "controls/pad:reset_all":
 			Controls.reset_all_bindings(key.begins_with("controls/pad:"))
 			show_status("Every %s binding back to its default" % ("controller" if key.begins_with("controls/pad:") else "keyboard & mouse"))
+
+
+func _act_audio(key: String) -> void:
+	match key:
+		"audio/reload":
+			show_status(Sfx.load_profile())
+			_show_detail(_detail_key)
+		"audio/sheet":
+			var path: String = Sfx.write_sheet()
+			show_status("Recording sheet: %s" % path if path else "Couldn't write the recording sheet")
+		_:
+			var id := key.trim_prefix("audio/board:")
+			match Sfx.audition(id):
+				"profile":
+					show_status("%s  ·  %s" % [id, "borrowed: " + SoundCatalog.FALLBACKS[id] if Sfx.status(id) == "borrowed" else "from " + Sfx.active_profile().title])
+				"beep":
+					show_status("%s  ·  not in this profile: its placeholder beep" % id)
 
 
 # --- Rebinding ------------------------------------------------------------------
@@ -896,6 +972,14 @@ func _value_text(key: String) -> Array:
 		"text":
 			return [UISettings.display_name(), UITheme.INK_SOFT]
 		"action":
+			if meta.has("event"):
+				match Sfx.status(meta.event):
+					"have":
+						return ["HAVE ›", UITheme.AQUA]
+					"borrowed":
+						return ["BORROWED ›", UITheme.INK_SOFT]
+					"missing":
+						return ["MISSING ›", UITheme.CORAL]
 			return ["›", UITheme.MUTED]
 		"range":
 			return [_format_value(value), UITheme.AQUA if changed else UITheme.INK_SOFT]
@@ -1020,6 +1104,8 @@ func _show_detail(key: String) -> void:
 	var words := ""
 	if GAME_OPTIONS.has(key):
 		words = GAME_OPTIONS[key][2]
+	elif meta.has("event"):
+		words = _sound_words(meta.event)
 	else:
 		words = SettingDocs.DOCS.get(key, "")
 	_detail_text.text = words
@@ -1042,6 +1128,25 @@ func _show_detail(key: String) -> void:
 	if used:
 		default_text += ("  ·  " if default_text else "") + "Used by %s" % used
 	_detail_default.text = default_text
+
+
+## The Sound Board's words for event `id`: what it's for, how it plays, and the
+## sound profile's files for it.
+func _sound_words(id: String) -> String:
+	var info := SoundCatalog.info(id)
+	var kinds := PackedStringArray(["P%d" % info.priority, "3D (record mono)" if info.is_3d else "2D"])
+	for flag: String in ["loop", "pitched", "layers"]:
+		if info[flag]:
+			kinds.append(flag)
+	var words := "%s\n\n%s  ·  file: %s.wav" % [info.description, "  ·  ".join(kinds), id]
+	var profile: SoundProfile = Sfx.active_profile()
+	if profile == null:
+		words += "\n\nSound profile None: nothing plays (A plays the placeholder beep)."
+	elif profile.has(id) and profile.dir:
+		words += "\n\nIn %s: %s" % [profile.title, ", ".join(profile.events[id].files)]
+	elif SoundCatalog.FALLBACKS.has(id):
+		words += "\n\nWithout its own, it uses %s." % SoundCatalog.FALLBACKS[id]
+	return words
 
 
 ## How value `value` of option `key` reads in the pane ("On", "Clownfish (Octane)", "12.50").

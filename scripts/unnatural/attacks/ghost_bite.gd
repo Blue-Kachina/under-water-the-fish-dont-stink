@@ -14,7 +14,8 @@ extends FishAttack
 ##
 ## As a weapon (Weapons) its milestones add echo jaws (more GhostBites of its
 ## own) that snap with it: at the first, behind the fish; at the second, at
-## both sides too.
+## both sides too; at the third, above and below it too. At the fourth every
+## bite snaps again AGAIN_AFTER s later.
 
 ## The jaws open, then snap shut (when it hurts), then fade.
 const OPEN_TIME := 0.07
@@ -24,10 +25,13 @@ const FADE_TIME := 0.32
 const TEETH := 11
 const ARC := 115.0
 const GHOST_COLOR := Color(0.6, 0.95, 1.0, 0.55)
+const AGAIN_AFTER := 0.3
 
 ## Bites so far, and zombies bitten.
 var bites := 0
 var bitten := 0
+## Second snaps (the fourth milestone), for the probes.
+var snapped_again := 0
 
 var _age := -1.0
 var _aim := Vector3.FORWARD
@@ -35,6 +39,8 @@ var _snapped := false
 ## The milestones' echo jaws (made as they're needed), and whether this is one.
 var _echoes: Array[GhostBite] = []
 var is_echo := false
+## The fourth milestone's second snap: s until it (-1: none to come).
+var _again_left := -1.0
 var _upper := MeshInstance3D.new()
 var _lower := MeshInstance3D.new()
 ## The teeth: white-hot at their tips, fading toward the gum.
@@ -141,13 +147,17 @@ func update(delta: float, active := true) -> void:
 
 
 ## Opens the jaws toward `direction` (unit); they snap shut SNAP_TIME later.
-func start(direction: Vector3) -> void:
+## `again`: the fourth milestone's second snap (which doesn't ask for a third).
+func start(direction: Vector3, again := false) -> void:
+	if not is_echo and milestones >= 4 and not again:
+		_again_left = AGAIN_AFTER
 	_aim = direction
 	_age = 0.0
 	_snapped = false
 	cooldown_left = settings.bite_cooldown
 	bites += 1
-	uses += 1
+	uses += 0 if again else 1
+	snapped_again += 1 if again else 0
 	visible = true
 	_place(0.0)
 	if is_echo or milestones <= 0:
@@ -158,6 +168,10 @@ func start(direction: Vector3) -> void:
 	if milestones >= 2:
 		aims.append(side)
 		aims.append(-side)
+	if milestones >= 3:
+		var above := side.cross(direction).normalized()
+		aims.append(above)
+		aims.append(-above)
 	for n in aims.size():
 		_echo(n).start(aims[n])
 
@@ -205,6 +219,10 @@ func zone_hits() -> PackedInt32Array:
 func _animate(delta: float) -> void:
 	for echo in _echoes:
 		echo._animate(delta)
+	if _again_left >= 0.0:
+		_again_left -= delta
+		if _again_left < 0.0:
+			start(_aim, true)
 	if _age < 0.0:
 		return
 	_age += delta

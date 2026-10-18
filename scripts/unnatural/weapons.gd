@@ -98,17 +98,28 @@ const ATTACK_FACETS := {
 }
 ## What each Lv milestone does, per weapon (shown on the card that reaches it).
 const MILESTONES := {
-	"greek_fire": ["Zombies that burn to death leave a patch behind", "The trail fans out three wide"],
-	"jellyfish_halo": ["Each jelly trails a ghost that stings too", "The halo swings out wide every few seconds"],
-	"depth_charges": ["A triggered mine pulls zombies in, then blows", "Every fourth blast is a cluster bomb"],
-	"remora_buddy": ["Remoras latch on and keep biting", "A kill splits a remora in two for a while"],
-	"leviathans_coil": ["Coils slow the zombies they touch", "The coil's head snaps at zombies near it"],
-	FishAttack.Kind.STING: ["A second, wider pulse follows each sting", "Stings slow what they hit"],
-	FishAttack.Kind.BITE: ["A second set of jaws snaps behind you", "Jaws snap at both sides too"],
-	FishAttack.Kind.LASH: ["Each lash strikes a second zombie too", "Arcs jump twice as far"],
-	FishAttack.Kind.THRUST: ["Spears pierce one more zombie", "Spears burst at the end of their flight"],
-	FishAttack.Kind.BUBBLES: ["Bubbles pop in a wider splash", "Every volley ends with one big bubble"],
-	FishAttack.Kind.SPINES: ["Spines fly further", "A second ring of spines follows each burst"],
+	"greek_fire": ["Zombies that burn to death leave a patch behind", "The trail fans out three wide",
+			"Patches flare up every few seconds, scorching wider", "The flames creep toward the nearest zombie"],
+	"jellyfish_halo": ["Each jelly trails a ghost that stings too", "The halo swings out wide every few seconds",
+			"A second, wider halo circles the other way", "Stings jump on to the nearest zombie"],
+	"depth_charges": ["A triggered mine pulls zombies in, then blows", "Every fourth blast is a cluster bomb",
+			"Armed mines drift toward zombies close by", "Every blast goes off again a moment later"],
+	"remora_buddy": ["Remoras latch on and keep biting", "A kill splits a remora in two for a while",
+			"Bites tear into the zombies round the one bitten", "Remora kills heal you a little"],
+	"leviathans_coil": ["Coils slow the zombies they touch", "The coil's head snaps at zombies near it",
+			"The tail lashes out in a shock ring", "The coil grows twice as long"],
+	FishAttack.Kind.STING: ["A second, wider pulse follows each sting", "Stings slow what they hit",
+			"Pulses draw zombies in from further out", "A third pulse follows, wider still"],
+	FishAttack.Kind.BITE: ["A second set of jaws snaps behind you", "Jaws snap at both sides too",
+			"Jaws snap above and below you too", "Every bite snaps twice"],
+	FishAttack.Kind.LASH: ["Each lash strikes a second zombie too", "Arcs jump twice as far",
+			"Each arc jumps on to two more zombies", "Each lash strikes a third zombie too"],
+	FishAttack.Kind.THRUST: ["Spears pierce one more zombie", "Spears burst at the end of their flight",
+			"Two more spears fan out with each thrust", "Spears pierce everything in their way"],
+	FishAttack.Kind.BUBBLES: ["Bubbles pop in a wider splash", "Every volley ends with one big bubble",
+			"Each volley blows twice as many bubbles", "Every volley ends with three big bubbles"],
+	FishAttack.Kind.SPINES: ["Spines fly further", "A second ring of spines follows each burst",
+			"Spines pierce two more zombies", "A third, full ring follows the second"],
 }
 
 
@@ -149,7 +160,7 @@ static func glyph(id: String, kind := FishAttack.Kind.BITE) -> String:
 	return "attack_" + FishAttack.source_of(kind) if id == ATTACK else id
 
 
-## Its milestone lines ([first, second]).
+## Its milestone lines ([first, second, third, fourth]).
 static func milestones(id: String, kind := FishAttack.Kind.BITE) -> Array:
 	return MILESTONES.get(kind if id == ATTACK else id, [])
 

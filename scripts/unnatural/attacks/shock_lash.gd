@@ -8,10 +8,12 @@ extends FishAttack
 ##
 ## As a weapon (Weapons): at its first milestone each lash whips the second
 ## nearest zombie too (arcing on from it as well); at its second, the arcs
-## jump FAR_ARCS times as far.
+## jump FAR_ARCS times as far; at its third, each arcs on to MORE_ARCS more
+## zombies; at its fourth, it whips the third nearest zombie too.
 
 const COLOR := Color(1.0, 0.95, 0.45, 1.0)
 const FAR_ARCS := 2.0
+const MORE_ARCS := 2
 const LIFE := 0.22
 const ARC_PROC := 0.5
 
@@ -42,7 +44,7 @@ func reach() -> float:
 
 
 func arcs() -> int:
-	return settings.lash_arcs + extra_projectiles
+	return settings.lash_arcs + extra_projectiles + (MORE_ARCS if milestones >= 3 else 0)
 
 
 ## The tail's tip.
@@ -56,16 +58,19 @@ func fire() -> bool:
 		return false
 	var struck_now := {}
 	_lash(first, struck_now)
-	if milestones >= 1:
-		var second := -1
+	# More lashes from the milestones: the next nearest not struck yet.
+	var more := (1 if milestones >= 1 else 0) + (1 if milestones >= 4 else 0)
+	for n in more:
+		var next := -1
 		var gap := INF
 		for j in horde.query_sphere(origin(), reach()):
 			var d := horde.enemy_position(j).distance_squared_to(origin())
 			if not struck_now.has(j) and d < gap:
 				gap = d
-				second = j
-		if second >= 0:
-			_lash(second, struck_now)
+				next = j
+		if next < 0:
+			break
+		_lash(next, struck_now)
 	return true
 
 

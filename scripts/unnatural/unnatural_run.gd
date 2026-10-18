@@ -648,8 +648,7 @@ func _apply_stats(fish: FishController) -> void:
 		attack.extra_projectiles = roundi(block.value("projectile_count") + loadout.facet(own, "count"))
 		attack.projectile_speed = (1.0 + block.value("projectile_speed")) * (1.0 + loadout.facet(own, "speed"))
 		var level := loadout.level(own)
-		attack.milestones = (1 if settings.milestone_first > 0 and level >= settings.milestone_first else 0) \
-				+ (1 if settings.milestone_second > 0 and level >= settings.milestone_second else 0)
+		attack.milestones = settings.milestones_at(level)
 		_attack_levels[fish] = level
 	if is_instance_valid(fish) and not fish.puppet:
 		fish.speed_scale = _swim_scale(fish)

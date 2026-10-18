@@ -7,7 +7,10 @@ extends Powerup
 ## jellies live in the world (one node for them all), not on the fish, so its
 ## strides don't swing them. Milestones: at the first, each jelly trails a
 ## ghost that stings too (TRAIL_SHARE of the damage); at the second, the halo
-## swings out to PULSE_REACH times as far every PULSE_EVERY s.
+## swings out to PULSE_REACH times as far every PULSE_EVERY s; at the third, a
+## second ring as big circles OUTER_REACH times as far out, the other way, for
+## OUTER_SHARE of the damage; at the fourth, each sting jumps on to the
+## nearest other zombie within JUMP_REACH for JUMP_SHARE of it.
 
 ## The ghosts trail their jellies by this much of a turn (radians), a size
 ## and damage share behind.
@@ -18,15 +21,21 @@ const TRAIL_SHARE := 0.5
 const PULSE_EVERY := 4.0
 const PULSE_TIME := 1.0
 const PULSE_REACH := 2.2
+const OUTER_REACH := 1.7
+const OUTER_SHARE := 0.75
+const JUMP_REACH := 4.0
+const JUMP_SHARE := 0.5
 
 ## Stings so far, for the probes.
 var stings := 0
+## Stings that jumped on (the fourth milestone), for the probes.
+var jumps := 0
 var _halo: Node3D
 var _turn := 0.0
 var _sting_left := 0.0
 var _pulse_age := 0.0
-## The jellies' count and trail when last built.
-var _built := Vector2i(-1, -1)
+## The jellies' count, trail and outer ring when last built.
+var _built := Vector3i(-1, -1, -1)
 
 
 func count() -> int:
@@ -62,15 +71,17 @@ func on_removed() -> void:
 	_halo = null
 
 
-## Where jelly `k` is now (`lag` radians behind: its ghost).
-func jelly_position(k: int, lag := 0.0) -> Vector3:
-	var a := _turn - lag + k * TAU / maxi(count(), 1)
-	return fish.global_position + Vector3(cos(a), 0.15 * sin(a * 3.0 + _turn), sin(a)) * orbit_radius()
+## Where jelly `k` is now (`lag` radians behind: its ghost; `outer`: the third
+## milestone's ring, further out and turning the other way).
+func jelly_position(k: int, lag := 0.0, outer := false) -> Vector3:
+	var a := (-_turn if outer else _turn) - lag + k * TAU / maxi(count(), 1) + (PI / maxi(count(), 1) if outer else 0.0)
+	return fish.global_position + Vector3(cos(a), 0.15 * sin(a * 3.0 + _turn), sin(a)) * orbit_radius() * (OUTER_REACH if outer else 1.0)
 
 
 func on_tick(delta: float) -> void:
 	var trail := milestone(1)
-	if not is_instance_valid(_halo) or _built != Vector2i(count(), 1 if trail else 0):
+	var outer := milestone(3)
+	if not is_instance_valid(_halo) or _built != Vector3i(count(), 1 if trail else 0, 1 if outer else 0):
 		_build()
 	_turn = fmod(_turn + spin() * TAU * delta, TAU)
 	_pulse_age = fmod(_pulse_age + delta, PULSE_EVERY)
@@ -86,6 +97,11 @@ func on_tick(delta: float) -> void:
 			var ghost := _halo.get_child(n + k) as Node3D
 			ghost.global_position = jelly_position(k, TRAIL_LAG)
 			ghost.scale = Vector3.ONE * settings.jelly_radius * 0.7
+	if outer:
+		var first := n * (2 if trail else 1)
+		for k in mini(n, _halo.get_child_count() - first):
+			var far := _halo.get_child(first + k) as Node3D
+			far.global_position = jelly_position(k, 0.0, true)
 	_sting_left -= delta
 	if _sting_left > 0.0:
 		return
@@ -95,6 +111,8 @@ func on_tick(delta: float) -> void:
 		_sting(jelly_position(k), settings.jelly_radius, damage())
 		if trail:
 			_sting(jelly_position(k, TRAIL_LAG), settings.jelly_radius * 0.7, damage() * TRAIL_SHARE)
+		if outer:
+			_sting(jelly_position(k, 0.0, true), settings.jelly_radius, damage() * OUTER_SHARE)
 
 
 func _sting(at: Vector3, reach: float, amount: float) -> void:
@@ -103,6 +121,29 @@ func _sting(at: Vector3, reach: float, amount: float) -> void:
 		var push := run.horde.enemy_position(i) - at
 		run.hit(i, amount, fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP,
 				settings.jelly_proc, [id])
+		if milestone(4):
+			_jump(i, amount * JUMP_SHARE)
+
+
+## The fourth milestone: a sting jumps from zombie `from` to the nearest other
+## within JUMP_REACH.
+func _jump(from: int, amount: float) -> void:
+	if not run.horde.is_alive(from):
+		return
+	var at := run.horde.enemy_position(from)
+	var best := -1
+	var best_gap := INF
+	for j in run.horde.query_sphere(at, JUMP_REACH):
+		var gap := run.horde.enemy_position(j).distance_squared_to(at)
+		if j != from and gap < best_gap:
+			best = j
+			best_gap = gap
+	if best < 0:
+		return
+	jumps += 1
+	var to := run.horde.enemy_position(best)
+	PowerupFx.flash(run, to, 0.4, color(id), 0.15)
+	run.hit(best, amount, fish, id, (to - at).normalized(), settings.jelly_proc * 0.5, [id])
 
 
 func _build() -> void:
@@ -115,7 +156,8 @@ func _build() -> void:
 		child.queue_free()
 		_halo.remove_child(child)
 	var trail := milestone(1)
-	_built = Vector2i(count(), 1 if trail else 0)
+	var outer := milestone(3)
+	_built = Vector3i(count(), 1 if trail else 0, 1 if outer else 0)
 	var mesh := _jelly_mesh(color(id))
 	for k in count():
 		var jelly := MeshInstance3D.new()
@@ -134,6 +176,15 @@ func _build() -> void:
 			ghost.scale = Vector3.ONE * settings.jelly_radius * 0.7
 			_halo.add_child(ghost)
 			ghost.global_position = jelly_position(k, TRAIL_LAG)
+	if outer:
+		for k in count():
+			var far := MeshInstance3D.new()
+			far.name = "Outer"
+			far.mesh = mesh
+			far.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			far.scale = Vector3.ONE * settings.jelly_radius
+			_halo.add_child(far)
+			far.global_position = jelly_position(k, 0.0, true)
 
 
 ## One jelly, as one mesh: a bell that glows at its rim and is nearly clear

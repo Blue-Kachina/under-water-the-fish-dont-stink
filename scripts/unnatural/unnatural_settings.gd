@@ -444,6 +444,8 @@ static func shared() -> UnnaturalSettings:
 ## At these weapon levels each weapon gains a new behaviour (0: never).
 @export_range(0, 50, 1, "or_greater") var milestone_first := 5
 @export_range(0, 50, 1, "or_greater") var milestone_second := 10
+@export_range(0, 50, 1, "or_greater") var milestone_third := 15
+@export_range(0, 50, 1, "or_greater") var milestone_fourth := 20
 ## A tome with more than one stat gives each this share of a step.
 @export_range(0.0, 2.0, 0.05, "or_greater") var tome_multi_share := 0.7
 ## When there's nothing left to offer: a pearl purse of fallback_pearls
@@ -632,3 +634,17 @@ func facets_for(tier: int) -> int:
 ## How many steps each facet a weapon upgrade of rarity `tier` raises goes up.
 func facet_size_for(tier: int) -> float:
 	return [facet_size_common, facet_size_uncommon, facet_size_rare, facet_size_epic, facet_size_legendary][clampi(tier, 0, 4)]
+
+
+## The level milestone `n` (1 to 4) comes at (0: never).
+func milestone_level(n: int) -> int:
+	return [milestone_first, milestone_second, milestone_third, milestone_fourth][n - 1] if n >= 1 and n <= 4 else 0
+
+
+## How many milestones a weapon at `level` has reached (0 to 4).
+func milestones_at(level: int) -> int:
+	var reached := 0
+	for n in range(1, 5):
+		var at := milestone_level(n)
+		reached += 1 if at > 0 and level >= at else 0
+	return reached

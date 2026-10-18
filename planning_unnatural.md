@@ -31,7 +31,32 @@ is a **Fish Fry**. Teams are team colours / team 0, 1. "Demo" is only for Rocket
 **Phases 0 to 8 are built (2026-10-17), and so is the second play-test's round of changes (Round 2
 below). Phase 9 isn't started.** Pick **Unnatural** or **Test Tank** in the mode list.
 
-### Handoff (2026-10-18, playability pass P1): start here
+### Handoff (2026-10-18, playability pass P2): start here
+**State:** P2 is built and probed (see "P2 as built"). The build is in
+`builds/windows/FishPlayground.exe` (10:46, with the Lv 15 and 20 milestones and the visible remoras). Nothing is half-done.
+1. **The first full sim** (6 runs: Dominus, Octane and Merc, greedy and random picks). The reports
+   are in `user://run_logs/sim/sim_p2_*.json`.
+   - Every run **beat the Leviathan** at about 10 minutes. No run ended with the bot down.
+   - Octane and Dominus snowball. They're at Lv 60 by 10:00, with 2,500+ kills a minute and
+     30,000 dps. ttk is under 0.3 s from minute 2 and near 0 from minute 5.
+   - Merc is closer: ttk sits inside the target until minute 6, then falls to 0.09 s.
+   - The bot takes almost no damage (often under 20 a minute).
+   - The economy snowballs with the kills. By minute 10 it's 300 to 800 pearls a minute, the purse
+     is over 1,400, and 50+ chests have been opened. Even at 0.05 and 0.002, the drop chances don't
+     hold back a build killing thousands a minute.
+   - Levers to discuss with the user (none changed yet):
+     - XP per level (the level curve);
+     - `difficulty_hp` and its growth;
+     - elites always dropping 3 pearls;
+     - chest price growth;
+     - the boss timing;
+     - whether the bot is too safe compared with a player.
+2. **Fixed along the way:** Greek Fire and Depth Charges threw a script error when the oldest
+   patch or mine had already burnt out or gone off. They read it into a typed variable; it's
+   untyped now.
+3. **Next: P3** (feel and readability), after the user's call on the balance levers.
+
+### Handoff (2026-10-18, playability pass P1)
 **State:** P1 of the Playability pass is built and probed, and the build is in
 `builds/windows/FishPlayground.exe` (08:23). Nothing is half-done. The user does all the git.
 
@@ -842,7 +867,30 @@ What's in it, by file:
 liked. The three defaults above are accepted. Pearls and chests dropped too often:
 `pearl_drop_chance` 0.12 → **0.05**, `chest_drop_chance` 0.006 → **0.002**. The level caps went up:
 `weapon_max_level` 10 → **20** and `tome_max_level` 10 → **99**. Past 20 pips, a card shows one
-level bar (`LevelUpCards.MAX_PIPS`). The milestones are still only at Lv 5 and 10.
+level bar (`LevelUpCards.MAX_PIPS`).
+
+**Milestones at Lv 15 and 20** (`milestone_third` and `milestone_fourth`, as the user asked). The
+lines are in `Weapons.MILESTONES`:
+
+| Weapon | Lv 15 | Lv 20 |
+|---|---|---|
+| Greek Fire | patches flare wide every 3 s | patches creep toward the nearest zombie |
+| Jellyfish Halo | a second, wider ring circles the other way | stings jump on to the nearest zombie |
+| Depth Charges | armed mines drift toward zombies | every blast goes off again 0.4 s later |
+| Remora Buddy | bites tear into the zombies round the target | remora kills heal 1% |
+| Leviathan's Coil | the tail end lashes a shock ring every 2 s | twice as long |
+| Sting | pulses draw zombies in | the echo has its own echo (a third pulse) |
+| Bite | jaws above and below too (5 echo jaws) | every bite snaps twice |
+| Lash | arcs jump to 2 more zombies | a third zombie lashed |
+| Thrust | 2 more spears | spears pierce everything |
+| Bubbles | twice the bubbles | three big bubbles |
+| Spines | they pierce 2 more | a third, full ring |
+
+The new `milestones_probe` runs every weapon at Lv 20 in the Test Tank and checks each effect.
+- A gap: online, a remote player's Remora heal happens on the host's copy, not on their machine.
+- **The remoras are visible now** (the user had never seen them). They had been 30 cm grey
+  capsules flat under the belly, hidden from the follow cam. They're now about twice the size,
+  low on the flanks, pale with a faint glow. Each bite's flash grew from 0.45 m to 0.8 m.
 
 ### P2 as built (2026-10-18)
 - **`RunLog`** (`scripts/unnatural/run_log.gd`): every Unnatural run has one; the Test Tank doesn't.

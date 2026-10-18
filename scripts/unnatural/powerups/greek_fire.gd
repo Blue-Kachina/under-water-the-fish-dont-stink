@@ -5,9 +5,17 @@ extends Powerup
 ## (damage over time, BURN_TICK at a time, proc coefficient fire_proc). Its
 ## facets (Weapons): burn damage, patch life, patch size, a denser trail, more
 ## patches out. Milestones: at the first, a zombie that burns to death leaves a
-## patch where it fell; at the second, the trail fans out three wide.
+## patch where it fell; at the second, the trail fans out three wide; at the
+## third, every FLARE_EVERY s each patch flares FLARE_REACH times as wide for
+## FLARE_BURN s of burn at once; at the fourth, the patches creep toward the
+## nearest zombie within CREEP_REACH at CREEP_SPEED m/s.
 
 const BURN_TICK := 0.25
+const FLARE_EVERY := 3.0
+const FLARE_REACH := 1.8
+const FLARE_BURN := 2.0
+const CREEP_REACH := 8.0
+const CREEP_SPEED := 2.5
 ## The fan's side patches sit this many patch radii off the middle one.
 const FAN_SPREAD := 1.6
 ## A burnt zombie's patch: at most one this often (s), so a crowd burning
@@ -18,6 +26,9 @@ var patches: Array[FirePatch] = []
 var _last_drop := Vector3.INF
 var _burn_left := BURN_TICK
 var _kill_patch_left := 0.0
+var _flare_left := FLARE_EVERY
+## Flares so far (the third milestone), for the probes.
+var flares := 0
 
 
 func spacing() -> float:
@@ -41,6 +52,11 @@ func max_patches() -> int:
 
 
 func on_tick(delta: float) -> void:
+	# Burnt-out patches go first (by index: a freed one in a typed loop or
+	# erase errors).
+	for k in range(patches.size() - 1, -1, -1):
+		if not is_instance_valid(patches[k]):
+			patches.remove_at(k)
 	_kill_patch_left -= delta
 	var at := fish.global_position
 	if fish.speed > 2.0 and (_last_drop == Vector3.INF or at.distance_to(_last_drop) >= spacing()):
@@ -51,15 +67,18 @@ func on_tick(delta: float) -> void:
 			_drop(back + side)
 			_drop(back - side)
 		_last_drop = at
+	if milestone(4):
+		_creep(delta)
+	if milestone(3):
+		_flare_left -= delta
+		if _flare_left <= 0.0:
+			_flare_left = FLARE_EVERY
+			_flare()
 	_burn_left -= delta
 	if _burn_left > 0.0:
 		return
 	_burn_left += BURN_TICK
 	var burn := dps() * BURN_TICK
-	# Burnt-out patches go (by index: erasing a freed one from a typed array errors).
-	for k in range(patches.size() - 1, -1, -1):
-		if not is_instance_valid(patches[k]):
-			patches.remove_at(k)
 	for patch in patches:
 		for i in run.horde.query_sphere(patch.global_position, patch.radius):
 			run.hit(i, burn, fish, id, Vector3.ZERO, settings.fire_proc, [id])
@@ -70,6 +89,36 @@ func on_kill(at: Vector3, source: String) -> void:
 	if source == id and milestone(1) and _kill_patch_left <= 0.0:
 		_kill_patch_left = KILL_PATCH_GAP
 		_drop(at)
+
+
+## The third milestone: every patch flares wide, FLARE_BURN s of burn at once.
+func _flare() -> void:
+	flares += 1
+	var burn := dps() * FLARE_BURN
+	for patch in patches:
+		if not is_instance_valid(patch):
+			continue
+		var reach := patch.radius * FLARE_REACH
+		PowerupFx.ring(run, patch.global_position, reach, color(id), Vector3.UP, 0.4)
+		for i in run.horde.query_sphere(patch.global_position, reach):
+			run.hit(i, burn, fish, id, Vector3.UP, settings.fire_proc, [id])
+
+
+## The fourth: the patches creep toward the nearest zombie close by (looked
+## for each burn tick, so not every patch searches every physics tick).
+func _creep(delta: float) -> void:
+	var look := _burn_left - delta <= 0.0
+	for patch in patches:
+		if not is_instance_valid(patch):
+			continue
+		if look:
+			var target := run.horde.nearest_in_cone(patch.global_position, Vector3.FORWARD, CREEP_REACH, -1.0)
+			patch.creep_to = run.horde.enemy_position(target) if target >= 0 else Vector3.INF
+		if patch.creep_to == Vector3.INF:
+			continue
+		var to := patch.creep_to - patch.global_position
+		if to.length() > 0.2:
+			patch.global_position += to.normalized() * minf(CREEP_SPEED * delta, to.length())
 
 
 func _drop(at: Vector3) -> void:
@@ -147,6 +196,8 @@ class FirePatch extends Node3D:
 	var radius := 1.6
 	var lifetime := 2.0
 	var age := 0.0
+	## Where it's creeping to (the fourth milestone; INF: nowhere).
+	var creep_to := Vector3.INF
 	var _flames := CPUParticles3D.new()
 
 	static var _mesh: QuadMesh

@@ -1,7 +1,8 @@
 # Planning: Sound Effects (and swappable Sound Profiles)
 
-Status: **plan only, 2026-10-18.** Nothing built yet. The game has no SFX today. The only
-audio is `ReplayAudio`, which plays a soundtrack beside a replay.
+Status: **phase 0 (foundation) built 2026-10-18**, in the 10:24 build. Nothing in the game
+calls it yet (phase 1 hooks it up). Before this, the only audio was `ReplayAudio`, which
+plays a soundtrack beside a replay.
 
 Goal: every meaningful moment in the game gets a sound. The sounds come from a **Sound
 Profile**, which is a folder of files with fixed names. You can make as many profiles as you
@@ -21,14 +22,15 @@ want to hear one. `None` will likely be retired once a real profile is finished.
 
 ```
 audio/profiles/
-  default/            <- placeholder beeps; only heard when picked, or via "Beep for missing sounds" (1.5)
+  README.md           <- the naming rules, for whoever records
+  acappella/
     profile.cfg
     ui/select.wav
     fish/stroke-1.wav
     fish/stroke-2.wav
     ball/hit@1-1.wav
     ...
-  acappella/
+  synth/
     profile.cfg
     ui/select.wav
     ...
@@ -90,7 +92,7 @@ scale="major_pentatonic"    ; major, minor, major_pentatonic, minor_pentatonic, 
 in with your recordings. A profile with five sounds plays those five and nothing else.
 
 For finding gaps, the debug panel has a **Beep for missing sounds** toggle (off by
-default). While it's on, a missing sound plays the `default` profile's placeholder beep,
+default). While it's on, a missing sound plays its built-in placeholder beep,
 so you can hear where the gaps are while playing. The Sound Board shows the same gaps
 without playing anything.
 
@@ -106,7 +108,7 @@ without playing anything.
 | `scripts/audio/sound_profile.gd` | Scans a profile folder, groups files into events (variations/layers/notes), reads `profile.cfg`, and loads the streams. |
 | `scripts/audio/sfx.gd` (autoload `Sfx`) | The API. Pools of `AudioStreamPlayer` and `AudioStreamPlayer3D`, voice limiting, loops, and profile switching. |
 | `scripts/audio/sfx_hooks/*.gd` | Small listeners that connect to the **signals the game already emits** and call `Sfx`. Gameplay code stays mostly unaware of sound. |
-| `default_bus_layout.tres` | The mixer buses (§2.3). |
+| (in `Sfx`) | The mixer buses (§2.3), made in code at startup. |
 
 ### 2.2 API
 
@@ -183,19 +185,22 @@ Hundreds of zombies can die in one second. Each catalog entry has:
 
 ### 2.7 Tools for you
 
-- **Sound Board** (debug panel tab): every event in the catalog, grouped by category.
-  Click to audition it in the active profile. Each one shows ✅ (in this profile), ↩
-  (falls back to default) or ⛔ (missing).
-- **Recording sheet:** `tools/audio/sound_sheet.py` (run with uv) writes
-  `audio/sound_sheet.csv`. It has the event id, description, suggested length, whether
-  it's 3D/looped/pitched, and a column per profile showing what's done. This is your
-  checklist when you sit down to record.
-- **Placeholder profile:** the same script can synthesise a crude beep/noise per event
-  into `default/`. You only hear these if you pick `default` or turn on **Beep for
-  missing sounds**; they also give the probes files to load.
-- **Probe** `tests/audio_probe.gd`: catalog ids are unique; every hook's id exists in the
-  catalog; profile parsing (variations/layers/notes); missing sounds are silent unless the beep toggle is on; `None` plays nothing; arena horn override; voice limiting;
-  hot reload swaps streams; nothing errors with an empty profile.
+- **Sound Board** (Settings > Audio > Sound Board tab): every event in the catalog,
+  grouped by category. Press A on a row to hear it. Each row says **HAVE** (in this
+  profile), **BORROWED** (uses another event's sound, e.g. a per-arena horn using the
+  generic one) or **MISSING** (plays its placeholder beep when auditioned). The detail
+  pane shows what the event is for, how it plays, its file name and the profile's files.
+- **Recording sheet:** Settings > Audio > **Write recording sheet** writes
+  `audio/sound_sheet.csv`: every event id, its file name, priority, 2D/3D,
+  loop/pitched/layers, the description, and a column per profile showing what's done.
+  This is your checklist when you sit down to record.
+- **Placeholder beeps:** built in (the **Beeps** profile) and synthesised in memory, so
+  there are no placeholder files in the repo. Each event gets its own pitch. Pitched
+  events beep on A, so you can hear the scale they climb.
+- **Probe** `tests/audio_probe.gd`: catalog ids, file-name parsing, None/Beeps, a
+  throwaway profile in `user://sfx_probe` (variations, layers, notes, trims, scale,
+  borrowed sounds, voice limits, cooldowns, loops, hot reload), buses and volumes, and
+  Settings > Audio with its Sound Board.
 
 ---
 
@@ -429,7 +434,7 @@ list.
 
 | Phase | What | Done when |
 |---|---|---|
-| **0. Foundation** | Buses, `SoundCatalog`, `SoundProfile`, `Sfx` autoload with the built-in silent **`None` profile selected by default**, Settings (volumes + sound profile picker + music picker), debug "Beep for missing sounds", debug panel Sound Board + Reload, `sound_sheet.py`, placeholder `default` profile, `audio_probe.gd` | the probe passes; you can audition placeholders on the Sound Board in a build |
+| **0. Foundation** | Buses, `SoundCatalog`, `SoundProfile`, `Sfx` autoload with the built-in silent **`None` profile selected by default**, Settings (volumes + sound profile picker + music picker), debug "Beep for missing sounds", Sound Board + Reload, recording sheet, built-in Beeps profile, `audio_probe.gd` | **Built 2026-10-18**: audio_probe passes (66 checks), ui/modes/pause/controls probes pass. Build 10:24 |
 | **1. Core feel** | UI, fish movement (strokes, stride, jump, dodge, boost), ball, goals, match flow | Free Play and 1v1 sound complete with placeholders |
 | **2. Battered, Nature, Hunt** | §3.5, §3.6, Hunt rows | |
 | **3. Unnatural** | attacks, zombies (with aggregation), pickups, cards, powerups, stage events, bosses | 3-player split-screen bench shows no frame-rate cost from audio (`split_bench`) |
@@ -455,7 +460,7 @@ All answered 2026-10-18.
 | **A5** | Goals | A single horn, with an optional per-arena override |
 | **A6** | Mix | Per profile (`[mix]` in `profile.cfg`) |
 | **A7** | Profile per player in split-screen | No, one per machine |
-| **A8** | Shipped profiles | Whatever you finish; `default` stays as the placeholder/gap-finder |
+| **A8** | Shipped profiles | Whatever you finish. The built-in Beeps stay as the placeholder/gap-finder |
 | **A9** | Missing sounds | Silent. A debug toggle, **Beep for missing sounds**, plays the placeholder instead |
 | **A10** | Where profiles live | In the repo (`audio/profiles/`), hot-reloaded when running from the project |
 | **A11** | Announcer | An optional `voice/` callout layer on its own bus and slider |

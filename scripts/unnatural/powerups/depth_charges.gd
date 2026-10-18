@@ -7,7 +7,10 @@ extends Powerup
 ## charge_proc). At most max_mines() out (the oldest goes). Milestones: at the
 ## first, a triggered mine pulls the zombies round it in for PULL_TIME s
 ## before it blows; at the second, every CLUSTER_EVERY-th blast throws
-## CLUSTER_COUNT smaller ones round it.
+## CLUSTER_COUNT smaller ones round it; at the third, an armed mine drifts
+## toward the nearest zombie within DRIFT_REACH at DRIFT_SPEED m/s; at the
+## fourth, every blast goes off again AFTERSHOCK_AFTER s later, for
+## AFTERSHOCK_SHARE of the damage.
 
 ## The first milestone's pull: PULL_TIME s, zombies within PULL_REACH blasts
 ## drawn in at PULL_ACCEL m/s².
@@ -19,12 +22,20 @@ const PULL_ACCEL := 120.0
 const CLUSTER_EVERY := 4
 const CLUSTER_COUNT := 4
 const CLUSTER_SIZE := 0.55
+const DRIFT_REACH := 10.0
+const DRIFT_SPEED := 3.0
+const AFTERSHOCK_AFTER := 0.4
+const AFTERSHOCK_SHARE := 0.6
 
 ## Mines dropped and blown so far, for the probes.
 var dropped := 0
 var blown := 0
 var mines: Array[Mine] = []
 var _next := 0.0
+## The fourth milestone's aftershocks to come: [s left, where, reach, damage].
+var _aftershocks: Array = []
+## Aftershocks gone off so far, for the probes.
+var aftershocks := 0
 
 
 func interval() -> float:
@@ -52,6 +63,13 @@ func max_mines() -> int:
 
 
 func on_tick(delta: float) -> void:
+	for k in range(_aftershocks.size() - 1, -1, -1):
+		var shock: Array = _aftershocks[k]
+		shock[0] -= delta
+		if shock[0] <= 0.0:
+			_aftershocks.remove_at(k)
+			aftershocks += 1
+			_blast(shock[1], shock[2], shock[3], true)
 	_next -= delta
 	if _next <= 0.0:
 		_next = interval()
@@ -72,6 +90,8 @@ func on_tick(delta: float) -> void:
 				mine.queue_free()
 			continue
 		var armed := mine.age >= arm_time()
+		if armed and milestone(3):
+			_drift(mine, delta)
 		if mine.age >= life() or (armed and not run.horde.query_sphere(mine.global_position, settings.charge_trigger).is_empty()):
 			if milestone(1) and mine.age < life():
 				mine.fuse = PULL_TIME  # the first milestone: it draws them in, then blows
@@ -82,6 +102,16 @@ func on_tick(delta: float) -> void:
 
 
 ## The first milestone: zombies round a mine drawn toward it.
+## The third milestone: an armed mine drifts toward the nearest zombie close by.
+func _drift(mine: Mine, delta: float) -> void:
+	var target := run.horde.nearest_in_cone(mine.global_position, Vector3.FORWARD, DRIFT_REACH, -1.0)
+	if target < 0:
+		return
+	var to := run.horde.enemy_position(target) - mine.global_position
+	if to.length() > 0.2:
+		mine.global_position += to.normalized() * minf(DRIFT_SPEED * delta, to.length())
+
+
 func _pull(at: Vector3, delta: float) -> void:
 	for i in run.horde.query_sphere(at, blast() * PULL_REACH):
 		var toward := at - run.horde.enemy_position(i)
@@ -113,7 +143,9 @@ func explode(at: Vector3) -> void:
 			_blast(at + out * blast(), blast() * CLUSTER_SIZE, damage() * CLUSTER_SIZE)
 
 
-func _blast(at: Vector3, reach: float, amount: float) -> void:
+func _blast(at: Vector3, reach: float, amount: float, aftershock := false) -> void:
+	if milestone(4) and not aftershock:
+		_aftershocks.append([AFTERSHOCK_AFTER, at, reach, amount * AFTERSHOCK_SHARE])
 	Explosion.spawn(run.ocean, at, color(id), reach, 0.0, 0.3)
 	for i in run.horde.query_sphere(at, reach):
 		var push := run.horde.enemy_position(i) - at
@@ -121,6 +153,7 @@ func _blast(at: Vector3, reach: float, amount: float) -> void:
 
 
 func on_removed() -> void:
+	_aftershocks.clear()
 	for mine in mines:
 		if is_instance_valid(mine):
 			mine.queue_free()

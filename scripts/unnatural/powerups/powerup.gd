@@ -167,11 +167,11 @@ func facet_count(facet_id: String) -> int:
 	return roundi(facet(facet_id))
 
 
-## Whether a weapon has reached milestone `n` (1: Lv milestone_first, 2: Lv milestone_second).
+## Whether a weapon has reached milestone `n` (1 to 4: Lv milestone_first to milestone_fourth).
 func milestone(n: int) -> bool:
 	if run == null or n <= 0:
 		return false
-	var at: int = run.settings.milestone_first if n == 1 else run.settings.milestone_second
+	var at := run.settings.milestone_level(n)
 	return at > 0 and stacks >= at
 
 
