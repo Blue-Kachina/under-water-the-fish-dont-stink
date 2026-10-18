@@ -1,8 +1,9 @@
 # Planning: Sound Effects (and swappable Sound Profiles)
 
-Status: **phase 0 (foundation) built 2026-10-18**, in the 10:24 build. Nothing in the game
-calls it yet (phase 1 hooks it up). Before this, the only audio was `ReplayAudio`, which
-plays a soundtrack beside a replay.
+Status: **phase 0 (foundation) built 2026-10-18** (10:24 build). **Phase 1 (core feel) built
+2026-10-18** (12:21 build): menus, your fish, the ball, goals and a 1v1's flow now ask for
+their sounds (Â§4 lists what's in and what's left). Before this, the only audio was
+`ReplayAudio`, which plays a soundtrack beside a replay.
 
 Goal: every meaningful moment in the game gets a sound. The sounds come from a **Sound
 Profile**, which is a folder of files with fixed names. You can make as many profiles as you
@@ -257,8 +258,8 @@ Hook = the existing signal or function it hangs off.
 |---|---|---|---|
 | `ball/hit` | fish hits ball | P1 | **layers @1–@3 by impact speed.** The most-heard sound in Free Play / 1v1 |
 | `ball/bounce` | ball off floor/wall/ceiling | P1 | intensity by speed |
-| `ball/hoop_rim` | ball clips a hoop | P2 | `hoop.gd` |
-| `ball/hoop_through` | ball through a hoop (obstacle course) | P2 | |
+| `arena/hoop_rim` | clipping a hoop's rim (obstacle course) | P2 | `hoop.gd` (not hooked yet) |
+| `arena/hoop_through` | swimming through the next hoop (obstacle course) | P2 | `arena.gd`. Renamed from `ball/hoop_*` in phase 1: it's the fish that goes through |
 | `ball/reset` | ball re-spawns | P2 | |
 | `arena/bubble_column_loop` | each bubble column | P2 | 3D loop, `bubble_column.gd` |
 | `arena/goal_net` | ball hits the back of the net | P1 | |
@@ -435,11 +436,42 @@ list.
 | Phase | What | Done when |
 |---|---|---|
 | **0. Foundation** | Buses, `SoundCatalog`, `SoundProfile`, `Sfx` autoload with the built-in silent **`None` profile selected by default**, Settings (volumes + sound profile picker + music picker), debug "Beep for missing sounds", Sound Board + Reload, recording sheet, built-in Beeps profile, `audio_probe.gd` | **Built 2026-10-18**: audio_probe passes (66 checks), ui/modes/pause/controls probes pass. Build 10:24 |
-| **1. Core feel** | UI, fish movement (strokes, stride, jump, dodge, boost), ball, goals, match flow | Free Play and 1v1 sound complete with placeholders |
+| **1. Core feel** | UI, fish movement (strokes, stride, jump, dodge, boost), ball, goals, match flow | **Built 2026-10-18** (12:05 build): `audio_hooks_probe` passes. See Â§4.1 |
 | **2. Battered, Nature, Hunt** | §3.5, §3.6, Hunt rows | |
 | **3. Unnatural** | attacks, zombies (with aggregation), pickups, cards, powerups, stage events, bosses | 3-player split-screen bench shows no frame-rate cost from audio (`split_bench`) |
 | **4. Space** | underwater bus filter, surface breach, murk, ambience loops, bubble columns, split-screen listener (A3) | |
 | **5. Music** (if wanted) | | |
+
+### 4.1 Phase 1: how it's hooked up
+
+`Sfx` makes an `SfxHooks` node (`scripts/audio/sfx_hooks/`), which watches every node entering
+the tree and adds a sound node to it: `FishSounds` on each fish, `BallSounds` on the ball,
+`ArenaSounds` on the aquarium (the goal net and horn, in Free Play too), `MatchSounds` on a
+1v1. It also sweeps the tree once when it starts: the game's startup scene is readied together
+with the autoloads, so its fish, ball and arena never pass through `node_added` (the 12:05
+build missed them; fixed in the 12:21 build). Menus are hooked up there too. Gameplay code only gained a few signals:
+`FishController.stroke_beat` (every stroke the rhythm hears, missed ones too; `stroked` still
+only fires on tempo), `FishController.respawning` (R in Free Play, or back from a battery
+mid-play) and `Ball.respawned`. `Sfx.requested` reports every sound asked for (probes).
+
+**UI sounds are settled once a frame.** One press can move focus, press a button and open a
+menu, and only the most specific sound plays: a menu's own sound (mode picked, pause, toggle)
+beats `ui/select`, which beats `ui/back`, which beats `ui/move`. Focus landing, a back press
+or the mode picker closing within 150 ms of another UI sound stays quiet. A button can set
+meta `sfx` to its own id, or `""` for none (the Sound Board's rows play their event instead).
+
+**Hooked in phase 1:** all of `ui/` except `ui/denied`; `fish/` stroke, stride, stroke_miss,
+jump, double_jump, dodge, boost_start/loop/stop/empty, supersonic, land, reset; `ball/hit`,
+`ball/bounce`, `ball/reset`; `arena/goal_net`, `arena/hoop_through`; `match/` countdown, go,
+goal_horn(_aquarium), goal_replay_in/out, clock_tick, time_up, overtime, win, lose (draw
+can't happen in a 1v1, but is hooked).
+
+**Left for later:** `ui/denied` (nothing in the menus refuses a press yet), `fish/teleport`
+and `fish/bump` (with Battered, phase 2), `arena/hoop_rim`, `fish/scrape_loop`,
+`fish/bow_wave_loop`, `fish/breach`/`fish/splash` and bubble columns (phase 4), Hunt's
+match sounds (phase 2). An online guest's copy of another player's fish (a puppet) makes
+no sound yet. In split-screen every view hears world sounds, so a sound near both players
+plays twice until phase 4's shared mix (A3).
 
 From phase 1 on, you can record in parallel: each phase's events appear on the Sound
 Board and in the sheet as they're hooked up.

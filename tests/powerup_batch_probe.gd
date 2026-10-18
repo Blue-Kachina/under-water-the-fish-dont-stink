@@ -154,6 +154,7 @@ func _run() -> void:
 	health.hp = health.max_hp
 
 	print("jellyfish halo:")
+	powers.jelly_count = 1  # one to start, so two at x2
 	powers.jelly_stacks = 2
 	horde.clear()
 	await _ticks(2)

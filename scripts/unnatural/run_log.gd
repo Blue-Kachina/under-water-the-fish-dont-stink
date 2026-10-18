@@ -12,8 +12,9 @@ extends Node
 ##
 ## Time to kill (ttk) is the zombies' average hp out now over the team's damage
 ## per second that minute: how long the whole build takes to chew through one
-## average zombie. The target curve (ttk_target_min to ttk_target_max) is what a
-## balanced build keeps within all run.
+## average zombie. Fill is the zombies out over the number the director wants
+## out: near 0, the build wipes every pack as it comes (too strong); near 1, the
+## horde is full round it.
 
 const DIR := "user://run_logs"
 
@@ -173,6 +174,8 @@ func _sample(span: float) -> Dictionary:
 		"ttk": snappedf(hp / dps, 0.001) if dps > 0.0 else -1.0,
 		"avg_hp": snappedf(hp, 0.1),
 		"alive": run.horde.alive_count(),
+		"target": run.director.target_alive(),
+		"fill": snappedf(float(run.horde.alive_count()) / maxf(run.director.target_alive(), 1.0), 0.01),
 		"difficulty": snappedf(run.difficulty(), 0.01),
 		"taken": snappedf(taken - float(_last.taken), 0.1),
 		"pearls_dropped": pearls_dropped - int(_last.pearls_dropped),

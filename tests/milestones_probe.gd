@@ -88,6 +88,8 @@ func _run() -> void:
 		if kind == FishAttack.Kind.BITE:
 			var bite := attack as GhostBite
 			check(bite.snapped_again >= bite.uses - 1 and bite.snapped_again > 0, "every bite snaps twice (%d bites, %d second snaps)" % [bite.uses, bite.snapped_again])
+		if kind == FishAttack.Kind.STING:
+			check(run.tank.sources().all(func(row: Dictionary) -> bool: return row.source != "bite"), "the Sting's echoes count as the sting, not the bite")
 		if kind == FishAttack.Kind.LASH:
 			var lash := attack as ShockLash
 			check(lash.arcs() == settings.lash_arcs + lash.extra_projectiles + ShockLash.MORE_ARCS, "the Lash arcs on to %d more" % ShockLash.MORE_ARCS)

@@ -134,6 +134,9 @@ func _ram_goal(me: Vector3) -> Vector3:
 	var index := run.horde.nearest_in_cone(me, nose, RAM_RANGE, RAM_CONE)
 	if index < 0 or run.boss_at(index) != null:
 		return Vector3.INF
+	var kind := run.horde.enemy_kind(index)
+	if kind and kind.behaviour == EnemyKind.Behaviour.TANK:
+		return Vector3.INF  # a boxfish bursts into a cloud that hurts: not point blank
 	var at := run.horde.enemy_position(index)
 	if run.horde.query_sphere(at, RAM_CROWD).size() > 2:
 		return Vector3.INF

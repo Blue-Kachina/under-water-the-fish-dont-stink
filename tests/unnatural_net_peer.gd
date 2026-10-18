@@ -82,6 +82,7 @@ func _host() -> void:
 	settings.cursed_chest_chance = 0.5  # some of each, to see the kinds come over
 	settings.chest_interval = 0.0
 	settings.pearl_drop_chance = 1.0  # every kill drops one here (pearl_currency_probe has the odds)
+	settings.pearl_elite_chance = 1.0  # elites too
 	settings.card_choices = 0  # kills level the team at once now: no picker hiding from the zombies
 	settings.chest_open_time = 999.0  # nobody opens one by idling beside it
 	settings.enemy_speed_scale = 0.0

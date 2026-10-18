@@ -35,6 +35,7 @@ func _run() -> void:
 	_kit()
 	await _loops()
 	_reload()
+	_loose()
 	_buses()
 	await _panel()
 	for key: String in _saved:
@@ -210,6 +211,29 @@ func _reload() -> void:
 	var said: String = Sfx.load_profile()
 	check(Sfx.status("ball/bounce") == "have" and Sfx.play_at("ball/bounce", Vector3.ZERO) != null, "a file saved, then Reload, plays")
 	check(said.begins_with("Sound profile: Probe Kit"), "Reload says what it loaded: %s" % said)
+
+
+## An exported game's loose profiles (audio/profiles beside the .exe): a
+## profile only there is offered; one also bundled gains the loose files, and
+## an event the loose folder has is its alone.
+func _loose() -> void:
+	print("loose profiles beside the game:")
+	var loose := ROOT.get_base_dir().path_join("loose")
+	_write_wav(loose.path_join("probe_kit/ball/hit.wav"), 0.1)
+	_write_wav(loose.path_join("probe_kit/fish/jump.wav"), 0.1)
+	_write_wav(loose.path_join("loose_only/ui/back.wav"), 0.1)
+	var was := Sfx.loose_root
+	Sfx.loose_root = loose
+	check(Sfx.profile_choices().has(["Loose Only", "loose_only"]), "a profile only beside the game is offered")
+	var said: String = Sfx.load_profile()
+	var kit: SoundProfile = Sfx.active_profile()
+	check(Sfx.status("fish/jump") == "have" and Sfx.status("ui/select") == "have", "the bundled profile gains the loose files and keeps its own")
+	check(Array(kit.events["ball/hit"].files) == ["ball/hit.wav"] and kit.events["ball/hit"].layers.is_empty(),
+			"an event in the loose folder is its alone (ball/hit's bundled layers dropped)")
+	check(kit.title == "Probe Kit" and said.contains("loose files"), "its name stays, and Reload says loose files are in: %s" % said)
+	Sfx.loose_root = was
+	Sfx.load_profile()
+	check(Sfx.status("fish/jump") == "missing", "without them, back to the bundled files")
 
 
 func _buses() -> void:

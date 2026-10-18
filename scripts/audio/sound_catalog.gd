@@ -68,9 +68,9 @@ const ROWS := [
 	# Ball and arena.
 	["ball/hit", 1, "3d layers voices=3", "A fish hits the ball, soft to smash. The most-heard sound in Free Play and 1v1."],
 	["ball/bounce", 1, "3d layers voices=3 cd=0.05", "The ball bounces off the floor, a wall or the ceiling."],
-	["ball/hoop_rim", 2, "3d", "The ball clips a hoop."],
-	["ball/hoop_through", 2, "3d", "The ball goes through a hoop."],
 	["ball/reset", 2, "3d", "The ball respawns."],
+	["arena/hoop_rim", 2, "3d", "Clipping a hoop's rim (obstacle course)."],
+	["arena/hoop_through", 2, "3d", "Swimming through the next hoop (obstacle course)."],
 	["arena/goal_net", 1, "3d layers", "The ball hits the back of the net."],
 	["arena/bubble_column_loop", 2, "3d loop voices=6", "A bubble column."],
 

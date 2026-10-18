@@ -31,7 +31,29 @@ is a **Fish Fry**. Teams are team colours / team 0, 1. "Demo" is only for Rocket
 **Phases 0 to 8 are built (2026-10-17), and so is the second play-test's round of changes (Round 2
 below). Phase 9 isn't started.** Pick **Unnatural** or **Test Tank** in the mode list.
 
-### Handoff (2026-10-18, playability pass P2): start here
+### Handoff (2026-10-18, balance pass 1): start here
+**State:** the defaults are rebalanced from 10 rounds of sims and the user's own logs (see
+"Balance pass 1" below). The build is in `builds/windows/FishPlayground.exe` (16:08). Final round:
+5 of 8 greedy runs beat the Leviathan at Lv 27–30, with purses of 10–77 pearls at minute 9 (they
+were 300–1,300). Halo builds lose most (3 of the 5 losses): a candidate for the next pass.
+
+**Results** (round 6, all six fish, greedy and random picks, with the defaults):
+- 9 of 12 runs beat the Leviathan at about 10 minutes, at Lv 17–30. The horde fills (0.8–1.0)
+  until about minute 8, and items are 6–20 by the boss.
+- Dominus was then fixed (round 9): greedy picks won 3 of 3, at Lv 27–34.
+- Random picks still lose. They often never take a second weapon.
+
+**Open:**
+- **The user's own run logs.** They now save as the run goes. Compare a human's fill, level and
+  damage taken with the bot's.
+- **The bot.** It is safer than a player at range: the horde rarely kills it once it's ahead.
+  Tune `enemy_damage_scale` and `difficulty_damage` from human logs, not from the bot.
+- **The bench's crowd** overrates area and front-cone weapons (Bite, Greek Fire). Use whole-run sims
+  for the final call.
+- **Greek Fire** is still about 2–3× the others at Lv 15–20 on the bench.
+- **Next:** P3 (feel and readability), then P4 (stacking curves).
+
+### Handoff (2026-10-18, playability pass P2)
 **State:** P2 is built and probed (see "P2 as built"). The build is in
 `builds/windows/FishPlayground.exe` (10:46, with the Lv 15 and 20 milestones and the visible remoras). Nothing is half-done.
 1. **The first full sim** (6 runs: Dominus, Octane and Merc, greedy and random picks). The reports
@@ -929,6 +951,71 @@ The new `milestones_probe` runs every weapon at Lv 20 in the Test Tank and check
   - Off clears what it set.
 - **Probe:** new `run_log_probe` (samples, picks, cause, saving and pruning, restart, the tank
   presets).
+
+### Balance pass 1 (2026-10-18, from the sim; the user was AFK)
+**No log from the user's play.** The log only saved when a run ended, and closing the game
+mid-run skipped that. The probes were also writing (and pruning to 3) in the real
+`user://run_logs/`. Both are fixed:
+- RunLog saves after every minute's sample (`in_progress`) and on close or quit.
+- Only the main scene saves; probes need `RunLog.save_anywhere`.
+- `run_log_probe` uses `user://run_logs_probe`.
+
+**What the sims showed:**
+- The director refills the horde whenever it's short. A strong build kills as fast as the director
+  spawns (about 2,500 a minute by minute 10), so its XP, and with it its level, is set by the
+  director's spawn volume: Lv 36–60 at the boss.
+- The weapons were very far apart. Bite and Sting were 9× Lash and Spines at Lv 1, and Greek Fire
+  grew ×1,000 from Lv 1 to 20.
+- Luck × `chest_drop_luck` plus elite chests made chests snowball: up to 66 chests and 172 items by
+  10:00.
+- The ttk target (0.3–1 s) can't work against the director's volume. **Fill** replaces it as the
+  sim's flag: zombies out ÷ `director.target_alive()`. Under `fill_target_min` (0.25), the build
+  wipes each pack as it comes.
+
+**New tools:**
+- `tests/weapon_bench.tscn`: each weapon's dps on the Test Tank crowd at Lv 1, 5, 10, 15 and 20.
+- run_sim's `--set K=V,...` and fish lists.
+- Settings: `difficulty_hp_curve`, `elite_chest_scale`, `chest_price_step`, `fill_target_min`.
+- The bot takes tomes (as a player would) and doesn't ram boxfish.
+
+**Changed defaults** (each config was picked from 4 rounds of 3 parallel sims, 4 fish each):
+
+| Setting | Was | Now |
+|---|---|---|
+| `xp_curve` | 1.35 | 1.9 (xp_base 5 kept: `xp_base` 8–10 starved the early game, with deaths at 3–5 min) |
+| `difficulty_hp_curve` | (linear) | 1.55 |
+| `pearl_elite_value` | 3 | 1 |
+| `elite_chest_scale` | 5 | 2 |
+| `chest_drop_luck` | 2 | 1 |
+| `chest_price_step` | – | 0.15 a chest paid for |
+| bite / sting / lash / thrust / bubble / spine damage | 30 / 16 / 26 / 34 / 12 / 14 | 26 / 9 / 47 / 34 / 9 / 32 |
+| bite_cooldown / bite_aim_cone | 1.1 s / 75° | 0.9 s / 110° (the crowd bench overrates the bite; in play, kiting, the jaws pointed away and Dominus died at 4–6 min) |
+| fire_dps / charge / jelly / remora / coil damage | 12 / 120 / 10 / 14 / 16 | 40 / 46 / 35 / 55 / 55 |
+| jelly_count / jelly_radius | 1 / 1.0 | 2 / 1.2 (one small jelly barely covered anything) |
+| burst_damage / burst_radius | 12 / 3.5 | 8 / 3.0 (boxfish clouds were the top killer: melee kills them point blank) |
+
+**The user's own logs** (saved by the new autosave; 6 short runs on the 11:17 build, and a full 10
+min Octane run at 15:00 on the new defaults):
+- The full run went Sting and Greek Fire, then 7 Tome of Tides. It reached Lv 30 at 10:00, about
+  like the bot. Damage taken was low (0–80 a minute).
+- The horde's fill fell to 0.18–0.33 by minutes 9–10.
+- **Bug found:** 76% of the damage was credited to "bite". The Sting's echo pulses were never given
+  their kind, so they kept the default (Bite). Fixed; `milestones_probe` checks it.
+  - The weapon bench had mixed those echoes into its "bite" row, which inflated the Bite and
+    deflated the Sting.
+  - Re-benched: the Sting is mid-pack (2,600 at Lv 20). The Bite (8,200 at Lv 20) is overrated by
+    the bench's crowd, but in whole-run sims Dominus is on par with the others.
+- **Pearls were worthless:** 1,294 in the purse and 4 chests opened in 10 minutes, at 365 pearls a
+  minute by the end. Most came from elites, which always dropped one, and by minute 10 about 9% of
+  spawns are elite. Now:
+  - an elite drops one by `pearl_elite_chance` (0.3);
+  - `chest_price_growth` 0.25 → 0.4 a minute (about 40 pearls a chest at 10:00, before the
+    per-chest step).
+
+Greek Fire also changed:
+- `fire_life_per_stack` 1 → 0.4, `fire_radius_step` 0.15 → 0.1, `fire_density_step` 0.2 → 0.12.
+- `fire_patches_step` 10 → 5 and `fire_max_patches` 80 → 60.
+- The flare is 0.5 s of burn at ×1.4 reach; the creep is 1 m/s within 5 m.
 
 ## Existing pieces to reuse
 | Piece | Where | Use in Unnatural |

@@ -30,6 +30,8 @@ const BOX_MARGIN := 0.02
 const SOLVER_ITERATIONS := 10
 
 signal touched(by: Node3D, hit_speed: float)
+## Sent back to a spot (respawn()), e.g. for a kickoff.
+signal respawned
 
 @export var settings: BallSettings
 ## Source of the water settings when settings.inherit_water is on.
@@ -123,6 +125,7 @@ func respawn(at: Vector3, kickoff := false) -> void:
 	visible = true
 	freeze = false
 	_collision.set_deferred("disabled", false)
+	respawned.emit()
 
 
 ## Burst after a goal: hidden, frozen and non-solid until respawn().

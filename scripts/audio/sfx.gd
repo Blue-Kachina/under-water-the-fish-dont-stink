@@ -18,6 +18,8 @@ extends Node
 signal changed(key: String)
 ## The active profile was (re)loaded.
 signal profile_loaded
+## Every sound the game asks for, whether or not the profile has it (probes listen).
+signal requested(id: String)
 
 const SETTINGS_PATH := "user://playground.cfg"
 const SECTION := "audio"
@@ -51,8 +53,15 @@ var voice_volume: int = DEFAULTS.voice_volume
 var beep_missing: bool = DEFAULTS.beep_missing
 ## More folders of profiles (probes); same layout as PROFILE_DIR.
 var extra_roots: PackedStringArray = []
+## Loose profiles beside an exported game (audio/profiles next to the .exe),
+## read straight from disk, so a new recording is heard after Reload sounds
+## with no new build. Their files win over the bundled ones (SoundProfile.open_all).
+## Empty when running from the project, whose own folder is already live.
+var loose_root := "" if OS.has_feature("editor") else OS.get_executable_path().get_base_dir().path_join("audio/profiles")
 ## Don't read or write the settings file (probes).
 var keep_settings_off_disk := false
+## Plays the game's sounds off its signals and state (SfxHooks).
+var hooks: SfxHooks
 
 var _profile: SoundProfile
 var _beeps: SoundProfile
@@ -84,6 +93,9 @@ func _ready() -> void:
 		profile = NONE  # its folder's gone
 	_apply_volumes()
 	load_profile()
+	hooks = SfxHooks.new()
+	hooks.name = "Hooks"
+	add_child(hooks)
 
 
 func _process(_delta: float) -> void:
@@ -112,11 +124,18 @@ func play_pitched(id: String, step: int, at: Variant = null, intensity := 1.0) -
 	return _start(id, intensity, at, maxi(step, 0))
 
 
+## A menu's sound `id` (`step` for a pitched one). Settled once a frame with
+## the rest of the UI's (SfxHooks.request), so one press makes one sound.
+func ui(id: String, step := -1) -> void:
+	hooks.request(id, step)
+
+
 ## Starts looping event `id`, following `follow` (a Node3D) if given. A handle
 ## for set_loop / stop_loop; it keeps going (silent) when the profile has no
 ## sound for it, and picks one up on a reload.
 func start_loop(id: String, follow: Node = null) -> int:
 	_check_id(id)
+	requested.emit(id)
 	var info := SoundCatalog.info(id)
 	var player: Node
 	if info.get("is_3d", false):
@@ -208,8 +227,9 @@ func profile_choices() -> Array:
 	for profile_id: String in dirs:
 		var config := ConfigFile.new()
 		var title := profile_id.capitalize()
-		if config.load(String(dirs[profile_id]).path_join(SoundProfile.CONFIG)) == OK:
-			title = str(config.get_value("profile", "name", title))
+		for folder: String in dirs[profile_id]:
+			if config.load(folder.path_join(SoundProfile.CONFIG)) == OK:
+				title = str(config.get_value("profile", "name", title))
 		choices.append([title, profile_id])
 	return choices
 
@@ -238,7 +258,7 @@ func load_profile() -> String:
 		BEEPS:
 			_profile = _beeps_profile()
 		_:
-			_profile = SoundProfile.open(_profile_dirs().get(profile, ""))
+			_profile = SoundProfile.open_all(_profile_dirs().get(profile, []))
 	_apply_underwater()
 	for handle: int in _loops:
 		_fill_loop(handle)
@@ -260,6 +280,8 @@ func summary() -> String:
 			SoundCatalog.events().size(), files]
 	if not _profile.unknown_files.is_empty():
 		text += " · not events: %s" % ", ".join(_profile.unknown_files)
+	if loose_root and Array(_profile.dirs).any(func(folder: String) -> bool: return folder.begins_with(loose_root)):
+		text += " · with loose files from %s" % loose_root.path_join(_profile.id)
 	return text
 
 
@@ -269,7 +291,7 @@ func write_sheet() -> String:
 	var profiles := []
 	var dirs := _profile_dirs()
 	for profile_id: String in dirs:
-		var opened := SoundProfile.open(dirs[profile_id])
+		var opened := SoundProfile.open_all(dirs[profile_id])
 		if opened:
 			profiles.append(opened)
 	var path := "res://audio/sound_sheet.csv" if OS.has_feature("editor") else "user://sound_sheet.csv"
@@ -281,15 +303,18 @@ func write_sheet() -> String:
 	return ProjectSettings.globalize_path(path)
 
 
-## Profile folders: id -> path.
+## Profile folders: id -> its folders, bundled first (a profile can be in several roots).
 func _profile_dirs() -> Dictionary:
 	var dirs := {}
-	for root: String in [PROFILE_DIR] + Array(extra_roots):
+	var roots := [PROFILE_DIR] + Array(extra_roots)
+	if loose_root:
+		roots.append(loose_root)
+	for root: String in roots:
 		if not DirAccess.dir_exists_absolute(root):
 			continue
 		for folder in DirAccess.get_directories_at(root):
 			if folder not in [NONE, BEEPS] and not folder.begins_with("."):
-				dirs[folder] = root.path_join(folder)
+				(dirs.get_or_add(folder, []) as Array).append(root.path_join(folder))
 	return dirs
 
 
@@ -316,6 +341,7 @@ func set_value(key: String, value: Variant) -> void:
 
 func _start(id: String, intensity: float, at: Variant, step: int) -> Node:
 	_check_id(id)
+	requested.emit(id)
 	var found := _resolve(id, beep_missing)
 	if found.is_empty():
 		return null

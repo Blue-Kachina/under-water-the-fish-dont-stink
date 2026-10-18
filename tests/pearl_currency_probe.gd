@@ -85,11 +85,21 @@ func _run() -> void:
 		pearl.queue_free()
 	await _ticks(1)
 	settings.pearl_drop_chance = 0.0
+	dropped[0] = 0
+	settings.pearl_elite_chance = 0.3
+	for n in 4000:
+		run._roll_pearl(far, fish, true, 300000 + n)
+	share = dropped[0] / 4000.0
+	check(absf(share - 0.3) < 0.03, "an elite drops one by pearl_elite_chance (%.3f)" % share)
+	for pearl in run.pearls_out:
+		pearl.queue_free()
+	await _ticks(1)
+	settings.pearl_elite_chance = 1.0
 	target = run.horde.spawn(1, far, Vector3.ZERO, true)
 	run.hit(target, 1e9, fish, "test")
 	await _ticks(1)
 	check(run.pearls_out.size() == 1 and roundi(run.pearls_out[0].value) == settings.pearl_elite_value,
-			"an elite always drops one, worth %d" % settings.pearl_elite_value)
+			"an elite's pearl is worth %d" % settings.pearl_elite_value)
 
 	print("taking pearls:")
 	var purse := run.purse_of(fish)

@@ -13,6 +13,16 @@ design is in `planning_audio.md`.
    `audio/sound_sheet.csv`).
 3. Pick the profile in Settings. After saving a file, press **Reload sounds** to hear it.
 
+### Trying sounds in the exported game
+
+The exported game only has the profiles that were here when it was built. To try a new
+recording without a new build, put it in an `audio/profiles` folder **next to the game's
+.exe**, laid out the same way (`builds/windows/audio/profiles/Homemade/fish/jump.wav`),
+and press **Reload sounds**. A profile there that the game doesn't have shows up as a new
+one; a profile it has gains those files. An event with files there uses only those (a
+new take replaces the old one). The Reload message says when loose files are in. Copy
+them into this folder too, so the next build has them.
+
 Anything your profile doesn't have stays silent. To hear where the gaps are, turn on
 **Beep for missing sounds**.
 

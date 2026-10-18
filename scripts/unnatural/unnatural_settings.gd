@@ -166,7 +166,7 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 5.0, 0.01, "or_greater") var difficulty_hp := 0.3
 ## How hp grows with the difficulty level: 1 + difficulty_hp x level ^ this
 ## (1: in a line; more: faster and faster, to keep up with a build's power).
-@export_range(0.5, 3.0, 0.05, "or_greater") var difficulty_hp_curve := 1.0
+@export_range(0.5, 3.0, 0.05, "or_greater") var difficulty_hp_curve := 1.55
 @export_range(0.0, 5.0, 0.01, "or_greater") var difficulty_damage := 0.15
 @export_range(0.0, 2.0, 0.01, "or_greater") var difficulty_speed := 0.04
 @export_range(0.0, 2.0, 0.01, "or_greater") var difficulty_size := 0.08
@@ -194,8 +194,8 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 60.0, 0.5, "or_greater") var glide_sweep := 10.0
 ## A boxfish bursts on death into a cloud burst_radius m round that hurts
 ## (burst_damage a touch, with i-frames) for burst_time s: don't batter one point blank.
-@export_range(0.0, 20.0, 0.1, "or_greater") var burst_radius := 3.5
-@export_range(0.0, 200.0, 1.0, "or_greater") var burst_damage := 12.0
+@export_range(0.0, 20.0, 0.1, "or_greater") var burst_radius := 3.0
+@export_range(0.0, 200.0, 1.0, "or_greater") var burst_damage := 8.0
 @export_range(0.0, 20.0, 0.1, "or_greater") var burst_time := 2.5
 ## The rot on their skins (0: their own colours, 1: all rot) and their eyes' glow.
 @export_range(0.0, 1.0, 0.01) var rot := 0.5
@@ -237,9 +237,9 @@ static func shared() -> UnnaturalSettings:
 
 @export_group("Ghost Bite")
 ## The Shark's auto-attack: huge spectral jaws that snap shut on the zone in front.
-@export_range(0.0, 1000.0, 1.0, "or_greater") var bite_damage := 13.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var bite_damage := 26.0
 ## Seconds between bites.
-@export_range(0.05, 10.0, 0.05, "or_greater") var bite_cooldown := 1.1
+@export_range(0.05, 10.0, 0.05, "or_greater") var bite_cooldown := 0.9
 ## How far the jaws reach (m) and their half-width (m)...
 @export_range(0.0, 60.0, 0.5, "or_greater") var bite_reach := 8.0
 @export_range(0.0, 40.0, 0.5, "or_greater") var bite_width := 4.5
@@ -247,11 +247,11 @@ static func shared() -> UnnaturalSettings:
 ## out-reaches ramming, bow wave powerups included).
 @export_range(1.0, 5.0, 0.05, "or_greater") var bite_over_bow := 1.6
 ## The jaws aim at the nearest zombie within this angle of the nose (degrees).
-@export_range(0.0, 180.0, 5.0) var bite_aim_cone := 75.0
+@export_range(0.0, 180.0, 5.0) var bite_aim_cone := 110.0
 
 @export_group("Anemone Sting")
 ## The Clownfish's: a stinging pulse all round it that hits everything inside.
-@export_range(0.0, 1000.0, 1.0, "or_greater") var sting_damage := 10.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var sting_damage := 9.0
 @export_range(0.05, 10.0, 0.05, "or_greater") var sting_cooldown := 0.9
 ## The pulse's radius (m)...
 @export_range(0.0, 60.0, 0.5, "or_greater") var sting_radius := 6.5
@@ -303,7 +303,7 @@ static func shared() -> UnnaturalSettings:
 ## The Boxfish's: spine_count spines (plus 4 per Projectiles) out in every
 ## direction whenever a zombie is within spine_range (m), each piercing up to
 ## spine_pierce zombies.
-@export_range(0.0, 1000.0, 1.0, "or_greater") var spine_damage := 26.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var spine_damage := 32.0
 @export_range(0.05, 10.0, 0.05, "or_greater") var spine_cooldown := 1.4
 @export_range(1, 200, 1, "or_greater") var spine_count := 18
 @export_range(1.0, 300.0, 1.0, "or_greater") var spine_speed := 30.0
@@ -403,7 +403,7 @@ static func shared() -> UnnaturalSettings:
 @export_group("Levels")
 ## XP to the next level: xp_base * level ^ xp_curve.
 @export_range(1.0, 1000.0, 1.0, "or_greater") var xp_base := 5.0
-@export_range(0.5, 3.0, 0.05, "or_greater") var xp_curve := 1.35
+@export_range(0.5, 3.0, 0.05, "or_greater") var xp_curve := 1.9
 ## Every kill's XP (it's the team's at once, no pickup) is worth this many
 ## times its value.
 @export_range(0.0, 10.0, 0.05, "or_greater") var xp_gain := 1.0
@@ -480,15 +480,15 @@ static func shared() -> UnnaturalSettings:
 ## times it), times 1 + the killer's luck x chest_drop_luck (which lifts the
 ## drops' chances too). Every chest is every player's: each opens it for themselves.
 @export_range(0.0, 1.0, 0.0005) var chest_drop_chance := 0.002
-@export_range(0.0, 50.0, 0.5, "or_greater") var elite_chest_scale := 5.0
-@export_range(0.0, 20.0, 0.1, "or_greater") var chest_drop_luck := 2.0
+@export_range(0.0, 50.0, 0.5, "or_greater") var elite_chest_scale := 2.0
+@export_range(0.0, 20.0, 0.1, "or_greater") var chest_drop_luck := 1.0
 ## Chests cost pearls (D23; off: free). The price is chest_price_base x (1 +
 ## chest_price_growth x minutes into the run); a cursed chest's is
 ## chest_cursed_price times that, a boss's free. Each player pays from their
 ## own purse for the chests they open.
 @export var chest_cost := true
 @export_range(0.0, 1000.0, 1.0, "or_greater") var chest_price_base := 8.0
-@export_range(0.0, 5.0, 0.05, "or_greater") var chest_price_growth := 0.25
+@export_range(0.0, 5.0, 0.05, "or_greater") var chest_price_growth := 0.4
 ## Each chest a player has paid for raises their next one's price by this
 ## share of it (0.15: the 10th costs 2.35x the first, at the same minute).
 @export_range(0.0, 2.0, 0.01, "or_greater") var chest_price_step := 0.15
@@ -522,10 +522,12 @@ static func shared() -> UnnaturalSettings:
 
 @export_group("Pearls")
 ## Pearls are the currency (D23): chests cost them. A kill drops one by chance,
-## pearl_drop_chance x (1 + the killer's Pearl Chance); an elite's always does,
-## worth pearl_elite_value; a beaten mini-boss drops boss_pearls.
+## pearl_drop_chance x (1 + the killer's Pearl Chance); an elite's by
+## pearl_elite_chance (likewise), worth pearl_elite_value; a beaten mini-boss
+## drops boss_pearls.
 @export_range(0.0, 1.0, 0.005) var pearl_drop_chance := 0.05
-@export_range(1, 100, 1, "or_greater") var pearl_elite_value := 3
+@export_range(0.0, 1.0, 0.01) var pearl_elite_chance := 0.3
+@export_range(1, 100, 1, "or_greater") var pearl_elite_value := 1
 @export_range(0, 1000, 1, "or_greater") var boss_pearls := 25
 ## Pearls this near a fish (m) are drawn in: the pickup range.
 @export_range(0.0, 60.0, 0.5, "or_greater") var pickup_range := 7.0
@@ -543,11 +545,10 @@ static func shared() -> UnnaturalSettings:
 ## saved to user://run_logs/ when it ends, keeping the newest run_logs_keep.
 @export var run_logs := true
 @export_range(1, 1000, 1, "or_greater") var run_logs_keep := 50
-## The time-to-kill target (s): the zombies' average hp over the team's damage
-## per second. A balanced build stays within it all run; the run simulator
-## (tests/run_sim.tscn) reports the minutes outside it.
-@export_range(0.0, 10.0, 0.05, "or_greater") var ttk_target_min := 0.3
-@export_range(0.0, 10.0, 0.05, "or_greater") var ttk_target_max := 1.0
+## The run simulator (tests/run_sim.tscn) flags the minutes when the horde's
+## fill (zombies out over the number the director wants out) is under this:
+## the build wipes each pack as it comes, too strong for the curve.
+@export_range(0.0, 1.0, 0.01) var fill_target_min := 0.25
 
 @export_group("Test Tank")
 ## A preset for power and frame benchmarks: every weapon slot full (the

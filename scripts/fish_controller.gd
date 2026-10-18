@@ -15,9 +15,16 @@ signal jumped
 signal double_jumped
 signal dodged(direction: Vector3)
 signal stroked(quality: float)
+## Every swim stroke the rhythm hears, for its sound: `quality` 0..1 (0 on the
+## beats that set the tempo), `missed` when it mashed or broke the rhythm.
+signal stroke_beat(quality: float, missed: bool)
 ## An Extra Swishy stride began (SwishySwim): its timing (0..1, or -1 for a
 ## fresh start) and the flow it left.
 signal strode(timing: float, flow: float)
+## A reset the player asked for (main's reset_play) or a respawn after a
+## battery (revive): the fish is about to jump to its spawn. Not sent for a
+## mode just placing it (set_spawn).
+signal respawning
 ## Start of every physics tick, before input is sampled: `state` is the result
 ## of the last step. Lets a test driver (tests/physics_parity_probe) read the
 ## state and set this tick's input with no lag.
@@ -969,12 +976,15 @@ func batter() -> void:
 
 ## Back in play after batter(), at `spawn`.
 func revive(spawn: Transform3D) -> void:
+	var was_battered := battered
 	if battered:
 		collision_layer = _saved_layers.x
 		collision_mask = _saved_layers.y
 	battered = false
 	visible = true
 	freeze = puppet
+	if was_battered:
+		respawning.emit()
 	if puppet:
 		_spawn_transform = spawn
 		global_transform = spawn
@@ -1082,6 +1092,7 @@ func _register_stroke(axis: int) -> void:
 		stroke_chain = 0
 		stroke_quality = 0.0
 		_last_stroke_interval = 0.0
+		stroke_beat.emit(0.0, true)
 		return
 
 	# Switching between side-to-side and up-and-down (e.g. spinning the stick)
@@ -1091,15 +1102,18 @@ func _register_stroke(axis: int) -> void:
 	stroke_quality = 0.0
 	if not continues:
 		_start_rhythm()  # this stroke is beat 1 of a new rhythm
+		stroke_beat.emit(0.0, false)
 		return
 	stroke_chain += 1
 	if _last_stroke_interval <= 0.0:
 		_last_stroke_interval = interval  # beat 2 sets the tempo
+		stroke_beat.emit(0.0, false)
 		return
 
 	var drift := absf(interval - _last_stroke_interval) / _last_stroke_interval
 	if drift > rhythm_tolerance:
 		_start_rhythm()  # off tempo: the rhythm breaks and restarts from this beat
+		stroke_beat.emit(0.0, true)
 		return
 	# On tempo: a small push. Following the latest interval lets the tempo drift
 	# gradually faster or slower without breaking the rhythm.
@@ -1107,6 +1121,7 @@ func _register_stroke(axis: int) -> void:
 	_last_stroke_interval = interval
 	_queued_stroke += 1.0
 	stroked.emit(stroke_quality)
+	stroke_beat.emit(stroke_quality, false)
 
 
 func _start_rhythm() -> void:

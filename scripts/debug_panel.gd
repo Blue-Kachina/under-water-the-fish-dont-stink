@@ -437,6 +437,8 @@ func _add_row(key: String, meta: Dictionary, heading: Label) -> Row:
 	_meta[key] = meta
 	var row := Row.new()
 	row.setup(self, key, _title_of(key), _s)
+	if key.begins_with("audio/board:"):
+		row.set_meta(&"sfx", "")  # it plays the event itself
 	heading.get_parent().add_child(row)
 	_rows[key] = row
 	_group_headings[heading].append(key)
@@ -800,6 +802,8 @@ func _step(key: String, direction: int) -> void:
 	var value: Variant = _value(key)
 	match meta.get("kind", ""):
 		"bool":
+			if is_editable(key) and bool(value) != (direction > 0):
+				Sfx.ui("ui/toggle_on" if direction > 0 else "ui/toggle_off")
 			_set_value(key, direction > 0)
 		"enum":
 			var choices: Array = meta.choices
@@ -807,6 +811,8 @@ func _step(key: String, direction: int) -> void:
 			for i in choices.size():
 				if choices[i][1] == value:
 					at = i
+			if is_editable(key) and choices.size() > 1:
+				Sfx.ui("ui/move")
 			_set_value(key, choices[posmod(at + direction, choices.size())][1])
 		"range":
 			var step := _pad_step(meta)
@@ -815,6 +821,8 @@ func _step(key: String, direction: int) -> void:
 			if meta.allow_lesser:
 				low = minf(low, value)
 			var next := clampf(snappedf(float(value) + direction * step, step), low, high)
+			if is_editable(key) and next != float(value):
+				Sfx.ui("ui/slider", roundi(7.0 * clampf((next - low) / maxf(high - low, 0.0001), 0.0, 1.0)))
 			_set_value(key, next)
 
 
@@ -1176,6 +1184,7 @@ func _build_detail_control(key: String, meta: Dictionary) -> void:
 				button.custom_minimum_size.x = 110.0 * s
 				button.disabled = not editable
 				button.pressed.connect(func() -> void: _set_value(key, on))
+				button.set_meta(&"sfx", "ui/toggle_on" if on else "ui/toggle_off")
 				button.set_meta("value", on)
 				pair.add_child(button)
 			_detail_control.add_child(pair)

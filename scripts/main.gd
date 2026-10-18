@@ -353,6 +353,7 @@ func reset_play() -> void:
 			unnatural_run.start()  # online, the host's restart is everyone's
 		return
 	_fish.set_spawn(_environment.spawn_transform())  # re-read: the aquarium's depends on the ball type
+	_fish.respawning.emit()
 	if _environment is Arena:
 		(_environment as Arena).reset_course()
 	elif _environment is AquariumArena:

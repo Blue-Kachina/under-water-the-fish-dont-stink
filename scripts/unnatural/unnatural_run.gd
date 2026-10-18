@@ -1131,17 +1131,14 @@ func credit_xp(xp: float, by: FishController) -> void:
 		xp_claimed.emit(xp * gain)
 
 
-## Maybe a pearl where `by`'s kill was (the host rolls, D23): an elite's
-## always (worth pearl_elite_value), anyone else's by pearl_drop_chance x (1 +
+## Maybe a pearl where `by`'s kill was (the host rolls, D23): an elite's by
+## pearl_elite_chance (worth pearl_elite_value), anyone else's by pearl_drop_chance, x (1 +
 ## the killer's Pearl Chance). `id`: the zombie's net id (every machine's
 ## pearl the same).
 func _roll_pearl(at: Vector3, by: FishController, elite: bool, id: int) -> void:
-	if elite:
-		drop_pearl(at, settings.pearl_elite_value, id)
-		return
-	var chance := settings.pearl_drop_chance * (1.0 + pearl_chance_of(by))
+	var chance := (settings.pearl_elite_chance if elite else settings.pearl_drop_chance) * (1.0 + pearl_chance_of(by))
 	if chance > 0.0 and rng.randf() < chance:
-		drop_pearl(at, 1, id)
+		drop_pearl(at, settings.pearl_elite_value if elite else 1, id)
 
 
 ## The boss whose body zombie slot `index` is (null: an ordinary zombie).

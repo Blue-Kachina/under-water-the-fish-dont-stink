@@ -148,6 +148,7 @@ func _make_echo() -> AnemoneSting:
 	if not is_instance_valid(_echo):
 		_echo = AnemoneSting.new()
 		_echo.is_echo = true
+		_echo.kind = kind  # its hits are the sting's (FishAttack.make sets kind; this one's made here)
 		_echo.echo_depth = echo_depth + 1
 		_echo.top_level = true
 		_echo.fish = fish

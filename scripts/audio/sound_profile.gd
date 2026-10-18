@@ -10,7 +10,9 @@ extends RefCounted
 ##
 ## Files load straight from disk while the game runs from the project folder,
 ## so saving a file and reloading the profile is heard at once; an exported
-## game loads the imported copies instead.
+## game loads the imported copies instead. A profile can be spread over
+## several folders (open_all): an exported game also reads the loose ones
+## next to it (Sfx.loose_root), whose files win.
 
 const EXTENSIONS := ["wav", "ogg", "mp3"]
 const CONFIG := "profile.cfg"
@@ -28,7 +30,9 @@ const SCALES := {
 
 ## The folder name: what Settings saves.
 var id := ""
+## Its last folder (the one whose files win); `dirs` lists them all.
 var dir := ""
+var dirs: PackedStringArray = []
 var title := ""
 var author := ""
 var description := ""
@@ -50,15 +54,32 @@ static var _name_pattern: RegEx
 
 ## Reads the profile in folder `folder` (its streams too). Null if it's not a folder.
 static func open(folder: String) -> SoundProfile:
-	if not DirAccess.dir_exists_absolute(folder):
-		return null
-	var profile := SoundProfile.new()
-	profile.dir = folder
-	profile.id = folder.trim_suffix("/").get_file()
-	profile.title = profile.id.capitalize()
-	profile._read_config()
-	for path in _files_under(folder, ""):
-		profile._add_file(path)
+	return open_all([folder])
+
+
+## Reads one profile from several folders of the same name, in order: an event
+## a later folder has files for is that folder's alone (a re-recording replaces
+## the old take, not adds to it), and a later profile.cfg's settings win. Null
+## if none of them is a folder.
+static func open_all(folders: Array) -> SoundProfile:
+	var profile: SoundProfile = null
+	for folder: String in folders:
+		if not DirAccess.dir_exists_absolute(folder):
+			continue
+		if profile == null:
+			profile = SoundProfile.new()
+			profile.id = folder.trim_suffix("/").get_file()
+			profile.title = profile.id.capitalize()
+		profile.dir = folder
+		profile.dirs.append(folder)
+		profile._read_config()
+		var files := _files_under(folder, "")
+		for path in files:
+			var parsed := parse_name(path)
+			if not parsed.is_empty():
+				profile.events.erase(parsed.id)
+		for path in files:
+			profile._add_file(path)
 	return profile
 
 

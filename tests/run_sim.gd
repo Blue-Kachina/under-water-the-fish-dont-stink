@@ -4,8 +4,9 @@ extends Node
 ## fast as the machine goes, and every run's RunLog (a sample a minute: damage
 ## per second, time to kill, damage taken, level, pearls, chests, builds) is
 ## gathered into a report: each minute's averages over the runs, the minutes
-## whose time to kill is outside the target (ttk_target_min to ttk_target_max:
-## balance bugs), when and why the bot went down, and the drops' rates.
+## when the horde's fill (zombies out over the director's target) is under
+## fill_target_min (the build wipes each pack as it comes: too strong), when
+## and why the bot went down, and the drops' rates.
 ## Reported, not pass/fail.
 ##
 ##   Godot_console.exe --headless --fixed-fps 120 --path . res://tests/run_sim.tscn -- --runs 6
@@ -24,7 +25,7 @@ extends Node
 ## --fixed-fps 120 (the physics rate) runs it unhinged from the clock: without
 ## it the sim only goes at real time.
 
-const SAMPLE_KEYS := ["level", "kills", "dps", "ttk", "avg_hp", "alive", "taken", "pearls_dropped", "chests_dropped",
+const SAMPLE_KEYS := ["level", "kills", "dps", "ttk", "avg_hp", "alive", "fill", "taken", "pearls_dropped", "chests_dropped",
 		"pearls_taken", "purse", "chests_opened"]
 
 var main: Node
@@ -158,10 +159,9 @@ func _report(seconds: float) -> void:
 	var longest := 0
 	for entry in logs:
 		longest = maxi(longest, (entry.samples as Array).size())
-	var lo := settings.ttk_target_min
-	var hi := settings.ttk_target_max
+	var lo := settings.fill_target_min
 	print("\nper minute (averages over the runs still going):")
-	print("  min  runs  level  kills/min    dps     ttk(s)  avg hp  alive  taken/min  pearls/min  chests/min  chests opened  purse")
+	print("  min  runs  level  kills/min    dps     ttk(s)  avg hp  alive  fill  taken/min  pearls/min  chests/min  chests opened  purse")
 	var outside := []
 	var rows := []
 	for m in longest:
@@ -181,20 +181,17 @@ func _report(seconds: float) -> void:
 		for key: String in SAMPLE_KEYS:
 			mean[key] = sums.get(key, 0.0) / count
 		var flag := ""
-		if mean.ttk < lo:
-			flag = "  << too strong"
-			outside.append([m + 1, mean.ttk])
-		elif mean.ttk > hi:
-			flag = "  >> too weak"
-			outside.append([m + 1, mean.ttk])
-		print("  %3d  %4d  %5.1f  %9.0f  %7.0f  %7.2f  %6.0f  %5.0f  %9.0f  %10.1f  %10.2f  %13.1f  %5.0f%s" % [m + 1, count,
-				mean.level, mean.kills, mean.dps, mean.ttk, mean.avg_hp, mean.alive, mean.taken, mean.pearls_dropped,
+		if m >= 1 and mean.fill < lo:
+			flag = "  << wipes the horde as it comes"
+			outside.append([m + 1, mean.fill])
+		print("  %3d  %4d  %5.1f  %9.0f  %7.0f  %7.2f  %6.0f  %5.0f  %4.2f  %9.0f  %10.1f  %10.2f  %13.1f  %5.0f%s" % [m + 1, count,
+				mean.level, mean.kills, mean.dps, mean.ttk, mean.avg_hp, mean.alive, mean.fill, mean.taken, mean.pearls_dropped,
 				mean.chests_dropped, mean.chests_opened, mean.purse, flag])
 		mean["minute"] = m + 1
 		mean["runs"] = count
 		rows.append(mean)
-	print("\ntime to kill target %.2f-%.2f s: %s" % [lo, hi, "every minute inside" if outside.is_empty()
-			else "%d minute(s) outside (balance bugs): %s" % [outside.size(), ", ".join(outside.map(func(o: Array) -> String: return "min %d (%.2f s)" % [o[0], o[1]]))]])
+	print("\nhorde fill (zombies out / the director's target), flagged under %.2f from minute 2: %s" % [lo, "never under" if outside.is_empty()
+			else "%d minute(s) under (the build wipes each pack as it comes): %s" % [outside.size(), ", ".join(outside.map(func(o: Array) -> String: return "min %d (%.2f)" % [o[0], o[1]]))]])
 	var downs := []
 	var causes := {}
 	var outcomes := {}

@@ -74,6 +74,7 @@ func _on_hoop_fish_entered(hoop: Hoop, body: Node3D) -> void:
 		next_hoop = 0
 	elif hoop.index != next_hoop:
 		return
+	Sfx.play_at("arena/hoop_through", hoop.global_position)
 	next_hoop += 1
 	if next_hoop >= hoops.size():
 		var is_best := course_time < best_time

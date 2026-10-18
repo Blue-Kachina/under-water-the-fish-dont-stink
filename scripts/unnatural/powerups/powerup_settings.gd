@@ -142,7 +142,7 @@ static func shared() -> PowerupSettings:
 @export_range(0, 10, 1, "or_greater") var remora_count_per_stack := 1
 @export_range(0.05, 20.0, 0.05, "or_greater") var remora_interval := 1.5
 @export_range(0.5, 60.0, 0.5, "or_greater") var remora_range := 7.0
-@export_range(0.0, 1000.0, 1.0, "or_greater") var remora_damage := 45.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var remora_damage := 55.0
 @export_range(0.0, 1.0, 0.05) var remora_proc := 0.5
 @export_range(0.0, 2.0, 0.01, "or_greater") var remora_damage_step := 0.25
 @export_range(0.0, 2.0, 0.01, "or_greater") var remora_rate_step := 0.15
@@ -177,12 +177,12 @@ static func shared() -> PowerupSettings:
 ## halo_radius_step orbit size, halo_spin_step orbit speed, jelly_rate_step
 ## sting rate. jelly_stacks: a level override for testing.
 @export_range(0, 20, 1, "or_greater") var jelly_stacks := 0
-@export_range(0, 20, 1, "or_greater") var jelly_count := 1
+@export_range(0, 20, 1, "or_greater") var jelly_count := 2
 @export_range(0, 10, 1, "or_greater") var jelly_count_per_stack := 1
 @export_range(0.5, 30.0, 0.1, "or_greater") var halo_radius := 3.2
 @export_range(0.0, 5.0, 0.05, "or_greater") var halo_spin := 0.5
-@export_range(0.1, 10.0, 0.05, "or_greater") var jelly_radius := 1.0
-@export_range(0.0, 1000.0, 1.0, "or_greater") var jelly_damage := 30.0
+@export_range(0.1, 10.0, 0.05, "or_greater") var jelly_radius := 1.2
+@export_range(0.0, 1000.0, 1.0, "or_greater") var jelly_damage := 35.0
 @export_range(0.05, 5.0, 0.05, "or_greater") var jelly_tick := 0.25
 @export_range(0.0, 1.0, 0.05) var jelly_proc := 0.2
 @export_range(0.0, 2.0, 0.01, "or_greater") var jelly_damage_step := 0.25
@@ -217,7 +217,7 @@ static func shared() -> PowerupSettings:
 @export_range(0.0, 10.0, 0.05, "or_greater") var charge_arm := 0.5
 @export_range(0.2, 20.0, 0.1, "or_greater") var charge_trigger := 2.0
 @export_range(0.5, 120.0, 0.5, "or_greater") var charge_life := 10.0
-@export_range(0.0, 5000.0, 5.0, "or_greater") var charge_damage := 52.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var charge_damage := 46.0
 @export_range(0.5, 40.0, 0.25, "or_greater") var charge_blast := 5.0
 @export_range(1, 200, 1, "or_greater") var charge_max := 12
 @export_range(0.0, 1.0, 0.05) var charge_proc := 0.5
