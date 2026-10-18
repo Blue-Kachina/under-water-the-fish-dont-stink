@@ -77,6 +77,7 @@ func _host() -> void:
 	settings.spawning = false
 	settings.stage_events = false
 	settings.chest_count = 3
+	settings.cursed_chest_chance = 0.5  # some of each, to see the kinds come over
 	settings.chest_interval = 0.0
 	settings.chest_open_time = 999.0  # nobody opens one by idling beside it
 	settings.enemy_speed_scale = 0.0
@@ -104,7 +105,8 @@ func _host() -> void:
 	var guest_pid := _other_pid(coop)
 	var guest_fish := coop.fish_of(guest_pid)
 	check(guest_fish != null and guest_fish.puppet and guest_fish in run.players, "the guest's fish is a puppet in our run")
-	await _phase("joined", {"chests": run.chests.size(), "chest_at": run.chests[0].position if not run.chests.is_empty() else Vector3.ZERO})
+	await _phase("joined", {"chests": run.chests.size(), "chest_at": run.chests[0].position if not run.chests.is_empty() else Vector3.ZERO,
+			"kinds": _kinds(run)})
 
 	print("host: zombies")
 	var at := fish.global_position + Vector3(0, 0, -25)
@@ -149,7 +151,8 @@ func _host() -> void:
 	var guest_chests: int = run.stats_of(guest_fish).get("chests", 0)
 	await _phase("guest_chest", {})
 	await _seconds(0.5)
-	check(run.chests[0].opened and run.stats_of(guest_fish).get("chests", 0) == guest_chests + 1, "the guest opened chest 0: open here, theirs")
+	check(run.chests[0].is_open_for(guest_fish) and run.stats_of(guest_fish).get("chests", 0) == guest_chests + 1, "the guest opened chest 0: for them here too")
+	check(not run.chests[0].is_open_for(fish) and run.chests[0] in run.shut_chests_for(fish), "...and it's still ours to open")
 	run.open_chest(run.chests[1], fish)
 	run._bury_chest()
 	await _seconds(0.5)
@@ -165,7 +168,7 @@ func _host() -> void:
 		boss.take(boss.hp + 1.0, fish, "probe")
 		await _seconds(2.0)
 		check(run.current_boss() == null, "we beat it")
-		await _phase("boss_down", {"chests": run.chests.size()})
+		await _phase("boss_down", {"chests": run.chests.size(), "kinds": _kinds(run)})
 
 	print("host: down and revive")
 	await _phase("go_down", {})
@@ -180,10 +183,8 @@ func _host() -> void:
 	print("host: late joiner")
 	if await _wait(func() -> bool: return coop.roster.size() >= 3, 60.0):
 		await _seconds(2.0)
-		var opened := []
-		for chest in run.chests:
-			opened.append(chest.opened)
-		await _phase("late_check", {"zombies": _zombie_ids(run).size(), "opened": opened, "level": run.levels.level, "kills": run.kills},
+		await _phase("late_check", {"zombies": _zombie_ids(run).size(), "opened": _opened(run, coop), "level": run.levels.level, "kills": run.kills,
+				"kinds": _kinds(run)},
 				false, "late")
 		await _wait_done("late_check", 10.0)
 		await _phase("late_leave", {}, false, "late")
@@ -239,6 +240,7 @@ func _guest() -> void:
 			"joined":
 				check(run.chests.size() == data.chests and (run.chests.is_empty() or run.chests[0].position.is_equal_approx(data.chest_at)),
 						"the host's chests are here (%d)" % run.chests.size())
+				check(_kinds(run) == data.kinds, "...each of its kind, cursed or not (%s)" % [_kinds(run)])
 			"spawns":
 				var missing := 0
 				var worst := 0.0
@@ -275,7 +277,7 @@ func _guest() -> void:
 				run.open_chest(run.chests[0], fish)
 				await _seconds(0.3)
 			"host_chest":
-				check(run.chests[1].opened, "the host opened chest 1: open here too")
+				check(run.chests[1].is_open_for(coop.fish_of(100)) and not run.chests[1].is_open_for(fish), "the host opened chest 1: for them, still shut for us")
 				check(run.chests.size() == data.count and run.chests[-1].position.is_equal_approx(data.last), "a new chest buried there turned up here")
 			"boss":
 				var boss := run.boss_by_id(data.id)
@@ -287,6 +289,7 @@ func _guest() -> void:
 				await _wait(func() -> bool: return run.current_boss() == null, 3.0)
 				check(run.current_boss() == null, "the host beat it: gone here too")
 				check(run.chests.size() == data.chests, "its chest is here too (%d chests)" % run.chests.size())
+				check(_kinds(run) == data.kinds, "...a boss chest with its fin, as the host's (%s)" % [_kinds(run)])
 			"go_down":
 				settings.god_mode = false
 				var health := run.health_of(fish)
@@ -319,11 +322,10 @@ func _late() -> void:
 	var data: Dictionary = _phase_data
 	_phase_name = ""
 	var run: UnnaturalRun = main.unnatural_run
-	var opened := []
-	for chest in run.chests:
-		opened.append(chest.opened)
+	var opened := _opened(run, NetSession.coop)
 	check(_zombie_ids(run).size() == data.zombies, "joining late: the host's zombies are here (%d of %d)" % [_zombie_ids(run).size(), data.zombies])
-	check(opened == data.opened, "...its chests, open and shut (%s)" % str(opened))
+	check(opened == data.opened, "...its chests, open and shut (%s; the host: %s)" % [str(opened), str(data.opened)])
+	check(_kinds(run) == data.kinds, "...and their kinds (%s)" % [_kinds(run)])
 	check(run.levels.level == data.level and run.kills == data.kills, "...and its level and kills (%d, %d)" % [run.levels.level, run.kills])
 	_send_done("late_check")
 	await _wait(func() -> bool: return _phase_name == "late_leave", 30.0)
@@ -423,6 +425,21 @@ func _zombies(run: UnnaturalRun) -> Array:
 	return list
 
 
+## Who's opened each chest (player ids, sorted), or "gone".
+func _opened(run: UnnaturalRun, coop: CoopSession) -> Array:
+	var all := []
+	for chest in run.chests:
+		if not is_instance_valid(chest) or chest.is_queued_for_deletion():
+			all.append("gone")
+			continue
+		var pids := []
+		for f in chest.opened_by:
+			pids.append(coop.pid_of(f))
+		pids.sort()
+		all.append(pids)
+	return all
+
+
 func _pearls(run: UnnaturalRun, of: Array) -> int:
 	var total := 0
 	for f: FishController in of:
@@ -484,3 +501,11 @@ func _seconds(seconds: float) -> void:
 func _ticks(n: int) -> void:
 	for i in n:
 		await get_tree().physics_frame
+
+
+## Each chest's kind and item ("" for one that's gone), in order.
+func _kinds(run: UnnaturalRun) -> Array:
+	var kinds := []
+	for chest in run.chests:
+		kinds.append("%d:%s" % [chest.kind, chest.item] if is_instance_valid(chest) and not chest.is_queued_for_deletion() else "")
+	return kinds

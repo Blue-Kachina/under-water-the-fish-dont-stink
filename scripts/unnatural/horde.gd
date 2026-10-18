@@ -21,6 +21,18 @@ extends Node3D
 ## every far_update_divisor-th step. The grid also answers the attacks' and
 ## contact damage's queries (query_sphere(), nearest_in_cone()).
 ##
+## The murk (planning_murk.md, apply_murk()): a zombie behind every camera
+## (murk_frustum) or further than cull_distance from the cameras isn't drawn,
+## and one between glint_near and glint_far shows a pair of red eyes (one
+## MultiMesh, zombie_glint.gdshader). Zombies past far_reach steer less often.
+##
+## Detail (the second perf pass): each look comes in BANDS of detail
+## (SchoolLook.detail_meshes(), by distance: settings.lod_*), since one
+## MultiMesh over the whole arena never gets Godot's own LOD. In split-screen
+## (settings.per_view_horde, cameras on their players' render layers) every
+## view has its own set of looks and eyes on its own layer, holding only the
+## zombies that view's camera sees.
+##
 ## damage() hurts one; at 0 hp it dies (killed), fades over DYING_TIME and its
 ## slot is freed. Immortal zombies (all of them with `immortal`, or one
 ## spawned so: the Test Tank's dummies) take hits but never die: a hit that
@@ -52,6 +64,11 @@ enum State { FREE, ALIVE, DYING }
 enum Lunge { STALK, TELEGRAPH, LUNGE, REST }
 
 const OVERLAY_SHADER := preload("res://shaders/zombie_overlay.gdshader")
+const GLINT_SHADER := preload("res://shaders/zombie_glint.gdshader")
+## The eyes' quads: each this far either side of the middle (in eye sizes).
+const GLINT_APART := 1.6
+## The eyes grow with distance (1 + d / GLINT_GROW, d in m) so they stay a few pixels.
+const GLINT_GROW := 25.0
 ## Never more than this many steps in one physics tick (after a hitch).
 const MAX_STEPS := 4
 ## Each zombie picks its target again every this many steps (staggered).
@@ -70,6 +87,8 @@ const ELITE_SIZE := 1.6
 const ELITE_HP := 5.0
 ## Floats per instance in a look's buffer: a 3x4 transform, then custom data.
 const STRIDE := 16
+## Detail bands per look (near, mid, far: settings.lod_*).
+const BANDS := 3
 
 var settings: UnnaturalSettings
 var kinds: Array[EnemyKind] = []
@@ -80,6 +99,10 @@ var immortal := false
 ## may be chased (1; 0: down, or invisible while picking a card or opening a chest).
 var targets := PackedVector3Array()
 var target_velocities := PackedVector3Array()
+## Each target's pull (1 if missing): a zombie picks the target nearest by
+## distance / pull, so a decoy (Anglerfish Lure) with pull 3 wins over a
+## player up to 3 times nearer.
+var target_pull := PackedFloat32Array()
 var chaseable := PackedByteArray()
 ## The arena: zombies stay within arena_radius of this, in the depth band.
 var arena_centre := Vector3.ZERO
@@ -87,8 +110,39 @@ var bounded := true
 var grid := HordeGrid.new()
 ## The live zombies as of the last step (indices).
 var alive := PackedInt32Array()
+## The difficulty level new zombies spawn at (UnnaturalRun sets it from the
+## clock): more hp, damage and speed, and bigger (UnnaturalSettings' Difficulty).
+var difficulty := 0.0
+## The Hourglass: every zombie (not a boss's body) stops dead for this long (s).
+## They can still be hit, but don't swim, lunge or hurt.
+var frozen_left := 0.0
 ## Everything random about them (wander phases, tail beats).
 var rng := RandomNumberGenerator.new()
+## The murk (apply_murk()): not drawn past cull_distance (m) from every camera;
+## red eyes from glint_near to glint_far; steering less often past far_reach
+## from every player (-1: settings.far_distance).
+var cull_distance := INF
+var glint_near := INF
+var glint_far := 0.0
+var far_reach := -1.0
+## How many zombies, and how many pairs of eyes, the last frame drew (in any
+## view), and how many fish all the views drew between them.
+var drawn_count := 0
+var glint_count := 0
+var drawn_instances := 0
+## The last frame's view sets (1: one set every view sees).
+var view_sets := 0
+## The minimap's survey (survey()): zombies per cell of a square grid over the
+## arena (survey_cells across, survey_cell m each, from survey_origin's x and
+## z), elites not counted; where the elites are; and survey()'s count, so maps
+## can tell when it's new.
+var survey_counts := PackedFloat32Array()
+var survey_cells := 0
+var survey_cell := 4.0
+var survey_origin := Vector3.ZERO
+var survey_elites := PackedVector3Array()
+var survey_version := 0
+var _survey_at := -1000000
 
 var _state := PackedByteArray()
 var _kind := PackedInt32Array()
@@ -113,6 +167,11 @@ var _immortal := PackedByteArray()
 var _proxy := PackedByteArray()
 var _proxy_count := 0
 var _net := PackedInt32Array()
+## The difficulty level each was spawned at, and the speed it gives.
+var _level := PackedFloat32Array()
+var _speed_scale := PackedFloat32Array()
+## The frozen look's strength (eases in and out).
+var _ice := 0.0
 ## Net id -> slot, for the live and dying.
 var _by_net := {}
 ## The next net id spawn() gives (the host's).
@@ -134,11 +193,29 @@ var _kind_behaviour := PackedInt32Array()
 var _since_step := 0.0
 var _steps := 0
 var _time := 0.0
-## Per look (kind * 3 + pose): its MultiMesh, and the buffer drawn into it.
+## Per look (set * _per_set + (kind * 3 + pose) * BANDS + band): its
+## MultiMesh, and the buffer drawn into it. A set per view (split-screen), or one.
 var _looks: Array[MultiMeshInstance3D] = []
 var _buffers: Array[PackedFloat32Array] = []
+var _per_set := 0
 var _overlays: Array[ShaderMaterial] = []
 var _shadows := false
+## Each set's eyes, and their buffers.
+var _glints: Array[MultiMeshInstance3D] = []
+var _glint_buffers: Array[PackedFloat32Array] = []
+var _glint_material := ShaderMaterial.new()
+## The render layer each set is drawn on (1: every view's).
+var _set_layers := PackedInt32Array()
+## The lod errors the looks' meshes were cut at (near, mid, far).
+var _lod_errors := Vector3(-1.0, -1.0, -1.0)
+var _used := PackedInt32Array()
+var _grown := PackedByteArray()
+## The cameras this frame: where, which way, the cosine of the view's
+## half-diagonal, and its player's render layer (0: none of its own).
+var _eyes := PackedVector3Array()
+var _forwards := PackedVector3Array()
+var _cosines := PackedFloat32Array()
+var _view_layers := PackedInt32Array()
 
 
 func _init() -> void:
@@ -176,6 +253,8 @@ func setup(horde_settings: UnnaturalSettings, horde_kinds: Array[EnemyKind], max
 	_immortal.resize(capacity)
 	_proxy.resize(capacity)
 	_net.resize(capacity)
+	_level.resize(capacity)
+	_speed_scale.resize(capacity)
 	_mode.resize(capacity)
 	_mode_left.resize(capacity)
 	_lunge.resize(capacity)
@@ -190,6 +269,53 @@ func setup(horde_settings: UnnaturalSettings, horde_kinds: Array[EnemyKind], max
 	_build_looks()
 
 
+## The murk at fog `density` (0: none), from settings: the cull distance, the
+## eyes' band and where steering slows. UnnaturalRun calls it every frame.
+func apply_murk(density: float) -> void:
+	if density <= 0.0:
+		cull_distance = INF
+		glint_near = INF
+		glint_far = 0.0
+		far_reach = -1.0
+		return
+	cull_distance = UnnaturalSettings.fog_reach(settings.murk_cull, density) + settings.murk_cull_margin
+	glint_near = UnnaturalSettings.fog_reach(settings.glint_from, density)
+	glint_far = settings.glint_distance
+	far_reach = UnnaturalSettings.fog_reach(settings.murk_far, density) if settings.murk_far > 0.0 else -1.0
+
+
+## Counts the zombies into the minimap's grid (cells about `cell` m) and
+## lists the elites, at most once every `every` seconds: every player's map
+## shares it.
+func survey(cell: float, every: float) -> void:
+	var now := Time.get_ticks_msec()
+	if survey_cells > 0 and now - _survey_at < roundi(every * 1000.0):
+		return
+	_survey_at = now
+	survey_version += 1
+	var half := settings.arena_radius + 10.0
+	var cells := clampi(ceili(half * 2.0 / maxf(cell, 0.5)), 1, 512)
+	survey_cell = half * 2.0 / cells
+	survey_origin = arena_centre - Vector3(half, 0.0, half)
+	if cells != survey_cells:
+		survey_cells = cells
+		survey_counts.resize(cells * cells)
+	survey_counts.fill(0.0)
+	survey_elites.clear()
+	var scale := 1.0 / survey_cell
+	for i in alive:
+		if _proxy[i] == 1:
+			continue
+		var at := _position[i]
+		if _elite[i] == 1:
+			survey_elites.append(at)
+			continue
+		var x := int((at.x - survey_origin.x) * scale)
+		var z := int((at.z - survey_origin.z) * scale)
+		if x >= 0 and z >= 0 and x < cells and z < cells:
+			survey_counts[z * cells + x] += 1.0
+
+
 ## Every zombie gone at once (no deaths).
 func clear() -> void:
 	_state.fill(State.FREE)
@@ -197,6 +323,7 @@ func clear() -> void:
 	_high = 0
 	_alive_count = 0
 	_proxy_count = 0
+	frozen_left = 0.0
 	_by_net.clear()
 	alive.clear()
 	grid.build(_position, alive)
@@ -204,7 +331,8 @@ func clear() -> void:
 
 ## A new zombie of kind `kind` at `at`, heading along `heading`. Returns its
 ## slot, or -1 with the horde full.
-func spawn(kind: int, at: Vector3, heading := Vector3.ZERO, elite := false, undying := false, net_id := 0) -> int:
+## `level`: its difficulty level (-1: the horde's `difficulty` now).
+func spawn(kind: int, at: Vector3, heading := Vector3.ZERO, elite := false, undying := false, net_id := 0, level := -1.0) -> int:
 	var i := -1
 	if not _free.is_empty():
 		i = _free[_free.size() - 1]
@@ -222,11 +350,17 @@ func spawn(kind: int, at: Vector3, heading := Vector3.ZERO, elite := false, undy
 	var facing := heading.normalized() if heading.length_squared() > 0.0001 else Vector3.FORWARD
 	_velocity[i] = facing * info.speed * 0.5
 	_set_facing(i, facing)
-	var hp := info.hp * settings.enemy_hp_scale * (ELITE_HP if elite else 1.0)
+	if level < 0.0:
+		level = difficulty
+	_level[i] = level
+	_speed_scale[i] = 1.0 + settings.difficulty_speed * level
+	var grow := minf(1.0 + settings.difficulty_size * level, maxf(settings.difficulty_size_max, 1.0))
+	var hp := info.hp * settings.enemy_hp_scale * (ELITE_HP if elite else 1.0) * (1.0 + settings.difficulty_hp * level)
 	_hp[i] = maxf(hp, 1.0)
 	_max_hp[i] = _hp[i]
-	_size[i] = info.size * (ELITE_SIZE if elite else 1.0)
-	_radius[i] = info.radius() * (ELITE_SIZE if elite else 1.0)
+	_size[i] = info.size * (ELITE_SIZE if elite else 1.0) * grow
+	_radius[i] = info.radius() * (ELITE_SIZE if elite else 1.0) * grow
+	_max_radius = maxf(_max_radius, _radius[i])
 	_elite[i] = 1 if elite else 0
 	_immortal[i] = 1 if undying else 0
 	_proxy[i] = 0
@@ -264,7 +398,7 @@ func spawn_pack(kind: int, count: int, at: Vector3, spread: float, heading := Ve
 ## A boss's body part: an undying slot `radius` m round at `at` that nothing
 ## steers or draws (move it with place()). Returns its slot, or -1.
 func spawn_proxy(at: Vector3, radius: float, net_id := 0) -> int:
-	var i := spawn(0, at, Vector3.ZERO, false, true, net_id)
+	var i := spawn(0, at, Vector3.ZERO, false, true, net_id, 0.0)
 	if i < 0:
 		return -1
 	_proxy[i] = 1
@@ -360,6 +494,26 @@ func enemy_kind_index(index: int) -> int:
 
 func enemy_hp(index: int) -> float:
 	return _hp[index]
+
+
+## Zombie `index`'s difficulty level (what it was spawned at).
+func enemy_level(index: int) -> float:
+	return _level[index]
+
+
+## Its contact damage's multiplier from its difficulty level.
+func damage_scale(index: int) -> float:
+	return 1.0 + settings.difficulty_damage * _level[index]
+
+
+## Every zombie stops dead for `seconds` (the Hourglass; a longer one already
+## going isn't cut short).
+func freeze(seconds: float) -> void:
+	frozen_left = maxf(frozen_left, seconds)
+
+
+func is_frozen() -> bool:
+	return frozen_left > 0.0
 
 
 func is_elite(index: int) -> bool:
@@ -499,7 +653,13 @@ func step_once(delta: float) -> void:
 		_kind_speed[k] = kinds[k].speed * settings.enemy_speed_scale
 		_kind_accel[k] = kinds[k].accel * maxf(settings.enemy_speed_scale, 0.2)
 		_kind_behaviour[k] = kinds[k].behaviour
-	_steer(delta)
+	if frozen_left > 0.0:
+		frozen_left = maxf(frozen_left - delta, 0.0)
+		for i in alive:
+			if _proxy[i] == 0:
+				_velocity[i] = Vector3.ZERO
+	else:
+		_steer(delta)
 	# The dying finish, and their slots free up.
 	for i in _high:
 		if _state[i] == State.DYING:
@@ -520,7 +680,8 @@ func step_once(delta: float) -> void:
 
 func _steer(delta: float) -> void:
 	var count := targets.size()
-	var far_squared := settings.far_distance * settings.far_distance
+	var far_gap := far_reach if far_reach > 0.0 else settings.far_distance
+	var far_squared := far_gap * far_gap
 	var divisor := maxi(settings.far_update_divisor, 1)
 	var separation := settings.separation
 	var strength := settings.separation_strength
@@ -551,8 +712,8 @@ func _steer(delta: float) -> void:
 		if not far or (_steps + i) % divisor == 0:
 			var dt := delta * divisor if far else delta
 			var kind := _kind[i]
-			var speed := _kind_speed[kind]
-			var accel := _kind_accel[kind]
+			var speed := _kind_speed[kind] * _speed_scale[i]
+			var accel := _kind_accel[kind] * _speed_scale[i]
 			if speed <= 0.0:
 				# A kind that doesn't swim (the Test Tank's dummies): it drifts back to rest.
 				_velocity[i] = velocity.move_toward(Vector3.ZERO, maxf(accel, 6.0) * dt)
@@ -665,6 +826,8 @@ func _nearest_target(at: Vector3) -> int:
 		if t < chaseable.size() and chaseable[t] == 0:
 			continue
 		var gap := targets[t].distance_squared_to(at)
+		if t < target_pull.size() and target_pull[t] > 0.0:
+			gap /= target_pull[t] * target_pull[t]
 		if gap < best_gap:
 			best_gap = gap
 			best = t
@@ -684,104 +847,339 @@ func _set_back(index: int, back: Vector3) -> void:
 	_axis_z[index] = back
 
 
-## Draws every zombie where it is now, between the last two steps.
+## Draws every zombie where it is now, between the last two steps: into each
+## view's set (split-screen) or the one set, in its detail band.
 func _draw_horde(delta: float) -> void:
 	if settings.enemy_shadows != _shadows:
 		_shadows = settings.enemy_shadows
 		for look in _looks:
 			look.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_ice = move_toward(_ice, 1.0 if frozen_left > 0.0 else 0.0, delta * 3.0)
 	for overlay in _overlays:
 		overlay.set_shader_parameter("rot", settings.rot)
 		overlay.set_shader_parameter("eye_glow", settings.eye_glow)
+		overlay.set_shader_parameter("frozen", _ice)
+	_fit_detail()
 	var step := 1.0 / maxf(settings.sim_rate, 1.0)
 	var blend := clampf(_since_step / step, 0.0, 1.0)
-	var used := PackedInt32Array()
-	used.resize(_looks.size())
-	var grown := PackedByteArray()
-	grown.resize(_looks.size())
 	var fade := delta * FLASH_FADE
+	_find_views()
+	var views := _eyes.size()
+	var per_view := _per_view()
+	var sets := views if per_view else 1
+	_fit_sets(sets, per_view)
+	_used.resize(_looks.size())
+	_used.fill(0)
+	_grown.resize(_looks.size())
+	_grown.fill(0)
+	var glint_used := PackedInt32Array()
+	glint_used.resize(sets)
+	var frustum := settings.murk_frustum
+	var cull_squared := cull_distance * cull_distance
+	var glints := glint_far > 0.0 and glint_near < glint_far and views > 0
+	var glint_near_squared := glint_near * glint_near
+	var glint_far_squared := glint_far * glint_far
+	var glint_fade := maxf(glint_far * 0.25, 1.0)
+	var glint_size := settings.glint_size
+	var glint_strength := settings.glint_strength
+	var mid_squared := settings.lod_mid_distance * settings.lod_mid_distance
+	var far_squared := settings.lod_far_distance * settings.lod_far_distance
+	var warning := 0.6 + 0.4 * sin(_time * 30.0)
+	drawn_count = 0
+	drawn_instances = 0
 	for i in _high:
 		var state := _state[i]
 		if state == State.FREE or _proxy[i] == 1:
 			continue
 		var at := _last_position[i].lerp(_position[i], blend)
-		var size := _size[i]
-		var dead := 0.0
-		if state == State.DYING:
-			dead = 1.0 - clampf(_dying[i] / DYING_TIME, 0.0, 1.0)
-			size *= 1.0 - dead * 0.85
 		var flash := maxf(_flash[i] - fade, 0.0)
 		_flash[i] = flash
-		var effort := clampf(_velocity[i].length() / 10.0, 0.0, 1.0)
-		var tail := fmod(_tail[i] + delta * lerpf(5.0, 15.0, effort), TAU)
-		_tail[i] = tail
-		var look := _kind[i] * 3 + SchoolLook.pose_for(tail)
-		var k := used[look] * STRIDE
-		used[look] += 1
-		var buffer := _buffers[look]
-		if k + STRIDE > buffer.size():
-			buffer.resize(maxi(buffer.size() * 2, STRIDE * 64))
-			_buffers[look] = buffer
-			grown[look] = 1
-		var x := _axis_x[i] * size
-		var y := _axis_y[i] * size
-		var z := _axis_z[i] * size
-		buffer[k] = x.x
-		buffer[k + 1] = y.x
-		buffer[k + 2] = z.x
-		buffer[k + 3] = at.x
-		buffer[k + 4] = x.y
-		buffer[k + 5] = y.y
-		buffer[k + 6] = z.y
-		buffer[k + 7] = at.y
-		buffer[k + 8] = x.z
-		buffer[k + 9] = y.z
-		buffer[k + 10] = z.z
-		buffer[k + 11] = at.z
-		buffer[k + 12] = flash
-		buffer[k + 13] = dead
-		buffer[k + 14] = float(_elite[i])
-		buffer[k + 15] = (0.6 + 0.4 * sin(_time * 30.0)) if _mode[i] == Lunge.TELEGRAPH else 0.0
+		var size := _size[i]
+		var dead := 0.0
+		var drawn_size := size
+		if state == State.DYING:
+			dead = 1.0 - clampf(_dying[i] / DYING_TIME, 0.0, 1.0)
+			drawn_size *= 1.0 - dead * 0.85
+		var slack := size * 1.5 + 1.0
+		var slack_squared := slack * slack
+		var reach_squared := size * size
+		# Worked out once, the first time a view draws it.
+		var counted := false
+		var base := 0
+		var x := Vector3.ZERO
+		var y := Vector3.ZERO
+		var z := Vector3.ZERO
+		var elite := 0.0
+		var warn := 0.0
+		for s in sets:
+			# Its distance from the nearest of this set's cameras that can see it (INF: none can).
+			var gap_squared := 0.0 if views == 0 else INF
+			var first := s if per_view else 0
+			var last := s + 1 if per_view else views
+			for v in range(first, last):
+				var off := at - _eyes[v]
+				var d_squared := off.length_squared()
+				if d_squared >= gap_squared:
+					continue
+				if frustum:
+					if d_squared > slack_squared and off.dot(_forwards[v]) + slack < sqrt(d_squared) * _cosines[v]:
+						continue  # behind this camera, or off to its side
+				gap_squared = d_squared
+			if glints and state == State.ALIVE and gap_squared > glint_near_squared and gap_squared < glint_far_squared:
+				var gap := sqrt(gap_squared)
+				var glow := glint_strength * clampf((gap - glint_near) / 6.0, 0.0, 1.0) * clampf((glint_far - gap) / glint_fade, 0.0, 1.0)
+				if glow > 0.01:
+					var e := glint_used[s] * STRIDE
+					glint_used[s] += 1
+					var eyes := _glint_buffers[s]
+					if e + STRIDE > eyes.size():
+						eyes.resize(maxi(eyes.size() * 2, STRIDE * 256))
+						_glint_buffers[s] = eyes
+					var scale := size * glint_size * (1.0 + gap / GLINT_GROW) * (1.6 if _elite[i] == 1 else 1.0)
+					var head := at - _axis_z[i] * size * 0.45
+					eyes[e] = scale
+					eyes[e + 1] = 0.0
+					eyes[e + 2] = 0.0
+					eyes[e + 3] = head.x
+					eyes[e + 4] = 0.0
+					eyes[e + 5] = scale
+					eyes[e + 6] = 0.0
+					eyes[e + 7] = head.y
+					eyes[e + 8] = 0.0
+					eyes[e + 9] = 0.0
+					eyes[e + 10] = scale
+					eyes[e + 11] = head.z
+					eyes[e + 12] = glow
+					eyes[e + 13] = 0.0
+					eyes[e + 14] = 0.0
+					eyes[e + 15] = 0.0
+			if gap_squared == INF or gap_squared > cull_squared:
+				continue  # behind this set's cameras, or lost in the murk
+			if not counted:
+				counted = true
+				drawn_count += 1
+				# The tail beats on (once a frame, however many views draw it).
+				var tail := _tail[i]
+				if frozen_left <= 0.0:
+					var effort := clampf(_velocity[i].length() / 10.0, 0.0, 1.0)
+					tail = fmod(tail + delta * lerpf(5.0, 15.0, effort), TAU)
+					_tail[i] = tail
+				# SchoolLook.pose_for(), inline: centre, right, centre, left.
+				var quarter := int(fposmod(tail, TAU) / (TAU / 4.0))
+				var pose := SchoolLook.CENTRE if quarter % 2 == 0 else (SchoolLook.RIGHT if quarter == 1 else SchoolLook.LEFT)
+				base = (_kind[i] * 3 + pose) * BANDS
+				x = _axis_x[i] * drawn_size
+				y = _axis_y[i] * drawn_size
+				z = _axis_z[i] * drawn_size
+				elite = float(_elite[i])
+				warn = warning if _mode[i] == Lunge.TELEGRAPH else 0.0
+			drawn_instances += 1
+			var band := 0 if gap_squared < mid_squared * reach_squared else (1 if gap_squared < far_squared * reach_squared else 2)
+			var look := s * _per_set + base + band
+			var k := _used[look] * STRIDE
+			_used[look] += 1
+			var buffer := _buffers[look]
+			if k + STRIDE > buffer.size():
+				buffer.resize(maxi(buffer.size() * 2, STRIDE * 64))
+				_buffers[look] = buffer
+				_grown[look] = 1
+			buffer[k] = x.x
+			buffer[k + 1] = y.x
+			buffer[k + 2] = z.x
+			buffer[k + 3] = at.x
+			buffer[k + 4] = x.y
+			buffer[k + 5] = y.y
+			buffer[k + 6] = z.y
+			buffer[k + 7] = at.y
+			buffer[k + 8] = x.z
+			buffer[k + 9] = y.z
+			buffer[k + 10] = z.z
+			buffer[k + 11] = at.z
+			buffer[k + 12] = flash
+			buffer[k + 13] = dead
+			buffer[k + 14] = elite
+			buffer[k + 15] = warn
 	for look in _looks.size():
-		var multimesh := _looks[look].multimesh
+		var instance := _looks[look]
+		var count := _used[look]
+		if instance.visible != (count > 0):
+			instance.visible = count > 0
+		if count == 0:
+			continue
+		var multimesh := instance.multimesh
 		var buffer := _buffers[look]
-		if grown[look] == 1 or multimesh.instance_count * STRIDE != buffer.size():
+		if _grown[look] == 1 or multimesh.instance_count * STRIDE != buffer.size():
 			multimesh.instance_count = buffer.size() / STRIDE
-		multimesh.visible_instance_count = used[look]
-		if used[look] > 0:
-			multimesh.buffer = buffer
+		multimesh.visible_instance_count = count
+		multimesh.buffer = buffer
+	glint_count = 0
+	for s in _glints.size():
+		var g := glint_used[s] if s < sets else 0
+		glint_count += g
+		if _glints[s].visible != (g > 0):
+			_glints[s].visible = g > 0
+		if g == 0:
+			continue
+		var eyes := _glints[s].multimesh
+		var buffer := _glint_buffers[s]
+		if eyes.instance_count * STRIDE != buffer.size():
+			eyes.instance_count = buffer.size() / STRIDE
+		eyes.visible_instance_count = g
+		eyes.buffer = buffer
+	view_sets = sets
 
 
-## One MultiMesh per kind per tail pose, with the rot overlay; the arena's size as bounds.
+## The cameras to draw for: every split-screen view (School.view_cameras), or
+## the viewport's own. None (a bare headless run): everything's drawn.
+func _find_views() -> void:
+	_eyes.clear()
+	_forwards.clear()
+	_cosines.clear()
+	_view_layers.clear()
+	var cameras: Array[Camera3D] = []
+	for camera in School.view_cameras:
+		if is_instance_valid(camera) and camera.is_inside_tree():
+			cameras.append(camera)
+	if cameras.is_empty() and is_inside_tree() and get_viewport().get_camera_3d():
+		cameras.append(get_viewport().get_camera_3d())
+	for camera in cameras:
+		_eyes.append(camera.global_position)
+		_forwards.append(-camera.global_basis.z)
+		var view := camera.get_viewport().get_visible_rect().size
+		var aspect := view.x / maxf(view.y, 1.0)
+		var across := tan(deg_to_rad(camera.fov) * 0.5)  # along the fov's own axis
+		var other := across * (aspect if camera.keep_aspect == Camera3D.KEEP_HEIGHT else 1.0 / maxf(aspect, 0.01))
+		var half := atan(sqrt(across * across + other * other))
+		_cosines.append(cos(minf(half + 0.05, PI * 0.5)))
+		var own := camera.cull_mask & TreasureChest.PLAYER_LAYERS
+		_view_layers.append(own if own != 0 and own & (own - 1) == 0 else 0)
+
+
+## A set per view: more than one view, each on its own player's layer.
+func _per_view() -> bool:
+	if not settings.per_view_horde or _eyes.size() < 2:
+		return false
+	var seen := 0
+	for layer in _view_layers:
+		if layer == 0 or seen & layer != 0:
+			return false
+		seen |= layer
+	return true
+
+
+## `sets` sets of looks built, each on its layer (its view's, or every view's).
+func _fit_sets(sets: int, per_view: bool) -> void:
+	while _glints.size() < sets:
+		_add_set()
+	for s in sets:
+		var layer := _view_layers[s] if per_view else 1
+		if _set_layers[s] == layer:
+			continue
+		_set_layers[s] = layer
+		for look in _per_set:
+			_looks[s * _per_set + look].layers = layer
+		_glints[s].layers = layer
+
+
+## Every look's meshes at the detail settings.lod_* ask for (when they change).
+func _fit_detail() -> void:
+	var errors := Vector3(settings.lod_near_error, settings.lod_mid_error, settings.lod_far_error)
+	if errors == _lod_errors:
+		return
+	_lod_errors = errors
+	for look in _looks.size():
+		var at := look % _per_set
+		var kind := at / (3 * BANDS)
+		var pose := (at / BANDS) % 3
+		_looks[look].multimesh.mesh = SchoolLook.detail_meshes(kinds[kind].family, errors[at % BANDS])[pose]
+
+
+## The rot overlays, and the first set of looks.
 func _build_looks() -> void:
 	for look in _looks:
 		look.queue_free()
+	for eyes in _glints:
+		eyes.queue_free()
 	_looks.clear()
 	_buffers.clear()
+	_glints.clear()
+	_glint_buffers.clear()
+	_set_layers.clear()
 	_overlays.clear()
-	var bounds := AABB(arena_centre - Vector3(1.0, 1.0, 1.0) * (settings.arena_radius + 50.0),
-			Vector3(2.0, 2.0, 2.0) * (settings.arena_radius + 50.0))
+	_per_set = kinds.size() * 3 * BANDS
 	for k in kinds.size():
 		var overlay := ShaderMaterial.new()
 		overlay.shader = OVERLAY_SHADER
 		overlay.set_shader_parameter("rot_color", kinds[k].tint)
 		_overlays.append(overlay)
-		var meshes := SchoolLook.meshes(kinds[k].family)
-		for pose in meshes.size():
-			var multimesh := MultiMesh.new()
-			multimesh.transform_format = MultiMesh.TRANSFORM_3D
-			multimesh.use_custom_data = true
-			multimesh.mesh = meshes[pose]
-			var buffer := PackedFloat32Array()
-			buffer.resize(STRIDE * 64)
-			multimesh.instance_count = 64
-			multimesh.visible_instance_count = 0
-			var look := MultiMeshInstance3D.new()
-			look.name = "%s%d" % [kinds[k].id.capitalize(), pose]
-			look.multimesh = multimesh
-			look.material_overlay = overlay
-			look.custom_aabb = bounds
-			look.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			add_child(look)
-			_looks.append(look)
-			_buffers.append(buffer)
+	_glint_material.shader = GLINT_SHADER
+	_add_set()
+
+
+## One more set of looks (a MultiMesh per kind per tail pose per band, with
+## the rot overlay) and eyes; the arena's size as bounds.
+func _add_set() -> void:
+	var s := _glints.size()
+	var bounds := AABB(arena_centre - Vector3(1.0, 1.0, 1.0) * (settings.arena_radius + 50.0),
+			Vector3(2.0, 2.0, 2.0) * (settings.arena_radius + 50.0))
+	_lod_errors = Vector3(settings.lod_near_error, settings.lod_mid_error, settings.lod_far_error)
+	for k in kinds.size():
+		var meshes: Array[Array] = []
+		for band in BANDS:
+			meshes.append(SchoolLook.detail_meshes(kinds[k].family, _lod_errors[band]))
+		for pose in 3:
+			for band in BANDS:
+				var multimesh := MultiMesh.new()
+				multimesh.transform_format = MultiMesh.TRANSFORM_3D
+				multimesh.use_custom_data = true
+				multimesh.mesh = meshes[band][pose]
+				var buffer := PackedFloat32Array()
+				buffer.resize(STRIDE * 64)
+				multimesh.instance_count = 64
+				multimesh.visible_instance_count = 0
+				var look := MultiMeshInstance3D.new()
+				look.name = "%s%d%s%s" % [kinds[k].id.capitalize(), pose, "NMF"[band], "" if s == 0 else str(s)]
+				look.multimesh = multimesh
+				look.material_overlay = _overlays[k]
+				look.custom_aabb = bounds
+				look.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				look.visible = false
+				add_child(look)
+				_looks.append(look)
+				_buffers.append(buffer)
+	var eyes := MultiMesh.new()
+	eyes.transform_format = MultiMesh.TRANSFORM_3D
+	eyes.use_custom_data = true
+	eyes.mesh = _eyes_mesh()
+	eyes.instance_count = 256
+	eyes.visible_instance_count = 0
+	var glints := MultiMeshInstance3D.new()
+	glints.name = "Glints" if s == 0 else "Glints%d" % s
+	glints.multimesh = eyes
+	glints.material_override = _glint_material
+	glints.custom_aabb = bounds
+	glints.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	glints.visible = false
+	add_child(glints)
+	_glints.append(glints)
+	var buffer := PackedFloat32Array()
+	buffer.resize(STRIDE * 256)
+	_glint_buffers.append(buffer)
+	_set_layers.append(1)
+
+
+## Two unit quads side by side (the eyes), GLINT_APART either side of the middle.
+static func _eyes_mesh() -> ArrayMesh:
+	var points := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	for side: float in [-GLINT_APART, GLINT_APART]:
+		for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+			points.append(Vector3(side + corner.x, corner.y, 0.0))
+			uvs.append(corner * 0.5 + Vector2(0.5, 0.5))
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = points
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh

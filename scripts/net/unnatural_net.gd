@@ -7,17 +7,20 @@ extends Node
 ##
 ## The host (UnnaturalRun.authority) runs the world, and sends:
 ## - every zombie that comes, each frame's in one batch ([net id, kind, where,
-##   heading, elite]), and every one killed ([net id, source, killer]) or taken
-##   away; each machine steers its copies itself;
+##   heading, elite, difficulty level]), and every one killed ([net id, source,
+##   killer]) or taken away; each machine steers its copies itself;
 ## - CORRECT_RATE times a second, where the zombies near any guest's players
 ##   are (the nearest MAX_CORRECT, within NEAR), with the run's clock and the
 ##   team's level and XP;
-## - chests buried and opened, bosses coming (with their proxies' net ids),
+## - chests buried or dropped, and who opened which (each player opens each
+##   chest for themselves); drops (hearts, magnets, hourglasses) and who took
+##   them (every machine applies it); bosses coming (with their proxies' net ids),
 ##   their state BOSS_RATE times a second, the Leviathan's bolts, and their end;
 ## - XP pearls taken (so every copy goes).
 ## A guest sends its players' hits (each frame's in one batch: the host
 ## applies them; its own copies never die until the host says), the XP pearls
-## they take (the host counts each once), and the chests they open. Each
+## they take (the host counts each once), the drops they touch (the first
+## claim gets it), and the chests they open. Each
 ## machine says when its own players go down or are revived; contact damage is
 ## always judged by the hurt player's own machine.
 
@@ -34,6 +37,8 @@ var _out_deaths := []
 var _out_removes := PackedInt32Array()
 var _out_hits := []
 var _correct_left := 0.0
+## Chest opens from the world whose player's puppet isn't here yet: [chest, pid].
+var _unresolved := []
 var _boss_left := 0.0
 
 
@@ -54,6 +59,7 @@ func hook(game_run: UnnaturalRun) -> void:
 	_out_deaths.clear()
 	_out_removes.clear()
 	_out_hits.clear()
+	_unresolved.clear()
 	if run.authority:
 		run.horde.spawned.connect(_on_spawned)
 		run.horde.killed.connect(_on_killed)
@@ -63,10 +69,13 @@ func hook(game_run: UnnaturalRun) -> void:
 		run.chest_opened.connect(_on_chest_opened)
 		run.boss_arrived.connect(_on_boss_arrived)
 		run.boss_defeated.connect(_on_boss_defeated)
+		run.pickup_dropped.connect(_on_pickup_dropped)
+		run.pickup_taken.connect(_on_pickup_taken)
 	else:
 		run.hit_claimed.connect(_on_hit_claimed)
 		run.pearl_claimed.connect(_on_pearl_claimed)
 		run.chest_claimed.connect(_on_chest_claimed)
+		run.pickup_claimed.connect(_on_pickup_claimed)
 	run.player_down.connect(_on_down.bind(true))
 	run.player_revived.connect(_on_down.bind(false))
 
@@ -99,6 +108,13 @@ func _pid(fish: Object) -> int:
 func tick(delta: float) -> void:
 	if run == null or not is_instance_valid(run):
 		return
+	for n in range(_unresolved.size() - 1, -1, -1):
+		var chest: TreasureChest = _unresolved[n][0] if is_instance_valid(_unresolved[n][0]) else null
+		var fish := coop.fish_of(_unresolved[n][1]) if chest else null
+		if chest == null or fish:
+			if fish:
+				chest.open_for(fish, run.layer_of(fish))
+			_unresolved.remove_at(n)
 	if not _out_spawns.is_empty():
 		_send_all("_spawns", [_out_spawns], true)
 		_out_spawns = []
@@ -157,7 +173,7 @@ func _on_spawned(index: int) -> void:
 	if run.horde.is_proxy(index):
 		return  # a boss's: sent with the boss
 	_out_spawns.append([run.horde.net_id_of(index), run.horde.enemy_kind_index(index), run.horde.enemy_position(index),
-			run.horde.enemy_velocity(index), run.horde.is_elite(index)])
+			run.horde.enemy_velocity(index), run.horde.is_elite(index), run.horde.enemy_level(index)])
 
 
 func _on_killed(index: int, _kind: int, _at: Vector3, source: String, by: Object) -> void:
@@ -173,11 +189,19 @@ func _on_pearl_taken(id: int) -> void:
 
 
 func _on_chest_buried(chest: TreasureChest) -> void:
-	_send_all("_chest", [chest.position, chest.rotation.y], true)
+	_send_all("_chest", [chest.position, chest.rotation.y, chest.sink_to, chest.kind, chest.item], true)
 
 
-func _on_chest_opened(chest: TreasureChest, _fish: FishController) -> void:
-	_send_all("_chest_opened", [run.chests.find(chest)], true)
+func _on_chest_opened(chest: TreasureChest, fish: FishController) -> void:
+	_send_all("_chest_opened", [run.chests.find(chest), _pid(fish)], true)
+
+
+func _on_pickup_dropped(pickup: Pickup) -> void:
+	_send_all("_drop", [pickup.id, pickup.kind, pickup.position], true)
+
+
+func _on_pickup_taken(id: int, kind: int, by: FishController) -> void:
+	_send_all("_drop_taken", [id, kind, _pid(by)], true)
 
 
 func _on_boss_arrived(boss: Boss) -> void:
@@ -214,6 +238,10 @@ func _on_chest_claimed(index: int, by: FishController) -> void:
 	_send_host("_claim_chest", [index, _pid(by)], true)
 
 
+func _on_pickup_claimed(id: int, by: FishController) -> void:
+	_send_host("_claim_drop", [id, _pid(by)], true)
+
+
 # --- Joining ---------------------------------------------------------------
 
 ## The world as it is now, for a guest joining (the host's).
@@ -222,10 +250,21 @@ func world() -> Dictionary:
 	for i in run.horde.alive:
 		if not run.horde.is_proxy(i):
 			zombies.append([run.horde.net_id_of(i), run.horde.enemy_kind_index(i), run.horde.enemy_position(i),
-					run.horde.enemy_velocity(i), run.horde.is_elite(i)])
+					run.horde.enemy_velocity(i), run.horde.is_elite(i), run.horde.enemy_level(i)])
+	# Each: where, its turn, where it sinks to, who's opened it, and whether it's gone.
 	var chests := []
 	for chest in run.chests:
-		chests.append([chest.position, chest.rotation.y, chest.opened] if is_instance_valid(chest) else [Vector3.ZERO, 0.0, true])
+		if is_instance_valid(chest) and not chest.is_queued_for_deletion():
+			var opened := []  # player ids are 64-bit (peer x 100 + slot)
+			for fish in chest.opened_by:
+				opened.append(_pid(fish))
+			chests.append([chest.position, chest.rotation.y, chest.sink_to, opened, false, chest.kind, chest.item])
+		else:
+			chests.append([Vector3.ZERO, 0.0, -INF, [], true, 0, ""])
+	var drops := []
+	for pickup in run.pickups:
+		if is_instance_valid(pickup):
+			drops.append([pickup.id, pickup.kind, pickup.position])
 	var bosses := []
 	for boss in run.bosses:
 		if is_instance_valid(boss) and not boss.dying:
@@ -234,7 +273,8 @@ func world() -> Dictionary:
 				parts.append(run.horde.net_id_of(index))
 			bosses.append(["miniboss" if boss is DrownedShark else "boss", boss.boss_id, parts, boss.hp, boss.max_hp,
 					boss.global_position, boss.net_state()])
-	return {"mode": "unnatural", "zombies": zombies, "chests": chests, "bosses": bosses, "elapsed": run.elapsed,
+	return {"mode": "unnatural", "zombies": zombies, "chests": chests, "drops": drops, "frozen": run.horde.frozen_left,
+			"bosses": bosses, "elapsed": run.elapsed,
 			"level": run.levels.level, "xp": run.levels.xp, "kills": run.kills, "over": run.is_over, "won": run.stage_complete}
 
 
@@ -243,9 +283,19 @@ func apply_world(state: Dictionary) -> void:
 	run.horde.clear()
 	_spawn_all(state.zombies)
 	for entry: Array in state.chests:
-		var chest := run.add_chest(entry[0], entry[1])
-		if entry[2]:
-			chest.open()
+		var chest := run.add_chest(entry[0], entry[1], entry[2], (entry[5] if entry.size() > 5 else 0) as TreasureChest.Kind, entry[6] if entry.size() > 6 else "")
+		if entry[4]:
+			chest.vanish()
+			continue
+		for pid: int in entry[3]:
+			var fish := coop.fish_of(pid)
+			if fish:
+				chest.open_for(fish, run.layer_of(fish))
+			else:
+				_unresolved.append([chest, pid])  # their puppet comes with the roster
+	for entry: Array in state.get("drops", []):
+		run.drop_pickup(entry[1], entry[2], entry[0])
+	run.horde.freeze(state.get("frozen", 0.0))
 	for entry: Array in state.bosses:
 		var boss := run.add_puppet_boss(entry[0], entry[1], entry[2], entry[3], entry[4], entry[5])
 		boss.set_net_state(entry[6], coop.rtt / 2.0)
@@ -259,7 +309,7 @@ func apply_world(state: Dictionary) -> void:
 func _spawn_all(entries: Array) -> void:
 	for entry: Array in entries:
 		if run.horde.index_of_net(entry[0]) < 0:
-			run.horde.spawn(entry[1], entry[2], entry[3], entry[4], false, entry[0])
+			run.horde.spawn(entry[1], entry[2], entry[3], entry[4], false, entry[0], entry[5] if entry.size() > 5 else 0.0)
 
 
 # --- Guest side ------------------------------------------------------------
@@ -319,15 +369,31 @@ func _pearl_taken(id: int) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _chest(at: Vector3, turn: float) -> void:
+func _chest(at: Vector3, turn: float, sink_to: float, kind: int, item: String) -> void:
 	if _guest_run():
-		run.add_chest(at, turn)
+		run.add_chest(at, turn, sink_to, kind as TreasureChest.Kind, item)
 
 
 @rpc("authority", "call_remote", "reliable")
-func _chest_opened(index: int) -> void:
+func _chest_opened(index: int, pid: int) -> void:
 	if _guest_run():
-		run.apply_chest_opened(index)
+		run.apply_chest_opened(index, coop.fish_of(pid))
+
+
+@rpc("authority", "call_remote", "reliable")
+func _drop(id: int, kind: int, at: Vector3) -> void:
+	if _guest_run() and run.pickup_by_id(id) == null:
+		run.drop_pickup(kind, at, id)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _drop_taken(id: int, kind: int, pid: int) -> void:
+	if not _guest_run():
+		return
+	var pickup := run.pickup_by_id(id)
+	if pickup:
+		pickup.vanish()
+	run.apply_pickup(kind, coop.fish_of(pid))
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -385,13 +451,14 @@ func _claim_pearl(id: int, pid: int, xp: float) -> void:
 func _claim_chest(index: int, pid: int) -> void:
 	if not is_host() or index < 0 or index >= run.chests.size():
 		return
-	var chest := run.chests[index]
-	if is_instance_valid(chest) and not chest.opened:
-		chest.open()
-		var fish := coop.fish_of(pid)
-		if fish:
-			run.stats_of(fish)["chests"] = run.stats_of(fish).get("chests", 0) + 1
-	_send_all("_chest_opened", [index], true)
+	run.apply_chest_opened(index, coop.fish_of(pid))
+	_send_all("_chest_opened", [index, pid], true)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _claim_drop(id: int, pid: int) -> void:
+	if is_host():
+		run.confirm_pickup(id, coop.fish_of(pid))  # its pickup_taken goes out to everyone
 
 
 # --- Everyone --------------------------------------------------------------

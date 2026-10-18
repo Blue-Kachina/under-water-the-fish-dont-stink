@@ -43,6 +43,9 @@ const SIGNATURE := {
 }
 
 var values := {}
+## What powerups add on top (Powerups keeps it up to date): Hermit Shell's max
+## hp, Barnacle Plating's armour...
+var bonus := {}
 
 
 func _init() -> void:
@@ -56,11 +59,11 @@ func reset() -> void:
 
 
 func value(id: String) -> float:
-	return values.get(id, 0.0)
+	return values.get(id, 0.0) + bonus.get(id, 0.0)
 
 
 func add(id: String, amount: float) -> void:
-	values[id] = value(id) + amount
+	values[id] = values.get(id, 0.0) + amount
 
 
 ## What one card of `id` at `multiplier` (its rarity's) gives. Whole stats

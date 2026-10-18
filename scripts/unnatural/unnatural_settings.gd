@@ -33,6 +33,56 @@ static func shared() -> UnnaturalSettings:
 ## Rocks and kelp on the seabed (how many of each).
 @export_range(0, 2000, 10, "or_greater") var seabed_rocks := 260
 @export_range(0, 4000, 10, "or_greater") var seabed_kelp := 600
+## The arena's edge, so it reads from far off: tall rock outcrops and a thick
+## band of tall kelp round it (and a faint red wall of light), from the seabed
+## to the top of the depth band.
+@export_range(0, 1000, 5, "or_greater") var edge_rocks := 90
+@export_range(0, 8000, 10, "or_greater") var edge_kelp := 900
+
+@export_group("Murk")
+## Murky water (planning_murk.md): the fog's density in the arena (0: the
+## ocean's own, with the blood moon's). The edge's thickening goes on top.
+## At 0.035 the fog is 50% at 20 m, 85% at 55 m and 95% at 86 m.
+@export_range(0.0, 0.2, 0.001, "or_greater") var murk_density := 0.035
+## How much of the sky the fog covers while it's murky (1: all of it, so
+## nothing fogged out stands against the sky).
+@export_range(0.0, 1.0, 0.05) var murk_sky := 1.0
+## Zombies are drawn only while the fog over them is under this (1: always
+## drawn): -ln(1 - murk_cull) / density metres from the camera, plus
+## murk_cull_margin. 0.98 at 0.035 is about 112 m.
+@export_range(0.5, 1.0, 0.005) var murk_cull := 0.98
+@export_range(0.0, 100.0, 1.0, "or_greater") var murk_cull_margin := 5.0
+## Zombies behind every camera aren't drawn either.
+@export var murk_frustum := true
+## Zombies where the fog over them is this thick or more (from every player)
+## steer only every far_update_divisor-th step, instead of past far_distance
+## (0: far_distance). 0.85 at 0.035 is about 54 m.
+@export_range(0.0, 0.999, 0.01) var murk_far := 0.85
+## With murk, packs may turn up in view too (in the murk, all round you), not
+## only out of every player's view.
+@export var murk_spawn_anywhere := true
+## Red eyes in the dark: zombies from where the fog is glint_from thick out to
+## glint_distance (m; 0: none) show a pair of glowing eyes through the murk,
+## fading with distance.
+@export_range(0.0, 1.0, 0.05) var glint_from := 0.8
+@export_range(0.0, 600.0, 5.0, "or_greater") var glint_distance := 170.0
+@export_range(0.0, 5.0, 0.05, "or_greater") var glint_strength := 1.0
+## Each eye's size (m), times the zombie's size.
+@export_range(0.01, 1.0, 0.01, "or_greater") var glint_size := 0.09
+
+@export_group("Minimap")
+## A flat map in the corner of each player's view: players and bosses as
+## icons, elites as dots, the zombie swarms as faint clouds, and chests.
+@export var minimap := true
+## Its size (a share of the view's height).
+@export_range(0.05, 0.6, 0.01) var minimap_size := 0.26
+## How far it shows (m, centre to rim; 0: the whole arena).
+@export_range(0.0, 1000.0, 5.0, "or_greater") var minimap_range := 90.0
+## The way you face is up (off: north is up).
+@export var minimap_heading_up := true
+## How often the swarm clouds are redrawn (per second).
+@export_range(1.0, 60.0, 1.0) var minimap_rate := 6.0
+@export_range(0.1, 1.0, 0.05) var minimap_opacity := 0.85
 
 @export_group("Camera")
 ## The survivor cam: it follows the way the fish swims (smoothed), not its
@@ -42,15 +92,19 @@ static func shared() -> UnnaturalSettings:
 ## Follow turns with the way the fish swims. Free turns only with the right
 ## stick, and stays where it's put.
 @export_enum("Follow", "Free") var camera_mode := 0
-## Follow cam: hold its direction while accelerate or reverse is held, and turn
-## to the way the fish swims once they're let go. Off: it always turns.
+## Follow cam: hold its direction while accelerate, reverse or boost is held, and
+## swing round behind the fish once they're let go, this quickly (1/s). Off: it
+## always turns, at camera_turn_rate.
 @export var camera_hold_on_throttle := true
+@export_range(0.2, 30.0, 0.1, "or_greater") var camera_swing_rate := 4.0
 ## Free cam: how fast the right stick turns it at full tilt (degrees/s), how
 ## far it can look up or down (degrees), and how quickly it drifts round
 ## behind the way the fish swims (1/s; 0: never, it stays where it's put).
 @export_range(10.0, 720.0, 5.0, "or_greater") var free_cam_speed := 150.0
 @export_range(0.0, 89.0, 1.0) var free_cam_pitch := 70.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var free_cam_follow := 0.0
+## Free cam: down on the right stick looks up, as a flight sim (D11).
+@export var free_cam_invert_y := true
 ## How quickly it turns to the way the fish swims (1/s; lower is calmer).
 @export_range(0.1, 20.0, 0.1, "or_greater") var camera_turn_rate := 2.0
 ## How much of the fish's climb or dive it follows (0: always level).
@@ -73,9 +127,10 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 100.0, 0.5, "or_greater") var swarm_per_minute := 4.0
 ## ...at most one pack every this many seconds.
 @export_range(0.05, 20.0, 0.05, "or_greater") var spawn_interval := 1.2
-## Packs turn up this far from a player (m), out of every player's view.
-@export_range(5.0, 200.0, 1.0, "or_greater") var spawn_distance_min := 28.0
-@export_range(5.0, 300.0, 1.0, "or_greater") var spawn_distance_max := 45.0
+## Packs turn up this far from a player (m): out of every player's view, or
+## anywhere round them in the murk (murk_spawn_anywhere).
+@export_range(5.0, 200.0, 1.0, "or_greater") var spawn_distance_min := 35.0
+@export_range(5.0, 300.0, 1.0, "or_greater") var spawn_distance_max := 55.0
 ## A zombie further than this from every player (m) is moved to a spawn point
 ## near them (not killed and respawned), keeping the pressure on.
 @export_range(20.0, 600.0, 5.0, "or_greater") var leash := 90.0
@@ -103,6 +158,16 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 10.0, 0.05, "or_greater") var enemy_hp_scale := 1.0
 @export_range(0.0, 5.0, 0.05, "or_greater") var enemy_speed_scale := 1.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var enemy_damage_scale := 1.0
+## Difficulty: a level that grows difficulty_per_minute a minute. Each zombie
+## keeps the level it spawned at: per level, difficulty_hp more hp,
+## difficulty_damage more contact damage, difficulty_speed more speed, and
+## difficulty_size bigger, up to difficulty_size_max times its size.
+@export_range(0.0, 5.0, 0.05, "or_greater") var difficulty_per_minute := 0.5
+@export_range(0.0, 5.0, 0.01, "or_greater") var difficulty_hp := 0.3
+@export_range(0.0, 5.0, 0.01, "or_greater") var difficulty_damage := 0.15
+@export_range(0.0, 2.0, 0.01, "or_greater") var difficulty_speed := 0.04
+@export_range(0.0, 2.0, 0.01, "or_greater") var difficulty_size := 0.08
+@export_range(1.0, 10.0, 0.05, "or_greater") var difficulty_size_max := 2.0
 ## Zombies closer than this (m, edge to edge) push apart, this hard (m/s² at contact).
 @export_range(0.0, 10.0, 0.05, "or_greater") var separation := 0.6
 @export_range(0.0, 200.0, 1.0, "or_greater") var separation_strength := 18.0
@@ -364,6 +429,25 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 10.0, 0.1, "or_greater") var chest_open_time := 2.0
 ## A chest offers this many powerups (different ones) to pick from.
 @export_range(1, 4, 1) var chest_choices := 3
+## A buried chest's chance of being cursed (blood red): it offers cursed
+## powerups, strong with a catch. Luck doesn't change it (D13).
+@export_range(0.0, 1.0, 0.01) var cursed_chest_chance := 0.1
+## Each kill has this chance of dropping a chest (an elite's: 5x), times 1 +
+## the killer's luck x chest_drop_luck (which lifts the drops' chances too).
+## Every chest is every player's: each opens it for themselves.
+@export_range(0.0, 1.0, 0.0005) var chest_drop_chance := 0.006
+@export_range(0.0, 20.0, 0.1, "or_greater") var chest_drop_luck := 2.0
+
+@export_group("Drops")
+## A kill's chance of dropping a heart (heals the whole team heart_heal of max
+## hp), a magnet (every XP pearl out flies to the taker) or an hourglass
+## (every zombie stops dead for hourglass_time s; bosses don't). An elite's:
+## 5x. The first player to touch one takes it.
+@export_range(0.0, 1.0, 0.0005) var heart_chance := 0.004
+@export_range(0.0, 1.0, 0.01) var heart_heal := 0.5
+@export_range(0.0, 1.0, 0.0005) var magnet_chance := 0.0015
+@export_range(0.0, 1.0, 0.0005) var hourglass_chance := 0.002
+@export_range(0.0, 120.0, 0.5, "or_greater") var hourglass_time := 15.0
 
 @export_group("Rarity")
 ## Each card's rarity: these base weights, each times (1 + luck * luck_effect) ^ tier.
@@ -384,13 +468,13 @@ static func shared() -> UnnaturalSettings:
 ## Pearls this near a fish (m) are drawn in: the pickup range.
 @export_range(0.0, 60.0, 0.5, "or_greater") var pickup_range := 7.0
 @export_range(0.0, 100.0, 0.5, "or_greater") var pickup_pull := 12.0
-## How long (s) an XP pearl waits before fading away.
-@export_range(1.0, 600.0, 1.0, "or_greater") var pearl_lifetime := 60.0
+## XP pearls never fade: they wait until someone takes them.
 @export_range(0.05, 3.0, 0.01, "or_greater") var pearl_size := 0.18
 ## Each pearl's own light (pretty, but costly with hundreds out).
 @export var pearl_lights := false
-## At most this many pearls out; past it, a new drop adds its XP to the oldest.
-@export_range(10, 2000, 10, "or_greater") var max_pearls := 300
+## At most this many pearls out; past it, a new drop adds its XP to the
+## nearest pearl, which grows with what it holds.
+@export_range(10, 4000, 10, "or_greater") var max_pearls := 600
 
 @export_group("Test Tank")
 ## The Test Tank's dummies' hp (applies on R), and whether they drift towards
@@ -436,5 +520,34 @@ static func shared() -> UnnaturalSettings:
 @export_range(1, 16, 1) var far_update_divisor := 4
 ## Zombies cast shadows.
 @export var enemy_shadows := false
+## Zombie detail by distance from the camera (scaled by their size): each part
+## of a fish at its coarsest LOD within the error (a share of the part's size;
+## 0: full detail). lod_near_error out to lod_mid_distance m, lod_mid_error out
+## to lod_far_distance m, lod_far_error beyond.
+@export_range(0.0, 0.2, 0.001, "or_greater") var lod_near_error := 0.004
+@export_range(0.0, 200.0, 1.0, "or_greater") var lod_mid_distance := 12.0
+@export_range(0.0, 0.5, 0.001, "or_greater") var lod_mid_error := 0.02
+@export_range(0.0, 400.0, 1.0, "or_greater") var lod_far_distance := 30.0
+@export_range(0.0, 1.0, 0.001, "or_greater") var lod_far_error := 0.1
+## Split-screen: each view draws only the zombies its own camera sees (on its
+## player's render layer), rather than every view drawing what any of them sees.
+@export var per_view_horde := true
 ## Show the director's live numbers (target alive, alive, next pack) on the HUD.
 @export var show_director := false
+
+
+## The fog's amount `distance` m out at `density` (Godot's exponential fog).
+static func fog_at(distance: float, density: float) -> float:
+	return 1.0 - exp(-maxf(distance, 0.0) * maxf(density, 0.0))
+
+
+## How far out the fog reaches `amount` at `density` (INF: never).
+static func fog_reach(amount: float, density: float) -> float:
+	if density <= 0.0 or amount >= 1.0:
+		return INF
+	return -log(1.0 - clampf(amount, 0.0, 0.999999)) / density
+
+
+## Murk is on (a density set).
+func murky() -> bool:
+	return murk_density > 0.0

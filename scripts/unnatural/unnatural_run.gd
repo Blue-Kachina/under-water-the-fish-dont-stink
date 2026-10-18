@@ -96,7 +96,16 @@ signal pearl_claimed(id: int, by: FishController, xp: float)
 signal chest_claimed(index: int, by: FishController)
 ## The host's: an XP pearl taken (so the guests' copies go), a chest buried.
 signal pearl_taken(id: int)
+## Drops (Pickup), online: one dropped here (the host's), one taken here (the
+## host's word: everyone applies it), and one a guest's player touched (to the host).
+signal pickup_dropped(pickup: Pickup)
+signal pickup_taken(id: int, kind: int, by: FishController)
+signal pickup_claimed(id: int, by: FishController)
 signal chest_buried(chest: TreasureChest)
+## A drop took effect (for the HUD's note).
+signal drop_taken(kind: int, by: FishController)
+## The Sunken Idol took a stack of powerup `id` from `fish` (a stage event).
+signal powerup_lost(fish: FishController, id: String)
 
 ## Players spawn side by side, this far apart (m).
 const SPAWN_SPACING := 3.0
@@ -110,6 +119,8 @@ const SPAWN_HIDDEN := 0.3
 const FLICKER_RATE := 16.0
 ## An elite's XP pearl is worth this many times its kind's.
 const ELITE_XP := 5.0
+## An elite's kill is this many times likelier to drop a chest or a pickup.
+const ELITE_CHEST := 5.0
 ## A beaten boss's XP pearl's id: this minus the boss's (zombies' are their net ids).
 const BOSS_PEARL := 2000000000
 
@@ -146,6 +157,12 @@ var is_over := false
 ## Zombies killed by the team this run.
 var kills := 0
 var pearls_out: Array[Pearl] = []
+## Hearts, magnets and hourglasses out (Pickup).
+var pickups: Array[Pickup] = []
+## Decoys the horde chases as well as the players (Anglerfish Lure's lures,
+## each with a `pull`, see Horde.target_pull). Freed ones drop out.
+var decoys: Array[Node3D] = []
+var _next_pickup_id := 1
 ## The arena's middle (the ocean's spawn).
 var centre := Vector3.ZERO
 
@@ -160,6 +177,8 @@ var _blocks := {}
 var _powerups := {}
 var _pending := {}
 var _chest_pending := {}
+## Sunken Idol's extra picks left from the chest `fish` has up.
+var _extra_picks := {}
 var _offers := {}
 var _offer_kind := {}
 var _opening := {}
@@ -207,7 +226,8 @@ func _ready() -> void:
 	seabed.name = "Seabed"
 	seabed.position = centre + Vector3.UP * settings.arena_floor
 	add_child(seabed)
-	seabed.setup(settings.arena_radius, settings.seabed_rocks, settings.seabed_kelp)
+	seabed.setup(settings.arena_radius, settings.seabed_rocks, settings.seabed_kelp, 11, settings.edge_rocks, settings.edge_kelp,
+			settings.arena_ceiling - settings.arena_floor + 5.0)
 	blood_moon = BloodMoon.new()
 	blood_moon.name = "BloodMoon"
 	blood_moon.ocean = ocean
@@ -215,6 +235,7 @@ func _ready() -> void:
 	blood_moon.radius = settings.arena_radius
 	blood_moon.surface_height = centre.y + settings.arena_ceiling + 6.0
 	blood_moon.strength = settings.blood_moon
+	blood_moon.settings = settings
 	add_child(blood_moon)
 	ocean.boundary_center = centre
 	ocean.boundary_radius = settings.arena_radius
@@ -236,6 +257,7 @@ func start() -> void:
 	_offer_kind.clear()
 	_pending.clear()
 	_chest_pending.clear()
+	_extra_picks.clear()
 	_opening.clear()
 	_revive.clear()
 	_bury_chests()
@@ -254,6 +276,10 @@ func start() -> void:
 		if is_instance_valid(pearl):
 			pearl.queue_free()
 	pearls_out.clear()
+	for pickup in pickups:
+		if is_instance_valid(pickup):
+			pickup.queue_free()
+	pickups.clear()
 	if tank:
 		tank.start()
 	var spawn: Transform3D = ocean.spawn_transform()
@@ -329,9 +355,11 @@ static func steady_camera(camera: Node, on: bool, from: UnnaturalSettings) -> vo
 		camera.set_meta("survivor_mode", from.camera_mode)
 		camera.set("free_cam", from.camera_mode == 1)
 	camera.set("hold_on_throttle", from.camera_hold_on_throttle)
+	camera.set("swing_rate", from.camera_swing_rate)
 	camera.set("free_turn_speed", deg_to_rad(from.free_cam_speed))
 	camera.set("free_pitch_limit", deg_to_rad(from.free_cam_pitch))
 	camera.set("free_follow_rate", from.free_cam_follow)
+	camera.set("free_invert_y", from.free_cam_invert_y)
 	camera.set("steady_heading", steady)
 	camera.set("heading_rate", from.camera_turn_rate)
 	camera.set("heading_climb", from.camera_climb)
@@ -375,7 +403,8 @@ func max_hp() -> float:
 
 ## `fish`'s max hp: the team's level's, plus their Max HP cards.
 func max_hp_of(fish: FishController) -> float:
-	return max_hp() + block_of(fish).value("max_hp")
+	var scale: float = (_powerups[fish] as Powerups).max_hp_scale() if _powerups.has(fish) else 1.0  # Glass Coral
+	return maxf((max_hp() + block_of(fish).value("max_hp")) * scale, 1.0)
 
 
 ## `fish`'s stats (StatBlock).
@@ -548,6 +577,10 @@ func _physics_process(delta: float) -> void:
 	if not is_over:
 		elapsed += delta
 	_update_targets()
+	if is_instance_valid(blood_moon):
+		horde.apply_murk(blood_moon.fog_density() if settings.murky() else 0.0)
+		if is_instance_valid(seabed):
+			seabed.set_murk(settings.murk_density)
 	if not tank and not is_over:
 		timeline.update(elapsed)  # a guest's only announces (the host's elapsed corrects ours)
 	if tank:
@@ -560,8 +593,9 @@ func _physics_process(delta: float) -> void:
 		director.elapsed = elapsed
 		director.players = maxi(around.size(), 1)
 		director.hushed = timeline.hushed(elapsed)
-		director.escalation = settings.enrage_scale if enraged else 1.0
+		director.escalation = (settings.enrage_scale if enraged else 1.0) * horde_scale()
 		director.update(delta, around)
+		horde.difficulty = difficulty()
 		_relocate_strays(delta)
 	for fish in local_players():
 		var health: FishHealth = _health.get(fish)
@@ -595,6 +629,20 @@ func _physics_process(delta: float) -> void:
 	_sync_pearls()
 
 
+## How many more zombies the players' curses call (Siren's Song): 1 without.
+func horde_scale() -> float:
+	var scale := 1.0
+	for fish: FishController in _powerups:
+		if is_instance_valid(fish):
+			scale *= (_powerups[fish] as Powerups).horde_scale()
+	return scale
+
+
+## The difficulty level zombies spawn at now (difficulty_per_minute a minute).
+func difficulty() -> float:
+	return maxf(elapsed / 60.0 * settings.difficulty_per_minute, 0.0)
+
+
 ## The horde chases every player who's up.
 func _update_targets() -> void:
 	var at := PackedVector3Array()
@@ -609,9 +657,21 @@ func _update_targets() -> void:
 			at[i] = fish.global_position
 			moving[i] = fish.swim_velocity()
 			chaseable[i] = 1 if is_up(fish) and not is_over and not is_picking(fish) else 0
+	var pull := PackedFloat32Array()
+	pull.resize(players.size())
+	pull.fill(1.0)
+	for k in range(decoys.size() - 1, -1, -1):
+		if not is_instance_valid(decoys[k]):
+			decoys.remove_at(k)
+	for decoy in decoys:
+		at.append(decoy.global_position)
+		moving.append(Vector3.ZERO)
+		chaseable.append(0 if is_over else 1)
+		pull.append(decoy.get("pull"))
 	horde.targets = at
 	horde.target_velocities = moving
 	horde.chaseable = chaseable
+	horde.target_pull = pull
 
 
 ## Hurts zombie `index` by `amount` from `source`, credited to `by`: every
@@ -703,6 +763,7 @@ func _touch_zombies(fish: FishController) -> void:
 	var health: FishHealth = _health[fish]
 	if health.iframes_left > 0.0 or settings.enemy_damage_scale <= 0.0:
 		return
+	var frozen := horde.is_frozen()  # the Hourglass: the frozen don't bite (bosses still do)
 	var at := fish.global_position
 	var battering := fish.speed >= fish.nature_batter_speed
 	var nose := -fish.global_basis.z
@@ -711,11 +772,13 @@ func _touch_zombies(fish: FishController) -> void:
 		if battering and offset.length_squared() > 0.0001 and offset.normalized().dot(nose) >= Battery.FRONT:
 			continue  # it's being battered, not biting
 		var kind := horde.enemy_kind(i)
-		var amount := kind.contact_damage * settings.enemy_damage_scale * (2.0 if horde.is_elite(i) else 1.0)
+		var amount := kind.contact_damage * settings.enemy_damage_scale * (2.0 if horde.is_elite(i) else 1.0) * horde.damage_scale(i)
 		var boss := boss_at(i)
 		if boss:
 			amount = boss.contact()
-		if not hurt(fish, amount):
+		elif frozen:
+			continue
+		if not hurt(fish, amount, i):
 			return
 		var away := offset.normalized() if offset.length_squared() > 0.0001 else -nose
 		horde.damage(i, 0.0, "contact", null, away)  # knocked back off the fish
@@ -730,17 +793,31 @@ func _touch_clouds(fish: FishController) -> void:
 			return
 
 
-## `fish` takes `amount` (unless in i-frames), then i-frames. Returns whether it hurt.
-func hurt(fish: FishController, amount: float) -> bool:
+## `fish` takes `amount` (unless in i-frames), then i-frames. Returns whether
+## it hurt. `from`: the zombie whose touch it was (-1: something else), for
+## powerups that answer it (Pufferfish Spines). A powerup may take the hit
+## instead (Bubble Wrap): then it's i-frames, and no hurt.
+func hurt(fish: FishController, amount: float, from := -1) -> bool:
 	if amount <= 0.0:
 		return false
 	var twist: Traversal = _twists.get(fish)
 	if twist:
 		amount *= twist.taken_factor()
+	var powerups: Powerups = _powerups.get(fish)
+	if powerups:
+		amount *= powerups.taken_scale()  # Blood Moon Shard
 	amount = maxf(amount - block_of(fish).value("armour"), 1.0)
 	var health: FishHealth = _health.get(fish)
-	if health == null or not health.take(amount, settings.iframes, settings.god_mode):
+	if health == null or health.down or health.iframes_left > 0.0:
 		return false
+	if powerups and powerups.blocks_hit(amount):
+		health.shield(settings.iframes)
+		stats_of(fish)["blocked"] = stats_of(fish).get("blocked", 0) + 1
+		return false
+	if not health.take(amount, settings.iframes, settings.god_mode):
+		return false
+	if powerups:
+		powerups.on_hurt(amount, from)
 	stats_of(fish).taken += amount
 	director.on_damage(amount / maxf(health.max_hp, 1.0))
 	player_hurt.emit(fish, amount)
@@ -849,8 +926,10 @@ func _keep_in_arena(fish: FishController, delta: float) -> void:
 		fish.apply_push(change)
 
 
-## A point spawn_distance from `around`, out of every player's view, inside the arena.
+## A point spawn_distance from `around`, inside the arena: out of every
+## player's view, or (murk_spawn_anywhere) anywhere round them, in the murk.
 func spawn_point(around: Vector3) -> Vector3:
+	var anywhere := settings.murky() and settings.murk_spawn_anywhere
 	var point := around
 	var reach := settings.arena_radius - 3.0
 	for attempt in 16:
@@ -862,6 +941,8 @@ func spawn_point(around: Vector3) -> Vector3:
 			flat = flat.normalized() * reach
 			point = Vector3(centre.x + flat.x, point.y, centre.z + flat.y)
 		point.y = clampf(point.y, centre.y + settings.arena_floor + 2.0, centre.y + settings.arena_ceiling - 1.0)
+		if anywhere:
+			break  # the murk hides it
 		var hidden := true
 		for fish in players:
 			if not is_instance_valid(fish):
@@ -921,6 +1002,10 @@ func _on_killed(index: int, kind_index: int, at: Vector3, source: String, by: Ob
 		zombie_killed.emit(at, kind, fish, source)
 		return  # no XP in the Test Tank: the level is the panel's
 	drop_pearl(at, kind.xp * (ELITE_XP if horde.is_elite(index) else 1.0), horde.net_id_of(index))
+	if authority:
+		if _rolls_chest(fish, horde.is_elite(index)):
+			drop_chest(at)
+		_roll_drop(at, fish, horde.is_elite(index))
 	zombie_killed.emit(at, kind, fish, source)
 
 
@@ -937,6 +1022,9 @@ func boss_at(index: int) -> Boss:
 ## A stage event starts (StageTimeline): a swarm or a boss.
 func _start_event(event: String) -> void:
 	stage_event.emit(event)
+	for fish in local_players():
+		if _powerups.has(fish):
+			(_powerups[fish] as Powerups).on_stage_event(event)
 	if not authority:
 		return  # the host makes it happen; its zombies and bosses come over the network
 	var around := PackedVector3Array()
@@ -1049,11 +1137,10 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 		stats_of(by)["bosses"] = stats_of(by).get("bosses", 0) + 1
 	boss_defeated.emit(boss, by)
 	if boss is DrownedShark:
-		var chest := TreasureChest.new()
+		# On every machine (each sees the boss beaten), so not sent as a drop.
+		var chest := add_chest(boss.global_position, 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
+				TreasureChest.Kind.BOSS, "drowned_fin")
 		chest.name = "SharkChest"
-		chest.position = boss.global_position
-		add_child(chest)
-		chests.append(chest)
 		drop_pearl(boss.global_position, settings.shark_xp, BOSS_PEARL - boss.boss_id)
 	elif boss is BloodLeviathan:
 		stage_complete = true
@@ -1083,18 +1170,24 @@ func _burst(at: Vector3, radius: float) -> void:
 	_clouds.append(cloud)
 
 
-## An XP pearl worth `value` at `at` (past max_pearls, the oldest takes its XP instead).
+## An XP pearl worth `value` at `at` (past max_pearls, the nearest takes its
+## XP instead, and grows). A guest's drops merge the same way as the host's:
+## the pearls out are the same on both, and so is the pick.
 func drop_pearl(at: Vector3, value: float, id := -1) -> void:
 	if value <= 0.0:
 		return
-	if pearls_out.size() >= settings.max_pearls and is_instance_valid(pearls_out[0]):
-		pearls_out[0].value += value
-		return
+	if pearls_out.size() >= settings.max_pearls:
+		var nearest := _nearest_pearl(at)
+		if nearest:
+			nearest.value += value
+			nearest.bulk = clampf(pow(nearest.value / maxf(nearest.get_meta("first_value", 1.0), 0.01), 1.0 / 3.0), 1.0, 3.0)
+			return
 	_sync_pearls()
 	var pearl := Pearl.new(_pearl_settings)
 	pearl.name = "XpPearl"
 	pearl.value = value
 	pearl.id = id
+	pearl.set_meta("first_value", value)
 	pearl.collectors.assign(local_players())  # online, each machine's own players pick up
 	pearl.position = at
 	add_child(pearl)
@@ -1115,6 +1208,19 @@ func _on_pearl_collected(pearl: Pearl, by: FishController) -> void:
 		pearl_taken.emit(pearl.id)
 	else:
 		pearl_claimed.emit(pearl.id, by, pearl.value * gain)  # the host adds it (once)
+
+
+## The XP pearl out nearest `at` that isn't being taken (null: none).
+func _nearest_pearl(at: Vector3) -> Pearl:
+	var best: Pearl = null
+	var gap := INF
+	for pearl in pearls_out:
+		if is_instance_valid(pearl) and pearl.absorbing == null:
+			var d := pearl.global_position.distance_squared_to(at)
+			if d < gap:
+				gap = d
+				best = pearl
+	return best
 
 
 ## The XP pearl `id` here, if it's still out.
@@ -1147,7 +1253,7 @@ func _sync_pearls() -> void:
 		reach = maxf(reach, (_blocks[key] as StatBlock).value("pickup_range"))
 	_pearl_settings.magnet_radius = settings.pickup_range * (1.0 + reach)
 	_pearl_settings.magnet_strength = settings.pickup_pull
-	_pearl_settings.pearl_lifetime = settings.pearl_lifetime
+	_pearl_settings.pearl_lifetime = INF  # Unnatural's never fade
 	_pearl_settings.pearl_size = settings.pearl_size
 	_pearl_settings.absorb_radius = 1.2
 
@@ -1175,7 +1281,7 @@ func _on_leveled_up(level: int) -> void:
 func _offer_next(fish: FishController) -> void:
 	if not is_instance_valid(fish):
 		return
-	if _chest_pending.get(fish, 0) > 0:
+	if not (_chest_pending.get(fish, []) as Array).is_empty():
 		_offer_chest(fish)
 	elif _pending.get(fish, 0) > 0:
 		_offer_level(fish)
@@ -1208,20 +1314,49 @@ func _offer_level(fish: FishController) -> void:
 	cards_offered.emit(fish, cards, "LEVEL %d" % (levels.level - left + 1), gave)
 
 
-## chest_choices different powerups.
+## `fish`'s next chest's pick. A treasure chest rolls a rarity with the
+## opener's luck and offers chest_choices powerups of it (filling up from the
+## tiers below); a cursed chest offers cursed powerups (luck doesn't help); a
+## boss chest offers its boss's own. Sunken Idol: one more pick from the same
+## chest a stack.
 func _offer_chest(fish: FishController) -> void:
-	var pool := Powerup.ids()
+	var queue: Array = _chest_pending.get(fish, [])
+	var spec: Array = queue.pop_front() if not queue.is_empty() else [TreasureChest.Kind.TREASURE, ""]
 	var cards := []
-	for n in mini(settings.chest_choices, pool.size()):
-		var at := rng.randi_range(0, pool.size() - 1)
-		var id: String = pool[at]
-		pool.remove_at(at)
-		cards.append({"powerup": id, "stacks": powerups_of(fish).stacks(id) + 1})
+	var heading := ""
+	var line := "PICK A POWERUP  ·  THE SAME ONE AGAIN STACKS"
+	match spec[0]:
+		TreasureChest.Kind.CURSED:
+			for id in Powerup.pick_from_tier(rng, Rarity.Tier.CURSED, settings.chest_choices):
+				cards.append(_powerup_card(fish, id))
+			heading = "CURSED TREASURE"
+			line = "STRONG, WITH A CATCH  ·  CHOOSE CAREFULLY"
+		TreasureChest.Kind.BOSS:
+			var item: String = spec[1]
+			if Powerup.INFO.has(item):
+				cards.append(_powerup_card(fish, item))
+			heading = "BOSS TREASURE!"
+			line = "%s'S PRIZE" % Powerup.title(item).to_upper()
+		_:
+			var rolled := Rarity.roll(rng, settings, block_of(fish).value("luck"))
+			for id in Powerup.pick_for_chest(rng, rolled, settings.chest_choices):
+				cards.append(_powerup_card(fish, id))
+			heading = "%s TREASURE!" % Rarity.NAMES[rolled]
+	if cards.is_empty():
+		_offer_next(fish)
+		return
+	_extra_picks[fish] = mini(powerups_of(fish).stacks("sunken_idol"), cards.size() - 1)
+	if _extra_picks[fish] > 0:
+		line = "PICK %d  ·  THE SUNKEN IDOL'S GIFT" % (_extra_picks[fish] + 1)
 	_offers[fish] = cards
 	_offer_kind[fish] = "chest"
 	if cards_pause_game():
 		_hold_for_cards(true)
-	cards_offered.emit(fish, cards, "TREASURE!", "PICK A POWERUP  ·  THE SAME ONE AGAIN STACKS")
+	cards_offered.emit(fish, cards, heading, line)
+
+
+func _powerup_card(fish: FishController, id: String) -> Dictionary:
+	return {"powerup": id, "stacks": powerups_of(fish).stacks(id) + 1, "tier": Powerup.tier(id)}
 
 
 ## `fish` takes card `index` of those up: a level's stat goes up, or a chest's
@@ -1233,7 +1368,18 @@ func pick(fish: FishController, index: int) -> void:
 	var card: Dictionary = cards[clampi(index, 0, cards.size() - 1)]
 	if _offer_kind.get(fish, "level") == "chest":
 		powerups_of(fish).add(card.powerup)
-		_chest_pending[fish] = _chest_pending.get(fish, 1) - 1
+		if _extra_picks.get(fish, 0) > 0 and cards.size() > 1:
+			# Sunken Idol: another pick from what's left of the same chest.
+			_extra_picks[fish] -= 1
+			var rest := cards.duplicate()
+			rest.remove_at(clampi(index, 0, cards.size() - 1))
+			for other: Dictionary in rest:
+				other.stacks = powerups_of(fish).stacks(other.powerup) + 1
+			_offers[fish] = rest
+			card_picked.emit(fish, card)
+			cards_offered.emit(fish, rest, "ANOTHER PICK", "THE SUNKEN IDOL'S GIFT")
+			return
+		_extra_picks.erase(fish)
 	else:
 		block_of(fish).add(card.stat, card.amount)
 		_apply_stats(fish)
@@ -1259,28 +1405,139 @@ func _bury_chests() -> void:
 
 func _bury_chest() -> void:
 	var spot := Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf_range(0.02, 1.0)) * settings.arena_radius * 0.9
-	var chest := add_chest(centre + Vector3(spot.x, settings.arena_floor - TreasureChest.SIZE.y * 0.3, spot.y), rng.randf() * TAU)
+	# Now and then a cursed one (luck doesn't help).
+	var kind := TreasureChest.Kind.CURSED if rng.randf() < settings.cursed_chest_chance else TreasureChest.Kind.TREASURE
+	var chest := add_chest(centre + Vector3(spot.x, settings.arena_floor - TreasureChest.SIZE.y * 0.3, spot.y), rng.randf() * TAU,
+			-INF, kind)
 	chest_buried.emit(chest)
 
 
-## A chest at `at`, turned `turn` (radians).
-func add_chest(at: Vector3, turn: float) -> TreasureChest:
+## A chest at `at`, turned `turn` (radians); `sink_to`: a dropped one sinks to
+## that height (-INF: it stays put).
+func add_chest(at: Vector3, turn: float, sink_to := -INF, kind := TreasureChest.Kind.TREASURE, item := "") -> TreasureChest:
 	var chest := TreasureChest.new()
 	chest.name = "Chest"
+	chest.kind = kind
+	chest.item = item
 	chest.position = at
 	chest.rotation.y = turn
+	chest.sink_to = sink_to
 	add_child(chest)
 	chests.append(chest)
 	return chest
 
 
-## The chests still shut.
+## Maybe a drop where `by`'s kill was (the host rolls): a heart, a magnet or an
+## hourglass, each by its chance (elite: x ELITE_CHEST), raised by their luck.
+func _roll_drop(at: Vector3, by: FishController, elite := false) -> void:
+	var luck := block_of(by).value("luck") if is_instance_valid(by) and _blocks.has(by) else 0.0
+	var lift := maxf(1.0 + luck * settings.chest_drop_luck, 0.0) * (ELITE_CHEST if elite else 1.0)
+	var roll := rng.randf()
+	for kind in [Pickup.Kind.HEART, Pickup.Kind.MAGNET, Pickup.Kind.HOURGLASS]:
+		var chance := [settings.heart_chance, settings.magnet_chance, settings.hourglass_chance][kind] as float * lift
+		if roll < chance:
+			drop_pickup(kind, at)
+			return
+		roll -= chance
+
+
+## A drop of `kind` at `at` (`id` -1: the next of ours; online, the host's id).
+func drop_pickup(kind: int, at: Vector3, id := -1) -> Pickup:
+	var pickup := Pickup.new()
+	pickup.name = Pickup.NAMES[kind].capitalize()
+	pickup.kind = kind as Pickup.Kind
+	if id < 0:
+		id = _next_pickup_id
+	_next_pickup_id = maxi(_next_pickup_id, id + 1)
+	pickup.id = id
+	pickup.collectors.assign(local_players())
+	pickup.position = at
+	add_child(pickup)
+	pickup.taken.connect(_on_pickup_taken)
+	pickup.tree_exiting.connect(func() -> void: pickups.erase(pickup))
+	pickups.append(pickup)
+	if authority:
+		pickup_dropped.emit(pickup)
+	return pickup
+
+
+func pickup_by_id(id: int) -> Pickup:
+	for pickup in pickups:
+		if is_instance_valid(pickup) and pickup.id == id:
+			return pickup
+	return null
+
+
+func _on_pickup_taken(pickup: Pickup, by: FishController) -> void:
+	if authority:
+		apply_pickup(pickup.kind, by)
+		pickup_taken.emit(pickup.id, pickup.kind, by)
+	else:
+		pickup_claimed.emit(pickup.id, by)  # the host says, then it happens
+
+
+## A guest's claim on drop `id` (we're the host): the first claim gets it.
+func confirm_pickup(id: int, by: FishController) -> bool:
+	var pickup := pickup_by_id(id)
+	if pickup == null:
+		return false
+	var kind := pickup.kind
+	pickup.vanish()
+	apply_pickup(kind, by)
+	pickup_taken.emit(id, kind, by)
+	return true
+
+
+## What a drop does, for `by` (on every machine: each heals only its own
+## players). A heart heals the whole team (D12): every player who's up.
+func apply_pickup(kind: int, by: FishController) -> void:
+	if is_instance_valid(by):
+		stats_of(by)["drops"] = stats_of(by).get("drops", 0) + 1
+	match kind:
+		Pickup.Kind.HEART:
+			for fish in local_players():
+				var health: FishHealth = _health.get(fish)
+				if health and not health.down:
+					health.heal(health.max_hp * settings.heart_heal)
+		Pickup.Kind.MAGNET:
+			for pearl in pearls_out:
+				if is_instance_valid(pearl):
+					pearl.drawn_by = by
+		Pickup.Kind.HOURGLASS:
+			horde.freeze(settings.hourglass_time)
+	drop_taken.emit(kind, by)
+
+
+## A chest dropped by a kill at `at`, sinking to the seabed.
+func drop_chest(at: Vector3) -> TreasureChest:
+	var chest := add_chest(at, rng.randf() * TAU, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3)
+	chest_buried.emit(chest)
+	return chest
+
+
+## The chests still shut for someone.
 func shut_chests() -> Array[TreasureChest]:
 	var shut: Array[TreasureChest] = []
 	for chest in chests:
-		if is_instance_valid(chest) and not chest.opened:
+		if is_instance_valid(chest) and not chest.open_for_all(players):
 			shut.append(chest)
 	return shut
+
+
+## The chests `fish` hasn't opened yet.
+func shut_chests_for(fish: FishController) -> Array[TreasureChest]:
+	var shut: Array[TreasureChest] = []
+	for chest in chests:
+		if is_instance_valid(chest) and not chest.is_open_for(fish) and not chest.is_queued_for_deletion():
+			shut.append(chest)
+	return shut
+
+
+## `fish`'s render layer (TreasureChest.player_layer), if it's played here (0: a puppet).
+func layer_of(fish: FishController) -> int:
+	if not is_instance_valid(fish) or fish.puppet:
+		return 0
+	return TreasureChest.player_layer(fish.get_meta("coop_index", maxi(players.find(fish), 0)))
 
 
 ## `fish` opens a chest by battering it, or by holding still beside it for
@@ -1299,7 +1556,7 @@ func _open_chests(fish: FishController, delta: float) -> void:
 	var battering := fish.speed >= fish.nature_batter_speed * powerups_of(fish).batter_speed_share()
 	var still := fish.speed <= settings.chest_still_speed
 	var holding: TreasureChest = null
-	for chest in shut_chests():
+	for chest in shut_chests_for(fish):
 		var middle := chest.global_position + Vector3.UP * TreasureChest.SIZE.y * 0.5
 		var offset := middle - at
 		var gap := offset.length()
@@ -1312,35 +1569,56 @@ func _open_chests(fish: FishController, delta: float) -> void:
 			holding = chest
 	if holding:
 		_opening[fish] = holding
-		holding.progress = minf(holding.progress + delta / maxf(settings.chest_open_time, 0.01), 1.0)
-		if holding.progress >= 1.0:
+		holding.set_progress(fish, minf(holding.progress_of(fish) + delta / maxf(settings.chest_open_time, 0.01), 1.0))
+		if holding.progress_of(fish) >= 1.0:
 			open_chest(holding, fish)
 	else:
 		var was: TreasureChest = _opening.get(fish)
 		_opening.erase(fish)
-		if is_instance_valid(was) and not was.opened:
-			was.progress = 0.0
+		if is_instance_valid(was):
+			was.set_progress(fish, 0.0)
 
 
-## Opens `chest` for `fish`: a powerup pick for them.
+## Opens `chest` for `fish` (each player opens each chest for themselves): a
+## powerup pick for them, and it's gone from their view.
 func open_chest(chest: TreasureChest, fish: FishController) -> void:
-	if chest.opened:
+	if not chest.open_for(fish, layer_of(fish)):
 		return
-	chest.open()
 	_opening.erase(fish)
 	stats_of(fish)["chests"] = stats_of(fish).get("chests", 0) + 1
 	chest_opened.emit(chest, fish)
 	if not authority:
 		chest_claimed.emit(chests.find(chest), fish)
-	_chest_pending[fish] = _chest_pending.get(fish, 0) + 1
+	if not _chest_pending.has(fish):
+		_chest_pending[fish] = []
+	(_chest_pending[fish] as Array).append([chest.kind, chest.item])
 	if not _offers.has(fish):
 		_offer_next(fish)
+	_clear_chest(chest)
 
 
-## Chest `index` opened by someone elsewhere (online): shut no more, no pick here.
-func apply_chest_opened(index: int) -> void:
-	if index >= 0 and index < chests.size() and is_instance_valid(chests[index]) and not chests[index].opened:
-		chests[index].open()
+## Chest `index` opened by `fish`, a player elsewhere (online): it's still
+## shut for everyone else, and there's no pick here.
+func apply_chest_opened(index: int, fish: FishController) -> void:
+	if index < 0 or index >= chests.size() or not is_instance_valid(chests[index]) or fish == null:
+		return
+	if chests[index].open_for(fish, layer_of(fish)):
+		stats_of(fish)["chests"] = stats_of(fish).get("chests", 0) + 1
+	_clear_chest(chests[index])
+
+
+## A chest everyone's opened goes (its place in `chests` stays, for online's indices).
+func _clear_chest(chest: TreasureChest) -> void:
+	if is_instance_valid(chest) and chest.open_for_all(players) and not chest.is_queued_for_deletion():
+		chest.vanish()
+
+
+## Whether a kill by `by` drops a chest: chest_drop_chance (elite: x
+## ELITE_CHEST), raised by their luck.
+func _rolls_chest(by: FishController, elite: bool) -> bool:
+	var luck := block_of(by).value("luck") if is_instance_valid(by) and _blocks.has(by) else 0.0
+	var chance := settings.chest_drop_chance * (ELITE_CHEST if elite else 1.0) * maxf(1.0 + luck * settings.chest_drop_luck, 0.0)
+	return chance > 0.0 and rng.randf() < chance
 
 
 ## Pauses the game for the cards (solo), or lets it go again.

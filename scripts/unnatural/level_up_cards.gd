@@ -15,7 +15,7 @@ const CARD_SIZE := Vector2(250.0, 330.0)
 const GAP := 28.0
 const ARM_TIME := 0.4
 
-## Each card: {"stat", "tier", "amount"} or {"powerup", "stacks"} (UnnaturalRun's offer).
+## Each card: {"stat", "tier", "amount"} or {"powerup", "stacks", "tier"} (UnnaturalRun's offer).
 var cards: Array = []
 ## The title ("LEVEL 4", "TREASURE!") and the line under it.
 var heading := ""
@@ -148,7 +148,7 @@ func _draw_card(i: int) -> void:
 		rect = rect.grow(10.0)
 	var glow := 0.0
 	if tier >= Rarity.Tier.RARE:
-		glow = 0.25 * (tier - 1)
+		glow = 0.25 * (mini(tier, Rarity.Tier.LEGENDARY) - 1)
 	if tier == Rarity.Tier.LEGENDARY:
 		glow += 0.25 * (0.5 + 0.5 * sin(_age * 6.0))
 	if glow > 0.0:
@@ -183,7 +183,10 @@ func _draw_powerup(i: int, card: Dictionary) -> void:
 	var band := Rect2(rect.position, Vector2(rect.size.x, 40.0))
 	draw_rect(band, Color(color, 0.85))
 	var stacks: int = card.stacks
-	BroadcastUI.text(self, band, "NEW" if stacks <= 1 else "STACK %d" % stacks, 18, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 800)
+	var tier: int = card.get("tier", Powerup.tier(id))
+	draw_rect(Rect2(rect.position + Vector2(0.0, rect.size.y - 8.0), Vector2(rect.size.x, 8.0)), Rarity.COLORS[tier])
+	BroadcastUI.text(self, band, "%s  ·  %s" % [Rarity.NAMES[tier], "NEW" if stacks <= 1 else "STACK %d" % stacks], 16, Color.WHITE,
+			HORIZONTAL_ALIGNMENT_CENTER, 800)
 	var badge := Rect2(rect.position + Vector2(rect.size.x * 0.5 - 34.0, 56.0), Vector2(68.0, 68.0))
 	draw_rect(badge, Color(color, 0.3))
 	draw_rect(badge, color, false, 3.0)

@@ -32,6 +32,7 @@ func check(ok: bool, what: String) -> void:
 
 func _run() -> void:
 	settings.spawning = false
+	settings.difficulty_per_minute = 0.0  # exact damage checks
 	settings.fish_attack = FishAttack.Kind.BITE  # these checks are the bite's (attack_probe has the rest)
 	settings.twists = false  # and no fish's twist skews them
 	settings.card_choices = 0  # level-ups without cards here (levels_probe has them)
@@ -193,6 +194,7 @@ func _run() -> void:
 	run.director.players = 1
 	check(later > 100 and coop > later, "the target grows with time (5:00: %d) and players (two: %d)" % [later, coop])
 	settings.spawning = false
+	settings.difficulty_per_minute = 0.0  # exact damage checks
 	settings.base_alive = 4
 	settings.bite_damage = 30.0
 	var stray := horde.alive[0]

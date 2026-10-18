@@ -4,8 +4,8 @@ shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_back, fog_disabled;
 
 uniform vec4 glow : source_color = vec4(0.85, 0.95, 1.0, 1.0);
-// 0..1, the pearl's fade (lifetime, absorbing).
-uniform float strength = 1.0;
+// 0..1, the pearl's fade (lifetime, absorbing): per pearl, so one material serves them all.
+instance uniform float strength = 1.0;
 uniform float pulse_rate = 1.6;
 
 void fragment() {

@@ -65,7 +65,7 @@ func _run() -> void:
 		if run.is_picking(fish) and not offers.size():
 			seen_picking = seen_picking or horde.chaseable[0] == 0
 	check(seen_picking, "holding still beside one: untouchable and unseen while it opens")
-	check(chest.opened and offers.size() == 1 and offers[0][1] == "TREASURE!", "after chest_open_time it opens, offering powerups")
+	check(chest.is_open_for(fish) and offers.size() == 1 and (offers[0][1] as String).ends_with("TREASURE!"), "after chest_open_time it opens, offering powerups (%s)" % offers[0][1] if offers.size() else "")
 	var cards: Array = offers[0][0]
 	var ids := cards.map(func(c: Dictionary) -> String: return c.powerup)
 	check(cards.size() == 3 and ids.size() == {ids[0]: 0, ids[1]: 0, ids[2]: 0}.size(), "three different powerups (%s)" % [ids])
@@ -82,9 +82,9 @@ func _run() -> void:
 	for t in 120:
 		fish.linear_velocity = (second.global_position + Vector3.UP * 0.5 - fish.global_position).normalized() * (fish.nature_batter_speed + 4.0)
 		await get_tree().physics_frame
-		if second.opened:
+		if second.is_open_for(fish):
 			break
-	check(second.opened and offers.size() == 1, "battering one opens it at once")
+	check(second.is_open_for(fish) and offers.size() == 1, "battering one opens it at once")
 	var same := -1
 	for i in (offers[0][0] as Array).size():
 		if offers[0][0][i].powerup == ids[0]:
@@ -162,7 +162,7 @@ func _run() -> void:
 		await get_tree().physics_frame
 	var by: Dictionary = run.stats_of(fish).by_source
 	check(by.get("chain_lightning", 0.0) > 0.0 and by.get("torpedo", 0.0) > 0.0, "one hit at 100% chances sets off lightning and torpedoes")
-	var torpedoes_flying := run.get_children().filter(func(n: Node) -> bool: return n is TorpedoLauncher.Torpedo).size()
+	var torpedoes_flying := (run.powerups_of(fish).held["torpedo"] as TorpedoLauncher).in_flight()
 	check(torpedoes_flying == 0, "and it all settles (no torpedoes still flying after 3 s)")
 	check(run.stats_of(fish).damage - damage_before < 5000.0, "bounded: %.0f damage, not a runaway loop" % (run.stats_of(fish).damage - damage_before))
 	powers.lightning_stacks = 0

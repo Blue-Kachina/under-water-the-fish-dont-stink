@@ -18,11 +18,40 @@ const LEFT := 2
 
 ## Family -> Array[Mesh], one per pose.
 static var _baked := {}
+## Family -> Array[ImporterMesh], one per pose: the bakes with their LODs.
+static var _importers := {}
+## "family:error" -> Array[Mesh], one per pose (detail_meshes()).
+static var _detailed := {}
 
 
 ## The baked meshes for `family`, one per pose in POSES.
 static func meshes(family: FishCharacter.Family) -> Array:
 	if not _baked.has(family):
+		var baked := []
+		for importer: ImporterMesh in _importers_for(family):
+			baked.append(importer.get_mesh())
+		_baked[family] = baked
+	return _baked[family]
+
+
+## The baked meshes for `family` at a fixed detail, one per pose: each part at
+## its coarsest LOD whose error is within `error` (a share of the part's size;
+## 0: full detail). For a MultiMesh spread over a whole arena (the Horde),
+## where Godot's own LOD, picked by the MultiMesh's bounds, never steps down.
+static func detail_meshes(family: FishCharacter.Family, error: float) -> Array:
+	if error <= 0.0:
+		return meshes(family)
+	var key := "%d:%.4f" % [family, error]
+	if not _detailed.has(key):
+		var built := []
+		for importer: ImporterMesh in _importers_for(family):
+			built.append(_at_detail(importer, error))
+		_detailed[key] = built
+	return _detailed[key]
+
+
+static func _importers_for(family: FishCharacter.Family) -> Array:
+	if not _importers.has(family):
 		var model := FishModel.build(family)
 		var baked := []
 		for swing: float in POSES:
@@ -30,8 +59,60 @@ static func meshes(family: FishCharacter.Family) -> Array:
 				model.tail.rotation.y = swing
 			baked.append(_bake(model))
 		model.free()
-		_baked[family] = baked
-	return _baked[family]
+		_importers[family] = baked
+	return _importers[family]
+
+
+## `importer`'s mesh with each part at the fewest triangles within `error`,
+## and parts that look the same (equal materials) merged into one surface, so
+## a fish is a few draws rather than one per part.
+static func _at_detail(importer: ImporterMesh, error: float) -> ArrayMesh:
+	var merged := {}  # material key -> [arrays, material, primitive]
+	var order: Array[String] = []
+	for surface in importer.get_surface_count():
+		var arrays := importer.get_surface_arrays(surface).duplicate(true)  # not the bake's own
+		for lod in importer.get_surface_lod_count(surface):
+			if importer.get_surface_lod_size(surface, lod) <= error:
+				var indices := importer.get_surface_lod_indices(surface, lod)
+				if indices.size() < (arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size():
+					arrays[Mesh.ARRAY_INDEX] = indices
+		var material := importer.get_surface_material(surface)
+		var key := "%d %s" % [importer.get_surface_primitive_type(surface), _material_key(material)]
+		for slot in Mesh.ARRAY_MAX:
+			key += "1" if arrays[slot] != null else "0"
+		if importer.get_surface_primitive_type(surface) != Mesh.PRIMITIVE_TRIANGLES or not arrays[Mesh.ARRAY_INDEX] is PackedInt32Array:
+			key += " %d" % surface  # not mergeable
+		if not merged.has(key):
+			merged[key] = [arrays, material, importer.get_surface_primitive_type(surface)]
+			order.append(key)
+			continue
+		var into: Array = merged[key][0]
+		var offset := (into[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		for n in indices.size():
+			indices[n] += offset
+		arrays[Mesh.ARRAY_INDEX] = indices
+		for slot in Mesh.ARRAY_MAX:
+			if into[slot] != null:
+				into[slot].append_array(arrays[slot])
+	var mesh := ArrayMesh.new()
+	for key in order:
+		var entry: Array = merged[key]
+		mesh.add_surface_from_arrays(entry[2], entry[0])
+		mesh.surface_set_material(mesh.get_surface_count() - 1, entry[1])
+	return mesh
+
+
+## Equal for materials that draw the same: the same one, or standard materials
+## with the same settings.
+static func _material_key(material: Material) -> String:
+	if not material is BaseMaterial3D:
+		return str(material.get_instance_id()) if material else "none"
+	var parts := PackedStringArray()
+	for property in material.get_property_list():
+		if property.usage & PROPERTY_USAGE_STORAGE:
+			parts.append(str(material.get(property.name)))
+	return "|".join(parts)
 
 
 ## Which pose shows a tail at `phase` (rad) in its beat: centre, right, centre, left.
@@ -42,7 +123,7 @@ static func pose_for(phase: float) -> int:
 
 ## Every visible mesh part of `model`, merged into one mesh in the model's own
 ## space, with LODs.
-static func _bake(model: FishModel) -> Mesh:
+static func _bake(model: FishModel) -> ImporterMesh:
 	var importer := ImporterMesh.new()
 	var indexed := true
 	for node in model.find_children("*", "MeshInstance3D", true, false):
@@ -77,7 +158,7 @@ static func _bake(model: FishModel) -> Mesh:
 					part.get_active_material(surface), "%s_%d" % [part.name, surface])
 	if indexed:
 		importer.generate_lods(25.0, 60.0, [])
-	return importer.get_mesh()
+	return importer
 
 
 ## Whether `part` and everything above it up to `model` is visible.

@@ -5,6 +5,9 @@ extends Node3D
 ## big red moon through it, and red god-rays slanting down. One node owns all
 ## of it, so it can pulse with events (pulse(): brighter as the boss
 ## arrives). Puts the environment back as it was when it leaves the tree.
+## It also owns the murk (planning_murk.md): `settings`' murk_density and
+## murk_sky, live. The surface reaches far past the arena so its edge is
+## always lost in the fog (its seam against the sky was a ring of light).
 
 const FOG_COLOR := Color(0.16, 0.025, 0.035)
 const AMBIENT_COLOR := Color(0.75, 0.3, 0.3)
@@ -15,6 +18,8 @@ const RAY_COLOR := Color(1.0, 0.25, 0.15, 0.05)
 const RAYS := 9
 
 var ocean: Ocean
+## The murk's settings (null: no murk).
+var settings: UnnaturalSettings
 ## How red it is (0: the plain ocean; UnnaturalSettings.blood_moon).
 var strength := 1.0
 ## Over the arena: its middle, radius and the water's surface height.
@@ -38,7 +43,7 @@ func _ready() -> void:
 	if ocean:
 		_env = ocean.environment()
 	if _env:
-		for key: String in ["fog_light_color", "fog_density", "ambient_light_color", "ambient_light_energy"]:
+		for key: String in ["fog_light_color", "fog_density", "fog_sky_affect", "ambient_light_color", "ambient_light_energy"]:
 			_before[key] = _env.get(key)
 		var base := ocean.fog_base() if ocean else []
 		if base.size() == 2:  # the fog before the arena edge's shift
@@ -48,6 +53,16 @@ func _ready() -> void:
 		if _sky:
 			_sky_before = [_sky.sky_top_color, _sky.sky_horizon_color, _sky.ground_horizon_color]
 	_apply()
+
+
+## The fog's density now, before the edge's thickening (0 before it's ready).
+## The murk's density is the arena's as it is; otherwise the blood moon thickens the ocean's a little.
+func fog_density() -> float:
+	if settings and settings.murky():
+		return settings.murk_density
+	if _before.is_empty():
+		return 0.0
+	return _before.fog_density * (1.0 + 0.25 * clampf(strength * (1.0 + 0.6 * _pulse), 0.0, 1.0))
 
 
 ## Brightens it for `seconds` (fading back), e.g. as a boss arrives.
@@ -69,12 +84,13 @@ func _apply() -> void:
 	var share := clampf(red, 0.0, 1.0)
 	if _env and not _before.is_empty():
 		var fog := (_before.fog_light_color as Color).lerp(FOG_COLOR, share)
-		var density: float = _before.fog_density * (1.0 + 0.25 * share)
+		var density := fog_density()
 		if ocean:
 			ocean.set_fog_base(fog, density)  # it shifts it toward the arena's edge
 		else:
 			_env.fog_light_color = fog
 			_env.fog_density = density
+		_env.fog_sky_affect = settings.murk_sky if settings and settings.murky() else _before.fog_sky_affect
 		_env.ambient_light_color = (_before.ambient_light_color as Color).lerp(AMBIENT_COLOR, share)
 		_env.ambient_light_energy = _before.ambient_light_energy * (1.0 + 0.2 * _pulse)
 	if _sky and not _sky_before.is_empty():
@@ -93,7 +109,7 @@ func _build() -> void:
 	var surface := MeshInstance3D.new()
 	surface.name = "Surface"
 	var plane := PlaneMesh.new()
-	plane.size = Vector2.ONE * radius * 3.0
+	plane.size = Vector2.ONE * maxf(radius * 12.0, 2000.0)
 	plane.flip_faces = true
 	var water := StandardMaterial3D.new()
 	water.albedo_color = Color(0.35, 0.06, 0.06, 0.55)

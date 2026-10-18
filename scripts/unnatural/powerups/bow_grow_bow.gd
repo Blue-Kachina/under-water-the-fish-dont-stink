@@ -7,27 +7,17 @@ extends Powerup
 ## always out-reaches the bow wave). From bow_low_speed_stacks stacks the bow
 ## wave batters below the battering speed too (Powerups.batter_speed_share()).
 
-var _ribbon: Node3D
-
-
 func on_stacks_changed() -> void:
 	fish.bow_scale = 1.0 + settings.bow_growth * stacks
-	if _ribbon == null or not is_instance_valid(_ribbon):
-		_ribbon = _make_ribbon()
-		fish.add_child(_ribbon)
-	_ribbon.scale = Vector3.ONE * (1.0 + 0.15 * (stacks - 1))
 
 
 func on_removed() -> void:
 	if is_instance_valid(fish):
 		fish.bow_scale = 1.0
-	if _ribbon and is_instance_valid(_ribbon):
-		_ribbon.queue_free()
-	_ribbon = null
 
 
 ## Two loops and a knot, on top of the fish's head.
-func _make_ribbon() -> Node3D:
+func make_worn() -> Node3D:
 	var ribbon := Node3D.new()
 	ribbon.name = "Bow"
 	ribbon.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.05, -fish.hitbox_length * 0.2)

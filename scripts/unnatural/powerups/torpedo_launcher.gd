@@ -6,10 +6,18 @@ extends Powerup
 ## explodes on impact (or when its time's up): torpedo_damage to every zombie
 ## in the blast (proc coefficient torpedo_proc, so it can start lightning but
 ## never torpedoes again). More stacks: more chance, more torpedoes, a bigger blast.
+## They fly as one pooled swarm (TorpedoSwarm), at most torpedo_max at once,
+## and only torpedo_fx_rate blasts a second are shown: a big launcher stays smooth.
 
 ## Torpedoes fired and blasts so far, for the probes.
 var fired := 0
 var blasts := 0
+
+var _swarm: TorpedoSwarm
+## Blast visuals left to show this second (torpedo_fx_rate): past it, a blast
+## still hurts, but goes off unseen.
+var _fx_left := 0.0
+var _fx_time := 0.0
 
 
 func chance() -> float:
@@ -29,84 +37,212 @@ func on_hit(_index: int, _damage: float, _source: String, proc: float, chain: Ar
 		launch(chain)
 
 
-## count() torpedoes from the fish, at its nearest zombies.
+## Torpedoes flying now.
+func in_flight() -> int:
+	return _swarm.count() if is_instance_valid(_swarm) else 0
+
+
+## count() torpedoes from the fish, each at one of its nearest zombies (the
+## nearest first), while fewer than torpedo_max are flying.
 func launch(chain: Array) -> void:
+	var room := settings.torpedo_max - in_flight()
+	if room <= 0:
+		return
+	if not is_instance_valid(_swarm):
+		_swarm = TorpedoSwarm.new()
+		_swarm.name = "Torpedoes"
+		_swarm.launcher = self
+		run.add_child(_swarm)
 	var from := fish.global_position
-	var near := run.horde.query_sphere(from, 40.0)
-	var sorted := Array(near)
-	sorted.sort_custom(func(a: int, b: int) -> bool:
-		return run.horde.enemy_position(a).distance_squared_to(from) < run.horde.enemy_position(b).distance_squared_to(from))
-	for n in count():
-		var torpedo := Torpedo.new()
-		torpedo.launcher = self
-		torpedo.chain = chain + [id]
-		torpedo.target = sorted[n % sorted.size()] if not sorted.is_empty() else -1
+	var wanted := mini(count(), room)
+	var nearest := _nearest(from, 25.0, wanted)
+	var from_chain := chain + [id]
+	for n in wanted:
 		var spread := Vector3(run.rng.randf_range(-1, 1), run.rng.randf_range(0.2, 1.0), run.rng.randf_range(-1, 1)).normalized()
-		torpedo.velocity = (-fish.global_basis.z * 0.6 + spread * 0.4).normalized() * settings.torpedo_speed * 0.5
-		torpedo.position = from + spread * 0.6
-		run.add_child(torpedo)
+		var velocity := (-fish.global_basis.z * 0.6 + spread * 0.4).normalized() * settings.torpedo_speed * 0.5
+		_swarm.add(from + spread * 0.6, velocity, nearest[n % nearest.size()] if not nearest.is_empty() else -1, from_chain)
 		fired += 1
+
+
+## Up to `k` live zombies within `reach` of `at`, the nearest first (a
+## running pick, no sort: k is a handful).
+func _nearest(at: Vector3, reach: float, k: int) -> PackedInt32Array:
+	var picked := PackedInt32Array()
+	var gaps := PackedFloat32Array()
+	for i in run.horde.query_sphere(at, reach):
+		var d := run.horde.enemy_position(i).distance_squared_to(at)
+		if picked.size() < k or d < gaps[picked.size() - 1]:
+			var slot := picked.size() if picked.size() < k else k - 1
+			if picked.size() < k:
+				picked.append(i)
+				gaps.append(d)
+			while slot > 0 and gaps[slot - 1] > d:
+				picked[slot] = picked[slot - 1]
+				gaps[slot] = gaps[slot - 1]
+				slot -= 1
+			picked[slot] = i
+			gaps[slot] = d
+	return picked
+
+
+func on_removed() -> void:
+	if is_instance_valid(_swarm):
+		_swarm.queue_free()
+	_swarm = null
 
 
 ## A torpedo's blast at `at`.
 func explode(at: Vector3, chain: Array) -> void:
 	blasts += 1
 	var reach := blast()
-	Explosion.spawn(run.ocean, at, Powerup.color(id), reach, 0.0, 0.25)
+	var now := Time.get_ticks_msec() / 1000.0
+	_fx_left = minf(_fx_left + (now - _fx_time) * settings.torpedo_fx_rate, settings.torpedo_fx_rate * 0.5)
+	_fx_time = now
+	if _fx_left >= 1.0:
+		_fx_left -= 1.0
+		Explosion.spawn(run.ocean, at, Powerup.color(id), reach, 0.0, 0.25)
 	for i in run.horde.query_sphere(at, reach):
 		var push := run.horde.enemy_position(i) - at
 		run.hit(i, settings.torpedo_damage, fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP,
 				run.powerup_settings.torpedo_proc, chain)
 
 
-## One heat-seeking torpedo.
-class Torpedo extends Node3D:
+## Twin launch tubes along the flanks, their muzzles glowing.
+func make_worn() -> Node3D:
+	var rack := Node3D.new()
+	rack.name = "Tubes"
+	var steel := StandardMaterial3D.new()
+	steel.albedo_color = Color(0.42, 0.45, 0.48)
+	steel.metallic = 0.8
+	steel.roughness = 0.35
+	for side: float in [-1.0, 1.0]:
+		var tube := CylinderMesh.new()
+		tube.top_radius = 0.07
+		tube.bottom_radius = 0.07
+		tube.height = fish.hitbox_length * 0.5
+		tube.radial_segments = 10
+		var at := Vector3(side * (fish.hitbox_width * 0.5 + 0.04), fish.hitbox_height * 0.1, -fish.hitbox_length * 0.05)
+		rack.add_child(worn_mesh(tube, steel, at, Vector3(PI / 2.0, 0.0, 0.0)))
+		var muzzle := TorusMesh.new()
+		muzzle.inner_radius = 0.05
+		muzzle.outer_radius = 0.08
+		muzzle.rings = 12
+		muzzle.ring_segments = 6
+		rack.add_child(worn_mesh(muzzle, worn_material(1.8), at + Vector3(0.0, 0.0, -fish.hitbox_length * 0.25), Vector3(PI / 2.0, 0.0, 0.0)))
+	return rack
+
+
+## Every torpedo a launcher has flying (round 2's perf pass): one node and one
+## MultiMesh for them all, not a node each. Each seeks its target, picking a
+## new one near it now and then once its target's gone, and blows up on
+## impact or when its time's up.
+class TorpedoSwarm extends MultiMeshInstance3D:
 	const TURN := 6.0
+	## How often (ticks) a torpedo with no target looks for one, and how far.
+	const RETARGET_TICKS := 6
+	const RETARGET_REACH := 15.0
+
+	static var _mesh: CapsuleMesh
+
 	var launcher: TorpedoLauncher
-	var chain: Array = []
-	var target := -1
-	var velocity := Vector3.ZERO
-	var age := 0.0
+	var _position := PackedVector3Array()
+	var _velocity := PackedVector3Array()
+	var _target := PackedInt32Array()
+	var _age := PackedFloat32Array()
+	var _chain: Array = []
+	var _ticks := 0
 
 	func _ready() -> void:
-		var body := MeshInstance3D.new()
-		var capsule := CapsuleMesh.new()
-		capsule.radius = 0.12
-		capsule.height = 0.7
-		capsule.radial_segments = 8
-		capsule.rings = 2
-		var metal := StandardMaterial3D.new()
-		metal.albedo_color = Color(0.5, 0.52, 0.55)
-		metal.metallic = 0.7
-		metal.emission_enabled = true
-		metal.emission = Powerup.color("torpedo")
-		metal.emission_energy_multiplier = 0.8
-		capsule.material = metal
-		body.mesh = capsule
-		body.rotation.x = PI / 2.0  # along -z
-		body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(body)
+		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+		cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if _mesh == null:
+			_mesh = CapsuleMesh.new()
+			_mesh.radius = 0.12
+			_mesh.height = 0.7
+			_mesh.radial_segments = 8
+			_mesh.rings = 2
+			var metal := StandardMaterial3D.new()
+			metal.albedo_color = Color(0.5, 0.52, 0.55)
+			metal.metallic = 0.7
+			metal.emission_enabled = true
+			metal.emission = Powerup.color("torpedo")
+			metal.emission_energy_multiplier = 0.8
+			_mesh.material = metal
+		multimesh = MultiMesh.new()
+		multimesh.transform_format = MultiMesh.TRANSFORM_3D
+		multimesh.mesh = _mesh
+		multimesh.instance_count = 0
+		top_level = true
+		global_transform = Transform3D.IDENTITY
+
+	func count() -> int:
+		return _position.size()
+
+	func add(at: Vector3, velocity: Vector3, target: int, chain: Array) -> void:
+		_position.append(at)
+		_velocity.append(velocity)
+		_target.append(target)
+		_age.append(0.0)
+		_chain.append(chain)
 
 	func _physics_process(delta: float) -> void:
-		age += delta
+		_ticks += 1
 		var horde := launcher.run.horde
 		var settings := launcher.settings
-		if not horde.is_alive(target):
-			target = horde.nearest_in_cone(global_position, Vector3.FORWARD, 30.0, -1.0)
 		var speed := settings.torpedo_speed
-		if target >= 0:
-			var to := horde.enemy_position(target) - global_position
-			if to.length() <= horde.enemy_radius(target) + 0.4:
-				_boom()
-				return
-			velocity = velocity.lerp(to.normalized() * speed, 1.0 - exp(-TURN * delta))
-		velocity = velocity.normalized() * minf(velocity.length() + speed * 2.0 * delta, speed)
-		global_position += velocity * delta
-		if velocity.length_squared() > 0.01:
-			look_at(global_position + velocity, Vector3.UP if absf(velocity.normalized().y) < 0.98 else Vector3.BACK)
-		if age >= settings.torpedo_life:
-			_boom()
+		var turn := 1.0 - exp(-TURN * delta)
+		var blown: Array[int] = []
+		for i in _position.size():
+			_age[i] += delta
+			var target := _target[i]
+			if target >= 0 and not horde.is_alive(target):
+				target = -1
+			if target < 0 and (_ticks + i) % RETARGET_TICKS == 0:
+				target = horde.nearest_in_cone(_position[i], _velocity[i].normalized() if _velocity[i].length_squared() > 0.01 else Vector3.FORWARD,
+						RETARGET_REACH, -0.2)
+			_target[i] = target
+			var velocity := _velocity[i]
+			if target >= 0:
+				var to := horde.enemy_position(target) - _position[i]
+				if to.length() <= horde.enemy_radius(target) + 0.4:
+					blown.append(i)
+					continue
+				velocity = velocity.lerp(to.normalized() * speed, turn)
+			velocity = velocity.normalized() * minf(velocity.length() + speed * 2.0 * delta, speed)
+			_velocity[i] = velocity
+			_position[i] += velocity * delta
+			if _age[i] >= settings.torpedo_life:
+				blown.append(i)
+		# Last first, so the swaps don't move one still to go.
+		for b in range(blown.size() - 1, -1, -1):
+			var i := blown[b]
+			var at := _position[i]
+			var chain: Array = _chain[i]
+			_remove(i)
+			launcher.explode(at, chain)
+		_draw()
 
-	func _boom() -> void:
-		launcher.explode(global_position, chain)
-		queue_free()
+	func _remove(i: int) -> void:
+		var last := _position.size() - 1
+		_position[i] = _position[last]
+		_velocity[i] = _velocity[last]
+		_target[i] = _target[last]
+		_age[i] = _age[last]
+		_chain[i] = _chain[last]
+		_position.resize(last)
+		_velocity.resize(last)
+		_target.resize(last)
+		_age.resize(last)
+		_chain.resize(last)
+
+	func _draw() -> void:
+		var n := _position.size()
+		if multimesh.instance_count < n:
+			multimesh.instance_count = maxi(n, multimesh.instance_count * 2)
+		multimesh.visible_instance_count = n
+		for i in n:
+			var forward := _velocity[i].normalized() if _velocity[i].length_squared() > 0.01 else Vector3.FORWARD
+			var up := Vector3.UP if absf(forward.y) < 0.98 else Vector3.BACK
+			# The capsule's long axis is y: lie it along the way it's going.
+			var basis := Basis.looking_at(forward, up) * Basis(Vector3.RIGHT, PI / 2.0)
+			multimesh.set_instance_transform(i, Transform3D(basis, _position[i]))

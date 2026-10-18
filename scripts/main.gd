@@ -745,6 +745,7 @@ func _start_unnatural(test_tank := false, authority := true) -> void:
 	_camera.ball_cam = false
 	UnnaturalRun.steady_camera(_camera, true, unnatural_run.settings)
 	_camera.snap()
+	_hud.survivor_cam = true
 	_unnatural_hud = UnnaturalHud.new()
 	_unnatural_hud.name = "UnnaturalHud"
 	_unnatural_hud.run = unnatural_run
@@ -760,6 +761,7 @@ func _end_match() -> void:
 		_local.detach_run()
 		_local.slots[0].mode_hud = null
 		UnnaturalRun.steady_camera(_camera, false, unnatural_run.settings)
+		_hud.survivor_cam = false
 		unnatural_run.end()
 		unnatural_run.queue_free()
 		unnatural_run = null

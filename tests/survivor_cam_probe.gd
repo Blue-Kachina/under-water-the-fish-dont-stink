@@ -35,6 +35,7 @@ func _run() -> void:
 	settings.camera_mode = 0
 	settings.camera_hold_on_throttle = true
 	settings.free_cam_follow = 0.0
+	settings.free_cam_invert_y = false
 	main.set_mode(main.UNNATURAL)
 	await _seconds(0.1)
 	main._match_card.play_requested.emit()
@@ -59,9 +60,24 @@ func _run() -> void:
 	await _seconds(0.8)
 	check(_flat(camera._heading).dot(start) > 0.99, "nor holding reverse")
 	Input.action_release("thrust_reverse")
+	Input.action_press("boost")
+	await _seconds(0.8)
+	check(_flat(camera._heading).dot(start) > 0.99, "nor holding boost (D9)")
+	Input.action_release("boost")
 	await _seconds(2.5)
 	check(_flat(camera._heading).dot(_flat(-fish.global_basis.z)) > 0.95, "let go, it turns round behind the fish")
 	check(_flat(-camera.global_basis.z).dot(_flat(-fish.global_basis.z)) > 0.9, "and the view goes with it")
+	# Its heading by itself: the nose, not the drift; from dead behind, the way the fish turns.
+	for spin: float in [2.0, -2.0]:
+		camera._heading = Vector3.FORWARD
+		var subject := {"angular_velocity": Vector3(0, spin, 0), "linear_velocity": Vector3(12, 0, 0)}
+		camera._turn_behind(subject, Vector3.BACK, settings.camera_swing_rate, 0.05)
+		var went := Vector3.FORWARD.signed_angle_to(_flat(camera._heading), Vector3.UP)
+		check(signf(went) == signf(spin), "dead behind, turning %s: it swings %s" % ["left" if spin > 0 else "right", "left" if went > 0 else "right"])
+	camera._heading = Vector3.FORWARD
+	for i in 60:
+		camera._turn_behind({"linear_velocity": Vector3(12, 0, 0)}, Vector3.LEFT, settings.camera_swing_rate, 1.0 / 60.0)
+	check(_flat(camera._heading).dot(Vector3.LEFT) > 0.95, "coasting sideways, it settles behind the nose, not the drift")
 	settings.camera_hold_on_throttle = false
 	Input.action_press("thrust_forward")
 	_face(0.0)
@@ -103,6 +119,16 @@ func _run() -> void:
 	Input.action_release("camera_up")
 	pitch = asin(clampf(camera._heading.y, -1.0, 1.0))
 	check(pitch > 0.5 and pitch <= deg_to_rad(settings.free_cam_pitch) + 0.01, "and up looks up (%.0f deg)" % rad_to_deg(pitch))
+	settings.free_cam_invert_y = true
+	await _seconds(0.1)
+	Input.action_press("camera_down")
+	await _seconds(1.0)
+	Input.action_release("camera_down")
+	check(asin(clampf(camera._heading.y, -1.0, 1.0)) >= pitch - 0.01, "free_cam_invert_y on: down on the stick looks up (D11)")
+	Input.action_press("camera_up")
+	await _seconds(3.0)
+	Input.action_release("camera_up")
+	check(asin(clampf(camera._heading.y, -1.0, 1.0)) < -0.5, "and up looks down")
 	settings.free_cam_follow = 3.0
 	await _seconds(2.5)
 	check(_flat(camera._heading).dot(_flat(-fish.global_basis.z)) > 0.95, "free_cam_follow drifts it behind the fish")

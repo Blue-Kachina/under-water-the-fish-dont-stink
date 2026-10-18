@@ -7,7 +7,9 @@ extends CanvasLayer
 ## - the stage clock (counting up) under it, with the kills under that;
 ## - a splash for each level-up, and when the run's over;
 ## - the results board (BroadcastUI.StatsBoard): held on D-pad up / B, and up
-##   by itself once everyone's down. R starts again.
+##   by itself once everyone's down. R starts again. Beside it, your own fish:
+##   its attack, level and hp, every stat it has, and its powerups (StatsPanel).
+## - the minimap (Minimap) in the bottom-right.
 ## With show_director on, the director's live numbers sit under the clock. In
 ## the Test Tank a DPS readout (TestTank's numbers) sits on the right.
 ## - the stage: each event's warning splash, the next one under the kills,
@@ -34,6 +36,7 @@ var player_camera: Camera3D:
 			player_camera.connect("survivor_cam_swapped", _show_cam_mode)
 
 var _bars := Bars.new()
+var _minimap := Minimap.new()
 var _clock := Label.new()
 var _kills := Label.new()
 var _director := Label.new()
@@ -42,6 +45,7 @@ var _board := BroadcastUI.StatsBoard.new()
 var _hurt := ColorRect.new()
 var _cards := LevelUpCards.new()
 var _dps := DpsPanel.new()
+var _stats := StatsPanel.new()
 var _over_age := -1.0
 var _cam_note := Label.new()
 
@@ -55,6 +59,8 @@ func _ready() -> void:
 	_bars.hud = self
 	_bars.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_bars)
+	_minimap.hud = self
+	add_child(_minimap)
 	for label: Label in [_clock, _kills, _director]:
 		label.anchor_left = 0.5
 		label.anchor_right = 0.5
@@ -98,6 +104,15 @@ func _ready() -> void:
 	_dps.offset_top = 140.0
 	_dps.offset_bottom = 520.0
 	add_child(_dps)
+	_stats.hud = self
+	_stats.anchor_left = 1.0
+	_stats.anchor_right = 1.0
+	_stats.offset_left = -StatsPanel.WIDTH - 16.0
+	_stats.offset_right = -16.0
+	_stats.offset_top = 120.0
+	_stats.offset_bottom = 900.0
+	_stats.visible = false
+	add_child(_stats)
 	add_child(_cards)
 	add_child(_board)
 	_board.headings = HEADINGS
@@ -124,13 +139,17 @@ func _ready() -> void:
 			_splash.play(StageTimeline.headline(event), "WARNING", StageTimeline.line(event), HP_COLOR, 2.4))
 		run.boss_defeated.connect(func(boss: Boss, by: FishController) -> void:
 			if boss is DrownedShark:
-				_splash.play("DROWNED SHARK BEATEN", "MINI-BOSS DOWN", "%s  ·  IT DROPPED A CHEST" % (by.display_name.to_upper() if is_instance_valid(by) and by.display_name else "SURVIVORS"),
-						TreasureChest.GOLD, 2.4))
+				_splash.play("DROWNED SHARK BEATEN", "MINI-BOSS DOWN", "%s  ·  IT DROPPED A BOSS CHEST" % (by.display_name.to_upper() if is_instance_valid(by) and by.display_name else "SURVIVORS"),
+						TreasureChest.STEEL, 2.4))
 		run.boss_enraged.connect(func(_boss: Boss) -> void:
 			_splash.play("THE LEVIATHAN ENRAGES", "NO TIME LIMIT", "AND THE DEAD KEEP COMING", HP_COLOR, 2.4))
 		run.stage_completed.connect(func() -> void:
 			_over_age = 0.0
 			_splash.play("STAGE COMPLETE", "THE NIGHT IS OVER", "%s  ·  %d KILLS" % [_time_text(run.elapsed), run.kills], TreasureChest.GOLD, OVER_SPLASH))
+		run.drop_taken.connect(_show_drop)
+		run.powerup_lost.connect(func(whose: FishController, id: String) -> void:
+			if whose == fish:
+				_note("THE SUNKEN IDOL TAKES YOUR %s" % Powerup.title(id).to_upper(), TreasureChest.BLOOD))
 		run.restarted.connect(func() -> void:
 			_over_age = -1.0
 			_cards.close()
@@ -138,8 +157,26 @@ func _ready() -> void:
 
 
 func _show_cam_mode(free: bool) -> void:
-	_cam_note.text = ("FREE CAM  ·  RIGHT STICK AIMS" if free else "FOLLOW CAM") + "  ·  Y SWAPS"
-	_cam_note.modulate.a = 1.6  # holds a moment before it fades
+	_note(("FREE CAM  ·  RIGHT STICK AIMS" if free else "FOLLOW CAM") + "  ·  Y SWAPS", Color.WHITE)
+
+
+## A short note in the middle of the view that holds a moment, then fades.
+func _note(text: String, color: Color) -> void:
+	_cam_note.text = text
+	_cam_note.add_theme_color_override("font_color", color)
+	_cam_note.modulate.a = 1.6
+
+
+## A drop taken: what it did (a heart heals the whole team).
+func _show_drop(kind: int, by: FishController) -> void:
+	var color: Color = Pickup.COLORS[kind]
+	match kind:
+		Pickup.Kind.HEART:
+			_note("HEART  ·  +%d%% HP%s" % [roundi(run.settings.heart_heal * 100.0), "" if run.players.size() <= 1 else " FOR THE TEAM"], color)
+		Pickup.Kind.MAGNET:
+			_note("MAGNET  ·  EVERY PEARL TO %s" % ("YOU" if by == fish else (by.display_name.to_upper() if is_instance_valid(by) and by.display_name else "A FRIEND")), color)
+		Pickup.Kind.HOURGLASS:
+			_note("HOURGLASS  ·  THE DEAD STAND STILL  ·  %d S" % roundi(run.settings.hourglass_time), color)
 
 
 func _process(delta: float) -> void:
@@ -155,10 +192,10 @@ func _process(delta: float) -> void:
 	_director.visible = run.settings.show_director
 	if _director.visible:
 		var director := run.director
-		_director.text = "DIRECTOR  alive %d / %d  ·  pressure x%.2f  ·  intensity %.2f%s  ·  kills/s %.1f  ·  pack %d  ·  elite %d%%" % [
+		_director.text = "DIRECTOR  alive %d / %d  ·  pressure x%.2f  ·  intensity %.2f%s  ·  kills/s %.1f  ·  pack %d  ·  elite %d%%  ·  difficulty %.1f" % [
 				run.horde.alive_count(), director.target_alive(), director.pressure, director.intensity,
 				"  ·  BREATHER %.0f s" % director.relief_left if director.in_relief() else "", director.kill_rate(),
-				director.swarm_size(), roundi(director.elite_chance() * 100.0)]
+				director.swarm_size(), roundi(director.elite_chance() * 100.0), run.difficulty()]
 	if _over_age >= 0.0:
 		_over_age += delta
 	_update_board()
@@ -167,8 +204,10 @@ func _process(delta: float) -> void:
 func _update_board() -> void:
 	var input: PlayerInput = fish.input_source if fish and fish.input_source else PlayerInput.everyone()
 	_board.shown = input.pressed("show_scoreboard") or _over_age >= OVER_SPLASH
+	_stats.visible = _board.shown and is_instance_valid(fish)
 	if not _board.shown:
 		return
+	_stats.queue_redraw()
 	_board.title = ("STAGE COMPLETE" if run.stage_complete else "RUN OVER") if run.is_over else "RUN STATS"
 	var footer := "TIME  %s    ·    LEVEL  %d" % [_time_text(run.elapsed), run.levels.level]
 	if run.is_over:
@@ -240,6 +279,65 @@ class DpsPanel extends Control:
 			BroadcastUI.text(self, Rect2(x, y, width, ROW), cells[c], size_px, color,
 					HORIZONTAL_ALIGNMENT_LEFT if c == 0 else HORIZONTAL_ALIGNMENT_RIGHT, 700)
 			x += width
+
+
+## Your own fish beside the results board: your fish and its attack, your
+## level and hp, every stat you have (the signature marked), and your
+## powerups with their stacks, each in its rarity's colour.
+class StatsPanel extends Control:
+	const WIDTH := 360.0
+	const ROW := 22.0
+
+	var hud: UnnaturalHud
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var run := hud.run
+		var fish := hud.fish
+		if not is_instance_valid(run) or not is_instance_valid(fish) or run.health_of(fish) == null:
+			return
+		var lines := []  # [text, colour, size]
+		var attack := run.attack_of(fish)
+		lines.append(["%s  ·  %s" % [FishCharacter.display_name(fish.character).to_upper(),
+				FishAttack.title(attack.kind).to_upper() if attack else "?"], BroadcastUI.GOLD, 16])
+		var health := run.health_of(fish)
+		lines.append(["LEVEL %d    ·    HP %d / %d" % [run.levels.level, roundi(health.hp), roundi(health.max_hp)], Color.WHITE, 15])
+		lines.append(["", Color.WHITE, 8])
+		lines.append(["STATS", Color(1, 1, 1, 0.6), 12])
+		var block := run.block_of(fish)
+		var signature := StatBlock.signature(fish.character)
+		var any := false
+		for id: String in StatBlock.STATS:
+			var value := block.value(id)
+			if absf(value) < 0.0001:
+				continue
+			any = true
+			lines.append([StatBlock.describe(id, value) + ("   (SIGNATURE)" if id == signature else ""),
+					BroadcastUI.GOLD if id == signature else Color.WHITE, 14])
+		if not any:
+			lines.append(["none yet", Color(1, 1, 1, 0.5), 14])
+		lines.append(["", Color.WHITE, 8])
+		lines.append(["POWERUPS", Color(1, 1, 1, 0.6), 12])
+		var held := run.powerups_of(fish).list()
+		for entry: Array in held:
+			var id: String = entry[0]
+			lines.append(["%s  x%d   ·   %s" % [Powerup.title(id), entry[1], Rarity.NAMES[Powerup.tier(id)]],
+					Rarity.COLORS[Powerup.tier(id)].lightened(0.25), 14])
+		if held.is_empty():
+			lines.append(["none yet", Color(1, 1, 1, 0.5), 14])
+		var height := 0.0
+		for line: Array in lines:
+			height += ROW if line[2] > 8 else 8.0
+		draw_rect(Rect2(0.0, 0.0, WIDTH, height + 20.0), Color(BroadcastUI.INK, 0.85))
+		draw_rect(Rect2(0.0, 0.0, 4.0, height + 20.0), BroadcastUI.GOLD)
+		var y := 10.0
+		for line: Array in lines:
+			var tall: float = ROW if line[2] > 8 else 8.0
+			if line[0] != "":
+				BroadcastUI.text(self, Rect2(16.0, y, WIDTH - 28.0, tall), line[0], line[2], line[1], HORIZONTAL_ALIGNMENT_LEFT, 700)
+			y += tall
 
 
 ## The health bar under the fish and the XP bar along the top; the player's
@@ -340,7 +438,7 @@ class Bars extends Control:
 		if camera == null:
 			return
 		var view := Rect2(Vector2.ZERO, size).grow(-40.0)
-		for chest in run.shut_chests():
+		for chest in run.shut_chests_for(fish):
 			var at := chest.global_position + Vector3.UP
 			var gap := at.distance_to(fish.global_position)
 			if gap > run.settings.chest_sense_range:
@@ -359,8 +457,9 @@ class Bars extends Control:
 				spot = middle + direction * reach
 			var pulse := 0.6 + 0.4 * sin(Time.get_ticks_msec() / 160.0)
 			var diamond := PackedVector2Array([spot + Vector2(0, -12), spot + Vector2(10, 0), spot + Vector2(0, 12), spot + Vector2(-10, 0)])
-			draw_colored_polygon(diamond, Color(TreasureChest.GOLD, 0.5 + 0.4 * pulse))
-			BroadcastUI.text(self, Rect2(spot.x - 40.0, spot.y + 12.0, 80.0, 18.0), "%d M" % roundi(gap), 13, TreasureChest.GOLD,
+			var tint := chest.tint()
+			draw_colored_polygon(diamond, Color(tint, 0.5 + 0.4 * pulse))
+			BroadcastUI.text(self, Rect2(spot.x - 40.0, spot.y + 12.0, 80.0, 18.0), "%d M" % roundi(gap), 13, tint,
 					HORIZONTAL_ALIGNMENT_CENTER, 700)
-			if chest.progress > 0.0 and inside:
-				draw_arc(spot, 22.0, -PI / 2.0, -PI / 2.0 + TAU * chest.progress, 32, TreasureChest.GOLD, 4.0)
+			if chest.progress_of(fish) > 0.0 and inside:
+				draw_arc(spot, 22.0, -PI / 2.0, -PI / 2.0 + TAU * chest.progress_of(fish), 32, tint, 4.0)

@@ -6,11 +6,14 @@ class_name Rarity
 ## (luck 0.5 roughly doubles epic and quintuples legendary). A tier's
 ## multiplier scales what the card gives.
 
-enum Tier { COMMON, UNCOMMON, RARE, EPIC, LEGENDARY }
+## BOSS and CURSED are powerups' alone (D13): a boss's own chest, and the
+## blood-red cursed chest. Cards never roll them.
+enum Tier { COMMON, UNCOMMON, RARE, EPIC, LEGENDARY, BOSS, CURSED }
 
-const NAMES := ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"]
-## Card frames: grey, green, blue, purple, gold.
-const COLORS := [Color(0.62, 0.64, 0.66), Color(0.3, 0.8, 0.35), Color(0.25, 0.55, 1.0), Color(0.68, 0.32, 0.95), Color(1.0, 0.76, 0.2)]
+const NAMES := ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY", "BOSS", "CURSED"]
+## Card frames: grey, green, blue, purple, gold, steel blue, blood red.
+const COLORS := [Color(0.62, 0.64, 0.66), Color(0.3, 0.8, 0.35), Color(0.25, 0.55, 1.0), Color(0.68, 0.32, 0.95), Color(1.0, 0.76, 0.2),
+		Color(0.45, 0.75, 0.9), Color(0.85, 0.08, 0.12)]
 
 
 static func weights(settings: UnnaturalSettings, luck: float) -> PackedFloat32Array:

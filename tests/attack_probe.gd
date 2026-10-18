@@ -36,6 +36,7 @@ func _run() -> void:
 	settings.card_choices = 0
 	settings.enemy_speed_scale = 0.0  # zombies hold still
 	settings.enemy_hp_scale = 100.0  # and nothing dies: count the hits
+	settings.difficulty_per_minute = 0.0  # every zombie at its kind's hp (_hurt compares with it)
 	settings.enemy_damage_scale = 0.0
 	settings.chest_count = 0
 	settings.twists = false

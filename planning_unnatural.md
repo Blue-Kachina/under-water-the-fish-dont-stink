@@ -28,38 +28,285 @@ system and the first four).
 is a **Fish Fry**. Teams are team colours / team 0, 1. "Demo" is only for Rocket League.
 
 ## Status
-**Phases 0 to 8 are built (2026-10-17). Online co-op now has a probe, and it passes. Phase 9 isn't
-started.** Pick **Unnatural** or **Test Tank** in the mode list.
+**Phases 0 to 8 are built (2026-10-17), and so is the second play-test's round of changes (Round 2
+below). Phase 9 isn't started.** Pick **Unnatural** or **Test Tank** in the mode list.
 
-### Handoff (second 2026-10-17 session): start here
-1. **Awaiting the user's play-test** of the camera rework (build exported 14:43):
-   - **Two survivor cams** (UNNATURAL > Camera: `camera_mode` picks the one a run starts with). The
-     ball cam button (Y) swaps them, per player, and the HUD shows FOLLOW CAM / FREE CAM.
-     - **Follow cam:** turns with the way the fish swims, but holds its direction while accelerate
-       or reverse is held (`camera_hold_on_throttle`). Boost doesn't count as accelerate; ask the
-       user whether it should.
-     - **Free cam:** only the right stick turns it (`free_cam_speed`, `free_cam_pitch` limit), and
-       it stays where it's put. `free_cam_follow` (default 0) can drift it back behind the fish.
-   - **Bug fixed:** with `rl_surface_mechanics` on (the default), swimming in open water counts as
-     "in the air", so the camera held its direction as RL's does in the air. The survivor cam never
-     turned at all while swimming, which likely explains most of the "frustrating" feedback.
-     `steady_heading` now always steers (`FollowCamera._process`).
-   - **Chests:** `chest_reach` is still 8 m, up from 3 m (the panel goes higher). Ask the user if
-     that's enough.
-2. **Phase 9** (polish: juice, damage numbers, the full scoreboard, a perf pass).
-3. Phase 8 leftovers (unchanged): D3's slow-mo for the picker; teammates' small health bars.
+### Handoff (fourth 2026-10-17 session): start here
+**State:** the answers to the open questions (D9 to D16) are built and probed. So are the first
+batch of powerups (D14) and the Boss and Cursed tiers (D13). See "The first powerup batch" and "Boss
+and Cursed powerups" below. Nothing is half-done. The user does all the git.
 
-Probes added: `survivor_cam_probe` (both cams, the swap, the panel) and the online pair
-`tests/unnatural_net.sh` + `unnatural_net_peer` (host, laggy guest, late joiner). The online probe
-checks spawns, a guest's hit, swim corrections (mean 0.12 m), pearls counted once, chests, the
-Drowned Shark puppet and its defeat, down and revive, a late joiner, restart and the host leaving.
-It found no game bugs.
-- Note for probes: `CoopSession._host_clock` only learns from Nature's snapshots, so it means
-  nothing in Unnatural. Use `rtt / 2` there, as UnnaturalNet does.
-- Earlier probes: `stage_probe`, `unnatural_coop_probe`.
-- At hand-off every probe passed except a flaky one. `powerup_probe`'s "without it: the bow off,
-  all back" failed 2 runs in 5 and passed in the other 3 (the Bow powerup, unrelated to the
-  camera). It's worth a look in phase 9.
+1. **Awaiting the user's play-test** of Round 2 and of this session's work. Expect tuning on:
+   - the follow cam's swing (`camera_swing_rate`);
+   - drop and chest chances;
+   - the difficulty curve;
+   - the edge's look;
+   - the 12 new powerups' numbers (POWERUPS section of the panel);
+   - the Boss and Cursed ones, and how often a chest is cursed (`cursed_chest_chance`).
+2. **Open question for the user:** beating the Blood Leviathan ends the run, so its Leviathan's
+   Coil can't be used yet (only through its testing override). Should a beaten Leviathan drop its
+   chest and let the run go on (endless, or a next stage)?
+3. **Phase 9** (polish: juice, damage numbers, the full scoreboard, more perf). About 23 ms
+   worst-case spikes are left in `torpedo_bench` with 16 torpedo stacks, 8 lightning stacks and
+   1000 zombies. A real profiler is the next step there.
+4. **Equipment** (D13): after phase 9. See §7c.
+5. Phase 8 leftovers: D3's slow-mo for the picker; teammates' small health bars.
+6. **Perf pass 2 (split-screen) is built**; see the next section. Awaiting the user's 3-player test.
+
+### Perf pass 2: split-screen (fifth 2026-10-17 session, built)
+The user found 3-player split-screen "extremely laggy". Measured with the new
+`tests/split_bench.tscn` (a window bench, not a probe: `--players --count --apart --spread
+--pearls --powers --profile`). The cause was the horde's GPU cost.
+- **Every zombie was a ~50,000-triangle model.** The 9 eye and mouth spheres are about 4,200
+  triangles each; the body is about 3,000. Each zombie was drawn twice (with the rot overlay) and
+  had about 15 surfaces. Godot's LODs never kicked in, because a MultiMesh's LOD is picked from its
+  bounds, which are the whole arena, so the camera is always inside them.
+  - Fix: `SchoolLook.detail_meshes(family, error)` cuts fixed-detail meshes from the bake's own
+    LODs. It also merges parts with equal materials, taking a fish from 17 surfaces to 6–8.
+  - The Horde draws three distance bands (near, mid, far). They are panel settings under
+    UNNATURAL > Performance: `lod_near_error` 0.004, `lod_mid_distance` 12 m, `lod_mid_error` 0.02,
+    `lod_far_distance` 30 m, `lod_far_error` 0.1. The distances scale with the zombie's size.
+  - A fish is now about 1.3k–4.7k triangles. Side-by-side shots at 2.5–45 m look the same as
+    full detail.
+- **Every view drew the union of what all the cameras saw.** Now, in split-screen
+  (`per_view_horde`, on by default), each view has its own set of looks and eyes. Each set sits
+  on its player's render layer (the chests' layers 17–20) and holds only what that camera sees.
+- **Empty looks are hidden.** A MultiMesh with 0 instances still cost draw calls.
+- **Draw loop:** the pose, transform and telegraph are worked out once per zombie, not once per
+  view. `SchoolLook.pose_for()` is inlined, since it built an array on every call.
+
+| 1920x1080, `split_bench` | Before | After |
+|---|---|---|
+| 1 player, 2,000 zombies | 7.9 ms (127 fps), GPU 7.6 ms | 1.6 ms, GPU 1.3 ms |
+| 3 players, 2,000 zombies | 24.9 ms (40 fps), GPU 24.5 ms | 8.4 ms (119 fps), GPU 2.6 ms |
+| 3 players, 3,000 zombies, bunched | — | 11.8 ms (85 fps) |
+| 3 players, 800 zombies, powerups at 4 stacks | — | 8.1 ms (124 fps) |
+
+At 3 players it's now CPU-bound:
+- the GDScript draw loop: 2.9 ms at 2,000 zombies and 3 views;
+- the render thread: about 1.8 ms;
+- the horde step: 1.3 ms per 30 Hz step.
+
+Scripts (the run, pearls, cameras, HUDs) are under 1 ms between them. Next levers if it's needed:
+- port `_draw_horde` and `step_once` to the GDExtension (`native/` is still just the template);
+- or rewrite far-band zombies at half rate.
+
+Probes: `murk_probe` checks the per-view sets, their layers, the bands and the cut meshes.
+Nature's schools still use the full bakes through `SchoolLook.meshes()`; `detail_meshes()` could
+serve them too if Nature split-screen needs it.
+
+### The first powerup batch (fourth 2026-10-17 session, built)
+The answers (D9 to D16), as built:
+- **D9.** Boost counts as accelerate for the follow cam's hold (`FollowCamera._throttle_held`).
+- **D11.** `free_cam_invert_y` (UNNATURAL > Camera), on by default: down on the stick looks up.
+- **D12.** A heart heals every player who's up, wherever they are. Online, each machine heals its
+  own players. The HUD says "FOR THE TEAM" in co-op.
+- **D15.** Bow Grow Bow was already common in `Powerup.INFO`; the §7b table now says so.
+
+The 12 powerups (D14), each with its own POWERUPS group and a `*_stacks` testing override
+(`PowerupSettings.STACKS` maps each id to its override):
+
+| Powerup | Tier | Built as |
+|---|---|---|
+| Barnacle Plating, Hermit Shell, Fizzy Soda, Speedy Seahorse | common | `StatPowerup`: `stat_bonus()` goes on the player's `StatBlock.bonus`, so it works like level-up cards |
+| Remora Buddy | common | remoras take turns nipping the nearest zombie; one worn per remora |
+| Bubble Wrap | common | ready after `bubble_ready` s untouched (shows the bubble), then takes a hit (`UnnaturalRun.hurt` asks `blocks_hit`) |
+| Pufferfish Spines | uncommon | on hurt: reflects a share at the toucher, and a spine burst |
+| Jellyfish Halo | uncommon | jellies orbit in the world (one node), stinging each tick |
+| Electric Eel | uncommon | a battery sends a shock ring (with a cooldown) |
+| Depth Charges | rare | mines drop behind, arm, and blow on proximity or at the end of their life |
+| Anglerfish Lure | rare | a decoy in `UnnaturalRun.decoys`, which the horde chases (`Horde.target_pull`), then it bursts |
+| Tsunami Heart | legendary | a battery sends a wave along the heading that hits each zombie once (with a cooldown) |
+
+New plumbing:
+- `Powerup` hooks `on_hurt(amount, from)`, `blocks_hit(amount)` and `stat_bonus()`;
+- `UnnaturalRun.hurt(fish, amount, from)` (from: the zombie whose touch it was);
+- `PowerupFx` (a short ring or flash, at most 40 at once).
+
+Known limits:
+- Online, an Anglerfish decoy draws only the zombies on the machine that dropped it.
+- Another player's powerup effects (mines, jellies, lures, waves) are local, like Greek Fire's.
+
+Probes: the new `powerup_batch_probe` covers all 12. `drops_probe` gained the team heart and
+now checks chest pools by tier, and `survivor_cam_probe` gained boost and invert-Y.
+
+**Probes at hand-off:**
+- The full suite passed. One timing check failed while other Godot runs were going at the same
+  time, and passed on its own.
+- `attack_probe` and `unnatural_combat_probe` now pin `difficulty_per_minute = 0`: they compare
+  hp with each kind's base hp. Any new probe that does the same should pin it too.
+- New this session:
+  - `drops_probe` (Round 2);
+  - `survivor_cam_probe` (both cameras, and the follow cam's swing);
+  - `tests/unnatural_net.sh` with `unnatural_net_peer` (online: host, a laggy guest, a late joiner);
+  - `tests/torpedo_bench.tscn` (a window bench, not a probe);
+  - `tests/round2_shots.tscn` (screenshots to check by eye).
+- Probe lessons:
+  - A press from a timer callback is missed: press at the start of a frame.
+  - `CoopSession._host_clock` means nothing in Unnatural.
+  - Player ids are 64-bit: never put them in PackedInt32Array.
+
+**Another session** asked to pick up the plan's remaining work after this one. It's working on
+`planning_murk.md` and `tests/horde_bench.gd`.
+
+### Boss and Cursed powerups (fourth 2026-10-17 session, built)
+D13's two tiers. `Rarity.Tier` gained BOSS and CURSED. Level-up cards never roll them, and
+neither do treasure chests (`pick_for_chest` stops at legendary).
+
+**Chests** now have a kind (`TreasureChest.Kind`):
+- treasure (gold);
+- cursed (blood red);
+- boss (steel blue, holding its boss's `item`).
+
+A buried chest is cursed with `cursed_chest_chance` (10%; luck doesn't change it). The Drowned
+Shark drops a boss chest with its Drowned Fin; it used to drop a treasure chest. The HUD's ping and
+the minimap show each chest in its colour. Online, a chest's kind and item go with it, both when it
+appears and in a late joiner's world.
+
+A player's opened chests wait in a queue (`_chest_pending`: [kind, item] each). The chest's kind
+decides its cards.
+
+| Powerup | Tier | Does |
+|---|---|---|
+| Drowned Fin | boss (the Drowned Shark) | press boost when ready: a dash at `fin_dash_speed`, untouchable, each zombie passed takes `fin_damage` once; then `fin_cooldown` |
+| Leviathan's Coil | boss (the Blood Leviathan) | `coil_segments` glowing coils trail the fish and hurt what they touch |
+| Blood Moon Shard | cursed | +100% damage; +50% damage taken |
+| Glass Coral | cursed | +100% damage; max hp halved |
+| Siren's Song | cursed | +100% XP gain; the director's target x1.5 (`UnnaturalRun.horde_scale`) |
+| Abyssal Hunger | cursed | a kill heals 3% of max hp; lose 2% a second (stops at 1 hp unless `hunger_can_kill`) |
+| Sunken Idol | cursed | one more pick from every chest (the cards left re-offered); each stage event takes a stack of a random other powerup you earned (the HUD says which) |
+
+Each has a POWERUPS group and a testing override, like the rest. Every number is a setting.
+
+Known limits:
+- The Leviathan's Coil has no drop yet (see the open question in the Handoff).
+- Online, the host's director counts only the host's own Siren's Song, since a guest's powerups
+  aren't sent.
+
+Probes: the new `boss_cursed_probe` covers all of it. `unnatural_net` now checks chest kinds, and
+`powerup_batch_probe` counts 23 powerups.
+
+### Round 2: the second play-test (2026-10-17, built)
+The user tried the two cameras: "an improvement". Their list, and how each gets built:
+
+1. **Follow cam.**
+   - The feedback: "still seems to favour a particular direction". After accelerate or reverse is
+     let go, it should swing round into place behind the fish.
+   - Found:
+     - It eased toward the way the fish *moves* (its velocity), not where it *faces*. A coasting
+       fish that has turned keeps its old velocity, so the camera settled off to one side.
+     - Swinging round from dead behind always went the same way round (a fixed nudge).
+   - Build:
+     - Let go, it turns its yaw behind the fish's facing, the shorter way round. From dead behind
+       it goes the way the fish is turning.
+     - It turns at its own rate (`camera_swing_rate`), on top of `camera_turn_rate` while swimming.
+     - Its climb still follows `camera_climb`.
+2. **Pearls.**
+   - They never expire (`pearl_lifetime` is gone from Unnatural).
+   - Every kill already drops one. Past the cap, a new drop merges into the *nearest* pearl (which
+     grows), not the oldest, so you can see where your kills' XP went.
+   - Pearls stay shared, one pickup each (user: "everybody gets XP anyway").
+3. **Chests, each player's own.**
+   - Every chest is there for every player. Each player opens it for themselves and gets their own
+     pick. Once you've opened it, it's gone from *your* view, and still there for the others.
+   - Split-screen: each player's camera has its own render layer (cull mask), and a chest shows
+     only on the layers of the players who haven't opened it.
+   - Online: a chest remembers who has opened it (by player id). Opening it no longer opens it for
+     everyone.
+4. **Chests from kills.**
+   - Each kill has `chest_drop_chance` of dropping a chest, raised by the killer's luck
+     (`chest_drop_luck`). The host rolls it and sends it over.
+   - The chest sinks to the seabed where the zombie died.
+5. **Luck and chests.**
+   - A chest's powerup rolls a rarity with the opener's luck (as the level-up cards do).
+   - Powerups get a rarity each: Bow Grow Bow is common; Greek Fire and Chain Lightning uncommon;
+     Torpedo Launcher rare.
+   - A chest offers powerups of its rolled rarity. With fewer than 3 of that rarity, it fills up
+     from the tiers below.
+6. **Drops from kills** (shared, one pickup, each a glowing token):
+   - **Heart** (rare, `heart_chance`): +50% of the picker's max hp (`heart_heal`).
+   - **Magnet** (rarer, `magnet_chance`): every pearl out flies to the picker.
+   - **Hourglass** (rare, `hourglass_chance`): every zombie stops dead for `hourglass_time` (15 s),
+     tinted icy. They can still be hit. Bosses go on (`hourglass_bosses` off).
+   - Online: the host rolls and sends drops. A guest claims a pickup the way it claims a pearl,
+     and the effect plays on every machine.
+7. **Arena edge.**
+   - A ring of tall rock outcrops and thick kelp forest on `arena_radius`, plus a faint red wall
+     of light, so the edge reads from far off. The edge push stays as it is.
+   - Settings: `edge_rocks`, `edge_kelp`, `edge_height`.
+8. **Every powerup is worn**, as the Bow is, and grows with its stacks:
+   - Greek Fire: a lantern on the tail.
+   - Chain Lightning: a crackling coil antenna.
+   - Torpedo Launcher: twin tubes on the flanks.
+9. **Difficulty over time.**
+   - A difficulty level grows with the minutes (`difficulty_per_minute`). Each zombie keeps the
+     level it was spawned at.
+   - Per level: hp +`difficulty_hp`, damage +`difficulty_damage`, speed +`difficulty_speed`, and
+     size +`difficulty_size`, up to `difficulty_size_max`.
+   - The director line shows the level. Online, each spawn carries its level.
+10. **Performance with a big Torpedo Launcher.**
+    - Measure first: a bench in the Test Tank with high torpedo stacks.
+    - Likely costs:
+      - one node, mesh and material per torpedo;
+      - sorting every zombie within 40 m on each launch;
+      - an `Explosion` per blast;
+      - proc chains: blasts start lightning.
+    - Fix with:
+      - pooled torpedoes drawn by one MultiMesh;
+      - a capped number in flight;
+      - a cheap nearest pick;
+      - blasts batched per frame.
+11. **Your stats on the scoreboard.** Beside the board: your fish, attack, level, max hp, every stat
+    that isn't 0 (from StatBlock), and your powerups with their stacks.
+12. **Powerups.** The brainstorm is below (§7b); the user picks which to build later.
+
+How it went, and where the build differs from the list above:
+- **Follow cam:** as planned (`FollowCamera._turn_behind`, `camera_swing_rate`).
+- **Pearls:** as planned. Also:
+  - pearls share one mesh and material (the aura's strength is an instance uniform);
+  - a pearl with no fish near rests between looks (`Pearl.SLEEP_TICKS`);
+  - `max_pearls` went up to 600.
+- **Chests:**
+  - Chests sink at 8 m/s.
+  - Each kill's chest chance is `chest_drop_chance` (0.006), and the drops' chances use
+    `chest_drop_luck` too.
+  - A chest everyone has opened vanishes, but keeps its place in `chests` (online indices).
+- **The online probe found a bug**, now fixed: player ids (peer x 100 + slot) don't fit
+  PackedInt32Array, so the chest openers in a late joiner's world are sent as plain ints.
+  - Also: chest opens whose player's puppet hadn't arrived yet now wait for it
+    (`UnnaturalNet._unresolved`).
+- **Drops:** the heart's chance is 0.004, the magnet's 0.0015, the hourglass's 0.002 (an elite's x5).
+  - While frozen, zombies don't steer, lunge or bite, and their tails stop.
+  - The HUD notes each drop that's taken.
+- **The arena's edge:** 90 outcrops (3 rocks each) and 900 kelp blades on the rim, plus a red
+  glow rising from the seabed (its shader works from the mesh's height).
+- **Worn powerups:** the `Powerup.make_worn()` / `wear()` / `take_off()` base. Taking a look off
+  detaches it at once. That also fixed `powerup_probe`'s flaky "bow off" check: `queue_free` only
+  frees at the frame's end, and a busy headless run steps several ticks in one frame.
+- **Difficulty:** the defaults are 0.5 levels a minute. Per level: +30% hp, +15% damage, +4% speed
+  and +8% size, up to 2x the size. At 10 minutes that's 2.5x the hp and 1.4x the size.
+- **Performance**, measured with `tests/torpedo_bench.tscn` (1920x1080, 1000 zombies, 16 torpedo
+  stacks, 8 lightning stacks):
+
+  | | Before | After |
+  |---|---|---|
+  | Physics per frame | 50 ms | 10 ms |
+  | Worst frame | 125–167 ms | about 23 ms |
+
+  With no powerups, the worst frame is 9.4 ms.
+  - The torpedoes:
+    - became one pooled MultiMesh swarm (`TorpedoSwarm`), at most `torpedo_max` (48) flying;
+    - re-target near themselves, now and then;
+    - take a nearest-k pick at launch instead of a sort;
+    - show at most `torpedo_fx_rate` (10) blasts a second.
+  - Chain Lightning:
+    - is capped at `lightning_max_rate` (30) strikes a second;
+    - each jump looks close first and widens only when it finds nothing;
+    - shows at most 40 bolts at once.
+  - Left over: about 23 ms worst-case spikes in that extreme case. A real profiler would find
+    the rest.
+- **Also fixed:** Greek Fire's "erase a freed object from a TypedArray" error spam.
+- **The controls hint** says "Y: follow/free cam" in Unnatural.
 
 ### Phase 7: the stage
 - **StageTimeline** (UNNATURAL > Stage): the ring at 2:30, the Drowned Shark at 5:00, the stampede
@@ -474,6 +721,110 @@ alive, intensity, next event) when `show_director` is on.
   - Jellyfish Familiar (a follower that stings).
 - **Settings.** Each powerup has its own section (§10), and each has a "stacks" slider for testing.
 
+### 7b. Powerup ideas (brainstorm, 2026-10-17: the user picks)
+Risk of Rain 2's shape: lots of small items that stack, and procs that chain off each other (with
+proc coefficients, as Torpedo and Lightning already have). Every one is worn on the fish and grows
+with its stacks.
+
+**Rarities.** A chest rolls one with the opener's luck:
+- Common, Uncommon, Rare and Legendary are the RoR2 tiers.
+- **Boss** items drop only from bosses.
+- **Cursed** items (RoR2's lunar) have a real downside. They come from a rarer blood-red chest,
+  and luck doesn't help with them.
+
+Stacking is linear unless noted; "hyperbolic" means `1 - 1/(1 + k·stacks)`, so it never reaches 100%.
+
+**Common** (white; simple stats and small procs)
+| Name | Worn | Does (per stack) |
+|---|---|---|
+| Bow Grow Bow | the bow (built) | a far bigger bow wave (moved to common, D15) |
+| Barnacle Plating | barnacles on the back | +2 armour |
+| Hermit Shell | a shell on the back | +15 max hp |
+| Kelp Wrap | kelp ribbons trailing | +0.5 hp/s regen |
+| Sea Salt | glittering crystals | +5% crit chance |
+| Fizzy Soda | bubbles fizzing off the gills | +8% attack speed |
+| Speedy Seahorse | a seahorse riding along | +6% swim speed |
+| Coral Knuckles | coral on the nose | +20% battery damage |
+| Diver's Goggles | goggles | +25% pickup range |
+| Lucky Sand Dollar | a coin on the forehead | +0.1 luck |
+| Sticky Anemone | an anemone tuft | 10% chance on hit to slow 40% for 2 s |
+| Ink Sac | a dark sac | hurt: an ink cloud, nearby zombies lose you for 2 s (+0.5 s) |
+| Bubble Wrap | a bubble shell | blocks the first hit after 8 s untouched (−1 s cooldown) |
+| Remora Buddy | a remora stuck on | nips the nearest zombie every 1.5 s (+1 remora) |
+
+**Uncommon** (green; procs and companions)
+| Name | Worn | Does |
+|---|---|---|
+| Greek Fire Trail | a lantern (built) | burning patches behind you |
+| Chain Lightning | a coil (built) | lightning jumps between zombies |
+| Pufferfish Spines | spines out | 50% of contact damage back at the toucher, and a spine burst |
+| Lamprey | a lamprey trailing | +1 hp per kill |
+| Sonar Pinger | a dish on the head | every 6 s a pulse marks zombies: +25% damage taken |
+| Cold Seep | frosted fins | 8% chance on hit to freeze 1.5 s (bosses: slow) |
+| Jellyfish Halo | orbiting jellies | +1 orbiting jelly that stings what it touches |
+| Treasure Map | a rolled map | +30% chest drop chance, chests pinged further |
+| Momentum Fin | streamers | +damage with speed (+10% per 10 m/s) |
+| Clam Shield | a clam | blocks one hit every 12 s (−2 s) |
+| Electric Eel | an eel coiled on | batteries send out a shock ring |
+| Whirlpool Charm | a spiral shell | 6% chance on kill to open a whirlpool that pulls in and grinds |
+
+**Rare** (blue; build-defining)
+| Name | Worn | Does |
+|---|---|---|
+| Torpedo Launcher | twin tubes (built) | seeking torpedoes on hit |
+| Depth Charges | a mine rack | drops a mine every 4 s (−10%); a big blast |
+| Kraken's Grasp | a tentacle | 5% chance on hit: a tentacle slams an area and holds what's in it |
+| Ghost Swordfish | a phantom swordfish escort | dashes through lines of zombies every 3 s (+1 swordfish) |
+| Anglerfish Lure | a lantern on a stalk | a decoy zombies chase; it bursts after 5 s |
+| Ammonite Spiral | a spiral shell | projectiles split into 3 on hit (+1 split) |
+| Riptide | swirling water | perfect strides leave a current that drags zombies back and hurts |
+| Reef Guardian | a coral crown | under 25% hp: 3 s untouchable (cooldown 60 s, −15%) |
+| Bioluminescence | glowing spots | level-ups and chests send out a flash that hurts with your level |
+
+**Legendary** (gold; rare and loud)
+| Name | Worn | Does |
+|---|---|---|
+| Poseidon's Trident | a trident | every 3rd attack calls lightning down on the biggest zombie near |
+| Tsunami Heart | a glowing heart | batteries send a wave along your heading (+width) |
+| Megalodon Tooth | a huge tooth | crits finish zombies under 15% hp (+5%, hyperbolic); not bosses |
+| Moon Pearl | a pearl on a chain | +1 extra card pick every level-up (+1) |
+| Abyssal Engine | a churning engine | +1 projectile and +15% area to every attack |
+
+**Boss** (dropped by bosses, one each)
+| Name | From | Does |
+|---|---|---|
+| Drowned Fin | the Drowned Shark | a charge: hold boost to dash, battering everything in the way |
+| Leviathan's Coil | the Blood Leviathan | trailing segments behind you hurt whatever they touch |
+
+**Cursed** (lunar: strong, with a catch)
+| Name | Does |
+|---|---|
+| Blood Moon Shard | +100% damage; +50% damage taken |
+| Glass Coral | +100% damage; max hp halved |
+| Siren's Song | XP x2; 50% more zombies |
+| Abyssal Hunger | big heal on kill; lose 2% hp a second |
+| Sunken Idol | every chest offers 1 more pick; you lose a random powerup each stage event |
+
+Picked (2026-10-17): see D13 to D16 in Decisions.
+
+### 7c. Equipment (D13: planned now, built after phase 9)
+RoR2's equipment: one item a player triggers when they choose, with a fairly long cooldown.
+- **One slot.** A new one replaces the old one, and the old one drops where you are, so a
+  teammate can take it.
+- **The button.** Every input is taken now. Two candidates:
+  - a long press on the ball cam button (Y), which swaps the survivor cams;
+  - a stick click.
+  The user picks when it's built.
+- **Where they come from.** An equipment chest: rarer than the others, and a different colour.
+- **The HUD.** The item's icon next to the powerups, with a cooldown sweep.
+- **Ideas** (to pick from later):
+  - Ink Bomb: blinds the zombies round you for a few seconds;
+  - Whale Call: a whale sweeps through the arena;
+  - Bubble Net: traps everything in a radius for a moment;
+  - Tide Turner: every zombie near is flung away;
+  - Sunken Bell: calls every pearl to you.
+- **Settings.** One cooldown each, plus a global cooldown scale.
+
 ### 8. The Test Tank (shooting range)
 A practice environment, picked like the other modes (`TEST_TANK`):
 - **Immortal, stationary dummy targets** in a school-shaped cluster, plus a few lines at
@@ -672,6 +1023,23 @@ These replace the earlier open questions. Where a section above differs, these w
    are **greatly exaggerated** because aiming in 3D water is hard: the Shark's are **huge ghost
    shark teeth**, and every melee reach must be **bigger than the bow wave**, or ramming would do
    the same job.
+
+9. **D9: Follow cam.** Boost counts as accelerate for the cam's hold.
+10. **D10: Chest reach.** `chest_reach` stays at 8 m.
+11. **D11: Free cam Y.** Becomes an invert-Y setting, **defaulting to inverted** (down on the stick
+    looks up).
+12. **D12: Hearts.** Drops stay shared (first touch takes it), but a heart heals the **whole team**,
+    wherever they are.
+13. **D13: Tiers.** Boss and Cursed tiers are wanted, built **after** the first batch. An
+    **Equipment** tier (triggered on demand, with a fairly long cooldown) is wanted too: plan it now,
+    build it after phase 9, once a button is freed up.
+14. **D14: First batch** (the balanced mix, 12 items):
+    - Common: Barnacle Plating, Hermit Shell, Fizzy Soda, Speedy Seahorse, Remora Buddy, Bubble Wrap;
+    - Uncommon: Pufferfish Spines, Jellyfish Halo, Electric Eel;
+    - Rare: Depth Charges, Anglerfish Lure;
+    - Legendary: Tsunami Heart.
+15. **D15: Bow Grow Bow** moves to **Common**.
+16. **D16: Actives** come only as the Equipment tier (D13), later.
 
 ## Risks
 - **Scale over the network.** Thousands of enemies on guests is the riskiest part. The pack-seed

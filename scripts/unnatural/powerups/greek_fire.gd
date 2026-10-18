@@ -22,10 +22,11 @@ func on_tick(delta: float) -> void:
 		return
 	_burn_left += BURN_TICK
 	var burn := (settings.fire_dps + settings.fire_dps_per_stack * (stacks - 1)) * BURN_TICK
-	for patch in patches.duplicate():
-		if not is_instance_valid(patch):
-			patches.erase(patch)
-			continue
+	# Burnt-out patches go (by index: erasing a freed one from a typed array errors).
+	for k in range(patches.size() - 1, -1, -1):
+		if not is_instance_valid(patches[k]):
+			patches.remove_at(k)
+	for patch in patches:
 		for i in run.horde.query_sphere(patch.global_position, patch.radius):
 			run.hit(i, burn, fish, id, Vector3.ZERO, settings.fire_proc, [id])
 
@@ -48,6 +49,46 @@ func on_removed() -> void:
 		if is_instance_valid(patch):
 			patch.queue_free()
 	patches.clear()
+
+
+## A lantern hung off the tail, its flame flickering.
+func make_worn() -> Node3D:
+	var lantern := Node3D.new()
+	lantern.name = "Lantern"
+	lantern.position = Vector3(0.0, fish.hitbox_height * 0.35, fish.hitbox_length * 0.45)
+	var brass := StandardMaterial3D.new()
+	brass.albedo_color = Color(0.55, 0.4, 0.15)
+	brass.metallic = 0.8
+	brass.roughness = 0.35
+	var cap := CylinderMesh.new()
+	cap.top_radius = 0.02
+	cap.bottom_radius = 0.09
+	cap.height = 0.08
+	cap.radial_segments = 8
+	lantern.add_child(worn_mesh(cap, brass, Vector3(0.0, 0.2, 0.0)))
+	var glass := CylinderMesh.new()
+	glass.top_radius = 0.07
+	glass.bottom_radius = 0.07
+	glass.height = 0.2
+	glass.radial_segments = 8
+	lantern.add_child(worn_mesh(glass, worn_material(2.2), Vector3(0.0, 0.07, 0.0)))
+	var base := CylinderMesh.new()
+	base.top_radius = 0.09
+	base.bottom_radius = 0.09
+	base.height = 0.04
+	base.radial_segments = 8
+	lantern.add_child(worn_mesh(base, brass, Vector3(0.0, -0.05, 0.0)))
+	var light := OmniLight3D.new()
+	light.light_color = color(id)
+	light.light_energy = 0.8
+	light.omni_range = 2.5
+	light.position.y = 0.07
+	lantern.add_child(light)
+	lantern.ready.connect(func() -> void:
+		var flicker := lantern.create_tween().set_loops()
+		flicker.tween_property(light, "light_energy", 1.3, 0.12)
+		flicker.tween_property(light, "light_energy", 0.6, 0.17))
+	return lantern
 
 
 ## One burning patch: a flickering ball of fire that fades out.

@@ -94,6 +94,11 @@ var fish_sitting_out := false:
 	set(value):
 		fish_sitting_out = value
 		_update_hint()
+## Unnatural's survivor cam is on: Y swaps follow and free cam (the hint says so).
+var survivor_cam := false:
+	set(value):
+		survivor_cam = value
+		_update_hint()
 
 
 func _ready() -> void:
@@ -443,7 +448,7 @@ func _update_hint() -> void:
 	else:
 		_hint.text = "Start/Esc: pause, settings    R: %s    Right stick/IJKL: look around    Y: %s cam    %s%sF11: fullscreen" % [
 				"restart kickoff" if match_1v1 else ("restart match" if hunt_match else "reset"),
-				"ring" if arena else ("fish" if nature_run or hunt_match else "ball"),
+				"follow/free" if survivor_cam else ("ring" if arena else ("fish" if nature_run or hunt_match else "ball")),
 				"Hold D-pad up/B: scoreboard    " if match_1v1 or hunt_match or nature_run else "",
 				"Back/View on another controller: join    " if nature_run else ""]
 
