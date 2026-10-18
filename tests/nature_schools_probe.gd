@@ -96,8 +96,9 @@ func _run() -> void:
 
 	print("panel:")
 	var panel: Node = main._panel
-	var slider: HSlider = panel._editors.get("nature/school_count")
-	check(slider != null and is_equal_approx(slider.step, 1.0) and slider.allow_greater, "NATURE section: school_count is a whole-number slider that allows more")
+	var slider: Dictionary = panel.option_range("nature/school_count")
+	check(slider.get("whole", false) and is_equal_approx(slider.get("step", 0.0), 1.0) and slider.get("allow_greater", false),
+			"NATURE section: school_count is a whole-number slider that allows more")
 	panel._apply("nature", {"school_count": 40.0})
 	check(settings.school_count == 40 and typeof(settings.school_count) == TYPE_INT, "a preset value past the end applies (%s)" % settings.school_count)
 	panel._apply("nature", {"school_count": 3})

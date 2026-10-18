@@ -57,7 +57,7 @@ func on_tick(delta: float) -> void:
 		if health.hp <= 0.0:
 			health.hp = 0.01
 			health.iframes_left = 0.0
-			run.hurt(fish, 1.0)  # the last of it: down, as a hit would put it
+			run.hurt(fish, 1.0, -1, "hunger (a curse)")  # the last of it: down, as a hit would put it
 	else:
 		health.hp = maxf(health.hp - drain, minf(health.hp, 1.0))
 

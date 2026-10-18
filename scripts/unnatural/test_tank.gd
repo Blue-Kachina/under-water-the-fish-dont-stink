@@ -24,6 +24,11 @@ const CLUSTER_COUNT := 40
 const LINES := [10.0, 20.0, 40.0]
 const LINE_SIDE := 16.0
 const LINE_COUNT := 5
+## tank_preset's levels, and what fills the slots, in order.
+const PRESET_LEVELS := [0, 5, 10, 20]
+const PRESET_WEAPONS: Array[String] = ["greek_fire", "jellyfish_halo", "depth_charges", "remora_buddy", "leviathans_coil"]
+const PRESET_TOMES: Array[String] = ["teeth", "tides", "reef", "shell", "schools", "kill", "ages", "currents", "fins", "ram",
+		"fortune", "pearls"]
 
 var run: UnnaturalRun
 ## The dummy kind's index in the horde.
@@ -35,6 +40,27 @@ var elapsed := 0.0
 var _sources := {}
 var _recent: Array = []
 var _rng := RandomNumberGenerator.new()
+## The tank_preset last applied (0 at the start: Off leaves the panel's values be).
+var _preset := 0
+
+
+## Every weapon and tome slot full at `level` (0: all cleared): the weapons'
+## level overrides (PowerupSettings) and the tank's stats, as `level` common
+## tome cards would give them.
+static func apply_preset(level: int, settings: UnnaturalSettings) -> void:
+	var powerup_settings := PowerupSettings.shared()
+	powerup_settings.attack_level = level
+	for n in PRESET_WEAPONS.size():
+		var id := PRESET_WEAPONS[n]
+		powerup_settings.set(PowerupSettings.STACKS[id], level if n < settings.weapon_slots - 1 else 0)
+	for stat: String in StatBlock.STATS:
+		settings.set("tank_" + stat, 0.0)
+	if level <= 0:
+		return
+	for n in mini(settings.tome_slots, PRESET_TOMES.size()):
+		var given := Tomes.gives(PRESET_TOMES[n], float(level), settings)
+		for stat: String in given:
+			settings.set("tank_" + stat, float(settings.get("tank_" + stat)) + float(given[stat]))
 
 
 ## The kind the dummies are (appended to the horde's kinds).
@@ -78,6 +104,9 @@ func update(delta: float) -> void:
 	elapsed += delta
 	_apply_dummy_kind()
 	var settings := run.settings
+	if settings.tank_preset != _preset:
+		_preset = settings.tank_preset
+		apply_preset(PRESET_LEVELS[clampi(_preset, 0, PRESET_LEVELS.size() - 1)], settings)
 	if run.levels.level != settings.tank_level:
 		run.levels.level = maxi(settings.tank_level, 1)
 		for fish in run.players:

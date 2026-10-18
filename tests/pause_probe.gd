@@ -1,7 +1,8 @@
 extends Node
 ## The pause menu: Start pauses (the fish holds still) and shows Resume, the
-## mode's reset and Settings; the tuning panel only shows from Settings and
-## hides on resuming. Start again, B (on release) or Resume (on release, so the
+## mode's reset and Settings; the settings only show from Settings, B steps
+## back out of them to the menu, and they hide on resuming. Main menu goes to
+## the home screen (B back to the game, or a mode picked starts it). Start again, B (on release) or Resume (on release, so the
 ## A press is over) carries on; Esc pauses without its release resuming. View
 ## (Select) no longer does anything. The reset option follows the mode (none on
 ## the match card or in Replays) and resets the fish.
@@ -52,10 +53,21 @@ func _run() -> void:
 
 	menu._settings.pressed.emit()
 	await _frames(2)
-	check(panel.is_open() and menu._settings.text == "Hide settings", "Settings shows the panel")
-	check(panel.process_mode == Node.PROCESS_MODE_ALWAYS, "panel runs while paused")
+	check(panel.is_open() and not menu._menu.visible, "Settings shows the settings (the menu steps aside)")
+	check(panel.process_mode == Node.PROCESS_MODE_ALWAYS, "settings run while paused")
+	await _button(JOY_BUTTON_DPAD_RIGHT)
+	check(panel.get_viewport().gui_get_focus_owner() == panel._rows["game/player_name"], "right: into the Game section's options")
+	await _button(JOY_BUTTON_B)
+	check(panel.is_open() and menu.is_open() and panel.get_viewport().gui_get_focus_owner() == panel._section_buttons["game"],
+			"B in the settings: back a column, not out of the pause")
+	await _button(JOY_BUTTON_B)
+	await _frames(2)
+	check(not panel.is_open() and menu.is_open() and menu._menu.visible and menu._settings.has_focus() and get_tree().paused,
+			"B again closes the settings: back on the menu's Settings, still paused")
+	menu._settings.pressed.emit()
+	await _frames(2)
 	await _button(JOY_BUTTON_START)
-	check(not get_tree().paused and not menu.is_open() and not panel.is_open(), "Start again resumes and hides the panel")
+	check(not get_tree().paused and not menu.is_open() and not panel.is_open(), "Start resumes from the settings and hides them")
 
 	print("cancel and accept:")
 	await _key(KEY_ESCAPE)
@@ -97,12 +109,24 @@ func _run() -> void:
 	await _frames(3)
 	await _button(JOY_BUTTON_START)
 	check(menu.is_open() and not menu._reset.visible, "Replays: pauses, no reset option")
-	menu._settings.pressed.emit()
-	await _frames(1)
-	panel._mode_picker.select(0)
-	panel._mode_picker.item_selected.emit(0)  # Free Play, picked while paused
+
+	print("main menu:")
+	var home: HomeScreen = main._home
+	menu._main_menu.pressed.emit()
 	await _frames(3)
-	check(main.current_mode == main.FREE_PLAY and menu._reset.visible, "mode picked while paused; reset option back")
+	check(home.is_open() and not menu.is_open() and get_tree().paused, "Main menu: the home screen, the game held behind it")
+	await _button(JOY_BUTTON_START)
+	check(not menu.is_open(), "Start doesn't open the pause menu over the home screen")
+	await _button(JOY_BUTTON_B)
+	check(not home.is_open() and not get_tree().paused, "B on the home screen (from the pause menu): back to the game")
+	await _button(JOY_BUTTON_START)
+	menu._main_menu.pressed.emit()
+	await _frames(3)
+	home.mode_chosen.emit(main.FREE_PLAY)  # picked in the mode picker
+	await _frames(3)
+	check(main.current_mode == main.FREE_PLAY and not home.is_open() and not get_tree().paused, "a mode picked: it's on, the game running")
+	await _button(JOY_BUTTON_START)
+	check(menu._reset.visible, "reset option back")
 	await _button(JOY_BUTTON_START)
 	check(not get_tree().paused, "resumed")
 

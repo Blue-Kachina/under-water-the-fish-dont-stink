@@ -220,9 +220,8 @@ func _guest() -> void:
 			"tuning":
 				check(is_equal_approx(fish.max_speed, data.max_speed) and is_equal_approx(NatureSettings.shared().spread, data.spread),
 						"the host's tuning is ours (max_speed %.2f, spread %.2f)" % [fish.max_speed, NatureSettings.shared().spread])
-				var editor: Control = main._panel._editors.get("fish/max_speed")
-				check(editor is Range and not (editor as Range).editable, "our panel's fish tuning is locked")
-				check((main._panel._editors.get("camera/distance") as Range).editable, "our camera's still ours")
+				check(not main._panel.is_editable("fish/max_speed"), "our settings' fish tuning is locked")
+				check(main._panel.is_editable("camera/distance"), "our camera's still ours")
 			"motion":
 				await _check_motion(coop)
 				await _check_schools(coop)
@@ -265,7 +264,7 @@ func _guest() -> void:
 				await _seconds(0.5)
 				check(not NetSession.is_online() and main.nature_run != null and main.nature_run.authority,
 						"the host left: Nature on our own again")
-				check((main._panel._editors.get("fish/max_speed") as Range).editable, "our tuning's ours again")
+				check(main._panel.is_editable("fish/max_speed"), "our tuning's ours again")
 				return
 		_send_done(phase)
 

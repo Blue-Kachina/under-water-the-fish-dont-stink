@@ -30,33 +30,37 @@ var _close := Button.new()
 var _lag := SpinBox.new()
 var _jitter := SpinBox.new()
 var _loss := SpinBox.new()
+var _s := 1.0
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	layer = 8  # over the pause menu and the tuning panel
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.03, 0.06, 0.08, 0.95)
-	style.set_corner_radius_all(6)
-	style.set_content_margin_all(16)
+	layer = 8  # over the pause menu, the home screen and the settings
+	var s := UITheme.scale_for(get_viewport())
+	_s = s
+	var dim := ColorRect.new()
+	dim.color = UITheme.DIM
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(dim)
+	var style := UITheme.box(UITheme.GROUND, 24.0 * s, Color(UITheme.AQUA, 0.25), maxf(1.0, s))
+	style.set_content_margin_all(28.0 * s)
+	_panel.theme = UITheme.theme(s)
 	_panel.add_theme_stylebox_override("panel", style)
 	_panel.set_anchors_preset(Control.PRESET_CENTER)
 	_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
-	_panel.custom_minimum_size = Vector2(440, 0)
+	_panel.custom_minimum_size = Vector2(520.0 * s, 0)
 	add_child(_panel)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 8)
+	column.add_theme_constant_override("separation", roundi(8.0 * s))
 	_panel.add_child(column)
 
-	var title := Label.new()
 	var game: Node = NetSession.coop.main
-	title.text = "CO-OP ONLINE  ·  %s" % ("UNNATURAL" if game and game.get("current_mode") == "Unnatural" else "NATURE")
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 24)
-	column.add_child(title)
+	column.add_child(UITheme.label("Co-op online", "caps", 12.0, UITheme.AQUA, s))
+	column.add_child(UITheme.label("Unnatural" if game and game.get("current_mode") == "Unnatural" else "Nature", "display", 32.0,
+			UITheme.INK, s, 600))
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.modulate = Color(1, 1, 1, 0.75)
+	_status.add_theme_color_override("font_color", UITheme.MUTED)
 	column.add_child(_status)
 
 	_name.text = UISettings.player_name
@@ -102,16 +106,13 @@ func _ready() -> void:
 	# and applies that app's Steam Input layout, which takes the controller over.
 	_steam_tip.text = "Controller stops working once Steam's on? In Steam: Settings > Controller > turn off \"Enable Steam Input for Xbox controllers\", then restart the game."
 	_steam_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_steam_tip.modulate = Color(1.0, 0.85, 0.5, 0.85)
-	_steam_tip.add_theme_font_size_override("font_size", 13)
+	_steam_tip.add_theme_color_override("font_color", UITheme.CORAL)
+	_steam_tip.add_theme_font_size_override("font_size", roundi(13.0 * s))
 	column.add_child(_steam_tip)
 	_setup_button(_leave, "Leave session", func() -> void: NetSession.leave())
 	column.add_child(_leave)
 
-	var testing := Label.new()
-	testing.text = "Simulated network (testing)"
-	testing.modulate = Color(1, 1, 1, 0.5)
-	column.add_child(testing)
+	column.add_child(UITheme.label("Simulated network (testing)", "caps", 11.0, UITheme.MUTED, s))
 	var trouble := HBoxContainer.new()
 	for pair: Array in [[_lag, "Lag ms", 0.0, 1000.0, 1.0, NetSession.lag_ms], [_jitter, "Jitter ms", 0.0, 500.0, 1.0, NetSession.jitter_ms],
 			[_loss, "Loss %", 0.0, 50.0, 1.0, NetSession.loss * 100.0]]:
@@ -172,7 +173,8 @@ func _row(label_text: String, control: Control) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	var label := Label.new()
 	label.text = label_text
-	label.custom_minimum_size.x = 80.0
+	label.add_theme_color_override("font_color", UITheme.INK_SOFT)
+	label.custom_minimum_size.x = 84.0 * _s
 	row.add_child(label)
 	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(control)
@@ -181,6 +183,6 @@ func _row(label_text: String, control: Control) -> HBoxContainer:
 
 func _setup_button(button: Button, text: String, on_pressed: Callable) -> void:
 	button.text = text
-	button.custom_minimum_size.y = 34.0
+	button.custom_minimum_size.y = 46.0 * _s
 	button.action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
 	button.pressed.connect(on_pressed)

@@ -3,22 +3,28 @@ extends FishAttack
 ## The Boxfish's auto-attack (planning_unnatural.md §5): whenever a zombie is
 ## within spine_range, spine_count spines (plus 4 per Projectiles stat) shoot
 ## out in every direction (most round its level), each piercing up to spine_pierce zombies.
+##
+## As a weapon (Weapons): at its first milestone the spines fly FAR_REACH
+## times as far; at its second, a second ring (half as many) follows each
+## burst SECOND_AFTER s later.
 
 const COLOR := Color(1.0, 0.8, 0.4, 0.85)
 ## A burst hits many at once.
 const PROC := 0.4
 ## This share of the spines go round the fish's level.
 const LEVEL_SHARE := 0.65
+const FAR_REACH := 1.4
+const SECOND_AFTER := 0.25
 
 var spines := ProjectileSwarm.new()
 var _turn := 0.0
+var _second_left := -1.0
 
 
 func _init() -> void:
 	name = "SpineBurst"
-	var spine := BoxMesh.new()
-	spine.size = Vector3(0.5, 0.5, 2.0)
-	spines.set_look(spine, FishAttack.ghost_material(COLOR))
+	# A needle: a hard amber core, a soft glow round it, a short trail.
+	spines.set_look(FxKit.lance_mesh(Color(1.0, 0.95, 0.75, 0.95), COLOR, -1.0, 0.8, 0.22, 0.7, 1.2))
 	spines.stretch = 1.5
 	add_child(spines)
 
@@ -48,12 +54,31 @@ func count() -> int:
 	return settings.spine_count + 4 * extra_projectiles
 
 
+func reach() -> float:
+	return settings.spine_range * area_scale * (FAR_REACH if milestones >= 1 else 1.0)
+
+
 func fire() -> bool:
-	var at := origin()
-	var reach := settings.spine_range * area_scale
-	if horde.query_sphere(at, reach).is_empty():
+	if horde.query_sphere(origin(), reach()).is_empty():
 		return false
-	var n := count()
+	_burst(count())
+	if milestones >= 2:
+		_second_left = SECOND_AFTER
+	return true
+
+
+func _animate(delta: float) -> void:
+	if _second_left >= 0.0:
+		_second_left -= delta
+		if _second_left < 0.0:
+			_turn += 0.35  # between the first ring's spines
+			_burst(maxi(count() / 2, 1))
+
+
+## `n` spines out, now.
+func _burst(n: int) -> void:
+	var at := origin()
+	var far := reach()
 	var speed := settings.spine_speed * projectile_speed
 	_turn += 0.7  # each burst a little turned, so the gaps move
 	var basis := fish.global_basis
@@ -74,5 +99,4 @@ func fire() -> bool:
 			var angle := k * PI * (3.0 - sqrt(5.0)) + _turn
 			out = Vector3(cos(angle) * ring, y, sin(angle) * ring)
 		out = (basis * out).normalized()
-		spines.fire(at + out * 0.6, out * speed, settings.spine_damage, settings.spine_size * area_scale, reach / speed, settings.spine_pierce)
-	return true
+		spines.fire(at + out * 0.6, out * speed, settings.spine_damage, settings.spine_size * area_scale, far / speed, settings.spine_pierce)

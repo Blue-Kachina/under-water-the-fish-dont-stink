@@ -1,15 +1,26 @@
 extends CanvasLayer
-## Live tuning panel. Lists every @export_range float, @export bool and @export
-## enum on the fish, the camera and the ball settings, writes changes to them
-## immediately, and saves/loads them as preset files. Add a new export to any of
-## them and it appears here, in a collapsible panel for its @export_group (all
-## start collapsed). A target can hide options that don't apply with
-## is_option_active(). Also picks the mode (main.gd's MODES) and the fish's
-## character (FishCharacter), and has the Gameplay and UI settings (UISettings).
+## Settings (UI Redesign Handoff, Settings C · Detail Pane): three columns,
+## the sections, the options in the chosen one, and a detail pane explaining
+## the focused option with its control. Also the live tuning model behind it:
+## every @export_range float or int, @export bool and @export enum on the fish,
+## the camera, the ball, Nature, Unnatural and the powerups is an option here,
+## written to its target at once and saved/loaded with preset files. Add an
+## export to any of them and it shows up under its @export_group's heading,
+## its doc comment as the description (tools/gen_setting_docs.gd). A target
+## can hide options that don't apply with is_option_active().
 ##
-## Shown from the pause menu's Settings (PauseMenu), so it runs while the game
-## is paused. Controls are mouse-only (no keyboard/gamepad focus), so the
-## controller stays on the pause menu.
+## The sections: Game (player name, fish, goal replays, tuning presets),
+## Display and Controls (UISettings; Controls, with every rebindable action's
+## keyboard & mouse and controller binding), then Camera, Fish, Ball, Nature,
+## Unnatural and Powerups (the tuning). The big ones are split into tabs
+## across the top (TABS).
+##
+## Controller: up/down move, left/right change the focused option (held, it
+## repeats), A toggles / picks / edits / rebinds, Y puts the option back to its
+## default, LB/RB step through the section's tabs (only ever its own), LT/RT jump
+## whole sections, B goes back a column and then closes. Mouse
+## works throughout. Shown from the pause menu's Settings (PauseMenu) and the
+## home screen (HomeScreen); runs while the game is paused.
 
 ## Where Save and Load open: preset files (.cfg) on this PC. A preset's values
 ## are applied over the defaults (Rocket League's), so it only needs to list
@@ -23,37 +34,140 @@ const SETTINGS_PATH := "user://playground.cfg"
 const LEGACY_SAVE_PATH := "user://tuning.cfg"
 ## Saved presets carry this (in [meta]).
 const TUNING_VERSION := 2
+## Optional preview stills for the detail pane: PREVIEW_DIR/<section>/<option>.png.
+const PREVIEW_DIR := "res://assets/ui/previews"
+
+## The sections in order: [id, title]. Game, Display and Controls are
+## UISettings and Controls; the rest are tuning targets.
+const SECTIONS := [["game", "Game"], ["display", "Display"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"],
+		["ball", "Ball"], ["nature", "Nature"], ["unnatural", "Unnatural"], ["powerups", "Powerups"]]
+## Who each tuning section is for ("Used by ...").
+const USED_BY := {
+	"camera": "the follow camera, in every mode",
+	"fish": "your fish, in every mode",
+	"ball": "the ball in Free Play and 1v1",
+	"nature": "Nature, Hunt and Unnatural",
+	"unnatural": "Unnatural and the Test Tank",
+	"powerups": "Unnatural's powerups",
+}
+## The Game, Display and Controls options: key -> [title, group, description, used by].
+const GAME_OPTIONS := {
+	"game/player_name": ["Player name", "Player", "Your name on the scoreboard, over your fish, and to the people you play with online.", "the scoreboard and online co-op"],
+	"game/character": ["Fish", "Player", "The fish you swim as. Each one has the hitbox of a Rocket League car (the name in brackets) and, in Unnatural, its own signature stat.", "every mode"],
+	"game/goal_replays": ["Goal replays", "Matches", "A replay of each goal in a 1v1, and of each battery in Hunt, from the net. Any button skips one.", "1v1 and Hunt"],
+	"game/preset_save": ["Save tuning preset", "Tuning presets", "Saves every tuning section (Camera to Powerups) as a preset file. The last preset saved or loaded loads at startup.", "the tuning sections"],
+	"game/preset_load": ["Load tuning preset", "Tuning presets", "Loads a preset file over the defaults, so a preset only needs to list what it changes. The shipped presets are in the same folder.", "the tuning sections"],
+	"game/preset_default": ["Default tuning", "Tuning presets", "Puts every tuning section back to its defaults (Rocket League's). Not saved until you save a preset.", "the tuning sections"],
+	"game/preset_copy": ["Copy tuning", "Tuning presets", "Copies the tuning as preset text to the clipboard, to paste into a file or a message.", "the tuning sections"],
+	"display/fullscreen": ["Fullscreen", "Window", "Fills the screen. F11 or Alt+Enter switches it any time. The game always starts fullscreen.", "the window"],
+	"display/show_stats": ["Stats panel", "Tuning aids", "A readout of the fish's speed, forward speed, drift and more, for tuning.", "the HUD"],
+	"display/show_input_overlay": ["Controller overlay", "Tuning aids", "Shows the controller's sticks, triggers and buttons live on screen.", "the HUD"],
+	"controls/profile": ["Controller profile", "Controller", "Which controller buttons do what. The sticks, triggers and keyboard are the same in every profile.", "your controller"],
+}
+## The big sections' tabs, across the top: section -> [[title, [@export_group
+## names]], ...]. A group not listed gets a tab of its own after these.
+## Powerups' tabs are by rarity, weapons on their own (_tab_for()); Controls'
+## are the keyboard and mouse's bindings and the controller's.
+const TABS := {
+	"fish": [["Swimming", ["Thrust", "Boost", "Water", "Rotation", "Steering"]],
+			["Strokes", ["Swim Strokes", "Extra Swishy", "Bow Wave", "Nature"]],
+			["Jumps & Surfaces", ["Jump & Dodge", "Powerslide", "Surface"]],
+			["Body & Controller", ["Hitbox", "Controller"]]],
+	"nature": [["Schools", ["Schools", "Formation", "Spawning", "Performance"]],
+			["Battering", ["Battered fish", "School Reactions", "Multis & Sprees"]],
+			["Pearls & Targets", ["Pearls", "Targeting"]]],
+	"unnatural": [["Arena", ["Arena", "Murk", "Minimap", "Camera"]],
+			["Horde", ["Director", "Enemies", "Twists"]],
+			["Survivor", ["Player", "Batteries", "Levels", "Weapons and Tomes", "Pearls"]],
+			["Attacks", ["Attacks", "Ghost Bite", "Anemone Sting", "Shock Lash", "Bill Thrust", "Bubble Volley", "Spine Burst"]],
+			["Stage & Bosses", ["Stage", "Drowned Shark", "Blood Leviathan"]],
+			["Loot", ["Chests", "Drops", "Rarity"]],
+			["Test Tank", ["Test Tank"]],
+			["Performance", ["Performance"]]],
+	"powerups": [["General", []], ["Weapons", []], ["Common", []], ["Uncommon", []], ["Rare", []], ["Epic", []], ["Legendary", []], ["Boss", []],
+			["Cursed", []]],
+	"controls": [["Keyboard & Mouse", []], ["Controller", []]],
+}
+## A held left/right repeats after this, this often (s).
+const REPEAT_DELAY := 0.38
+const REPEAT_EVERY := 0.06
+## A held up/down keeps moving through the list: after this, this often,
+## speeding up to SCROLL_FAST once held for SCROLL_FAST_AFTER (s).
+const SCROLL_DELAY := 0.35
+const SCROLL_EVERY := 0.09
+const SCROLL_FAST := 0.045
+const SCROLL_FAST_AFTER := 1.2
+## How long a rebind waits for a key or button before giving up (s).
+const CAPTURE_TIME := 6.0
+## A rebind ignores input this long at first (the A press that started it).
+const CAPTURE_ARM := 0.2
 
 @export var fish: FishController
 @export var follow_camera: Camera3D
 @export var ball_settings: BallSettings
 
-var _targets := {}
-var _defaults := {}
-var _editors := {}  # "section/property" -> HSlider, CheckBox or OptionButton
-var _value_labels := {}  # "section/property" -> a slider's value Label
-var _rows := {}  # "section/property" -> the control to hide when the option doesn't apply
-var _group_panels := {}  # group's FoldableContainer -> its "section/property" keys
-var _panel: PanelContainer
-var _status: Label
-var _mode_row: HBoxContainer
-var _mode_picker: OptionButton
-var _character_picker: OptionButton
-var _load_button: Button
-var _default_button: Button
-## Sections someone else sets (an online session's host): shown, not editable.
-var _locked := {}
-
-signal mode_selected(mode: String)
-signal character_selected(character: FishCharacter.Family)
 ## Any tuning value changed (a control, a preset, a restore): whatever copies
 ## the tuning (other local players' fish, an online session) can follow.
 signal tuning_changed
+signal character_selected(character: FishCharacter.Family)
+## Settings closed (B from the sections, or set_open(false)).
+signal closed
+
+var _targets := {}
+var _defaults := {}
+## "section/property" -> its Row.
+var _rows := {}
+## "section/property" -> {section, prop, kind, group, min, max, step, whole,
+## allow_greater, allow_lesser, choices: [[name, value], ...]}.
+var _meta := {}
+## Group heading Label -> its "section/property" keys (hidden when none show).
+var _group_headings := {}
+## Section id -> its button, and the list of its rows.
+var _section_buttons := {}
+var _section_lists := {}
+var _section := "game"
+## The root of the screen (shown while open).
+var _panel: Control
+var _status: Label
+var _title: Label
+var _subtitle: Label
+var _detail: VBoxContainer
+var _detail_preview: TextureRect
+var _detail_group: Label
+var _detail_title: Label
+var _detail_text: Label
+var _detail_control: VBoxContainer
+var _detail_default: Label
+var _detail_lock: Label
+var _detail_key := ""
+var _hints: ControllerHints
+var _s := 1.0
+var _character := FishCharacter.Family.OCTANE
+var _character_enabled := true
+## Sections someone else sets (an online session's host): shown, not editable.
+var _locked := {}
+var _lock_note := ""
+var _repeat_dir := 0
+var _repeat_time := 0.0
+## Held up/down: which way (-1 up, 1 down), and for how long.
+var _scroll_dir := 0
+var _scroll_held := 0.0
+var _scroll_time := 0.0
+## Section id -> its tabs, each {"title", "list": VBoxContainer, "groups": [names]}.
+var _tabs := {}
+## Section id -> the tab shown.
+var _tab_at := {}
+var _tab_bar: HBoxContainer
+var _tab_strip: HBoxContainer
+var _tab_scroll: ScrollContainer
+## The option a rebind is waiting on ("" when none), and for how long.
+var _capture_key := ""
+var _capture_age := 0.0
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	layer = 7  # over the pause menu's dimming
+	layer = 7  # over the pause menu and the home screen
 	_targets = {"fish": fish, "camera": follow_camera, "ball": ball_settings, "nature": NatureSettings.shared(),
 			"unnatural": UnnaturalSettings.shared(), "powerups": PowerupSettings.shared()}
 	for section: String in _targets:
@@ -62,6 +176,12 @@ func _ready() -> void:
 	_panel.visible = false
 	_export_presets()
 	_load_startup_preset()
+	UISettings.changed.connect(func(key: String) -> void:
+		for section: String in ["game", "display"]:
+			if _rows.has("%s/%s" % [section, key]):
+				_refresh_row("%s/%s" % [section, key])
+		if _detail_key.ends_with("/" + key):
+			_show_detail(_detail_key))
 
 
 func is_open() -> bool:
@@ -69,311 +189,1117 @@ func is_open() -> bool:
 
 
 func set_open(open: bool) -> void:
+	if open == _panel.visible:
+		return
 	_panel.visible = open
-
-
-func _build_ui() -> void:
-	_panel = PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.03, 0.06, 0.08, 0.88)
-	style.set_corner_radius_all(6)
-	style.set_content_margin_all(10)
-	_panel.add_theme_stylebox_override("panel", style)
-	_panel.anchor_bottom = 1.0
-	_panel.offset_left = 12.0
-	_panel.offset_top = 12.0
-	_panel.offset_right = 452.0
-	_panel.offset_bottom = -48.0
-	add_child(_panel)
-
-	var root := VBoxContainer.new()
-	_panel.add_child(root)
-
-	var title := Label.new()
-	title.text = "Settings"
-	title.add_theme_font_size_override("font_size", 20)
-	root.add_child(title)
-
-	var buttons := HBoxContainer.new()
-	root.add_child(buttons)
-	buttons.add_child(_button("Save...", _pick_preset.bind(true)))
-	_load_button = _button("Load...", _pick_preset.bind(false))
-	buttons.add_child(_load_button)
-	_default_button = _button("Default", _restore_defaults)
-	buttons.add_child(_default_button)
-	buttons.add_child(_button("Copy", _copy_to_clipboard))
-
-	# Hidden for now: just the one profile (Controls.DEFAULT_PROFILE).
-	var profile_row := HBoxContainer.new()
-	profile_row.visible = false
-	root.add_child(profile_row)
-	var profile_label := Label.new()
-	profile_label.text = "Controller profile"
-	profile_row.add_child(profile_label)
-	var profiles := OptionButton.new()
-	profiles.focus_mode = Control.FOCUS_NONE
-	for profile_name: String in Controls.profile_names():
-		profiles.add_item(profile_name)
-		if profile_name == Controls.current_profile:
-			profiles.select(profiles.item_count - 1)
-	profiles.item_selected.connect(func(index: int) -> void:
-		Controls.apply_profile(profiles.get_item_text(index))
-		_status.text = "Controller profile: %s (remembered on this PC)" % Controls.current_profile)
-	profile_row.add_child(profiles)
-
-	_mode_row = HBoxContainer.new()  # filled in by set_modes()
-	root.add_child(_mode_row)
-
-	var character_row := HBoxContainer.new()
-	root.add_child(character_row)
-	var character_label := Label.new()
-	character_label.text = "Character"
-	character_row.add_child(character_label)
-	_character_picker = OptionButton.new()
-	_character_picker.focus_mode = Control.FOCUS_NONE
-	for family: FishCharacter.Family in FishCharacter.CARS:
-		_character_picker.add_item(FishCharacter.display_name(family), family)
-	_character_picker.item_selected.connect(func(index: int) -> void:
-		character_selected.emit(_character_picker.get_item_id(index))
-		_status.text = "Character: %s (remembered on this PC)" % _character_picker.get_item_text(index))
-	character_row.add_child(_character_picker)
-
-	_status = Label.new()
-	_status.modulate = Color(1, 1, 1, 0.6)
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	root.add_child(_status)
-
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	root.add_child(scroll)
-	var list := VBoxContainer.new()
-	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(list)
-
-	_build_game_section(list)
-	for section: String in _targets:
-		_build_section(list, section, _targets[section])
-
-
-## Gameplay and display preferences (UISettings): saved on this PC as they
-## change, not with the tuning.
-func _build_game_section(list: VBoxContainer) -> void:
-	var header := Label.new()
-	header.text = "GAME"
-	header.add_theme_font_size_override("font_size", 18)
-	list.add_child(header)
-
-	var gameplay := _foldable(list, "Gameplay")
-	var checks := {}
-	checks["goal_replays"] = _ui_check(gameplay, "goal_replays", "Goal replays (1v1)")
-	var name_row := HBoxContainer.new()
-	gameplay.add_child(name_row)
-	var name_label := Label.new()
-	name_label.text = "Player name"
-	name_label.custom_minimum_size.x = 170.0
-	name_row.add_child(name_label)
-	var name_edit := LineEdit.new()
-	name_edit.text = UISettings.player_name
-	name_edit.placeholder_text = UISettings.DEFAULT_NAME
-	name_edit.max_length = 20
-	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_edit.text_changed.connect(func(text: String) -> void: UISettings.set_value("player_name", text))
-	name_edit.text_submitted.connect(func(_text: String) -> void: name_edit.release_focus())
-	name_row.add_child(name_edit)
-
-	var ui := _foldable(list, "UI")
-	for entry: Array in [["show_stats", "Show stats panel (speed, drift, ...)"],
-			["show_input_overlay", "Show controller overlay"],
-			["fullscreen", "Fullscreen (F11)"]]:
-		checks[entry[0]] = _ui_check(ui, entry[0], entry[1])
-	# Follow changes made elsewhere (F11).
-	UISettings.changed.connect(func(key: String) -> void:
-		if checks.has(key):
-			checks[key].set_pressed_no_signal(UISettings.get(key)))
-	list.add_child(HSeparator.new())
-
-
-## A CheckBox in `parent` for the UISettings bool `key`.
-func _ui_check(parent: Control, key: String, text: String) -> CheckBox:
-	var check := CheckBox.new()
-	check.text = text
-	check.focus_mode = Control.FOCUS_NONE
-	check.button_pressed = UISettings.get(key)
-	check.toggled.connect(func(on: bool) -> void: UISettings.set_value(key, on))
-	parent.add_child(check)
-	return check
-
-
-## A collapsible (and collapsed) panel titled `title` in `list`; returns the
-## list to fill it with.
-func _foldable(list: VBoxContainer, title: String) -> VBoxContainer:
-	var panel := FoldableContainer.new()
-	panel.title = title
-	panel.folded = true
-	panel.focus_mode = Control.FOCUS_NONE
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	list.add_child(panel)
-	var contents := VBoxContainer.new()
-	panel.add_child(contents)
-	return contents
+	_capture_key = ""
+	if open:
+		for action: String in ["ui_section_previous", "ui_section_next"]:
+			_triggers_held[action] = Input.is_action_pressed(action)  # RT is the throttle: held on the way in doesn't count
+		_refresh_visibility()
+		for key: String in _rows:
+			_refresh_row(key)
+		_show_section(_section)
+		(_section_buttons[_section] as Button).grab_focus.call_deferred()
+	else:
+		_repeat_dir = 0
+		closed.emit()
 
 
 func show_status(text: String) -> void:
 	_status.text = text
 
 
-## Shows `character` as picked in the Character row (selections are reported
-## via character_selected).
+## Shows `character` as picked (selections are reported via character_selected).
 func set_character(character: FishCharacter.Family) -> void:
-	_character_picker.select(_character_picker.get_item_index(character))
+	_character = character
+	if _rows.has("game/character"):
+		_refresh_row("game/character")
 
 
 ## The character can only be changed while playing, not during a replay.
 func set_character_enabled(enabled: bool) -> void:
-	_character_picker.disabled = not enabled
-	_character_picker.tooltip_text = "" if enabled else "Close the replay to change character"
+	_character_enabled = enabled
+	if _rows.has("game/character"):
+		_refresh_row("game/character")
 
 
-## Adds the mode picker; selections are reported via mode_selected.
-func set_modes(names: Array, current: String) -> void:
-	var label := Label.new()
-	label.text = "Mode"
-	_mode_row.add_child(label)
-	_mode_picker = OptionButton.new()
-	_mode_picker.focus_mode = Control.FOCUS_NONE
-	for mode: String in names:
-		_mode_picker.add_item(mode)
-	set_mode(current)
-	_mode_picker.item_selected.connect(func(index: int) -> void:
-		var mode := _mode_picker.get_item_text(index)
-		mode_selected.emit(mode)
-		_status.text = "Mode: %s" % mode)
-	_mode_row.add_child(_mode_picker)
+## Whether the option `key` ("section/property") can be changed now (not
+## locked by an online host, not a disabled one).
+func is_editable(key: String) -> bool:
+	if _locked.has(key.get_slice("/", 0)):
+		return false
+	if key == "game/character":
+		return _character_enabled
+	if key in ["game/preset_load", "game/preset_default"]:
+		return _locked.is_empty()
+	return true
 
 
-## Shows `mode` as picked (selections are reported via mode_selected).
-func set_mode(mode: String) -> void:
-	if _mode_picker == null:
-		return
-	for i in _mode_picker.item_count:
-		if _mode_picker.get_item_text(i) == mode:
-			_mode_picker.select(i)
+## What a range option allows: {min, max, step, whole, allow_greater, allow_lesser}.
+func option_range(key: String) -> Dictionary:
+	return _meta.get(key, {})
 
 
-func _build_section(list: VBoxContainer, section: String, target: Object) -> void:
-	var header := Label.new()
-	header.text = section.to_upper()
-	header.add_theme_font_size_override("font_size", 18)
-	list.add_child(header)
+# --- Building ---------------------------------------------------------------
 
-	var shown_group := ""
-	var group_panel: FoldableContainer
-	var group_list: VBoxContainer
-	for property in _tunable_properties(target):
-		var prop: String = property.name
-		var key := "%s/%s" % [section, prop]
-		if group_panel == null or property.group != shown_group:
-			shown_group = property.group
-			group_list = _foldable(list, shown_group if shown_group else "General")
-			group_panel = group_list.get_parent()
-			_group_panels[group_panel] = []
-		_group_panels[group_panel].append(key)
+func _build_ui() -> void:
+	_s = UITheme.scale_for(get_viewport())
+	var s := _s
+	_panel = Control.new()
+	_panel.name = "Settings"
+	_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_panel.theme = UITheme.theme(s)
+	add_child(_panel)
+	var ground := ColorRect.new()
+	ground.color = UITheme.GROUND
+	ground.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_panel.add_child(ground)
 
-		var editor: Control
-		if property.type == TYPE_BOOL:
-			var check := CheckBox.new()
-			check.text = prop.capitalize()
-			check.button_pressed = target.get(prop)
-			check.toggled.connect(func(on: bool) -> void:
-				target.set(prop, on)
-				tuning_changed.emit()
-				_refresh_visibility())
-			editor = check
-			group_list.add_child(check)
-			_rows[key] = check
-		elif property.hint == PROPERTY_HINT_ENUM:
-			var row := HBoxContainer.new()
-			var name_label := Label.new()
-			name_label.text = prop.capitalize()
-			name_label.custom_minimum_size.x = 170.0
-			name_label.tooltip_text = prop
-			row.add_child(name_label)
-			var picker := OptionButton.new()
-			for option: String in property.hint_string.split(","):
-				var parts := option.split(":")
-				picker.add_item(parts[0], parts[1].to_int() if parts.size() > 1 else picker.item_count)
-			picker.select(picker.get_item_index(target.get(prop)))
-			picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			picker.item_selected.connect(func(index: int) -> void:
-				target.set(prop, picker.get_item_id(index))
-				tuning_changed.emit()
-				_refresh_visibility())
-			row.add_child(picker)
-			editor = picker
-			group_list.add_child(row)
-			_rows[key] = row
-		else:
-			var row := HBoxContainer.new()
-			var name_label := Label.new()
-			name_label.text = prop.capitalize()
-			name_label.custom_minimum_size.x = 170.0
-			name_label.tooltip_text = prop
-			row.add_child(name_label)
+	var frame := MarginContainer.new()
+	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for side in ["left", "right"]:
+		frame.add_theme_constant_override("margin_" + side, roundi(56.0 * s))
+	frame.add_theme_constant_override("margin_top", roundi(36.0 * s))
+	frame.add_theme_constant_override("margin_bottom", roundi(24.0 * s))
+	_panel.add_child(frame)
+	var page := VBoxContainer.new()
+	page.add_theme_constant_override("separation", roundi(18.0 * s))
+	frame.add_child(page)
 
-			var range_parts: PackedStringArray = property.hint_string.split(",")
-			var whole: bool = property.type == TYPE_INT
-			var slider := HSlider.new()
-			slider.min_value = range_parts[0].to_float()
-			slider.max_value = range_parts[1].to_float()
-			slider.step = 1.0 if whole else 0.01
-			if range_parts.size() > 2 and range_parts[2].is_valid_float():
-				slider.step = range_parts[2].to_float()
-			# "or_greater" / "or_less": a preset's value can lie past the slider's end.
-			slider.allow_greater = "or_greater" in range_parts
-			slider.allow_lesser = "or_less" in range_parts
-			slider.value = target.get(prop)
-			slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			row.add_child(slider)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", roundi(14.0 * s))
+	page.add_child(header)
+	var heading := UITheme.label("Settings", "display", 30.0, UITheme.INK, s, 600)
+	header.add_child(heading)
+	var lab := UITheme.label("Tuning lab", "caps", 13.0, UITheme.AQUA, s)
+	lab.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	header.add_child(lab)
 
-			var value_label := Label.new()
-			value_label.custom_minimum_size.x = 56.0
-			value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			value_label.text = _format_value(target.get(prop))
-			row.add_child(value_label)
+	var columns := HBoxContainer.new()
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	columns.add_theme_constant_override("separation", roundi(24.0 * s))
+	page.add_child(columns)
 
-			slider.value_changed.connect(func(value: float) -> void:
-				target.set(prop, roundi(value) if whole else value)
-				tuning_changed.emit()
-				value_label.text = _format_value(target.get(prop)))
-			editor = slider
-			_value_labels[key] = value_label
-			group_list.add_child(row)
-			_rows[key] = row
+	# Sections.
+	var rail := PanelContainer.new()
+	rail.add_theme_stylebox_override("panel", UITheme.box(UITheme.DEEP, 18.0 * s))
+	rail.custom_minimum_size.x = 220.0 * s
+	columns.add_child(rail)
+	var rail_list := VBoxContainer.new()
+	rail_list.add_theme_constant_override("separation", roundi(4.0 * s))
+	var rail_margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		rail_margin.add_theme_constant_override("margin_" + side, roundi(10.0 * s))
+	rail.add_child(rail_margin)
+	rail_margin.add_child(rail_list)
+	for entry: Array in SECTIONS:
+		var button := SectionButton.new()
+		button.setup(entry[0], entry[1], s)
+		button.focus_entered.connect(_show_section.bind(entry[0]))
+		button.pressed.connect(func() -> void: _focus_rows(entry[0]))
+		button.panel = self
+		rail_list.add_child(button)
+		_section_buttons[entry[0]] = button
+	# Up/down through the sections only, stopping at the ends (held, it keeps going).
+	var buttons: Array = _section_buttons.values()
+	for i in buttons.size():
+		var button: Button = buttons[i]
+		button.focus_neighbor_top = button.get_path_to(buttons[maxi(i - 1, 0)])
+		button.focus_neighbor_bottom = button.get_path_to(buttons[mini(i + 1, buttons.size() - 1)])
 
-		editor.focus_mode = Control.FOCUS_NONE
-		_editors[key] = editor
+	# Right of the sections: the title, the tabs (big sections), then the
+	# options and the detail pane side by side.
+	var right := VBoxContainer.new()
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.add_theme_constant_override("separation", roundi(4.0 * s))
+	columns.add_child(right)
+	_title = UITheme.label("Game", "display", 34.0, UITheme.INK, s, 600)
+	right.add_child(_title)
+	_subtitle = UITheme.label("", "caps", 13.0, UITheme.AQUA, s)
+	right.add_child(_subtitle)
+	_build_tab_bar(right)
+	var spacer := Control.new()
+	spacer.custom_minimum_size.y = 8.0 * s
+	right.add_child(spacer)
+	var lower := HBoxContainer.new()
+	lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	lower.add_theme_constant_override("separation", roundi(24.0 * s))
+	right.add_child(lower)
 
-	list.add_child(HSeparator.new())
+	# Options.
+	var middle := VBoxContainer.new()
+	middle.custom_minimum_size.x = 520.0 * s
+	lower.add_child(middle)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
+	middle.add_child(scroll)
+	var lists := VBoxContainer.new()
+	lists.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(lists)
+	for entry: Array in SECTIONS:
+		var list := VBoxContainer.new()
+		list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		list.add_theme_constant_override("separation", roundi(6.0 * s))
+		list.visible = false
+		lists.add_child(list)
+		_section_lists[entry[0]] = list
+		_tabs[entry[0]] = []
+		_tab_at[entry[0]] = 0
+		for tab: Array in TABS.get(entry[0], []):
+			_new_tab(entry[0], tab[0], tab[1])
+	_build_game_options()
+	_build_bindings()
+	for section: String in _targets:
+		_build_section(section, _targets[section])
+	_prune_tabs()
+
+	# Detail.
+	var detail_box := PanelContainer.new()
+	detail_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail_box.add_theme_stylebox_override("panel", UITheme.box(UITheme.PANEL, 20.0 * s))
+	lower.add_child(detail_box)
+	var detail_margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		detail_margin.add_theme_constant_override("margin_" + side, roundi(24.0 * s))
+	detail_box.add_child(detail_margin)
+	var detail_scroll := ScrollContainer.new()
+	detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	detail_margin.add_child(detail_scroll)
+	_detail = VBoxContainer.new()
+	_detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_detail.add_theme_constant_override("separation", roundi(10.0 * s))
+	detail_scroll.add_child(_detail)
+	_detail_preview = TextureRect.new()
+	_detail_preview.custom_minimum_size.y = 240.0 * s
+	_detail_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_detail_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_detail_preview.visible = false
+	_detail.add_child(_detail_preview)
+	_detail_group = UITheme.label("", "caps", 13.0, UITheme.AQUA, s)
+	_detail.add_child(_detail_group)
+	_detail_title = UITheme.label("", "display", 26.0, UITheme.INK, s, 600)
+	_detail_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_detail.add_child(_detail_title)
+	_detail_text = UITheme.label("", "body", 16.0, UITheme.INK_SOFT, s)
+	_detail_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_detail.add_child(_detail_text)
+	_detail_lock = UITheme.label("", "body", 15.0, UITheme.CORAL, s, 600)
+	_detail_lock.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_detail.add_child(_detail_lock)
+	_detail_control = VBoxContainer.new()
+	_detail_control.add_theme_constant_override("separation", roundi(8.0 * s))
+	_detail.add_child(_detail_control)
+	_detail_default = UITheme.label("", "body", 14.0, UITheme.MUTED, s)
+	_detail_default.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_detail.add_child(_detail_default)
+
+	# Footer: the status line and the hints.
+	var footer := HBoxContainer.new()
+	page.add_child(footer)
+	_status = UITheme.label("", "body", 14.0, UITheme.MUTED, s)
+	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_status.clip_text = true
+	footer.add_child(_status)
+	_hints = ControllerHints.new()
+	_hints.s = s
+	_hints.hints = [["LB/RB", "Tab"], ["LT/RT", "Section"], ["◀ ▶", "Change"], ["Y", "Default"], ["B", "Back"]]
+	footer.add_child(_hints)
 	_refresh_visibility()
 
 
+## A group heading in `list`.
+func _heading(list: VBoxContainer, text: String) -> Label:
+	var heading := UITheme.label(text, "caps", 12.0, UITheme.MUTED, _s)
+	heading.custom_minimum_size.y = 30.0 * _s
+	heading.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	list.add_child(heading)
+	_group_headings[heading] = []
+	return heading
+
+
+## A row for option `key` under `heading` (in the heading's list: its tab's).
+func _add_row(key: String, meta: Dictionary, heading: Label) -> Row:
+	meta["section"] = key.get_slice("/", 0)
+	meta["prop"] = key.get_slice("/", 1)
+	_meta[key] = meta
+	var row := Row.new()
+	row.setup(self, key, _title_of(key), _s)
+	heading.get_parent().add_child(row)
+	_rows[key] = row
+	_group_headings[heading].append(key)
+	_refresh_row(key)
+	return row
+
+
+# --- Tabs ---------------------------------------------------------------------
+
+## The bar of tabs over the options: LB, the tabs (scrolling if they don't
+## fit), RB. Hidden for sections with one tab.
+func _build_tab_bar(parent: Control) -> void:
+	var s := _s
+	_tab_bar = HBoxContainer.new()
+	_tab_bar.add_theme_constant_override("separation", roundi(10.0 * s))
+	_tab_bar.custom_minimum_size.y = 44.0 * s
+	parent.add_child(_tab_bar)
+	var left := ControllerHints.new()
+	left.s = s
+	left.hints = [["LB", ""]]
+	left.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_tab_bar.add_child(left)
+	_tab_scroll = ScrollContainer.new()
+	_tab_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_tab_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_tab_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	_tab_bar.add_child(_tab_scroll)
+	_tab_strip = HBoxContainer.new()
+	_tab_strip.add_theme_constant_override("separation", roundi(4.0 * s))
+	_tab_scroll.add_child(_tab_strip)
+	var right := ControllerHints.new()
+	right.s = s
+	right.hints = [["RB", ""]]
+	right.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_tab_bar.add_child(right)
+
+
+## A tab for `section` holding export groups `groups`; its list of rows.
+func _new_tab(section: String, title: String, groups: Array) -> VBoxContainer:
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", roundi(6.0 * _s))
+	list.visible = false
+	_section_lists[section].add_child(list)
+	_tabs[section].append({"title": title, "list": list, "groups": groups})
+	return list
+
+
+## The list option `key` (of export group `group`) goes in: its tab's, or the
+## section's own list when it has no tabs.
+func _list_for(key: String, group: String) -> VBoxContainer:
+	var section := key.get_slice("/", 0)
+	var tabs: Array = _tabs[section]
+	if not TABS.has(section):
+		return _section_lists[section]
+	var title := _tab_for(key, group)
+	for tab: Dictionary in tabs:
+		if tab.title == title or (title.is_empty() and group in tab.groups):
+			return tab.list
+	return _new_tab(section, group if title.is_empty() else title, [group])
+
+
+## The tab title an option belongs under by rule ("" when TABS decides it by
+## its group): Powerups by the rarity of the powerup the group is named for,
+## Controls by keyboard or controller.
+func _tab_for(key: String, group: String) -> String:
+	match key.get_slice("/", 0):
+		"controls":
+			return "Keyboard & Mouse" if key.begins_with("controls/kb:") else "Controller"
+		"powerups":
+			if group == "Cursed":
+				return "Cursed"
+			if group == "Fish attack (weapon)":
+				return "Weapons"
+			var name := group.trim_suffix(" (boss)")
+			for id in Powerup.ids():
+				if Powerup.title(id) == name:
+					return "Weapons" if Powerup.is_weapon(id) else Rarity.NAMES[Powerup.tier(id)].capitalize()
+			return "General"
+	return ""
+
+
+## Drops tabs nothing went in (Powerups has no Epic powerup yet).
+func _prune_tabs() -> void:
+	for section: String in _tabs:
+		var kept := []
+		for tab: Dictionary in _tabs[section]:
+			if tab.list.get_child_count() > 0:
+				kept.append(tab)
+			else:
+				tab.list.queue_free()
+		_tabs[section] = kept
+
+
+## The list shown for `section` now: its current tab's, or its own.
+func _shown_list(section: String) -> VBoxContainer:
+	var tabs: Array = _tabs.get(section, [])
+	if tabs.is_empty():
+		return _section_lists[section]
+	return tabs[clampi(_tab_at[section], 0, tabs.size() - 1)].list
+
+
+## Shows tab `index` of `section`, and its tab bar.
+func _show_tab(section: String, index: int) -> void:
+	var tabs: Array = _tabs.get(section, [])
+	_tab_at[section] = clampi(index, 0, maxi(tabs.size() - 1, 0))
+	for i in tabs.size():
+		tabs[i].list.visible = i == _tab_at[section]
+	_tab_bar.visible = tabs.size() > 1
+	_hints.hints = ([["LB/RB", "Tab"]] if tabs.size() > 1 else []) + [["LT/RT", "Section"], ["◀ ▶", "Change"], ["Y", "Default"],
+			["B", "Back"]]
+	for child in _tab_strip.get_children():
+		_tab_strip.remove_child(child)
+		child.queue_free()
+	for i in tabs.size():
+		var button := TabButton.new()
+		button.setup(tabs[i].title, i == _tab_at[section], _s)
+		button.pressed.connect(func() -> void:
+			var focus := get_viewport().gui_get_focus_owner()
+			_show_tab(section, i)
+			if focus is Row:
+				_focus_rows(section))
+		_tab_strip.add_child(button)
+		if i == _tab_at[section]:
+			(func() -> void:
+				if is_instance_valid(button) and _tab_scroll.is_ancestor_of(button):
+					_tab_scroll.ensure_control_visible(button)).call_deferred()
+	_link_rows(section)
+
+
+## The next (+1) or previous (-1) tab of this section, wrapping round. The
+## bumpers never leave the section (LT / RT do that); with no tabs they do
+## nothing. Focus stays in its column.
+func _step_tab(direction: int) -> void:
+	var tabs: Array = _tabs.get(_section, [])
+	if tabs.size() < 2:
+		return
+	var focus := get_viewport().gui_get_focus_owner()
+	_show_tab(_section, posmod(int(_tab_at.get(_section, 0)) + direction, tabs.size()))
+	_show_first_detail(_section)
+	if focus is Row or (focus != null and _detail.is_ancestor_of(focus)):
+		_focus_rows(_section)
+
+
+func _build_game_options() -> void:
+	var heading: Label
+	var group := ""
+	for key: String in GAME_OPTIONS:
+		var info: Array = GAME_OPTIONS[key]
+		var list := _list_for(key, info[1])
+		if heading == null or info[1] != group or heading.get_parent() != list:
+			group = info[1]
+			heading = _heading(list, group)
+		var meta := {"group": group}
+		match key:
+			"game/player_name":
+				meta["kind"] = "text"
+			"game/character":
+				meta["kind"] = "enum"
+				var choices := []
+				for family: FishCharacter.Family in FishCharacter.CARS:
+					choices.append([FishCharacter.display_name(family), family])
+				meta["choices"] = choices
+			"controls/profile":
+				meta["kind"] = "enum"
+				var profiles := []
+				for profile: String in Controls.profile_names():
+					profiles.append([profile, profile])
+				meta["choices"] = profiles
+			_:
+				meta["kind"] = "action" if key.begins_with("game/preset_") else "bool"
+		_add_row(key, meta, heading)
+
+
+## The Controls section's rebinds (Controls.REBINDABLE): a row for each
+## action's keyboard and mouse binding (its tab) and its controller binding
+## (the other, under the controller profile), and a reset for each.
+func _build_bindings() -> void:
+	for pad: bool in [false, true]:
+		var kind := "pad" if pad else "kb"
+		var heading: Label
+		var group := ""
+		for entry: Array in Controls.REBINDABLE:
+			var key := "controls/%s:%s" % [kind, entry[0]]
+			var list := _list_for(key, entry[2])
+			if heading == null or entry[2] != group:
+				group = entry[2]
+				heading = _heading(list, group)
+			_add_row(key, {"group": group, "kind": "binding", "action": entry[0], "pad": pad, "title": entry[1]}, heading)
+		var reset_key := "controls/%s:reset_all" % kind
+		var reset_heading := _heading(_list_for(reset_key, "Bindings"), "Bindings")
+		_add_row(reset_key, {"group": "Bindings", "kind": "action", "pad": pad,
+				"title": "Reset all controller bindings" if pad else "Reset all keyboard & mouse bindings"}, reset_heading)
+	Controls.bindings_changed.connect(func() -> void:
+		for key: String in _rows:
+			if key.begins_with("controls/"):
+				_refresh_row(key)
+		if _detail_key.begins_with("controls/"):
+			_show_detail(_detail_key))
+
+
+func _build_section(section: String, target: Object) -> void:
+	var shown_group := "∅"
+	var heading: Label
+	for property in _tunable_properties(target):
+		var prop: String = property.name
+		var key := "%s/%s" % [section, prop]
+		if heading == null or property.group != shown_group:
+			shown_group = property.group
+			var group_name: String = shown_group if shown_group else "General"
+			heading = _heading(_list_for(key, group_name), group_name)
+		var meta := {"group": shown_group if shown_group else "General"}
+		if property.type == TYPE_BOOL:
+			meta["kind"] = "bool"
+		elif property.hint == PROPERTY_HINT_ENUM:
+			meta["kind"] = "enum"
+			var choices := []
+			var next_value := 0
+			for option: String in property.hint_string.split(","):
+				var parts := option.split(":")
+				var value := parts[1].to_int() if parts.size() > 1 else next_value
+				choices.append([parts[0], value])
+				next_value = value + 1
+			meta["choices"] = choices
+		else:
+			var range_parts: PackedStringArray = property.hint_string.split(",")
+			var whole: bool = property.type == TYPE_INT
+			meta["kind"] = "range"
+			meta["min"] = range_parts[0].to_float()
+			meta["max"] = range_parts[1].to_float()
+			meta["whole"] = whole
+			meta["step"] = 1.0 if whole else 0.01
+			if range_parts.size() > 2 and range_parts[2].is_valid_float():
+				meta["step"] = range_parts[2].to_float()
+			# "or_greater" / "or_less": a preset's value can lie past the slider's end.
+			meta["allow_greater"] = "or_greater" in range_parts
+			meta["allow_lesser"] = "or_less" in range_parts
+		_add_row(key, meta, heading)
+
+
+# --- Values -----------------------------------------------------------------
+
+## Option `key`'s value now (a binding's: what it's bound to).
+func _value(key: String) -> Variant:
+	var section := key.get_slice("/", 0)
+	var prop := key.get_slice("/", 1)
+	var meta: Dictionary = _meta.get(key, {})
+	if meta.get("kind", "") == "binding":
+		return Controls.binding_text(meta.action, meta.pad)
+	match key:
+		"game/character":
+			return _character
+		"controls/profile":
+			return Controls.current_profile
+	if section in ["game", "display"]:
+		return UISettings.get(prop) if prop in UISettings.KEYS else null
+	return _targets[section].get(prop) if _targets.has(section) else null
+
+
+## Option `key`'s default.
+func _default(key: String) -> Variant:
+	var section := key.get_slice("/", 0)
+	var prop := key.get_slice("/", 1)
+	var meta: Dictionary = _meta.get(key, {})
+	if meta.get("kind", "") == "binding":
+		return Controls.default_text(meta.action, meta.pad)
+	match key:
+		"game/player_name":
+			return UISettings.DEFAULT_NAME
+		"game/character":
+			return FishCharacter.Family.OCTANE
+		"game/goal_replays", "display/fullscreen":
+			return true
+		"display/show_stats", "display/show_input_overlay":
+			return false
+		"controls/profile":
+			return Controls.DEFAULT_PROFILE
+	return _defaults[section].get(prop) if _defaults.has(section) else null
+
+
+## Sets option `key` to `value`, the way its control would.
+func _set_value(key: String, value: Variant) -> void:
+	if not is_editable(key):
+		return
+	var section := key.get_slice("/", 0)
+	var prop := key.get_slice("/", 1)
+	match key:
+		"game/character":
+			_character = value
+			character_selected.emit(value)
+			show_status("Fish: %s (remembered on this PC)" % FishCharacter.display_name(value))
+		"controls/profile":
+			Controls.apply_profile(value)
+			show_status("Controller profile: %s (remembered on this PC)" % Controls.current_profile)
+		_:
+			if section in ["game", "display"]:
+				UISettings.set_value(prop, value)
+			elif _targets.has(section):
+				var meta: Dictionary = _meta[key]
+				if meta.get("whole", false):
+					value = roundi(value)
+				_targets[section].set(prop, value)
+				tuning_changed.emit()
+				if meta.kind != "range":
+					_refresh_visibility()
+	_refresh_row(key)
+	if key == _detail_key:
+		_sync_detail()
+
+
+## Moves option `key` one step (`direction` -1 or 1): a range by its step, a
+## bool on/off, an enum to the next choice.
+func _step(key: String, direction: int) -> void:
+	var meta: Dictionary = _meta.get(key, {})
+	var value: Variant = _value(key)
+	match meta.get("kind", ""):
+		"bool":
+			_set_value(key, direction > 0)
+		"enum":
+			var choices: Array = meta.choices
+			var at := 0
+			for i in choices.size():
+				if choices[i][1] == value:
+					at = i
+			_set_value(key, choices[posmod(at + direction, choices.size())][1])
+		"range":
+			var step := _pad_step(meta)
+			var low: float = meta.min
+			var high: float = maxf(meta.max, value) if meta.allow_greater else meta.max
+			if meta.allow_lesser:
+				low = minf(low, value)
+			var next := clampf(snappedf(float(value) + direction * step, step), low, high)
+			_set_value(key, next)
+
+
+## How far one left/right press moves a slider: its step, unless that would
+## take more than 100 presses to cross it.
+func _pad_step(meta: Dictionary) -> float:
+	var step: float = meta.step
+	var span: float = meta.max - meta.min
+	if step <= 0.0:
+		step = 0.01
+	if span / step > 100.0:
+		step = maxf(snappedf(span / 100.0, step), step)
+	return step
+
+
+func _reset_option(key: String) -> void:
+	var meta: Dictionary = _meta.get(key, {})
+	if meta.get("kind", "") == "action":
+		return
+	if meta.get("kind", "") == "binding":
+		Controls.reset_binding(meta.action, meta.pad)
+		show_status("%s back to %s" % [_title_of(key), Controls.default_text(meta.action, meta.pad)])
+		return
+	var value: Variant = _default(key)
+	if value != null:
+		_set_value(key, value)
+		show_status("%s back to its default" % _title_of(key))
+
+
+## Runs action `key` (the tuning preset rows).
+func _act(key: String) -> void:
+	if not is_editable(key):
+		show_status("The host sets the tuning while you're online")
+		return
+	match key:
+		"game/preset_save":
+			_pick_preset(true)
+		"game/preset_load":
+			_pick_preset(false)
+		"game/preset_default":
+			_restore_defaults()
+		"game/preset_copy":
+			_copy_to_clipboard()
+		"controls/kb:reset_all", "controls/pad:reset_all":
+			Controls.reset_all_bindings(key.begins_with("controls/pad:"))
+			show_status("Every %s binding back to its default" % ("controller" if key.begins_with("controls/pad:") else "keyboard & mouse"))
+
+
+# --- Rebinding ------------------------------------------------------------------
+
+## Whether a rebind is waiting for a key or button (the pause menu leaves all
+## input to it then).
+func is_capturing() -> bool:
+	return not _capture_key.is_empty()
+
+
+## Option `key` (a binding) waits for the key, mouse button, controller button
+## or stick push to use.
+func _start_capture(key: String) -> void:
+	_capture_key = key
+	_capture_age = 0.0
+	_repeat_dir = 0
+	_refresh_row(key)
+	if key == _detail_key:
+		_show_detail(key)  # the pane says it's listening too
+	var pad: bool = _meta[key].pad
+	show_status(("Press the controller button, or push the stick or trigger, for %s  ·  Esc cancels" if pad
+			else "Press the key or mouse button for %s  ·  Esc cancels") % _title_of(key))
+
+
+func _end_capture(event: InputEvent) -> void:
+	var key := _capture_key
+	_capture_key = ""
+	if event:
+		var meta: Dictionary = _meta[key]
+		var shared := Controls.actions_on(event, meta.action)
+		Controls.rebind(meta.action, event)
+		show_status("%s: %s%s" % [_title_of(key), Controls.binding_text(meta.action, meta.pad),
+				"  ·  also on %s" % ", ".join(shared) if not shared.is_empty() else ""])
+	else:
+		show_status("Rebind cancelled")
+	_refresh_row(key)
+	if _rows.has(key):
+		(_rows[key] as Row).grab_focus()
+	if key == _detail_key:
+		_show_detail(key)
+
+
+## While a rebind waits: the first fitting key / button / push is it; Esc (or
+## B on the keyboard tab) cancels. Everything else is swallowed.
+func _capture_input(event: InputEvent) -> void:
+	get_viewport().set_input_as_handled()
+	if _capture_age < CAPTURE_ARM:
+		return
+	var pad: bool = _meta[_capture_key].pad
+	var key_event := event as InputEventKey
+	if key_event and key_event.pressed and not key_event.echo and key_event.physical_keycode == KEY_ESCAPE:
+		_end_capture(null)
+		return
+	if pad:
+		if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:
+			_end_capture(event)
+		elif event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) >= 0.6:
+			_end_capture(event)
+		elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+			_end_capture(null)
+	else:
+		if key_event and key_event.pressed and not key_event.echo:
+			_end_capture(event)
+		elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+			_end_capture(event)
+		elif event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed \
+				and (event as InputEventJoypadButton).button_index == JOY_BUTTON_B:
+			_end_capture(null)
+
+
+## What row `key`'s value says, and in what colour.
+func _value_text(key: String) -> Array:
+	var meta: Dictionary = _meta.get(key, {})
+	var value: Variant = _value(key)
+	var changed: bool = value != _default(key)
+	match meta.get("kind", ""):
+		"binding":
+			if key == _capture_key:
+				var left := ceili(CAPTURE_TIME - _capture_age)
+				return [("PRESS A BUTTON…  %d" if meta.pad else "PRESS A KEY…  %d") % left, UITheme.CORAL]
+			return [str(value).to_upper(), UITheme.AQUA if Controls.is_rebound(meta.action, meta.pad) else UITheme.INK_SOFT]
+		"bool":
+			return ["ON", UITheme.AQUA] if value else ["OFF", UITheme.MUTED]
+		"enum":
+			for choice: Array in meta.choices:
+				if choice[1] == value:
+					return [str(choice[0]).to_upper(), UITheme.AQUA if changed else UITheme.INK_SOFT]
+			return [str(value), UITheme.INK_SOFT]
+		"text":
+			return [UISettings.display_name(), UITheme.INK_SOFT]
+		"action":
+			return ["›", UITheme.MUTED]
+		"range":
+			return [_format_value(value), UITheme.AQUA if changed else UITheme.INK_SOFT]
+	return ["", UITheme.MUTED]
+
+
+func _refresh_row(key: String) -> void:
+	var row: Row = _rows.get(key)
+	if row == null:
+		return
+	var shown := _value_text(key)
+	var meta: Dictionary = _meta[key]
+	var changed: bool = (meta.kind == "range" and _value(key) != _default(key)) \
+			or (meta.kind == "binding" and Controls.is_rebound(meta.action, meta.pad))
+	row.set_value(shown[0], shown[1], changed)
+	row.modulate.a = 1.0 if is_editable(key) else 0.45
+
+
+## A slider's value as its row shows it: whole numbers without decimals.
+static func _format_value(value: Variant) -> String:
+	if value is int:
+		return str(value)
+	var text := "%.2f" % value
+	if absf(value) >= 100.0:
+		text = "%.1f" % value
+	return text
+
+
+func _title_of(key: String) -> String:
+	if GAME_OPTIONS.has(key):
+		return GAME_OPTIONS[key][0]
+	if _meta.has(key) and _meta[key].has("title"):
+		return _meta[key].title
+	return key.get_slice("/", 1).capitalize()
+
+
+# --- Navigation and the detail pane ------------------------------------------
+
+func _show_section(section: String) -> void:
+	_section = section
+	for id: String in _section_lists:
+		_section_lists[id].visible = id == section
+	for id: String in _section_buttons:
+		(_section_buttons[id] as SectionButton).current = id == section
+	for entry: Array in SECTIONS:
+		if entry[0] == section:
+			_title.text = entry[1]
+	_subtitle.text = ""
+	_show_tab(section, _tab_at.get(section, 0))
+	_show_first_detail(section)
+
+
+## The detail pane for the first option shown in `section`.
+func _show_first_detail(section: String) -> void:
+	var first := _first_row(section)
+	if first:
+		_show_detail(first.key)
+
+
+## Focus into `section`'s options (its first one).
+func _focus_rows(section: String) -> void:
+	_show_section(section)
+	var first := _first_row(section)
+	if first:
+		first.grab_focus()
+
+
+func _first_row(section: String) -> Row:
+	for child in _shown_list(section).get_children():
+		if child is Row and child.visible:
+			return child
+	return null
+
+
+## Up/down between the shown rows only, stopping at the ends; left/right stay
+## put (they change the value).
+func _link_rows(section: String) -> void:
+	var shown: Array[Row] = []
+	for child in _shown_list(section).get_children():
+		if child is Row and child.visible:
+			shown.append(child)
+	for i in shown.size():
+		var row := shown[i]
+		row.focus_neighbor_top = row.get_path_to(shown[maxi(i - 1, 0)])
+		row.focus_neighbor_bottom = row.get_path_to(shown[mini(i + 1, shown.size() - 1)])
+		row.focus_neighbor_left = row.get_path_to(row)
+		row.focus_neighbor_right = row.get_path_to(row)
+
+
+## The next (+1) or previous (-1) section (LT / RT), at the tab it was left on.
+func _step_section(direction: int) -> void:
+	var at := 0
+	for i in SECTIONS.size():
+		if SECTIONS[i][0] == _section:
+			at = i
+	_step_section_to(SECTIONS[posmod(at + direction, SECTIONS.size())][0])
+
+
+## Over to `section`, focus staying in its column (the section buttons or the options).
+func _step_section_to(section: String) -> void:
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus is Row or (focus != null and _detail.is_ancestor_of(focus)):
+		_focus_rows(section)
+	else:
+		_show_section(section)
+		(_section_buttons[section] as Button).grab_focus()
+
+
+## The detail pane for option `key`: what it is, its control, its default.
+func _show_detail(key: String) -> void:
+	_detail_key = key
+	var meta: Dictionary = _meta.get(key, {})
+	var section := key.get_slice("/", 0)
+	var group: String = meta.get("group", "")
+	var section_title := ""
+	for entry: Array in SECTIONS:
+		if entry[0] == section:
+			section_title = entry[1]
+	_subtitle.text = ("%s · %s" % [section_title, group]).to_upper()
+	_detail_group.text = group.to_upper()
+	_detail_title.text = _title_of(key)
+	var words := ""
+	if GAME_OPTIONS.has(key):
+		words = GAME_OPTIONS[key][2]
+	else:
+		words = SettingDocs.DOCS.get(key, "")
+	_detail_text.text = words
+	_detail_text.visible = not words.is_empty()
+	var preview_path := PREVIEW_DIR.path_join(section).path_join(key.get_slice("/", 1) + ".png")
+	_detail_preview.visible = ResourceLoader.exists(preview_path)
+	_detail_preview.texture = load(preview_path) if _detail_preview.visible else null
+	_detail_lock.visible = not is_editable(key)
+	_detail_lock.text = (_lock_note if _lock_note else "Locked") if _locked.has(section) else "Not now: close the replay first." \
+			if key == "game/character" else "The host sets the tuning while you're online."
+	for child in _detail_control.get_children():
+		_detail_control.remove_child(child)  # now: _sync_detail mustn't see the last option's
+		child.queue_free()
+	_build_detail_control(key, meta)
+	var used: String = GAME_OPTIONS[key][3] if GAME_OPTIONS.has(key) else USED_BY.get(section, "")
+	var default_value: Variant = _default(key)
+	var default_text := ""
+	if meta.get("kind", "") != "action" and default_value != null:
+		default_text = "Default: %s" % _shown(key, default_value)
+	if used:
+		default_text += ("  ·  " if default_text else "") + "Used by %s" % used
+	_detail_default.text = default_text
+
+
+## How value `value` of option `key` reads in the pane ("On", "Clownfish (Octane)", "12.50").
+func _shown(key: String, value: Variant) -> String:
+	var meta: Dictionary = _meta.get(key, {})
+	match meta.get("kind", ""):
+		"bool":
+			return "On" if value else "Off"
+		"enum":
+			for choice: Array in meta.choices:
+				if choice[1] == value:
+					return str(choice[0])
+		"range":
+			return _format_value(value)
+	return str(value)
+
+
+func _build_detail_control(key: String, meta: Dictionary) -> void:
+	var s := _s
+	var editable := is_editable(key)
+	match meta.get("kind", ""):
+		"bool":
+			var pair := HBoxContainer.new()
+			for on: bool in [true, false]:
+				var button := ChoiceButton.new()
+				button.setup("On" if on else "Off", s)
+				button.custom_minimum_size.x = 110.0 * s
+				button.disabled = not editable
+				button.pressed.connect(func() -> void: _set_value(key, on))
+				button.set_meta("value", on)
+				pair.add_child(button)
+			_detail_control.add_child(pair)
+		"enum":
+			for choice: Array in meta.choices:
+				var button := ChoiceButton.new()
+				button.setup(str(choice[0]), s)
+				button.disabled = not editable
+				button.pressed.connect(func() -> void: _set_value(key, choice[1]))
+				button.set_meta("value", choice[1])
+				_detail_control.add_child(button)
+		"range":
+			var line := HBoxContainer.new()
+			var slider := HSlider.new()
+			slider.min_value = meta.min
+			slider.max_value = meta.max
+			slider.step = meta.step
+			slider.allow_greater = meta.allow_greater
+			slider.allow_lesser = meta.allow_lesser
+			slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			slider.custom_minimum_size.y = 28.0 * s
+			slider.editable = editable
+			slider.focus_mode = Control.FOCUS_CLICK
+			slider.set_value_no_signal(_value(key))
+			slider.value_changed.connect(func(value: float) -> void: _set_value(key, value))
+			line.add_child(slider)
+			var number := UITheme.label(_format_value(_value(key)), "caps", 18.0, UITheme.AQUA, s, 700)
+			number.custom_minimum_size.x = 70.0 * s
+			number.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			line.add_child(number)
+			_detail_control.add_child(line)
+			var ends := UITheme.label("%s – %s%s" % [_format_value(meta.min), _format_value(meta.max), "+" if meta.allow_greater else ""],
+					"body", 13.0, UITheme.MUTED, s)
+			_detail_control.add_child(ends)
+		"text":
+			var edit := LineEdit.new()
+			edit.text = UISettings.player_name
+			edit.placeholder_text = UISettings.DEFAULT_NAME
+			edit.max_length = 20
+			edit.text_changed.connect(func(text: String) -> void: UISettings.set_value("player_name", text))
+			edit.text_submitted.connect(func(_text: String) -> void:
+				if _rows.has(key):
+					(_rows[key] as Row).grab_focus())
+			_detail_control.add_child(edit)
+		"action":
+			var button := Button.new()
+			button.text = _title_of(key)
+			button.disabled = not editable
+			button.pressed.connect(_act.bind(key))
+			_detail_control.add_child(button)
+		"binding":
+			var listening := key == _capture_key
+			var bound_text: String = ("Press a button…" if meta.pad else "Press a key…") if listening else str(_value(key))
+			var bound := UITheme.label(bound_text, "caps", 22.0, UITheme.CORAL if listening else UITheme.AQUA, s, 700)
+			bound.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_detail_control.add_child(bound)
+			var row := HBoxContainer.new()
+			var rebind := Button.new()
+			rebind.text = "Rebind"
+			rebind.pressed.connect(_start_capture.bind(key))
+			row.add_child(rebind)
+			var reset := Button.new()
+			reset.text = "Default"
+			reset.disabled = not Controls.is_rebound(meta.action, meta.pad)
+			reset.pressed.connect(_reset_option.bind(key))
+			row.add_child(reset)
+			_detail_control.add_child(row)
+			var shared := PackedStringArray()
+			for event in InputMap.action_get_events(meta.action):
+				if Controls._is_pad(event) == meta.pad:
+					for other in Controls.actions_on(event, meta.action):
+						if other not in shared:
+							shared.append(other)
+			if not shared.is_empty():
+				_detail_control.add_child(UITheme.label("Also on: %s" % ", ".join(shared), "body", 14.0, UITheme.CORAL, s))
+	# Plain buttons on the pane's fill: the deep fill, so they show.
+	for button in _detail_control.find_children("*", "Button", true, false):
+		if not button is ChoiceButton:
+			var deep := UITheme.box(UITheme.DEEP, 12.0 * s)
+			deep.set_content_margin(SIDE_LEFT, 18.0 * s)
+			deep.set_content_margin(SIDE_RIGHT, 18.0 * s)
+			deep.set_content_margin(SIDE_TOP, 8.0 * s)
+			deep.set_content_margin(SIDE_BOTTOM, 8.0 * s)
+			button.add_theme_stylebox_override("normal", deep)
+			button.add_theme_stylebox_override("disabled", deep)
+	_sync_detail()
+
+
+## The detail control shows the option's value now (changed from a row).
+func _sync_detail() -> void:
+	var value: Variant = _value(_detail_key)
+	for child in _detail_control.get_children():
+		if child is ChoiceButton:
+			(child as ChoiceButton).current = child.get_meta("value") == value
+		elif child is HBoxContainer:
+			for inner in child.get_children():
+				if inner is ChoiceButton:
+					(inner as ChoiceButton).current = inner.get_meta("value") == value
+				elif inner is HSlider:
+					(inner as HSlider).set_value_no_signal(value)
+				elif inner is Label:
+					(inner as Label).text = _format_value(value)
+
+
+## Where focus goes on B: from the detail pane back to its row, from a row to
+## its section, from a section closed.
+func _back() -> void:
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus != null and _detail.is_ancestor_of(focus) and _rows.has(_detail_key):
+		(_rows[_detail_key] as Row).grab_focus()
+	elif focus is Row:
+		(_section_buttons[_section] as Button).grab_focus()
+	else:
+		set_open(false)
+
+
+func _input(event: InputEvent) -> void:
+	if not is_open():
+		return
+	if is_capturing():
+		_capture_input(event)
+		return
+	var focus := get_viewport().gui_get_focus_owner()
+	var typing := focus is LineEdit
+	if event.is_echo() and (event.is_action("ui_up") or event.is_action("ui_down")) and (focus is Row or focus is SectionButton):
+		get_viewport().set_input_as_handled()  # held: _process moves it, at its own pace
+		return
+	if event.is_action_pressed("ui_page_previous") and not typing:
+		_step_tab(-1)
+	elif event.is_action_pressed("ui_page_next") and not typing:
+		_step_tab(1)
+	elif event.is_action_pressed("ui_reset") and not typing:
+		if focus is Row:
+			_reset_option((focus as Row).key)
+		elif focus != null and _detail.is_ancestor_of(focus):
+			_reset_option(_detail_key)
+		else:
+			return
+	elif event.is_action_pressed("ui_cancel"):
+		_back()
+	else:
+		return
+	get_viewport().set_input_as_handled()
+
+
+func _process(delta: float) -> void:
+	if not is_open():
+		return
+	if is_capturing():
+		_capture_age += delta
+		if _capture_age >= CAPTURE_TIME:
+			_end_capture(null)
+		else:
+			_refresh_row(_capture_key)  # the countdown
+		return
+	# LT / RT (Home / End): whole sections (the triggers are sticks to Godot, so on their edge).
+	var focus := get_viewport().gui_get_focus_owner()
+	if not focus is LineEdit:
+		for pair: Array in [["ui_section_previous", -1], ["ui_section_next", 1]]:
+			if _trigger_pulled(pair[0]):
+				_step_section(pair[1])
+	_scroll_held_list(delta, get_viewport().gui_get_focus_owner())
+	# Held left/right on a row repeats (controllers don't echo).
+	var direction := 0
+	if focus is Row:
+		direction = int(Input.is_action_pressed("ui_right")) - int(Input.is_action_pressed("ui_left"))
+	if direction == 0 or direction != _repeat_dir:
+		_repeat_dir = direction
+		_repeat_time = -REPEAT_DELAY
+		return
+	_repeat_time += delta
+	while _repeat_time >= REPEAT_EVERY:
+		_repeat_time -= REPEAT_EVERY
+		_step((focus as Row).key, direction)
+
+
+## Held up/down on an option or a section: after SCROLL_DELAY focus keeps
+## moving that way (the first step is the press itself, Godot's own), quicker
+## the longer it's held, stopping at the end of the list.
+func _scroll_held_list(delta: float, focus: Control) -> void:
+	var direction := 0
+	if focus is Row or focus is SectionButton:
+		direction = int(Input.is_action_pressed("ui_down")) - int(Input.is_action_pressed("ui_up"))
+	if direction == 0 or direction != _scroll_dir:
+		_scroll_dir = direction
+		_scroll_held = 0.0
+		_scroll_time = -SCROLL_DELAY
+		return
+	_scroll_held += delta
+	_scroll_time += delta
+	var every := SCROLL_FAST if _scroll_held >= SCROLL_FAST_AFTER else SCROLL_EVERY
+	while _scroll_time >= every:
+		_scroll_time -= every
+		var next := focus.find_valid_focus_neighbor(SIDE_BOTTOM if direction > 0 else SIDE_TOP)
+		if next == null or next == focus:
+			return  # the end of the list
+		next.grab_focus()
+		focus = next
+
+
+var _triggers_held := {}
+
+
+## Whether `action` (a trigger past half way, or its key) went down since the
+## last frame; it has to come back up before it counts again.
+func _trigger_pulled(action: String) -> bool:
+	var held := Input.is_action_pressed(action)
+	var pulled: bool = held and not _triggers_held.get(action, false)
+	_triggers_held[action] = held
+	return pulled
+
+
 ## Hides options a target says don't apply right now (via an optional
-## is_option_active(property) method), and group panels left empty.
+## is_option_active(property) method), and headings left with none.
 func _refresh_visibility() -> void:
 	for key: String in _rows:
-		var parts := key.split("/")
-		var target: Object = _targets[parts[0]]
-		_rows[key].visible = not target.has_method("is_option_active") or target.is_option_active(parts[1])
-	for group_panel: FoldableContainer in _group_panels:
-		group_panel.visible = _group_panels[group_panel].any(func(key: String) -> bool: return _rows[key].visible)
+		var section := key.get_slice("/", 0)
+		if not _targets.has(section):
+			continue
+		var target: Object = _targets[section]
+		_rows[key].visible = not target.has_method("is_option_active") or target.is_option_active(key.get_slice("/", 1))
+	for heading: Label in _group_headings:
+		heading.visible = _group_headings[heading].any(func(key: String) -> bool: return _rows[key].visible)
+	if _section_lists.has(_section):
+		_link_rows(_section)
 
 
-## A slider's value as its label shows it: whole numbers without decimals.
-static func _format_value(value: Variant) -> String:
-	return str(value) if value is int else "%.2f" % value
-
+# --- Tuning model -------------------------------------------------------------
 
 ## Script variables exported as a float or int range, a bool or an enum, tagged with their @export_group.
 func _tunable_properties(target: Object) -> Array[Dictionary]:
@@ -401,24 +1327,21 @@ func _snapshot(target: Object) -> Dictionary:
 	return values
 
 
+## Puts `values` (property -> value) on `section`'s target, as a preset or a
+## restore does (past a slider's end too).
 func _apply(section: String, values: Dictionary) -> void:
+	var target: Object = _targets[section]
 	for prop: String in values:
 		var key := "%s/%s" % [section, prop]
-		var editor: Control = _editors.get(key)
-		if editor is HSlider:
-			# Set the target directly: the slider would round to its step (33.33 -> 33.5).
-			var value: Variant = values[prop]
-			if _targets[section].get(prop) is int:
-				value = roundi(value)
-			_targets[section].set(prop, value)
-			(editor as HSlider).set_value_no_signal(value)
-			_value_labels[key].text = _format_value(_targets[section].get(prop))
-		elif editor is CheckBox:
-			(editor as CheckBox).button_pressed = values[prop]
-		elif editor is OptionButton:
-			var picker := editor as OptionButton
-			picker.select(picker.get_item_index(values[prop]))
-			picker.item_selected.emit(picker.selected)  # select() doesn't emit it
+		if not _rows.has(key):
+			continue
+		var value: Variant = values[prop]
+		if target.get(prop) is int:
+			value = roundi(value)
+		target.set(prop, value)
+		_refresh_row(key)
+	if _detail_key.begins_with(section + "/"):
+		_sync_detail()
 	tuning_changed.emit()
 
 
@@ -519,17 +1442,15 @@ func set_sections_locked(sections: Array, locked: bool, note := "") -> void:
 			_locked[section] = true
 		else:
 			_locked.erase(section)
-	for key: String in _editors:
-		var editor: Control = _editors[key]
-		var off: bool = _locked.has(key.get_slice("/", 0))
-		if editor is BaseButton:
-			(editor as BaseButton).disabled = off
-		elif editor is Range:
-			(editor as Range).editable = not off
-	_load_button.disabled = not _locked.is_empty()
-	_default_button.disabled = not _locked.is_empty()
 	if locked and note:
+		_lock_note = note
 		_status.text = note
+	elif _locked.is_empty():
+		_lock_note = ""
+	for key: String in _rows:
+		_refresh_row(key)
+	if not _detail_key.is_empty():
+		_show_detail(_detail_key)
 
 
 ## Every section's tuning now, for restore_tuning().
@@ -586,9 +1507,182 @@ func _copy_to_clipboard() -> void:
 	_status.text = "Copied current tuning to clipboard"
 
 
-func _button(text: String, on_pressed: Callable) -> Button:
-	var button := Button.new()
-	button.text = text
-	button.focus_mode = Control.FOCUS_NONE
-	button.pressed.connect(on_pressed)
-	return button
+## A section in the left column: the current one gets the panel fill and an
+## aqua bar on its right edge.
+class SectionButton extends Button:
+	var id := ""
+	var panel: Node
+	var current := false:
+		set(value):
+			current = value
+			add_theme_stylebox_override("normal", _current if value else _clear)
+			add_theme_color_override("font_color", UITheme.INK if value else UITheme.MUTED)
+			_bar.visible = value
+	var _clear: StyleBoxFlat
+	var _current: StyleBoxFlat
+	var _bar := ColorRect.new()
+
+	func setup(section: String, title: String, s: float) -> void:
+		id = section
+		text = title
+		alignment = HORIZONTAL_ALIGNMENT_LEFT
+		custom_minimum_size.y = 46.0 * s
+		action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+		add_theme_font_override("font", UITheme.body(600))
+		add_theme_font_size_override("font_size", roundi(17.0 * s))
+		_clear = UITheme.box(Color(0, 0, 0, 0), 12.0 * s)
+		_current = UITheme.box(UITheme.PANEL, 12.0 * s)
+		var hover := UITheme.box(Color(UITheme.PANEL, 0.6), 12.0 * s)
+		for box: StyleBoxFlat in [_clear, _current, hover]:
+			box.set_content_margin(SIDE_LEFT, 16.0 * s)
+		add_theme_stylebox_override("hover", hover)
+		add_theme_stylebox_override("pressed", hover)
+		add_theme_color_override("font_hover_color", UITheme.INK)
+		add_theme_color_override("font_focus_color", UITheme.INK)
+		# The current section's 3 px aqua bar on its right edge.
+		_bar.color = UITheme.AQUA
+		_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_bar.anchor_left = 1.0
+		_bar.anchor_right = 1.0
+		_bar.anchor_bottom = 1.0
+		_bar.offset_left = -3.0 * s
+		_bar.offset_top = 8.0 * s
+		_bar.offset_bottom = -8.0 * s
+		add_child(_bar)
+		current = false
+
+	func _gui_input(event: InputEvent) -> void:
+		if event.is_action_pressed("ui_right"):
+			pressed.emit()
+			accept_event()
+
+
+## One option in the middle column: its name on the left, its value on the
+## right in condensed caps. Left/right change it, A toggles, picks or edits.
+class Row extends Button:
+	var key := ""
+	var panel: Node
+	var _name: Label
+	var _value: Label
+	var _dot: Control
+
+	func setup(owner_panel: Node, option: String, title: String, s: float) -> void:
+		panel = owner_panel
+		key = option
+		custom_minimum_size.y = 56.0 * s
+		action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+		var line := HBoxContainer.new()
+		line.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		line.offset_left = 18.0 * s
+		line.offset_right = -18.0 * s
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(line)
+		_name = UITheme.label(title, "body", 17.0, UITheme.INK, s, 500)
+		_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_name.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_name.clip_text = true
+		line.add_child(_name)
+		_dot = ColorRect.new()
+		_dot.color = UITheme.CORAL
+		_dot.custom_minimum_size = Vector2(6.0, 6.0) * s
+		_dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_dot.visible = false
+		line.add_child(_dot)
+		_value = Label.new()
+		var px := roundi(18.0 * s)
+		_value.add_theme_font_override("font", UITheme.caps(px, 600, 0.08))
+		_value.add_theme_font_size_override("font_size", px)
+		_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_value.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		line.add_child(_value)
+		focus_entered.connect(func() -> void: panel._show_detail(key))
+		mouse_entered.connect(func() -> void:
+			if not has_focus():
+				grab_focus())
+		pressed.connect(_on_accept)
+
+	func set_value(text: String, color: Color, changed: bool) -> void:
+		_value.text = text
+		_value.add_theme_color_override("font_color", color)
+		_dot.visible = changed
+
+	func _on_accept() -> void:
+		var kind: String = panel._meta[key].kind
+		match kind:
+			"binding":
+				panel._start_capture(key)
+			"bool":
+				panel._set_value(key, not panel._value(key))
+			"enum":
+				panel._step(key, 1)
+			"action":
+				panel._act(key)
+			"text":
+				for child in panel._detail_control.get_children():
+					if child is LineEdit:
+						(child as LineEdit).grab_focus()
+						(child as LineEdit).select_all()
+
+	## Held, they repeat (the panel's _process), so key echoes are just swallowed.
+	func _gui_input(event: InputEvent) -> void:
+		if event.is_action("ui_left") or event.is_action("ui_right"):
+			if event.is_pressed() and not event.is_echo():
+				panel._step(key, 1 if event.is_action("ui_right") else -1)
+			accept_event()
+
+
+## A tab in the bar over a big section's options: the current one in aqua,
+## underlined. Clicking one shows it (LB / RB step through them).
+class TabButton extends Button:
+	func setup(title: String, current: bool, s: float) -> void:
+		text = title
+		focus_mode = Control.FOCUS_NONE
+		custom_minimum_size.y = 40.0 * s
+		add_theme_font_override("font", UITheme.body(600))
+		add_theme_font_size_override("font_size", roundi(16.0 * s))
+		var fill := UITheme.box(Color(UITheme.AQUA, 0.12) if current else Color(0, 0, 0, 0), 10.0 * s)
+		fill.set_content_margin(SIDE_LEFT, 16.0 * s)
+		fill.set_content_margin(SIDE_RIGHT, 16.0 * s)
+		var hover := UITheme.box(Color(UITheme.PANEL, 0.8), 10.0 * s)
+		hover.set_content_margin(SIDE_LEFT, 16.0 * s)
+		hover.set_content_margin(SIDE_RIGHT, 16.0 * s)
+		add_theme_stylebox_override("normal", fill)
+		add_theme_stylebox_override("hover", hover if not current else fill)
+		add_theme_stylebox_override("pressed", fill)
+		add_theme_color_override("font_color", UITheme.AQUA if current else UITheme.MUTED)
+		add_theme_color_override("font_hover_color", UITheme.AQUA if current else UITheme.INK)
+		if current:
+			var line := ColorRect.new()
+			line.color = UITheme.AQUA
+			line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			line.anchor_top = 1.0
+			line.anchor_right = 1.0
+			line.anchor_bottom = 1.0
+			line.offset_left = 12.0 * s
+			line.offset_right = -12.0 * s
+			line.offset_top = -3.0 * s
+			add_child(line)
+
+
+## A choice in the detail pane (On / Off, an enum's options): the current one
+## in aqua.
+class ChoiceButton extends Button:
+	var current := false:
+		set(value):
+			current = value
+			add_theme_color_override("font_color", UITheme.AQUA if value else UITheme.INK_SOFT)
+			add_theme_stylebox_override("normal", _on if value else _off)
+	var _on: StyleBoxFlat
+	var _off: StyleBoxFlat
+
+	func setup(title: String, s: float) -> void:
+		text = title
+		alignment = HORIZONTAL_ALIGNMENT_LEFT
+		custom_minimum_size.y = 44.0 * s
+		_off = UITheme.box(UITheme.DEEP, 12.0 * s)
+		_on = UITheme.box(Color(UITheme.AQUA, 0.14), 12.0 * s, Color(UITheme.AQUA, 0.6), maxf(1.0, 1.5 * s))
+		for box: StyleBoxFlat in [_on, _off]:
+			box.set_content_margin(SIDE_LEFT, 16.0 * s)
+			box.set_content_margin(SIDE_RIGHT, 16.0 * s)
+		current = false

@@ -5,12 +5,15 @@ extends Node
 ## Ghost Bite on, and the launcher at --stacks=N (default each of 0, 8 and 16
 ## in turn); prints the frame time (average and worst), the physics, process
 ## and render time, the torpedoes in flight and the blasts a second.
-##   Godot_console.exe --path . res://tests/torpedo_bench.tscn -- --stacks=16 --horde=500 --lightning=0
+## --attack=K gives the player another attack (FishAttack.Kind: 1 sting, 2
+## bite, 3 lash, 4 thrust, 5 bubbles, 6 spines; default 2).
+##   Godot_console.exe --path . res://tests/torpedo_bench.tscn -- --stacks=16 --horde=500 --lightning=0 --attack=2
 
 var stacks: Array[int] = [0, 8, 16]
 var horde_count := 500
 var lightning := 0
 var seconds := 6.0
+var attack := 2
 
 
 func _ready() -> void:
@@ -21,6 +24,8 @@ func _ready() -> void:
 			horde_count = arg.trim_prefix("--horde=").to_int()
 		elif arg.begins_with("--lightning="):
 			lightning = arg.trim_prefix("--lightning=").to_int()
+		elif arg.begins_with("--attack="):
+			attack = arg.trim_prefix("--attack=").to_int()
 		elif arg.begins_with("--seconds="):
 			seconds = arg.trim_prefix("--seconds=").to_float()
 	get_window().size = Vector2i(1920, 1080)
@@ -35,7 +40,7 @@ func _run(main: Node) -> void:
 	var settings := UnnaturalSettings.shared()
 	var powers := PowerupSettings.shared()
 	settings.tank_horde = horde_count
-	settings.fish_attack = 2  # Ghost Bite
+	settings.fish_attack = attack
 	settings.tank_attack_speed = 2.0
 	powers.lightning_stacks = lightning
 	main.set_mode(main.TEST_TANK)
@@ -70,8 +75,8 @@ func _run(main: Node) -> void:
 			flying = maxi(flying, _torpedoes(run))
 		var elapsed := (Time.get_ticks_usec() - started) / 1e6
 		var blasts := (launcher.blasts if launcher else 0) - blasts_before
-		print("BENCH torpedo stacks=%d horde=%d alive=%d lightning=%d  frame %.2f ms avg (%.0f fps), worst %.1f ms  physics %.2f ms  process %.2f ms  draw calls %.0f  torpedoes in flight (most) %d  blasts %.0f/s" % [
-			count, horde_count, run.horde.alive_count(), lightning, elapsed * 1000.0 / frames, frames / elapsed, worst,
+		print("BENCH attack=%d torpedo stacks=%d horde=%d alive=%d lightning=%d  frame %.2f ms avg (%.0f fps), worst %.1f ms  physics %.2f ms  process %.2f ms  draw calls %.0f  torpedoes in flight (most) %d  blasts %.0f/s" % [
+			attack, count, horde_count, run.horde.alive_count(), lightning, elapsed * 1000.0 / frames, frames / elapsed, worst,
 			physics_ms / frames, process_ms / frames, draws / frames, flying, blasts / elapsed])
 	get_tree().quit()
 

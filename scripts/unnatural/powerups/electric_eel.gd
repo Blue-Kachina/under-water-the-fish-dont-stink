@@ -29,7 +29,7 @@ func on_battery(_index: int) -> void:
 	rings += 1
 	var at := fish.global_position
 	var reach := radius()
-	PowerupFx.ring(run, at, reach, color(id), fish.global_basis.y)
+	PowerupFx.shock(run, at, reach, color(id), fish.global_basis.y)
 	for i in run.horde.query_sphere(at, reach):
 		var push := run.horde.enemy_position(i) - at
 		run.hit(i, damage(), fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP, settings.eel_proc, [id])

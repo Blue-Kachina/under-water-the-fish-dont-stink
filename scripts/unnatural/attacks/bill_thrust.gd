@@ -6,34 +6,23 @@ extends FishAttack
 ## thrust_pierce zombies. Each Projectiles stat adds a spear, fanned
 ## thrust_spread degrees apart; Projectile Speed (the Swordfish's signature)
 ## makes them faster and fly further in the same time.
+##
+## As a weapon (Weapons): at its first milestone the spears pierce one more
+## zombie; at its second, a spear that flies its full range bursts, hurting
+## every zombie within BURST_REACH (times area) for BURST_SHARE of its damage.
 
 const COLOR := Color(0.55, 0.85, 1.0, 0.9)
+const BURST_REACH := 2.5
+const BURST_SHARE := 0.6
 
 var spears := ProjectileSwarm.new()
 
 
 func _init() -> void:
 	name = "BillThrust"
-	var spear := CylinderMesh.new()
-	spear.top_radius = 0.0
-	spear.bottom_radius = 0.5
-	spear.height = 2.0
-	spear.radial_segments = 6
-	spear.rings = 1
-	# Along -z, point first.
-	var mesh := ArrayMesh.new()
-	var arrays := spear.get_mesh_arrays()
-	var turn := Basis(Vector3.RIGHT, -PI / 2.0)
-	var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
-	for i in points.size():
-		points[i] = turn * points[i]
-		normals[i] = turn * normals[i]
-	arrays[Mesh.ARRAY_VERTEX] = points
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_TANGENT] = null
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	spears.set_look(mesh, FishAttack.ghost_material(COLOR))
+	# A lance of light, point first along -z: a white-hot core in an icy sheath,
+	# a trail streaming off behind (FxKit.lance_mesh).
+	spears.set_look(FxKit.lance_mesh(Color(0.85, 0.97, 1.0, 0.95), COLOR, -1.1, 0.5, 0.2, 0.8, 2.2))
 	spears.stretch = 2.5
 	add_child(spears)
 
@@ -41,6 +30,13 @@ func _init() -> void:
 func _ready() -> void:
 	spears.horde = horde
 	spears.on_hit = func(index: int, amount: float, push: Vector3) -> void: strike(index, amount, push)
+	spears.on_expire = func(at: Vector3, amount: float) -> void:
+		if milestones < 2:
+			return
+		var reach := BURST_REACH * area_scale
+		PowerupFx.pop(self, at, reach, COLOR, 0.25)
+		for i in horde.query_sphere(at, reach):
+			strike(i, amount * BURST_SHARE, toward(at, i, Vector3.UP))
 
 
 func cooldown() -> float:
@@ -74,5 +70,5 @@ func fire() -> bool:
 		var offset := (n - (count - 1) * 0.5) * deg_to_rad(settings.thrust_spread)
 		var direction := aim.rotated(up, offset)
 		spears.fire(tip, direction * speed(), settings.thrust_damage, settings.thrust_size * area_scale,
-				settings.thrust_range / settings.thrust_speed, settings.thrust_pierce)
+				settings.thrust_range / settings.thrust_speed, settings.thrust_pierce + (1 if milestones >= 1 else 0))
 	return true

@@ -525,11 +525,15 @@ class StatsBoard extends Control:
 	const BAR_LABEL_HEIGHT := 20.0
 	const BAR_HEIGHT := 22.0
 	const FOOTER_HEIGHT := 26.0
+	## A row's badges (HexBadge) under its name: their width and the gap between.
+	const BADGE := 26.0
+	const BADGE_GAP := 4.0
 	## How much of the play shows through the panels.
 	const SHADE := 0.62
 
 	## Each team: "name", "score", "color" and "rows", each row "name", "values"
-	## (one per headings) and "focus" (the player's own row).
+	## (one per headings), "focus" (the player's own row) and optionally
+	## "badges": [glyph id, rim colour] each, drawn in lines under the name.
 	var teams: Array = []
 	## Each: "label", "share" (Blue's, 0-1) and "text" (what to write at each end).
 	var bars: Array = []
@@ -563,12 +567,25 @@ class StatsBoard extends Control:
 	func _height() -> float:
 		var height := TITLE_HEIGHT
 		for team: Dictionary in teams:
-			height += GAP + HEADER_HEIGHT + ROW_HEIGHT * team.rows.size()
+			height += GAP + HEADER_HEIGHT
+			for row: Dictionary in team.rows:
+				height += _row_height(row)
 		if not bars.is_empty():
 			height += GAP + BAR_LABEL_HEIGHT + BAR_HEIGHT
 		if not footer.is_empty():
 			height += GAP + FOOTER_HEIGHT
 		return height
+
+	## A row's height: the line of values, plus its lines of badges.
+	func _row_height(row: Dictionary) -> float:
+		var count: int = row.get("badges", []).size()
+		if count == 0:
+			return ROW_HEIGHT
+		return ROW_HEIGHT + ceili(float(count) / _badges_per_line()) * (BADGE + BADGE_GAP) + BADGE_GAP
+
+	func _badges_per_line() -> int:
+		var width := NAME_WIDTH + COLUMN_WIDTH * HEADINGS.size() - 28.0  # the row, less a margin each side
+		return maxi(floori((width + BADGE_GAP) / (BADGE + BADGE_GAP)), 1)
 
 	func _draw() -> void:
 		var shade := Color(BroadcastUI.INK, SHADE)
@@ -595,17 +612,24 @@ class StatsBoard extends Control:
 			y += HEADER_HEIGHT
 			var striped := false
 			for row: Dictionary in team.rows:
-				var rect := Rect2(PLATE_WIDTH, y, size.x - PLATE_WIDTH, ROW_HEIGHT)
+				var tall := _row_height(row)
+				var rect := Rect2(PLATE_WIDTH, y, size.x - PLATE_WIDTH, tall)
 				draw_rect(rect, Color(BroadcastUI.INK_LIGHT if striped else BroadcastUI.INK, SHADE))
 				if row.get("focus", false):
-					draw_rect(Rect2(rect.position.x, y, 4.0, ROW_HEIGHT), BroadcastUI.GOLD)
+					draw_rect(Rect2(rect.position.x, y, 4.0, tall), BroadcastUI.GOLD)
+				var badges: Array = row.get("badges", [])
+				var per_line := _badges_per_line()
+				for b in badges.size():
+					var centre := Vector2(PLATE_WIDTH + 14.0 + BADGE * 0.5 + (b % per_line) * (BADGE + BADGE_GAP),
+							y + ROW_HEIGHT + BADGE * 0.5 + (b / per_line) * (BADGE + BADGE_GAP))
+					HexBadge.draw_badge(self, centre, BADGE, badges[b][0], badges[b][1], true, UITheme.HUD_FILL)
 				BroadcastUI.text(self, Rect2(PLATE_WIDTH + 14.0, y, NAME_WIDTH - 14.0, ROW_HEIGHT), str(row.name).to_upper(), 16,
 						Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, 600)
 				var values: Array = row["values"]
 				for i in values.size():
 					BroadcastUI.text(self, Rect2(columns_x + i * COLUMN_WIDTH, y, COLUMN_WIDTH, ROW_HEIGHT), str(values[i]), 18,
 							BroadcastUI.GOLD if i == 0 else Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 700)
-				y += ROW_HEIGHT
+				y += tall
 				striped = not striped
 		if not bars.is_empty():
 			y += GAP

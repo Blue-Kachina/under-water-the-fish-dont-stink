@@ -496,6 +496,10 @@ func enemy_hp(index: int) -> float:
 	return _hp[index]
 
 
+func enemy_max_hp(index: int) -> float:
+	return _max_hp[index]
+
+
 ## Zombie `index`'s difficulty level (what it was spawned at).
 func enemy_level(index: int) -> float:
 	return _level[index]
@@ -549,6 +553,12 @@ func set_cooldown(index: int, seconds: float) -> void:
 
 ## Hurts zombie `index` by `amount` from `source` (e.g. "bite", "battery"),
 ## knocked back along `push` (unit, or zero). Returns whether that killed it.
+## Zombie `index`'s velocity changed by `change` (a pull, a fling), unhurt.
+func shove(index: int, change: Vector3) -> void:
+	if is_alive(index) and not is_proxy(index):
+		_velocity[index] += change
+
+
 func damage(index: int, amount: float, source: String, by: Object = null, push := Vector3.ZERO) -> bool:
 	if not is_alive(index):
 		return false

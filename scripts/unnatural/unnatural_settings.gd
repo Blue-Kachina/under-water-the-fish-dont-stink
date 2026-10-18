@@ -401,16 +401,55 @@ static func shared() -> UnnaturalSettings:
 ## XP to the next level: xp_base * level ^ xp_curve.
 @export_range(1.0, 1000.0, 1.0, "or_greater") var xp_base := 5.0
 @export_range(0.5, 3.0, 0.05, "or_greater") var xp_curve := 1.35
-## Every XP pearl is worth this many times its value.
+## Every kill's XP (it's the team's at once, no pickup) is worth this many
+## times its value.
 @export_range(0.0, 10.0, 0.05, "or_greater") var xp_gain := 1.0
-## Each level-up offers this many cards, each a different stat (0: no cards,
-## just the hp and signature stat).
+## Each level-up offers this many cards, each a different weapon or tome (0:
+## no cards, just the hp and signature stat).
 @export_range(0, 6, 1) var card_choices := 3
 ## Solo, the game pauses while the cards are up (co-op: the picker can't be
 ## hurt or seen by zombies instead).
 @export var cards_pause := true
 ## The signature stat's +1 each level, in steps.
 @export_range(0.0, 5.0, 0.25, "or_greater") var signature_steps := 1.0
+
+@export_group("Weapons and Tomes")
+## Slots (planning_unnatural.md, Playability pass, D17): a player holds this
+## many weapons (the fish's own attack is one of them) and this many tomes.
+## More come from meta-progression later.
+@export_range(1, 8, 1, "or_greater") var weapon_slots := 2
+@export_range(0, 8, 1, "or_greater") var tome_slots := 2
+## A weapon or tome stops being offered at this level.
+@export_range(1, 50, 1, "or_greater") var weapon_max_level := 20
+@export_range(1, 200, 1, "or_greater") var tome_max_level := 99
+## Each level-up card is one of these, by weight: upgrade a weapon you hold,
+## upgrade a tome you hold, a new weapon (only with a weapon slot free), a new
+## tome (only with a tome slot free).
+@export_range(0.0, 100.0, 1.0, "or_greater") var card_weight_weapon := 40.0
+@export_range(0.0, 100.0, 1.0, "or_greater") var card_weight_tome := 30.0
+@export_range(0.0, 100.0, 1.0, "or_greater") var card_weight_new_weapon := 15.0
+@export_range(0.0, 100.0, 1.0, "or_greater") var card_weight_new_tome := 15.0
+## A weapon upgrade raises this many facets (different ones), by its rarity...
+@export_range(1, 6, 1, "or_greater") var facets_common := 1
+@export_range(1, 6, 1, "or_greater") var facets_uncommon := 1
+@export_range(1, 6, 1, "or_greater") var facets_rare := 2
+@export_range(1, 6, 1, "or_greater") var facets_epic := 2
+@export_range(1, 6, 1, "or_greater") var facets_legendary := 3
+## ...each by this many of its steps.
+@export_range(0.0, 10.0, 0.1, "or_greater") var facet_size_common := 1.0
+@export_range(0.0, 10.0, 0.1, "or_greater") var facet_size_uncommon := 1.5
+@export_range(0.0, 10.0, 0.1, "or_greater") var facet_size_rare := 1.5
+@export_range(0.0, 10.0, 0.1, "or_greater") var facet_size_epic := 2.0
+@export_range(0.0, 10.0, 0.1, "or_greater") var facet_size_legendary := 2.5
+## At these weapon levels each weapon gains a new behaviour (0: never).
+@export_range(0, 50, 1, "or_greater") var milestone_first := 5
+@export_range(0, 50, 1, "or_greater") var milestone_second := 10
+## A tome with more than one stat gives each this share of a step.
+@export_range(0.0, 2.0, 0.05, "or_greater") var tome_multi_share := 0.7
+## When there's nothing left to offer: a pearl purse of fallback_pearls
+## (times 1 + level / 10), or a team heal of fallback_heal of max hp.
+@export_range(0, 1000, 1, "or_greater") var fallback_pearls := 10
+@export_range(0.0, 1.0, 0.05) var fallback_heal := 0.3
 
 @export_group("Chests")
 ## Chests buried round the arena at the start, one more uncovered every
@@ -435,8 +474,16 @@ static func shared() -> UnnaturalSettings:
 ## Each kill has this chance of dropping a chest (an elite's: 5x), times 1 +
 ## the killer's luck x chest_drop_luck (which lifts the drops' chances too).
 ## Every chest is every player's: each opens it for themselves.
-@export_range(0.0, 1.0, 0.0005) var chest_drop_chance := 0.006
+@export_range(0.0, 1.0, 0.0005) var chest_drop_chance := 0.002
 @export_range(0.0, 20.0, 0.1, "or_greater") var chest_drop_luck := 2.0
+## Chests cost pearls (D23; off: free). The price is chest_price_base x (1 +
+## chest_price_growth x minutes into the run); a cursed chest's is
+## chest_cursed_price times that, a boss's free. Each player pays from their
+## own purse for the chests they open.
+@export var chest_cost := true
+@export_range(0.0, 1000.0, 1.0, "or_greater") var chest_price_base := 8.0
+@export_range(0.0, 5.0, 0.05, "or_greater") var chest_price_growth := 0.25
+@export_range(0.0, 10.0, 0.05, "or_greater") var chest_cursed_price := 1.5
 
 @export_group("Drops")
 ## A kill's chance of dropping a heart (heals the whole team heart_heal of max
@@ -464,19 +511,42 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 20.0, 0.1, "or_greater") var multiplier_epic := 3.0
 @export_range(0.0, 20.0, 0.1, "or_greater") var multiplier_legendary := 5.0
 
-@export_group("XP Pearls")
+@export_group("Pearls")
+## Pearls are the currency (D23): chests cost them. A kill drops one by chance,
+## pearl_drop_chance x (1 + the killer's Pearl Chance); an elite's always does,
+## worth pearl_elite_value; a beaten mini-boss drops boss_pearls.
+@export_range(0.0, 1.0, 0.005) var pearl_drop_chance := 0.05
+@export_range(1, 100, 1, "or_greater") var pearl_elite_value := 3
+@export_range(0, 1000, 1, "or_greater") var boss_pearls := 25
 ## Pearls this near a fish (m) are drawn in: the pickup range.
 @export_range(0.0, 60.0, 0.5, "or_greater") var pickup_range := 7.0
 @export_range(0.0, 100.0, 0.5, "or_greater") var pickup_pull := 12.0
-## XP pearls never fade: they wait until someone takes them.
+## Pearls never fade: they wait until someone takes them.
 @export_range(0.05, 3.0, 0.01, "or_greater") var pearl_size := 0.18
 ## Each pearl's own light (pretty, but costly with hundreds out).
 @export var pearl_lights := false
-## At most this many pearls out; past it, a new drop adds its XP to the
+## At most this many pearls out; past it, a new drop adds its worth to the
 ## nearest pearl, which grows with what it holds.
 @export_range(10, 4000, 10, "or_greater") var max_pearls := 600
 
+@export_group("Run Logs")
+## Each run's log (RunLog: a sample a minute, the picks, how it ended) is
+## saved to user://run_logs/ when it ends, keeping the newest run_logs_keep.
+@export var run_logs := true
+@export_range(1, 1000, 1, "or_greater") var run_logs_keep := 50
+## The time-to-kill target (s): the zombies' average hp over the team's damage
+## per second. A balanced build stays within it all run; the run simulator
+## (tests/run_sim.tscn) reports the minutes outside it.
+@export_range(0.0, 10.0, 0.05, "or_greater") var ttk_target_min := 0.3
+@export_range(0.0, 10.0, 0.05, "or_greater") var ttk_target_max := 1.0
+
 @export_group("Test Tank")
+## A preset for power and frame benchmarks: every weapon slot full (the
+## attack, then Greek Fire, Jellyfish Halo, Depth Charges, Remora Buddy, the
+## Coil) and every tome slot (Teeth, Tides, the Reef, the Shell...), all at
+## that level. It sets the weapons' level overrides (POWERUPS) and the tank's
+## stats below; Off clears what it set.
+@export_enum("Off", "Full slots Lv 5", "Full slots Lv 10", "Full slots Lv 20") var tank_preset := 0
 ## The Test Tank's dummies' hp (applies on R), and whether they drift towards
 ## you (at tank_walk_speed m/s) or hold still.
 @export_range(1.0, 100000.0, 10.0, "or_greater") var tank_dummy_hp := 100.0
@@ -507,6 +577,7 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_duration := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_pickup_range := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_xp_gain := 0.0
+@export_range(0.0, 10.0, 0.05, "or_greater") var tank_pearl_chance := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_luck := 0.0
 
 @export_group("Performance")
@@ -551,3 +622,13 @@ static func fog_reach(amount: float, density: float) -> float:
 ## Murk is on (a density set).
 func murky() -> bool:
 	return murk_density > 0.0
+
+
+## How many facets a weapon upgrade of rarity `tier` raises.
+func facets_for(tier: int) -> int:
+	return [facets_common, facets_uncommon, facets_rare, facets_epic, facets_legendary][clampi(tier, 0, 4)]
+
+
+## How many steps each facet a weapon upgrade of rarity `tier` raises goes up.
+func facet_size_for(tier: int) -> float:
+	return [facet_size_common, facet_size_uncommon, facet_size_rare, facet_size_epic, facet_size_legendary][clampi(tier, 0, 4)]

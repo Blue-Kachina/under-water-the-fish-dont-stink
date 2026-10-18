@@ -105,7 +105,8 @@ func _run() -> void:
 	check(remora.nips >= 1 and _dealt("remora_buddy") > 0.0, "it nips the zombie near (%d nips)" % remora.nips)
 	powers.remora_stacks = 3
 	await _ticks(2)
-	check(remora.count() == 3 and fish.find_child("Remoras", false, false).get_child_count() == 3, "x3: three remoras, all worn")
+	check(remora.count() == powers.remora_count + remora.facet_count("count") and remora.count() >= 2 and fish.find_child("Remoras", false, false).get_child_count() == remora.count(),
+			"Lv 3: its count facet adds remoras, all worn (%d)" % remora.count())
 	powers.remora_stacks = 0
 
 	print("bubble wrap:")

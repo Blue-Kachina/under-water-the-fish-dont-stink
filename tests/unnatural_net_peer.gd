@@ -12,7 +12,9 @@ extends Node
 ## - Zombies: the host's spawns reach the guest; a guest's hit kills on the
 ##   host (its own copy waits for the host's word); corrections keep the
 ##   guest's copies close to where the host has them while they swim.
-## - Pearls: a guest's pickup gives the team XP once; both on one at once, once.
+## - XP and pearls: a guest's kill claims its XP for the team; a guest's
+##   pickup goes in its own purse and counts on the host once; both on one at
+##   once, once.
 ## - Chests: a guest opens one on the host, the host's open shows on the guest,
 ##   a newly buried one turns up there.
 ## - A boss: the guest gets a puppet of it, its body where the host has it, and
@@ -79,6 +81,8 @@ func _host() -> void:
 	settings.chest_count = 3
 	settings.cursed_chest_chance = 0.5  # some of each, to see the kinds come over
 	settings.chest_interval = 0.0
+	settings.pearl_drop_chance = 1.0  # every kill drops one here (pearl_currency_probe has the odds)
+	settings.card_choices = 0  # kills level the team at once now: no picker hiding from the zombies
 	settings.chest_open_time = 999.0  # nobody opens one by idling beside it
 	settings.enemy_speed_scale = 0.0
 	settings.god_mode = true
@@ -117,17 +121,18 @@ func _host() -> void:
 	var target := _zombie_ids(run)[0]
 	var kills_before := run.kills
 	var guest_kills: int = run.stats_of(guest_fish).kills
+	var xp_before := run.levels.total_xp
 	await _phase("guest_hits", {"id": target})
 	check(run.horde.index_of_net(target) < 0 and run.kills == kills_before + 1, "the guest's hit killed it here")
 	check(run.stats_of(guest_fish).kills == guest_kills + 1, "...for them (%d kills)" % run.stats_of(guest_fish).kills)
+	await _seconds(0.5)
+	check(run.levels.total_xp > xp_before, "the guest claimed its kill's XP: the team's went up (%.1f)" % (run.levels.total_xp - xp_before))
 
 	print("host: pearls")
-	var xp_before := run.levels.total_xp
 	var guest_pearls: int = run.stats_of(guest_fish).pearls
 	await _phase("guest_pearl", {"id": target})
 	await _seconds(0.5)
 	check(run.pearl_by_id(target) == null and run.stats_of(guest_fish).pearls == guest_pearls + 1, "the guest's pearl counted here, for them")
-	check(run.levels.total_xp > xp_before, "the team's XP went up (%.1f)" % (run.levels.total_xp - xp_before))
 	# One pearl, both of us on it at once: it counts once.
 	var race := _zombie_ids(run)[0]
 	var race_at := run.horde.enemy_position(run.horde.index_of_net(race))
@@ -261,10 +266,12 @@ func _guest() -> void:
 			"guest_pearl":
 				var pearl := run.pearl_by_id(data.id)
 				check(pearl != null, "its pearl dropped here, the same id")
+				var purse := run.purse_of(fish)
 				if pearl:
 					_hold_at(pearl.global_position, 1.0)
 					await _seconds(1.0)
 				check(run.pearl_by_id(data.id) == null, "we took it")
+				check(run.purse_of(fish) == purse + 1, "into our own purse (%d)" % run.purse_of(fish))
 			"pearl_race":
 				_hold_at(data.at + Vector3(-0.4, 0, 0), 1.2)
 			"pearl_count":

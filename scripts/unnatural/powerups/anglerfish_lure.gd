@@ -100,28 +100,71 @@ func make_worn() -> Node3D:
 	return rod
 
 
-## A decoy: a glowing, pulsing bulb with a light, swelling as it nears its burst.
+## A decoy: a white-hot bulb inside a membrane glowing at its rim, a soft halo
+## round it and motes of light drifting off, with a light; it throbs, faster
+## and bigger as it nears its burst. Fades near the camera.
 class Lure extends Node3D:
 	var age := 0.0
 	var pull := 3.0
 	var tint := Color.WHITE
 	var _glow := StandardMaterial3D.new()
 	var _ball := MeshInstance3D.new()
+	var _skin := MeshInstance3D.new()
+	var _halo := MeshInstance3D.new()
+	var _halo_material: StandardMaterial3D
 
 	func _ready() -> void:
-		_glow.albedo_color = tint
+		_glow.albedo_color = tint.lerp(Color.WHITE, 0.6)
 		_glow.emission_enabled = true
-		_glow.emission = tint
+		_glow.emission = tint.lerp(Color.WHITE, 0.4)
 		_glow.emission_energy_multiplier = 3.0
-		var sphere := SphereMesh.new()
-		sphere.radius = 0.45
-		sphere.height = 0.9
-		sphere.radial_segments = 12
-		sphere.rings = 6
-		sphere.material = _glow
-		_ball.mesh = sphere
+		FxKit.fade_near(_glow)
+		var core := SphereMesh.new()
+		core.radius = 0.22
+		core.height = 0.44
+		core.radial_segments = 12
+		core.rings = 6
+		core.material = _glow
+		_ball.mesh = core
 		_ball.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(_ball)
+		var skin := SphereMesh.new()
+		skin.radius = 0.5
+		skin.height = 1.0
+		skin.radial_segments = 16
+		skin.rings = 8
+		skin.material = FxKit.rim(Color(tint, 0.9), 0.1, 0.5, true)
+		_skin.mesh = skin
+		_skin.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_skin)
+		var quad := QuadMesh.new()
+		quad.size = Vector2(2.6, 2.6)
+		_halo_material = FxKit.glow(Color(tint, 0.5), FxKit.dot(), true)
+		_halo_material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		_halo_material.billboard_keep_scale = true
+		_halo.mesh = quad
+		_halo.material_override = _halo_material
+		_halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_halo)
+		var motes := CPUParticles3D.new()
+		var mote := QuadMesh.new()
+		mote.size = Vector2(0.14, 0.14)
+		var mote_material := FxKit.glow(tint.lerp(Color.WHITE, 0.3), FxKit.dot(), true)
+		mote_material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		mote.material = mote_material
+		motes.mesh = mote
+		motes.amount = 8
+		motes.lifetime = 1.6
+		motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		motes.emission_sphere_radius = 0.4
+		motes.direction = Vector3.UP
+		motes.spread = 60.0
+		motes.initial_velocity_min = 0.2
+		motes.initial_velocity_max = 0.6
+		motes.gravity = Vector3(0, 0.3, 0)
+		motes.local_coords = false
+		motes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(motes)
 		var light := OmniLight3D.new()
 		light.light_color = tint
 		light.light_energy = 2.0
@@ -129,6 +172,12 @@ class Lure extends Node3D:
 		add_child(light)
 
 	func _process(_delta: float) -> void:
-		var throb := 1.0 + 0.15 * sin(age * 9.0) + age * 0.08
+		# Quicker and bigger toward the burst.
+		var urgency := clampf(age / maxf(PowerupSettings.shared().lure_life, 0.1), 0.0, 1.0)
+		var beat := sin(age * lerpf(7.0, 18.0, urgency))
+		var throb := 1.0 + 0.12 * beat + urgency * 0.35
 		_ball.scale = Vector3.ONE * throb
-		_glow.emission_energy_multiplier = 2.5 + 1.5 * sin(age * 9.0)
+		_skin.scale = Vector3.ONE * (throb * 0.95 + 0.05)
+		_halo.scale = Vector3.ONE * (0.9 + 0.2 * beat + urgency * 0.5)
+		_halo_material.albedo_color.a = 0.4 + 0.15 * beat + urgency * 0.2
+		_glow.emission_energy_multiplier = 2.5 + 1.5 * beat

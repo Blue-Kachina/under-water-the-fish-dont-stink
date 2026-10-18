@@ -34,6 +34,7 @@ func _ready() -> void:
 
 func _run() -> void:
 	settings.spawning = false
+	settings.chest_cost = false  # chests are free here (pearl_currency_probe has prices)
 	settings.fish_attack = FishAttack.Kind.BITE  # these checks are the bite's (attack_probe has the rest)
 	settings.twists = false  # and no fish's twist skews them
 	settings.card_choices = 0

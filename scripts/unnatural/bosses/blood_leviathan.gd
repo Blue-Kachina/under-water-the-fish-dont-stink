@@ -223,7 +223,7 @@ func _update_bolts(delta: float) -> void:
 		if not spent:
 			for fish in run.players:
 				if not fish.puppet and run.is_up(fish) and fish.global_position.distance_to(bolt.at) <= UnnaturalRun.PLAYER_RADIUS + 0.45:
-					run.hurt(fish, settings.leviathan_bolt_damage * settings.enemy_damage_scale)
+					run.hurt(fish, settings.leviathan_bolt_damage * settings.enemy_damage_scale, -1, "the Leviathan's bolt")
 					spent = true
 					break
 		if spent:

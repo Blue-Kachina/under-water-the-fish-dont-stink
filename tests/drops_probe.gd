@@ -62,20 +62,20 @@ func _run() -> void:
 
 	print("pearls:")
 	var away := fish.global_position + Vector3(40, 0, 0)
-	run.drop_pearl(away, 3.0, 9001)
+	run.drop_pearl(away, 3, 9001)
 	await _ticks(2)
 	var pearl := run.pearl_by_id(9001)
 	pearl.age = 100000.0
 	await _ticks(10)
-	check(is_instance_valid(pearl) and run.pearl_by_id(9001) == pearl, "an XP pearl never fades")
+	check(is_instance_valid(pearl) and run.pearl_by_id(9001) == pearl, "a pearl never fades")
 	var cap := settings.max_pearls
 	settings.max_pearls = run.pearls_out.size() + 1
-	run.drop_pearl(away + Vector3(0, 0, 30), 3.0, 9002)
+	run.drop_pearl(away + Vector3(0, 0, 30), 3, 9002)
 	await _ticks(1)
-	run.drop_pearl(away + Vector3(0.5, 0, 0), 3.0, 9003)
+	run.drop_pearl(away + Vector3(0.5, 0, 0), 3, 9003)
 	await _ticks(1)
 	check(run.pearl_by_id(9003) == null and is_equal_approx(pearl.value, 6.0) and pearl.bulk > 1.0,
-			"past the cap a drop merges into the nearest pearl, which grows (%.0f xp, x%.2f)" % [pearl.value, pearl.bulk])
+			"past the cap a drop merges into the nearest pearl, which grows (%.0f pearls, x%.2f)" % [pearl.value, pearl.bulk])
 	settings.max_pearls = cap
 	for p in run.pearls_out.duplicate():
 		p.queue_free()
@@ -144,13 +144,13 @@ func _run() -> void:
 	check(is_equal_approx(health.hp, health.max_hp * 0.7) and run.pickups.is_empty(),
 			"taking it heals half the max hp (%.0f of %.0f)" % [health.hp, health.max_hp])
 	for n in 5:
-		run.drop_pearl(fish.global_position + Vector3(60 + n * 10, 0, 20), 1.0, 9100 + n)
+		run.drop_pearl(fish.global_position + Vector3(60 + n * 10, 0, 20), 1, 9100 + n)
 	run.drop_pickup(Pickup.Kind.MAGNET, fish.global_position + Vector3(0, 0, -6))
 	await _hold(fish.global_position + Vector3(0, 0, -6), 0.3)
 	check(run.pearls_out.all(func(p: Pearl) -> bool: return p.drawn_by == fish), "a magnet: every pearl flies to the taker")
-	var xp_before := run.levels.total_xp
+	var purse_before := run.purse_of(fish)
 	await _seconds(6.0)
-	check(run.pearls_out.is_empty() and run.levels.total_xp >= xp_before + 5.0, "...and they all come in (+%.0f xp)" % (run.levels.total_xp - xp_before))
+	check(run.pearls_out.is_empty() and run.purse_of(fish) >= purse_before + 5, "...and they all come in (+%d pearls)" % (run.purse_of(fish) - purse_before))
 	settings.enemy_speed_scale = 1.0
 	var biter := horde.spawn(1, fish.global_position + Vector3(0, 0, 8))
 	run.drop_pickup(Pickup.Kind.HOURGLASS, fish.global_position + Vector3(0, 0, -6))
@@ -203,6 +203,9 @@ func _run() -> void:
 	await _frames(3)
 	var hud: UnnaturalHud = main._unnatural_hud
 	check(hud._board.shown and hud._stats.visible, "the board shows your stats beside it")
+	var row: Dictionary = hud._board.teams[0].rows[0]
+	check(row.badges.size() == run.powerups_of(fish).list().size(),
+			"your powerups are badges under your name (%d)" % row.badges.size())
 	Input.action_release("show_scoreboard")
 	await _frames(3)
 	check(not hud._stats.visible, "and goes with it")

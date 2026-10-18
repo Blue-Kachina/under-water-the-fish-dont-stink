@@ -16,11 +16,14 @@ extends Node
 ##   chest for themselves); drops (hearts, magnets, hourglasses) and who took
 ##   them (every machine applies it); bosses coming (with their proxies' net ids),
 ##   their state BOSS_RATE times a second, the Leviathan's bolts, and their end;
-## - XP pearls taken (so every copy goes).
+## - pearls dropped (the host rolls them; each frame's in one batch) and taken
+##   (so every copy goes).
 ## A guest sends its players' hits (each frame's in one batch: the host
-## applies them; its own copies never die until the host says), the XP pearls
-## they take (the host counts each once), the drops they touch (the first
-## claim gets it), and the chests they open. Each
+## applies them; its own copies never die until the host says), the XP their
+## kills earned (with their XP Gain: the host adds it to the team's), the
+## pearls they take (into their own purse at once; the host takes it out of
+## everyone's sea), their Pearl Chance now and then (for the host's rolls),
+## the drops they touch (the first claim gets it), and the chests they open. Each
 ## machine says when its own players go down or are revived; contact damage is
 ## always judged by the hurt player's own machine.
 
@@ -28,6 +31,8 @@ const CORRECT_RATE := 10.0
 const BOSS_RATE := 15.0
 const NEAR := 45.0
 const MAX_CORRECT := 400
+## A guest says its players' Pearl Chance this often (s), when it's changed.
+const GAINS_EVERY := 1.0
 
 var coop: CoopSession
 var run: UnnaturalRun
@@ -36,6 +41,11 @@ var _out_spawns := []
 var _out_deaths := []
 var _out_removes := PackedInt32Array()
 var _out_hits := []
+var _out_pearls := []
+var _out_xp := 0.0
+var _gains_left := 0.0
+## Each local player's Pearl Chance as last sent (pid -> value).
+var _gains_sent := {}
 var _correct_left := 0.0
 ## Chest opens from the world whose player's puppet isn't here yet: [chest, pid].
 var _unresolved := []
@@ -59,11 +69,15 @@ func hook(game_run: UnnaturalRun) -> void:
 	_out_deaths.clear()
 	_out_removes.clear()
 	_out_hits.clear()
+	_out_pearls.clear()
+	_out_xp = 0.0
+	_gains_sent.clear()
 	_unresolved.clear()
 	if run.authority:
 		run.horde.spawned.connect(_on_spawned)
 		run.horde.killed.connect(_on_killed)
 		run.horde.removed.connect(_on_removed)
+		run.pearl_dropped.connect(_on_pearl_dropped)
 		run.pearl_taken.connect(_on_pearl_taken)
 		run.chest_buried.connect(_on_chest_buried)
 		run.chest_opened.connect(_on_chest_opened)
@@ -74,6 +88,7 @@ func hook(game_run: UnnaturalRun) -> void:
 	else:
 		run.hit_claimed.connect(_on_hit_claimed)
 		run.pearl_claimed.connect(_on_pearl_claimed)
+		run.xp_claimed.connect(func(xp: float) -> void: _out_xp += xp)
 		run.chest_claimed.connect(_on_chest_claimed)
 		run.pickup_claimed.connect(_on_pickup_claimed)
 	run.player_down.connect(_on_down.bind(true))
@@ -127,7 +142,17 @@ func tick(delta: float) -> void:
 	if not _out_hits.is_empty():
 		_send_host("_claim_hits", [_out_hits], true)
 		_out_hits = []
+	if not _out_pearls.is_empty():
+		_send_all("_pearls", [_out_pearls], true)
+		_out_pearls = []
+	if _out_xp > 0.0:
+		_send_host("_claim_xp", [_out_xp], true)
+		_out_xp = 0.0
 	if not run.authority:
+		_gains_left -= delta
+		if _gains_left <= 0.0:
+			_gains_left = GAINS_EVERY
+			_send_gains()
 		return
 	_correct_left -= delta
 	if _correct_left <= 0.0:
@@ -184,6 +209,10 @@ func _on_removed(index: int) -> void:
 	_out_removes.append(run.horde.net_id_of(index))
 
 
+func _on_pearl_dropped(id: int, at: Vector3, value: int) -> void:
+	_out_pearls.append([id, at, value])
+
+
 func _on_pearl_taken(id: int) -> void:
 	_send_all("_pearl_taken", [id], true)
 
@@ -230,8 +259,18 @@ func _on_hit_claimed(net_id: int, amount: float, source: String, by: FishControl
 	_out_hits.append([net_id, amount, source, _pid(by)])
 
 
-func _on_pearl_claimed(id: int, by: FishController, xp: float) -> void:
-	_send_host("_claim_pearl", [id, _pid(by), xp], true)
+func _on_pearl_claimed(id: int, by: FishController) -> void:
+	_send_host("_claim_pearl", [id, _pid(by)], true)
+
+
+## Our players' Pearl Chance, if it's changed since we last said.
+func _send_gains() -> void:
+	for fish in run.local_players():
+		var pid := _pid(fish)
+		var value := run.pearl_chance_of(fish)
+		if not _gains_sent.has(pid) or not is_equal_approx(_gains_sent[pid], value):
+			_gains_sent[pid] = value
+			_send_host("_gains", [pid, value], true)
 
 
 func _on_chest_claimed(index: int, by: FishController) -> void:
@@ -265,6 +304,10 @@ func world() -> Dictionary:
 	for pickup in run.pickups:
 		if is_instance_valid(pickup):
 			drops.append([pickup.id, pickup.kind, pickup.position])
+	var pearls := []
+	for pearl in run.pearls_out:
+		if is_instance_valid(pearl) and pearl.absorbing == null:
+			pearls.append([pearl.id, pearl.global_position, roundi(pearl.value)])
 	var bosses := []
 	for boss in run.bosses:
 		if is_instance_valid(boss) and not boss.dying:
@@ -273,7 +316,7 @@ func world() -> Dictionary:
 				parts.append(run.horde.net_id_of(index))
 			bosses.append(["miniboss" if boss is DrownedShark else "boss", boss.boss_id, parts, boss.hp, boss.max_hp,
 					boss.global_position, boss.net_state()])
-	return {"mode": "unnatural", "zombies": zombies, "chests": chests, "drops": drops, "frozen": run.horde.frozen_left,
+	return {"mode": "unnatural", "zombies": zombies, "chests": chests, "drops": drops, "pearls": pearls, "frozen": run.horde.frozen_left,
 			"bosses": bosses, "elapsed": run.elapsed,
 			"level": run.levels.level, "xp": run.levels.xp, "kills": run.kills, "over": run.is_over, "won": run.stage_complete}
 
@@ -295,6 +338,9 @@ func apply_world(state: Dictionary) -> void:
 				_unresolved.append([chest, pid])  # their puppet comes with the roster
 	for entry: Array in state.get("drops", []):
 		run.drop_pickup(entry[1], entry[2], entry[0])
+	for entry: Array in state.get("pearls", []):
+		if run.pearl_by_id(entry[0]) == null:
+			run.drop_pearl(entry[1], entry[2], entry[0], false)
 	run.horde.freeze(state.get("frozen", 0.0))
 	for entry: Array in state.bosses:
 		var boss := run.add_puppet_boss(entry[0], entry[1], entry[2], entry[3], entry[4], entry[5])
@@ -358,6 +404,15 @@ func _correct(elapsed: float, level: int, xp: float, kills: int, ids: PackedInt3
 		var index := run.horde.index_of_net(ids[n])
 		if index >= 0:
 			run.horde.correct(index, positions[n] + velocities[n] * ahead, velocities[n])
+
+
+@rpc("authority", "call_remote", "reliable")
+func _pearls(entries: Array) -> void:
+	if not _guest_run():
+		return
+	for entry: Array in entries:
+		if run.pearl_by_id(entry[0]) == null:
+			run.drop_pearl(entry[1], entry[2], entry[0], false)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -442,9 +497,21 @@ func _claim_hits(entries: Array) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _claim_pearl(id: int, pid: int, xp: float) -> void:
+func _claim_pearl(id: int, pid: int) -> void:
 	if is_host():
-		run.confirm_pearl(id, coop.fish_of(pid), xp)
+		run.confirm_pearl(id, coop.fish_of(pid))
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _claim_xp(xp: float) -> void:
+	if is_host():
+		run.confirm_xp(xp)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _gains(pid: int, pearl_chance: float) -> void:
+	if is_host():
+		run.set_remote_pearl_chance(coop.fish_of(pid), pearl_chance)
 
 
 @rpc("any_peer", "call_remote", "reliable")

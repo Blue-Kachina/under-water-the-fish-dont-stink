@@ -112,7 +112,7 @@ func _run() -> void:
 	await _ticks(2)
 	check(shark.dying and run.current_boss() == null and run.chests.size() == chests_before + 1 and run.chests[-1].global_position.distance_to(at) < 1.0,
 			"beaten: it drops a chest where it was")
-	check(run.pearls_out.size() == pearls_before + 1 and is_equal_approx(run.pearls_out[-1].value, settings.shark_xp), "and a big XP pearl")
+	check(run.pearls_out.size() == pearls_before + settings.boss_pearls, "and %d pearls spill out (D23)" % settings.boss_pearls)
 	await _ticks(10)
 	check(shark.parts.is_empty(), "its proxies are gone")
 

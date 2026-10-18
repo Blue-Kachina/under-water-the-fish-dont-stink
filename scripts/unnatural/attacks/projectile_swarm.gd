@@ -11,6 +11,10 @@ extends Node3D
 
 ## Called for each zombie hit: (index, damage, push).
 var on_hit: Callable
+## Called when one bursts (`pop`), for its look: (where, its radius).
+var on_pop: Callable
+## Called when one's life runs out in flight: (where, its damage).
+var on_expire: Callable
 var horde: Horde
 ## How quickly a projectile turns after its target (1/s; 0: straight).
 var homing := 0.0
@@ -43,9 +47,11 @@ func _init() -> void:
 	add_child(_draw)
 
 
-## The look: a mesh about 1 across (2 along -z for spears), and its material.
-func set_look(mesh: Mesh, material: Material) -> void:
-	mesh.surface_set_material(0, material)
+## The look: a mesh about 1 across (2 along -z for spears), and its material
+## (null: the mesh's own surfaces' materials).
+func set_look(mesh: Mesh, material: Material = null) -> void:
+	if material:
+		mesh.surface_set_material(0, material)
 	_multimesh.mesh = mesh
 
 
@@ -93,6 +99,8 @@ func _physics_process(delta: float) -> void:
 func _step(i: int, delta: float) -> bool:
 	_life[i] -= delta
 	if _life[i] <= 0.0:
+		if on_expire.is_valid():
+			on_expire.call(_position[i], _damage[i])
 		return false
 	var velocity := _velocity[i]
 	if homing > 0.0:
@@ -125,6 +133,8 @@ func _step(i: int, delta: float) -> bool:
 
 func _burst(i: int, at: Vector3) -> void:
 	pops += 1
+	if on_pop.is_valid():
+		on_pop.call(at, _radius[i])
 	for j in horde.query_sphere(at, pop):
 		var away := horde.enemy_position(j) - at
 		on_hit.call(j, _damage[i], away.normalized() if away.length_squared() > 0.0001 else _velocity[i].normalized())

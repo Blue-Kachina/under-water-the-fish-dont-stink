@@ -1,27 +1,61 @@
 class_name GreekFire
 extends Powerup
-## Greek Fire Trail (planning_unnatural.md §7): burning patches left behind as
-## the fish swims, one every fire_spacing m. Zombies in a patch burn (damage
-## over time, BURN_TICK at a time, proc coefficient fire_proc). More stacks:
-## longer-lived patches, more burn.
+## Greek Fire Trail (planning_unnatural.md §7), a weapon: burning patches left
+## behind as the fish swims, one every spacing() m. Zombies in a patch burn
+## (damage over time, BURN_TICK at a time, proc coefficient fire_proc). Its
+## facets (Weapons): burn damage, patch life, patch size, a denser trail, more
+## patches out. Milestones: at the first, a zombie that burns to death leaves a
+## patch where it fell; at the second, the trail fans out three wide.
 
 const BURN_TICK := 0.25
+## The fan's side patches sit this many patch radii off the middle one.
+const FAN_SPREAD := 1.6
+## A burnt zombie's patch: at most one this often (s), so a crowd burning
+## doesn't carpet the sea.
+const KILL_PATCH_GAP := 0.15
 
 var patches: Array[FirePatch] = []
 var _last_drop := Vector3.INF
 var _burn_left := BURN_TICK
+var _kill_patch_left := 0.0
+
+
+func spacing() -> float:
+	return settings.fire_spacing / (1.0 + facet("density"))
+
+
+func radius() -> float:
+	return settings.fire_radius * (1.0 + facet("radius"))
+
+
+func life() -> float:
+	return (settings.fire_life + facet("life")) * duration_scale()
+
+
+func dps() -> float:
+	return settings.fire_dps * (1.0 + facet("burn"))
+
+
+func max_patches() -> int:
+	return settings.fire_max_patches + facet_count("patches")
 
 
 func on_tick(delta: float) -> void:
+	_kill_patch_left -= delta
 	var at := fish.global_position
-	if fish.speed > 2.0 and (_last_drop == Vector3.INF or at.distance_to(_last_drop) >= settings.fire_spacing):
-		_drop(at - fish.swim_velocity().normalized() * 0.8)
+	if fish.speed > 2.0 and (_last_drop == Vector3.INF or at.distance_to(_last_drop) >= spacing()):
+		var back := at - fish.swim_velocity().normalized() * 0.8
+		_drop(back)
+		if milestone(2):
+			var side := fish.global_basis.x * radius() * FAN_SPREAD
+			_drop(back + side)
+			_drop(back - side)
 		_last_drop = at
 	_burn_left -= delta
 	if _burn_left > 0.0:
 		return
 	_burn_left += BURN_TICK
-	var burn := (settings.fire_dps + settings.fire_dps_per_stack * (stacks - 1)) * BURN_TICK
+	var burn := dps() * BURN_TICK
 	# Burnt-out patches go (by index: erasing a freed one from a typed array errors).
 	for k in range(patches.size() - 1, -1, -1):
 		if not is_instance_valid(patches[k]):
@@ -31,14 +65,21 @@ func on_tick(delta: float) -> void:
 			run.hit(i, burn, fish, id, Vector3.ZERO, settings.fire_proc, [id])
 
 
+## The first milestone: a zombie burnt to death leaves a patch where it fell.
+func on_kill(at: Vector3, source: String) -> void:
+	if source == id and milestone(1) and _kill_patch_left <= 0.0:
+		_kill_patch_left = KILL_PATCH_GAP
+		_drop(at)
+
+
 func _drop(at: Vector3) -> void:
-	while patches.size() >= settings.fire_max_patches:
-		var oldest: FirePatch = patches.pop_front()
+	while patches.size() >= max_patches():
+		var oldest: Variant = patches.pop_front()  # untyped: a burnt-out one is a freed instance
 		if is_instance_valid(oldest):
 			oldest.queue_free()
 	var patch := FirePatch.new()
-	patch.radius = settings.fire_radius
-	patch.lifetime = settings.fire_life + settings.fire_life_per_stack * (stacks - 1)
+	patch.radius = radius()
+	patch.lifetime = life()
 	patch.position = at
 	run.add_child(patch)
 	patches.append(patch)
@@ -91,36 +132,95 @@ func make_worn() -> Node3D:
 	return lantern
 
 
-## One burning patch: a flickering ball of fire that fades out.
+## One burning patch: tongues of flame licking up through the patch, white-hot
+## to orange to a dull red as they rise and go out. They fade away close to
+## the camera (it follows from behind, so the trail runs right past it), and
+## the patch stops feeding them a flame's life before it's gone.
 class FirePatch extends Node3D:
+	## A flame's life (s).
+	const FLAME_LIFE := 0.7
+	## A new patch catches a moment after it's dropped, so it isn't burning
+	## between the camera and the fish while the fish is still right on it.
+	## (It burns zombies from the start.)
+	const LIGHT_AFTER := 0.3
+
 	var radius := 1.6
 	var lifetime := 2.0
 	var age := 0.0
-	var _material := StandardMaterial3D.new()
-	var _ball := MeshInstance3D.new()
+	var _flames := CPUParticles3D.new()
+
+	static var _mesh: QuadMesh
+	static var _ramp: Gradient
+	static var _scale: Curve
 
 	func _ready() -> void:
-		var sphere := SphereMesh.new()
-		sphere.radius = 1.0
-		sphere.height = 2.0
-		sphere.radial_segments = 12
-		sphere.rings = 6
-		_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
-		_material.albedo_color = Color(1.0, 0.45, 0.1, 0.6)
-		sphere.material = _material
-		_ball.mesh = sphere
-		_ball.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(_ball)
+		var spread := radius / 1.6  # the flames' sizes were set for the default radius
+		_flames.mesh = _flame_mesh()
+		_flames.amount = 12
+		_flames.emitting = false  # see LIGHT_AFTER
+		_flames.lifetime = FLAME_LIFE
+		_flames.lifetime_randomness = 0.4
+		_flames.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		_flames.emission_sphere_radius = radius * 0.55
+		_flames.direction = Vector3.UP
+		_flames.spread = 20.0
+		_flames.initial_velocity_min = 0.3
+		_flames.initial_velocity_max = 0.9
+		_flames.gravity = Vector3(0.0, 1.6, 0.0)  # flames rise
+		_flames.angle_min = -12.0
+		_flames.angle_max = 12.0
+		_flames.scale_amount_min = 0.7 * spread
+		_flames.scale_amount_max = 1.3 * spread
+		_flames.scale_amount_curve = _scale
+		_flames.color_ramp = _ramp
+		_flames.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_flames)
 
 	func _process(delta: float) -> void:
 		age += delta
 		if age >= lifetime:
 			queue_free()
-			return
-		var fade := 1.0 - clampf((age - lifetime * 0.7) / (lifetime * 0.3), 0.0, 1.0)
-		var flicker := 0.85 + 0.15 * sin(age * 23.0 + position.x)
-		_ball.scale = Vector3(radius, radius * 0.6, radius) * flicker * clampf(age / 0.15, 0.3, 1.0)
-		_material.albedo_color = Color(1.0, 0.4 + 0.15 * flicker, 0.1, 0.55 * fade)
+		elif age >= lifetime - FLAME_LIFE:
+			_flames.emitting = false  # the last flames burn out with the patch
+		else:
+			_flames.emitting = age >= LIGHT_AFTER
+
+	## The flame quad, its material and ramps, made once and shared.
+	static func _flame_mesh() -> QuadMesh:
+		if _mesh:
+			return _mesh
+		var glow := Gradient.new()
+		glow.set_color(0, Color(1, 1, 1, 1))
+		glow.set_color(1, Color(1, 1, 1, 0))
+		glow.add_point(0.45, Color(1, 1, 1, 0.55))
+		var texture := GradientTexture2D.new()
+		texture.gradient = glow
+		texture.fill = GradientTexture2D.FILL_RADIAL
+		texture.fill_from = Vector2(0.5, 0.55)  # hot low in the tongue
+		texture.fill_to = Vector2(0.5, 0.0)
+		texture.width = 64
+		texture.height = 64
+		var material := StandardMaterial3D.new()
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		material.vertex_color_use_as_albedo = true
+		material.albedo_texture = texture
+		FxKit.fade_near(material)  # gone close to the camera (it follows from behind)
+		_mesh = QuadMesh.new()
+		_mesh.size = Vector2(0.45, 0.85)  # taller than wide: a tongue
+		_mesh.material = material
+		_ramp = Gradient.new()
+		_ramp.set_color(0, Color(1.0, 0.95, 0.7, 0.0))
+		_ramp.set_color(1, Color(0.25, 0.05, 0.03, 0.0))
+		# Soft: they're added on, and overlapping patches would burn out to white.
+		_ramp.add_point(0.1, Color(1.0, 0.8, 0.4, 0.6))
+		_ramp.add_point(0.4, Color(1.0, 0.42, 0.08, 0.5))
+		_ramp.add_point(0.75, Color(0.7, 0.12, 0.04, 0.22))
+		_scale = Curve.new()
+		_scale.add_point(Vector2(0.0, 0.4))
+		_scale.add_point(Vector2(0.3, 1.0))
+		_scale.add_point(Vector2(1.0, 0.25))
+		return _mesh

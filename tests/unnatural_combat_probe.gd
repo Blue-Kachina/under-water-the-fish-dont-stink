@@ -76,7 +76,7 @@ func _run() -> void:
 	var bitten: float = stats.by_source.get("bite", 0.0)
 	check(stats.kills == 1 and run.kills == 1 and bitten >= 22.0, "the kill and bite damage are counted (%d, %.0f)" % [stats.kills, bitten])
 	check(bite.bites >= 1 and bite.cooldown_left > 0.0, "the bite went on cooldown")
-	check(run.pearls_out.size() == 1 and run.pearls_out[0].value == horde.kinds[1].xp, "it dropped an XP pearl worth its kind's XP")
+	check(is_equal_approx(run.levels.total_xp, horde.kinds[1].xp * settings.xp_gain), "its XP went to the team at once (%.1f)" % run.levels.total_xp)
 	horde.clear()
 
 	print("contact damage:")
@@ -139,9 +139,11 @@ func _run() -> void:
 	var to_next := levels.xp_to_next()
 	await _park(Vector3(0, 0, 40), Vector3.FORWARD)
 	await _ticks(2)
-	run.drop_pearl(fish.global_position + Vector3(0, 0, -3), to_next)
+	var purse_before := run.purse_of(fish)
+	run.drop_pearl(fish.global_position + Vector3(0, 0, -3), 2)
 	await _ticks(120)
-	check(run.pearls_out.is_empty() and stats.pearls >= 1, "an XP pearl nearby is drawn in and collected")
+	check(run.pearls_out.is_empty() and run.purse_of(fish) == purse_before + 2, "a pearl nearby is drawn in, into the purse (+%d)" % (run.purse_of(fish) - purse_before))
+	run.credit_xp(to_next / settings.xp_gain, fish)
 	check(levels.level == 2, "enough XP: level 2")
 	check(is_equal_approx(health.max_hp, run.max_hp_of(fish)) and is_equal_approx(run.max_hp(), settings.base_hp + settings.hp_per_level) and is_equal_approx(health.hp, hp_before + settings.hp_per_level),
 			"max hp up by hp_per_level, healed by as much (%.0f / %.0f)" % [health.hp, health.max_hp])

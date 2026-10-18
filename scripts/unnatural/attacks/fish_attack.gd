@@ -48,6 +48,10 @@ var area_scale := 1.0
 var damage_scale := 1.0
 var extra_projectiles := 0
 var projectile_speed := 1.0
+## Its weapon facets on top (Weapons, set by UnnaturalRun._apply_stats): how
+## hard it knocks zombies back, and the milestones it has reached (0, 1 or 2).
+var knock_scale := 1.0
+var milestones := 0
 var cooldown_left := 0.0
 ## Attacks made, and zombies hurt.
 var uses := 0
@@ -153,7 +157,7 @@ func _animate(_delta: float) -> void:
 ## Hurts zombie `index` by `amount` (before damage_scale), pushed along `push`.
 func strike(index: int, amount: float, push: Vector3, coefficient := -1.0) -> void:
 	struck += 1
-	on_hit.call(index, amount * damage_scale, fish, source(), push, proc() if coefficient < 0.0 else coefficient)
+	on_hit.call(index, amount * damage_scale, fish, source(), push * knock_scale, proc() if coefficient < 0.0 else coefficient)
 
 
 ## The fish's hitbox middle (where reaches are measured from).

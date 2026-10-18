@@ -30,6 +30,7 @@ const STATS := {
 	"duration": ["Duration", 0.1, true, false],
 	"pickup_range": ["Pickup Range", 0.15, true, true],
 	"xp_gain": ["XP Gain", 0.08, true, true],
+	"pearl_chance": ["Pearl Chance", 0.15, true, true],
 	"luck": ["Luck", 0.1, false, true],
 }
 ## Each fish's signature stat (+1 step every level).

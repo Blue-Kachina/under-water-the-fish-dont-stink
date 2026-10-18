@@ -1,7 +1,8 @@
 extends Node3D
-## Movement playground root: owns the swappable environment, global shortcuts
-## and the pause menu (PauseMenu, on Start), whose Settings shows the tuning
-## panel. The mode (picked in the tuning panel) decides the environment: Free Play and
+## Movement playground root: owns the swappable environment, global shortcuts,
+## the home screen the game starts on (HomeScreen, whose mode picker starts a
+## mode) and the pause menu (PauseMenu, on Start), whose Settings shows the
+## settings (DebugPanel). The mode decides the environment: Free Play and
 ## 1v1 (against a bot, Match1v1) in the Aquarium Arena, Free Swim and Nature
 ## (Extra Swishy strides after a fish to batter, NatureRun) and Hunt (a 1v1
 ## on Nature's tuning against a hostile fish, HuntMatch) and Unnatural (zombie
@@ -64,6 +65,35 @@ const MODE_ENVIRONMENTS := {
 	OBSTACLE_COURSE: "Obstacle Course",
 	REPLAYS: "Aquarium Arena",
 }
+## Each mode's tile in the home screen's mode picker (ModePicker): its title,
+## pitch (the featured tile), a short line (a small tile), its line icon
+## (HexBadge), its colours (the tile, its accent) and how it can be played.
+const MODE_TILES := {
+	UNNATURAL: {"title": "Unnatural", "icon": "mode_unnatural", "colors": [Color(0.25, 0.04, 0.08), Color(0.93, 0.25, 0.3)],
+		"pitch": "A blood moon has turned every fish but you. Survive the zombie horde, level up and stack powerups from chests.",
+		"short": "Survive the zombie horde", "play": ["Solo", "Split-screen", "Online"]},
+	ONE_V_ONE: {"title": "1v1", "icon": "mode_1v1", "colors": [Color(0.04, 0.17, 0.3), Color(0.35, 0.65, 1.0)],
+		"pitch": "Fish-ball in the aquarium against a bot: five minutes on the clock, overtime on a tie.",
+		"short": "Fish-ball against a bot", "play": ["Solo"]},
+	HUNT: {"title": "Hunt", "icon": "mode_hunt", "colors": [Color(0.27, 0.1, 0.06), Color(1.0, 0.54, 0.36)],
+		"pitch": "One on one in open water: batter the other fish before it batters you.",
+		"short": "Batter it before it batters you", "play": ["Solo"]},
+	NATURE: {"title": "Nature", "icon": "mode_nature", "colors": [Color(0.03, 0.2, 0.17), Color(0.3, 0.88, 0.62)],
+		"pitch": "Swim like a real fish: sweep, stride and build speed, then batter the schools for points.",
+		"short": "Stride, sweep and batter schools", "play": ["Solo", "Split-screen", "Online"]},
+	FREE_PLAY: {"title": "Free Play", "icon": "mode_free_play", "colors": [Color(0.05, 0.14, 0.24), Color(0.22, 0.89, 0.84)],
+		"pitch": "The aquarium arena and a ball, no clock: practise touches, aerials and shots.",
+		"short": "The arena and a ball, no clock", "play": ["Solo"]},
+	FREE_SWIM: {"title": "Free Swim", "icon": "mode_free_swim", "colors": [Color(0.04, 0.16, 0.24), Color(0.45, 0.8, 0.95)],
+		"pitch": "The open ocean and nothing to do but swim it.",
+		"short": "The open ocean, just swimming", "play": ["Solo"]},
+	OBSTACLE_COURSE: {"title": "Obstacle Course", "icon": "mode_obstacle_course", "colors": [Color(0.16, 0.12, 0.05), Color(1.0, 0.8, 0.3)],
+		"pitch": "Hoops, ramps and walls to swim through, round and over.",
+		"short": "Hoops, ramps and walls", "play": ["Solo"]},
+	TEST_TANK: {"title": "Test Tank", "icon": "mode_test_tank", "colors": [Color(0.12, 0.08, 0.2), Color(0.75, 0.55, 1.0)],
+		"pitch": "Unnatural's shooting range: dummies to hit, every stat to set, and a DPS readout.",
+		"short": "Dummies and a DPS readout", "play": ["Solo"]},
+}
 ## Converted replays are kept here, so a .replay converts only once. Bump the
 ## folder when the converter's output changes, so old conversions are redone.
 const CONVERTED_DIR := "user://replays/converter-1.2"
@@ -102,8 +132,10 @@ var _replay_controls: ReplayControls
 ## Where closing Replays goes back to.
 var _mode_before_replays := FREE_PLAY
 var _loader: Thread
-## Start pauses the game here; the tuning panel opens from it.
+## Start pauses the game here; the settings open from it.
 var _pause_menu: PauseMenu
+## Where the game starts (and the pause menu's Main menu goes): the mode picker.
+var _home: HomeScreen
 
 @onready var _fish: FishController = $Fish
 @onready var _world: WorldEnvironment = $WorldEnvironment
@@ -129,8 +161,6 @@ func _ready() -> void:
 		elif key == "goal_replays" and match_1v1:
 			match_1v1.goal_replays = UISettings.goal_replays)
 	set_mode(saved_mode, false)
-	_panel.set_modes(MODES, current_mode)
-	_panel.mode_selected.connect(set_mode)
 	_panel.set_character(_fish.character)
 	_panel.character_selected.connect(set_character)
 	var arcade := ArcadeFx.new()
@@ -159,10 +189,26 @@ func _ready() -> void:
 	_pause_menu.pauses = func() -> bool: return not NetSession.is_online()
 	_pause_menu.opened.connect(func() -> void: _hold_local_players(NetSession.is_online()))
 	_pause_menu.closed.connect(func() -> void: _hold_local_players(false))
-	_pause_menu.coop_requested.connect(func() -> void:
-		var menu := CoopMenu.new()
-		menu.name = "CoopMenu"
-		add_child(menu))
+	_pause_menu.coop_requested.connect(_open_coop)
+	_pause_menu.main_menu_allowed = func() -> bool: return not NetSession.is_online()
+	_pause_menu.can_open = func() -> bool: return not _home.is_open()
+	_pause_menu.main_menu_requested.connect(func() -> void: _home.open(true))
+	_home = HomeScreen.new()
+	_home.name = "HomeScreen"
+	_home.main = self
+	_home.settings_panel = _panel
+	_home.mode_chosen.connect(func(mode: String) -> void:
+		_home.close()
+		start_mode(mode))
+	_home.replays_requested.connect(func() -> void:
+		_home.close()
+		set_mode(REPLAYS))
+	_home.coop_requested.connect(_open_coop)
+	_home.settings_requested.connect(func() -> void:
+		_home.remember_focus()
+		_panel.set_open(true))
+	_home.character_changed.connect(set_character)
+	add_child(_home)
 	NetSession.coop.attach_main(self)
 	get_window().files_dropped.connect(func(files: PackedStringArray) -> void:
 		if files.is_empty():
@@ -172,11 +218,45 @@ func _ready() -> void:
 		else:
 			load_replay(files[0]))
 	var args := OS.get_cmdline_user_args()
+	var replay_given := false
 	for i in args.size():
 		if args[i].begins_with("--replay="):
 			load_replay(args[i].trim_prefix("--replay="))
+			replay_given = true
 		elif args[i] == "--replay" and i + 1 < args.size():
 			load_replay(args[i + 1])
+			replay_given = true
+	if get_tree().current_scene == self and not replay_given:
+		_home.open()  # the game starts on the home screen (not in test probes)
+
+
+## Online co-op (the pause menu's or the home screen's Co-op).
+func _open_coop() -> void:
+	if has_node("CoopMenu"):
+		return
+	var menu := CoopMenu.new()
+	menu.name = "CoopMenu"
+	add_child(menu)
+
+
+## Starts `mode` straight away (the home screen's mode picker): a match mode's
+## match too, with no card to wait on. Picking the mode that's on starts it
+## afresh.
+func start_mode(mode: String) -> void:
+	if mode not in MODES:
+		return
+	if mode == current_mode and current_environment == MODE_ENVIRONMENTS[mode]:
+		if mode == REPLAYS:
+			return
+		if _playing():
+			_end_match()
+			_apply_mode()  # back on its card, which the match starts from below
+		elif _match_card == null:
+			reset_play()
+	else:
+		set_mode(mode)
+	if _match_card:
+		play_match()
 
 
 ## The mode last played (not Replays). Older settings picked the environment
@@ -544,8 +624,6 @@ func set_mode(mode: String, remember := true) -> void:
 		_enter_replays()
 	elif was_replays and mode != REPLAYS:
 		_camera.snap()
-	if _panel.is_node_ready():
-		_panel.set_mode(mode)
 	if remember and mode != REPLAYS and get_tree().current_scene == self:  # not from probes
 		var settings := ConfigFile.new()
 		settings.load(SETTINGS_PATH)

@@ -18,21 +18,25 @@ extends Node
 ## panel's fish_attack for every fish), and swims with its own twist
 ## (Traversal). Ramming a zombie at nature_batter_speed or faster batters it, the
 ## bow wave counting: damage that grows with speed, and i-frames for the hit,
-## so ramming is rewarded rather than punished. Killed zombies drop XP pearls
-## (Pearl, drawn in from pickup_range) for the team's one shared level
-## (Levels); each level raises everyone's max hp and heals them by as much,
-## gives each their fish's signature stat (StatBlock.SIGNATURE), and offers
-## each local player card_choices cards (cards_offered), each a different stat
-## at its own rarity (Rarity, which luck pushes up), to pick() one. Solo, the
-## game pauses while the cards are up; in co-op (D3) nobody else waits, and
-## the picker can't be hurt or seen by the zombies until they've picked. Each
-## player's stats (StatBlock) feed their attack, damage, crits, batteries, swim,
-## armour, regen, pickup range and XP.
+## so ramming is rewarded rather than punished. A kill's XP goes straight to
+## the team's one shared level (Levels; D22, credit_xp()), and now and then
+## the kill drops a pearl (D23, _roll_pearl()): the currency, drawn in from
+## pickup_range into the taker's purse. Each level raises everyone's max hp
+## and heals them by as much, gives each their fish's signature stat
+## (StatBlock.SIGNATURE), and offers each local player card_choices cards
+## (cards_offered, CardDeck): weapon and tome upgrades, and new ones while
+## their slots (Loadout) are free, each at its own rarity (Rarity, which luck
+## pushes up), to pick() one. Solo, the game pauses while the cards are up;
+## in co-op (D3) nobody else waits, and the picker can't be hurt or seen by
+## the zombies until they've picked. Each player's stats (StatBlock, which
+## tomes add to) feed their attack, damage, crits, batteries, swim, armour,
+## regen, pickup range, XP and pearls.
 ##
 ## Chests (TreasureChest) lie buried round the arena, chest_count at the
-## start and one more every chest_interval. Batter one, or hold still beside
-## it for chest_open_time (untouchable and unseen meanwhile, D3), and it
-## offers chest_choices powerups (chest_offered) to pick_card() one. Each
+## start and one more every chest_interval. They cost pearls (chest_price(),
+## rising through the run). Batter one, or hold still beside it for
+## chest_open_time (untouchable and unseen meanwhile, D3), and it offers
+## chest_choices items (chest_offered) to pick_card() one. Each
 ## player's powerups (Powerups) hook every hit (hit() carries a proc
 ## coefficient and the chain of powerups that led to it), kill, battery,
 ## tick and stride.
@@ -89,12 +93,16 @@ signal boss_defeated(boss: Boss, by: FishController)
 signal boss_enraged(boss: Boss)
 ## The Leviathan's beaten: the stage is complete (the run's over, won).
 signal stage_completed
-## Online, a guest's: a hit on zombie `net_id` for the host to apply; an XP
-## pearl a local player took (worth `xp`, gains applied); a chest opened here.
+## Online, a guest's: a hit on zombie `net_id` for the host to apply; a pearl
+## a local player took; XP a local player's kill earned (gains applied, for
+## the host to add to the team's); a chest opened here.
 signal hit_claimed(net_id: int, amount: float, source: String, by: FishController)
-signal pearl_claimed(id: int, by: FishController, xp: float)
+signal pearl_claimed(id: int, by: FishController)
+signal xp_claimed(xp: float)
 signal chest_claimed(index: int, by: FishController)
-## The host's: an XP pearl taken (so the guests' copies go), a chest buried.
+## The host's: a pearl dropped (worth `value`), or taken (so the guests'
+## copies go); a chest buried.
+signal pearl_dropped(id: int, at: Vector3, value: int)
 signal pearl_taken(id: int)
 ## Drops (Pickup), online: one dropped here (the host's), one taken here (the
 ## host's word: everyone applies it), and one a guest's player touched (to the host).
@@ -117,12 +125,15 @@ const RELOCATE_INTERVAL := 1.0
 const SPAWN_HIDDEN := 0.3
 ## The i-frame flicker (per second).
 const FLICKER_RATE := 16.0
-## An elite's XP pearl is worth this many times its kind's.
+## An elite's XP is this many times its kind's.
 const ELITE_XP := 5.0
 ## An elite's kill is this many times likelier to drop a chest or a pickup.
 const ELITE_CHEST := 5.0
-## A beaten boss's XP pearl's id: this minus the boss's (zombies' are their net ids).
+## A beaten boss's pearls' ids: this minus the boss's x 1000, minus the pearl's
+## number (zombies' are their net ids).
 const BOSS_PEARL := 2000000000
+## A boss's pearls spill this far round it (m).
+const BOSS_PEARL_SPREAD := 3.0
 
 var ocean: Ocean
 ## Every player's fish; the first is `player`.
@@ -175,6 +186,13 @@ var _stats := {}
 ## and the chest they're opening by holding still.
 var _blocks := {}
 var _powerups := {}
+## Per player: their weapons and tomes (Loadout), their pearl purse, and the
+## attack level last put on their attack.
+var _loadouts := {}
+var _purses := {}
+var _attack_levels := {}
+## Online, the host's: each remote player's Pearl Chance, as their machine says.
+var _remote_pearl_chance := {}
 var _pending := {}
 var _chest_pending := {}
 ## Sunken Idol's extra picks left from the chest `fish` has up.
@@ -190,6 +208,8 @@ var _paused_for_cards := false
 var _pearl_settings := NatureSettings.new()
 var _clouds: Array[BurstCloud] = []
 var _relocate_left := 0.0
+## The run's log (null in the Test Tank): saved when the run ends.
+var run_log: RunLog
 
 
 func setup(run_ocean: Ocean, player_fish: FishController) -> void:
@@ -239,6 +259,11 @@ func _ready() -> void:
 	add_child(blood_moon)
 	ocean.boundary_center = centre
 	ocean.boundary_radius = settings.arena_radius
+	if not test_tank:
+		run_log = RunLog.new(self)
+		add_child(run_log)
+		run_over.connect(func() -> void: run_log.finish("down"))
+		stage_completed.connect(func() -> void: run_log.finish("won"))
 	for fish in players:
 		_join(fish)
 	start()
@@ -246,6 +271,7 @@ func _ready() -> void:
 
 ## Everyone back at the start: the horde gone, level 1, full health.
 func start() -> void:
+	_log_quit()
 	if authority:
 		restarted.emit()
 	elapsed = 0.0
@@ -290,6 +316,15 @@ func start() -> void:
 			fish.revive(spawn_for(fish, spawn))
 			moved.append(fish)
 	_announce_teleport(moved)
+	if run_log:
+		run_log.begin()
+
+
+## A run left before it ended (restarted, or the mode changed): its log, as
+## quit, if it got anywhere.
+func _log_quit() -> void:
+	if run_log and run_log.ending.is_empty() and elapsed >= 10.0:
+		run_log.finish("quit")
 
 
 ## Where `fish` starts: beside the others, in its co-op place (meta
@@ -302,6 +337,7 @@ func spawn_for(fish: FishController, spawn: Transform3D) -> Transform3D:
 
 ## Hands the players' fish back. Call before freeing the run.
 func end() -> void:
+	_log_quit()
 	set_physics_process(false)
 	horde.set_physics_process(false)
 	_hold_for_cards(false)
@@ -421,6 +457,39 @@ func powerups_of(fish: FishController) -> Powerups:
 	return _powerups[fish]
 
 
+## `fish`'s weapons and tomes.
+func loadout_of(fish: FishController) -> Loadout:
+	if not _loadouts.has(fish):
+		_loadouts[fish] = Loadout.new()
+	return _loadouts[fish]
+
+
+## `fish`'s pearls to spend.
+func purse_of(fish: FishController) -> int:
+	return _purses.get(fish, 0)
+
+
+func add_pearls(fish: FishController, amount: int) -> void:
+	if is_instance_valid(fish):
+		_purses[fish] = maxi(purse_of(fish) + amount, 0)
+
+
+## `fish`'s Pearl Chance: their own stat here, or (a remote player's, online)
+## what their machine said.
+func pearl_chance_of(fish: FishController) -> float:
+	if not is_instance_valid(fish):
+		return 0.0
+	if fish.puppet:
+		return _remote_pearl_chance.get(fish, 0.0)
+	return block_of(fish).value("pearl_chance")
+
+
+## A remote player's Pearl Chance, from their machine (the host's, online).
+func set_remote_pearl_chance(fish: FishController, value: float) -> void:
+	if is_instance_valid(fish):
+		_remote_pearl_chance[fish] = value
+
+
 ## `fish` has cards up, or is opening a chest (and can't be hurt or seen meanwhile).
 func is_picking(fish: FishController) -> bool:
 	return _offers.has(fish) or _opening.has(fish)
@@ -487,6 +556,10 @@ func _leave(fish: FishController) -> void:
 	_opening.erase(fish)
 	_revive.erase(fish)
 	_blocks.erase(fish)
+	_loadouts.erase(fish)
+	_purses.erase(fish)
+	_attack_levels.erase(fish)
+	_remote_pearl_chance.erase(fish)
 	if _powerups.has(fish):
 		(_powerups[fish] as Powerups).clear()
 		_powerups.erase(fish)
@@ -504,6 +577,9 @@ func _leave(fish: FishController) -> void:
 
 func _reset_player(fish: FishController) -> void:
 	block_of(fish).reset()
+	loadout_of(fish).reset()
+	_purses.erase(fish)
+	_attack_levels.erase(fish)
 	powerups_of(fish).clear()
 	powerups_of(fish).refresh()
 	_offers.erase(fish)
@@ -556,15 +632,25 @@ func _make_attack(fish: FishController) -> FishAttack:
 	return attack
 
 
-## `fish`'s stats on its attack, its swimming and its max hp.
+## `fish`'s stats on its attack (with the attack's own weapon facets and
+## milestones), its swimming and its max hp.
 func _apply_stats(fish: FishController) -> void:
 	var block := block_of(fish)
 	var attack: FishAttack = _attacks.get(fish)
 	if attack:
-		attack.attack_speed = 1.0 + block.value("attack_speed")
-		attack.area_scale = 1.0 + block.value("area")
-		attack.extra_projectiles = roundi(block.value("projectile_count"))
-		attack.projectile_speed = 1.0 + block.value("projectile_speed")
+		var loadout := loadout_of(fish)
+		loadout.attack_kind = attack.kind
+		var own := Weapons.ATTACK
+		attack.attack_speed = (1.0 + block.value("attack_speed")) * (1.0 + loadout.facet(own, "rate"))
+		attack.area_scale = (1.0 + block.value("area")) * (1.0 + loadout.facet(own, "size"))
+		attack.damage_scale = 1.0 + loadout.facet(own, "damage")
+		attack.knock_scale = 1.0 + loadout.facet(own, "knock")
+		attack.extra_projectiles = roundi(block.value("projectile_count") + loadout.facet(own, "count"))
+		attack.projectile_speed = (1.0 + block.value("projectile_speed")) * (1.0 + loadout.facet(own, "speed"))
+		var level := loadout.level(own)
+		attack.milestones = (1 if settings.milestone_first > 0 and level >= settings.milestone_first else 0) \
+				+ (1 if settings.milestone_second > 0 and level >= settings.milestone_second else 0)
+		_attack_levels[fish] = level
 	if is_instance_valid(fish) and not fish.puppet:
 		fish.speed_scale = _swim_scale(fish)
 		fish.stride_scale = 1.0 + block.value("stride_power")
@@ -609,6 +695,8 @@ func _physics_process(delta: float) -> void:
 		var stats := stats_of(fish)
 		stats.top_speed = maxf(stats.top_speed, fish.speed)
 		var attack := _make_attack(fish)
+		if _attack_levels.get(fish, -1) != loadout_of(fish).level(Weapons.ATTACK):
+			_apply_stats(fish)  # the attack's level override, live
 		attack.update(delta, is_up(fish) and not is_over)
 		var twist: Traversal = _twists.get(fish)
 		if twist:
@@ -789,15 +877,16 @@ func _touch_zombies(fish: FishController) -> void:
 func _touch_clouds(fish: FishController) -> void:
 	for cloud in _clouds:
 		if is_instance_valid(cloud) and cloud.contains(fish.global_position, PLAYER_RADIUS):
-			hurt(fish, settings.burst_damage * settings.enemy_damage_scale)
+			hurt(fish, settings.burst_damage * settings.enemy_damage_scale, -1, "a burst cloud")
 			return
 
 
 ## `fish` takes `amount` (unless in i-frames), then i-frames. Returns whether
 ## it hurt. `from`: the zombie whose touch it was (-1: something else), for
 ## powerups that answer it (Pufferfish Spines). A powerup may take the hit
-## instead (Bubble Wrap): then it's i-frames, and no hurt.
-func hurt(fish: FishController, amount: float, from := -1) -> bool:
+## instead (Bubble Wrap): then it's i-frames, and no hurt. `cause`: what it
+## was, for the run log (a zombie's touch names its kind).
+func hurt(fish: FishController, amount: float, from := -1, cause := "") -> bool:
 	if amount <= 0.0:
 		return false
 	var twist: Traversal = _twists.get(fish)
@@ -819,11 +908,26 @@ func hurt(fish: FishController, amount: float, from := -1) -> bool:
 	if powerups:
 		powerups.on_hurt(amount, from)
 	stats_of(fish).taken += amount
+	if run_log:
+		run_log.hurt_by(fish, cause if cause != "" else _cause_of(from))
 	director.on_damage(amount / maxf(health.max_hp, 1.0))
 	player_hurt.emit(fish, amount)
 	if health.down:
 		_on_down(fish)
 	return true
+
+
+## What zombie slot `from`'s touch is, for the run log: a boss's title, or the
+## kind's name (an elite's marked).
+func _cause_of(from: int) -> String:
+	if from < 0:
+		return "something else"
+	var boss := boss_at(from)
+	if boss:
+		return boss.title.capitalize()
+	var kind := horde.enemy_kind(from)
+	var name_of := kind.display_name if kind and kind.display_name != "" else (kind.id if kind else "a zombie")
+	return ("elite " if horde.is_elite(from) else "") + name_of
 
 
 func _on_down(fish: FishController) -> void:
@@ -1001,12 +1105,44 @@ func _on_killed(index: int, kind_index: int, at: Vector3, source: String, by: Ob
 	if tank:
 		zombie_killed.emit(at, kind, fish, source)
 		return  # no XP in the Test Tank: the level is the panel's
-	drop_pearl(at, kind.xp * (ELITE_XP if horde.is_elite(index) else 1.0), horde.net_id_of(index))
+	var elite := horde.is_elite(index)
+	credit_xp(kind.xp * (ELITE_XP if elite else 1.0), fish)
 	if authority:
-		if _rolls_chest(fish, horde.is_elite(index)):
+		_roll_pearl(at, fish, elite, horde.net_id_of(index))
+		if _rolls_chest(fish, elite):
 			drop_chest(at)
-		_roll_drop(at, fish, horde.is_elite(index))
+		_roll_drop(at, fish, elite)
 	zombie_killed.emit(at, kind, fish, source)
+
+
+## A kill's `xp` for the team, earned by `by` (D22: no pickup), with their XP
+## Gain. It counts where the killer is played: offline or the host's own
+## players, straight to the team's level; a guest's own players, claimed to
+## the host (xp_claimed). A remote player's kill is skipped (their own machine
+## claims it); nobody's kill counts on the host, without a gain.
+func credit_xp(xp: float, by: FishController) -> void:
+	if xp <= 0.0:
+		return
+	if is_instance_valid(by) and by.puppet:
+		return  # their own machine claims it (or, on a guest, the host has it)
+	var gain := 1.0 + (block_of(by).value("xp_gain") if is_instance_valid(by) else 0.0)
+	if authority:
+		levels.add(xp * gain)
+	elif is_instance_valid(by):
+		xp_claimed.emit(xp * gain)
+
+
+## Maybe a pearl where `by`'s kill was (the host rolls, D23): an elite's
+## always (worth pearl_elite_value), anyone else's by pearl_drop_chance x (1 +
+## the killer's Pearl Chance). `id`: the zombie's net id (every machine's
+## pearl the same).
+func _roll_pearl(at: Vector3, by: FishController, elite: bool, id: int) -> void:
+	if elite:
+		drop_pearl(at, settings.pearl_elite_value, id)
+		return
+	var chance := settings.pearl_drop_chance * (1.0 + pearl_chance_of(by))
+	if chance > 0.0 and rng.randf() < chance:
+		drop_pearl(at, 1, id)
 
 
 ## The boss whose body zombie slot `index` is (null: an ordinary zombie).
@@ -1141,7 +1277,12 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 		var chest := add_chest(boss.global_position, 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
 				TreasureChest.Kind.BOSS, "drowned_fin")
 		chest.name = "SharkChest"
-		drop_pearl(boss.global_position, settings.shark_xp, BOSS_PEARL - boss.boss_id)
+		if authority:
+			levels.add(settings.shark_xp)
+		# Its pearls, the same on every machine (each sees the boss beaten).
+		for n in settings.boss_pearls:
+			var spill := Vector3(sin(n * 2.4), 0.3 * sin(n * 1.3), cos(n * 2.4)) * BOSS_PEARL_SPREAD * sqrt((n + 1.0) / maxf(settings.boss_pearls, 1.0))
+			drop_pearl(boss.global_position + spill, 1, BOSS_PEARL - boss.boss_id * 1000 - n, false)
 	elif boss is BloodLeviathan:
 		stage_complete = true
 		is_over = true
@@ -1170,12 +1311,17 @@ func _burst(at: Vector3, radius: float) -> void:
 	_clouds.append(cloud)
 
 
-## An XP pearl worth `value` at `at` (past max_pearls, the nearest takes its
-## XP instead, and grows). A guest's drops merge the same way as the host's:
-## the pearls out are the same on both, and so is the pick.
-func drop_pearl(at: Vector3, value: float, id := -1) -> void:
-	if value <= 0.0:
+## A pearl worth `value` at `at` (past max_pearls, the nearest takes its worth
+## instead, and grows). A guest's drops merge the same way as the host's: the
+## pearls out are the same on both, and so is the pick. `announce`: the
+## host's own roll, sent to the guests (pearl_dropped).
+func drop_pearl(at: Vector3, value: int, id := -1, announce := true) -> void:
+	if value <= 0:
 		return
+	if announce and authority:
+		pearl_dropped.emit(id, at, value)
+	if run_log:
+		run_log.pearls_dropped += value
 	if pearls_out.size() >= settings.max_pearls:
 		var nearest := _nearest_pearl(at)
 		if nearest:
@@ -1184,7 +1330,7 @@ func drop_pearl(at: Vector3, value: float, id := -1) -> void:
 			return
 	_sync_pearls()
 	var pearl := Pearl.new(_pearl_settings)
-	pearl.name = "XpPearl"
+	pearl.name = "Pearl"
 	pearl.value = value
 	pearl.id = id
 	pearl.set_meta("first_value", value)
@@ -1198,19 +1344,20 @@ func drop_pearl(at: Vector3, value: float, id := -1) -> void:
 	pearls_out.append(pearl)
 
 
+## A local player took a pearl: its worth goes in their purse at once (a guest
+## tells the host, so every copy goes).
 func _on_pearl_collected(pearl: Pearl, by: FishController) -> void:
-	var gain := 1.0
+	var worth := roundi(pearl.value)
 	if is_instance_valid(by):
-		stats_of(by).pearls += 1
-		gain += block_of(by).value("xp_gain")
+		stats_of(by).pearls += worth
+		add_pearls(by, worth)
 	if authority:
-		levels.add(pearl.value * gain)
 		pearl_taken.emit(pearl.id)
 	else:
-		pearl_claimed.emit(pearl.id, by, pearl.value * gain)  # the host adds it (once)
+		pearl_claimed.emit(pearl.id, by)
 
 
-## The XP pearl out nearest `at` that isn't being taken (null: none).
+## The pearl out nearest `at` that isn't being taken (null: none).
 func _nearest_pearl(at: Vector3) -> Pearl:
 	var best: Pearl = null
 	var gap := INF
@@ -1223,7 +1370,7 @@ func _nearest_pearl(at: Vector3) -> Pearl:
 	return best
 
 
-## The XP pearl `id` here, if it's still out.
+## The pearl `id` here, if it's still out.
 func pearl_by_id(id: int) -> Pearl:
 	if id < 0:
 		return null
@@ -1233,20 +1380,27 @@ func pearl_by_id(id: int) -> Pearl:
 	return null
 
 
-## A guest's pearl claim (we're the host): the XP, once; returns whether it counted.
-func confirm_pearl(id: int, by: FishController, xp: float) -> bool:
+## A guest's pearl claim (we're the host): it goes from everyone's sea, and
+## counts on their board once; returns whether it counted. (The guest's purse
+## took it already, on their machine.)
+func confirm_pearl(id: int, by: FishController) -> bool:
 	var pearl := pearl_by_id(id)
 	if pearl == null:
 		return false  # gone already (someone else got it)
 	pearl.queue_free()
 	if is_instance_valid(by):
-		stats_of(by).pearls += 1
-	levels.add(xp)
+		stats_of(by).pearls += roundi(pearl.value)
 	pearl_taken.emit(id)
 	return true
 
 
-## The XP pearls' look and pull from UnnaturalSettings.
+## A guest's XP claim (we're the host): to the team's level.
+func confirm_xp(xp: float) -> void:
+	if authority and xp > 0.0:
+		levels.add(xp)
+
+
+## The pearls' look and pull from UnnaturalSettings.
 func _sync_pearls() -> void:
 	var reach := 0.0
 	for key: Variant in _blocks:
@@ -1292,23 +1446,20 @@ func _offer_next(fish: FishController) -> void:
 			_hold_for_cards(false)
 
 
-## card_choices different stats, each with its own rarity.
+## card_choices different cards (CardDeck): weapon and tome upgrades, new ones
+## while slots are free, each with its own rarity.
 func _offer_level(fish: FishController) -> void:
 	var left: int = _pending.get(fish, 0)
-	var pool := StatBlock.pool(attack_of(fish))
-	var luck := block_of(fish).value("luck")
-	var cards := []
-	for n in mini(settings.card_choices, pool.size()):
-		var at := rng.randi_range(0, pool.size() - 1)
-		var stat: String = pool[at]
-		pool.remove_at(at)
-		var tier := Rarity.roll(rng, settings, luck)
-		cards.append({"stat": stat, "tier": tier, "amount": StatBlock.amount(stat, Rarity.multiplier(settings, tier))})
+	var cards := CardDeck.deal(self, fish, settings.card_choices)
+	if cards.is_empty():
+		_pending[fish] = 0
+		_offer_next(fish)
+		return
 	_offers[fish] = cards
 	_offer_kind[fish] = "level"
 	var signature := StatBlock.signature(fish.character)
-	var gave := "+%d MAX HP    ·    %s (SIGNATURE)" % [roundi(settings.hp_per_level),
-			StatBlock.describe(signature, StatBlock.amount(signature, settings.signature_steps)).to_upper()]
+	var gave := "+%d MAX HP  ·  %s (SIGNATURE)  ·  %s" % [roundi(settings.hp_per_level),
+			StatBlock.describe(signature, StatBlock.amount(signature, settings.signature_steps)).to_upper(), CardDeck.slot_line(self, fish)]
 	if cards_pause_game():
 		_hold_for_cards(true)
 	cards_offered.emit(fish, cards, "LEVEL %d" % (levels.level - left + 1), gave)
@@ -1359,14 +1510,28 @@ func _powerup_card(fish: FishController, id: String) -> Dictionary:
 	return {"powerup": id, "stacks": powerups_of(fish).stacks(id) + 1, "tier": Powerup.tier(id)}
 
 
-## `fish` takes card `index` of those up: a level's stat goes up, or a chest's
-## powerup is theirs (another stack); then their next pick, or back to play.
+## `fish` takes card `index` of those up: a level's weapon or tome goes up (or
+## comes), or a chest's powerup is theirs (another stack; a boss weapon takes
+## a slot, or asks which weapon it replaces); then their next pick, or back to
+## play.
 func pick(fish: FishController, index: int) -> void:
 	var cards: Array = _offers.get(fish, [])
 	if cards.is_empty():
 		return
 	var card: Dictionary = cards[clampi(index, 0, cards.size() - 1)]
-	if _offer_kind.get(fish, "level") == "chest":
+	var offer_kind: String = _offer_kind.get(fish, "level")
+	if offer_kind == "swap":
+		if card.kind == "swap":
+			_take_boss_weapon(fish, card.incoming, card.weapon)
+	elif offer_kind == "chest" and Powerup.is_weapon(card.powerup):
+		var loadout := loadout_of(fish)
+		if loadout.has_weapon(card.powerup) or loadout.weapons.size() < settings.weapon_slots:
+			_take_boss_weapon(fish, card.powerup, "")
+		else:
+			_offer_swap(fish, card.powerup)
+			card_picked.emit(fish, card)
+			return
+	elif offer_kind == "chest":
 		powerups_of(fish).add(card.powerup)
 		if _extra_picks.get(fish, 0) > 0 and cards.size() > 1:
 			# Sunken Idol: another pick from what's left of the same chest.
@@ -1381,13 +1546,69 @@ func pick(fish: FishController, index: int) -> void:
 			return
 		_extra_picks.erase(fish)
 	else:
-		block_of(fish).add(card.stat, card.amount)
-		_apply_stats(fish)
+		take_card(fish, card)
 		_pending[fish] = _pending.get(fish, 1) - 1
 	_offers.erase(fish)
 	_offer_kind.erase(fish)
 	card_picked.emit(fish, card)
 	_offer_next(fish)
+
+
+## What a level's card does for `fish` (CardDeck's kinds).
+func take_card(fish: FishController, card: Dictionary) -> void:
+	var loadout := loadout_of(fish)
+	match card.get("kind", ""):
+		"weapon", "new_weapon":
+			var id: String = card.weapon
+			if loadout.has_weapon(id):
+				loadout.upgrade_weapon(id, card.gains)
+			else:
+				loadout.add_weapon(id)
+			if id != Weapons.ATTACK:
+				powerups_of(fish).refresh()
+		"tome", "new_tome":
+			loadout.add_tome(card.tome)
+			var gives: Dictionary = card.gives
+			for stat: String in gives:
+				block_of(fish).add(stat, gives[stat])
+		"fallback":
+			if card.what == "pearls":
+				add_pearls(fish, card.amount)
+			else:
+				for player in local_players():
+					var health: FishHealth = _health.get(player)
+					if health and not health.down:
+						health.heal(health.max_hp * float(card.amount))
+	_apply_stats(fish)
+
+
+## Boss weapon `id` is `fish`'s (at coil_arrive_level), in place of `replacing`
+## ("": a free slot, or it's held already: a level up).
+func _take_boss_weapon(fish: FishController, id: String, replacing: String) -> void:
+	var loadout := loadout_of(fish)
+	if loadout.has_weapon(id):
+		loadout.upgrade_weapon(id, Weapons.roll(rng, id, loadout.attack_kind, Rarity.Tier.RARE, settings, powerup_settings))
+	else:
+		if replacing != "":
+			loadout.remove_weapon(replacing)
+		loadout.add_weapon(id, maxi(powerup_settings.coil_arrive_level, 1))
+	powerups_of(fish).refresh()
+	_apply_stats(fish)
+
+
+## Every weapon slot's full: which weapon does boss weapon `incoming` replace?
+## Each held one (not the fish's own attack) as a card, and a card to keep them all.
+func _offer_swap(fish: FishController, incoming: String) -> void:
+	var loadout := loadout_of(fish)
+	var cards := []
+	for id in loadout.weapons:
+		if id != Weapons.ATTACK:
+			cards.append({"kind": "swap", "weapon": id, "incoming": incoming, "tier": Powerup.tier(incoming),
+					"level": loadout.earned_level(id)})
+	cards.append({"kind": "keep", "weapon": incoming, "tier": Rarity.Tier.COMMON})
+	_offers[fish] = cards
+	_offer_kind[fish] = "swap"
+	cards_offered.emit(fish, cards, "%s: NO FREE SLOT" % Powerup.title(incoming).to_upper(), "SWAP A WEAPON FOR IT, OR KEEP YOURS")
 
 
 ## Chests round the arena: chest_count now, on the seabed.
@@ -1511,6 +1732,8 @@ func apply_pickup(kind: int, by: FishController) -> void:
 ## A chest dropped by a kill at `at`, sinking to the seabed.
 func drop_chest(at: Vector3) -> TreasureChest:
 	var chest := add_chest(at, rng.randf() * TAU, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3)
+	if run_log:
+		run_log.chests_dropped += 1
 	chest_buried.emit(chest)
 	return chest
 
@@ -1562,6 +1785,8 @@ func _open_chests(fish: FishController, delta: float) -> void:
 		var gap := offset.length()
 		if gap > settings.chest_reach + GhostBite.bow_reach(fish):
 			continue
+		if not can_afford(fish, chest):
+			continue  # short of pearls: it stays shut (the HUD shows its price)
 		if battering and gap > 0.001 and offset.normalized().dot(nose) >= Battery.FRONT:
 			open_chest(chest, fish)
 			return
@@ -1582,8 +1807,10 @@ func _open_chests(fish: FishController, delta: float) -> void:
 ## Opens `chest` for `fish` (each player opens each chest for themselves): a
 ## powerup pick for them, and it's gone from their view.
 func open_chest(chest: TreasureChest, fish: FishController) -> void:
+	var price := chest_price(chest)
 	if not chest.open_for(fish, layer_of(fish)):
 		return
+	add_pearls(fish, -price)
 	_opening.erase(fish)
 	stats_of(fish)["chests"] = stats_of(fish).get("chests", 0) + 1
 	chest_opened.emit(chest, fish)
@@ -1595,6 +1822,24 @@ func open_chest(chest: TreasureChest, fish: FishController) -> void:
 	if not _offers.has(fish):
 		_offer_next(fish)
 	_clear_chest(chest)
+
+
+## What `chest` costs to open now, in pearls (D23): chest_price_base, growing
+## with the run's minutes (chest_price_growth), a cursed one's
+## chest_cursed_price times that; a boss's free, and every one free with
+## chest_cost off or in the Test Tank.
+func chest_price(chest: TreasureChest) -> int:
+	if not settings.chest_cost or tank or test_tank or chest.kind == TreasureChest.Kind.BOSS:
+		return 0
+	var price := settings.chest_price_base * (1.0 + settings.chest_price_growth * elapsed / 60.0)
+	if chest.kind == TreasureChest.Kind.CURSED:
+		price *= settings.chest_cursed_price
+	return roundi(price)
+
+
+## Whether `fish` has the pearls to open `chest`.
+func can_afford(fish: FishController, chest: TreasureChest) -> bool:
+	return purse_of(fish) >= chest_price(chest)
 
 
 ## Chest `index` opened by `fish`, a player elsewhere (online): it's still

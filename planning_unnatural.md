@@ -31,7 +31,40 @@ is a **Fish Fry**. Teams are team colours / team 0, 1. "Demo" is only for Rocket
 **Phases 0 to 8 are built (2026-10-17), and so is the second play-test's round of changes (Round 2
 below). Phase 9 isn't started.** Pick **Unnatural** or **Test Tank** in the mode list.
 
-### Handoff (fourth 2026-10-17 session): start here
+### Handoff (2026-10-18, playability pass P1): start here
+**State:** P1 of the Playability pass is built and probed, and the build is in
+`builds/windows/FishPlayground.exe` (08:23). Nothing is half-done. The user does all the git.
+
+1. **Awaiting the user's play-test of P1.** Expect tuning on:
+   - the card weights (`card_weight_*`), and how fast 2 + 2 slots fill (D17);
+   - the facet steps (POWERUPS > Weapons) and the rarity table (`facets_*`, `facet_size_*`);
+   - the economy: `pearl_drop_chance` (0.12), `chest_price_base` (8) and `chest_price_growth`
+     (0.25 a minute);
+   - the milestones' feel (Lv 5 and 10). Try them in the Test Tank: a weapon's `*_stacks`
+     setting and `attack_level` are level overrides.
+2. **For the user to confirm:** three defaults (see "P1 as built"):
+   - the Coil's swap offer;
+   - per-player purses (not the team's);
+   - Sunken Idol takes items only.
+3. **Next: P2**, the run simulator (`tests/run_sim.tscn`), run logs and Test Tank presets. Then
+   P3 (feel, which takes in phase 9's juice), P4 (choice tools and limiters), P5 (pacing, incl.
+   the Leviathan's chest and a next stage), P6 (meta), P7 (co-op, batteries, every mode).
+4. **Known gaps:**
+   - Leviathan's Coil can't be earned yet (the Leviathan ends the run; P5).
+   - Online, a pearl two players take at once can land in both purses.
+   - Rerolls, skips and banishes wait for P4 and P6.
+5. **Probe notes:**
+   - Probes that aren't about prices set `chest_cost = false`.
+   - `unnatural_net_peer` sets `card_choices = 0`. Kills now level the team at once, and a
+     player picking cards hides from the zombies.
+   - New probes: `slots_probe` and `pearl_currency_probe`.
+   - The online test runs with `tests/unnatural_net.sh <godot> <port>`.
+   - Regression on 2026-10-18: every probe passed except `school_probe` (Nature, untouched by P1). It failed twice in the full run, each time on a different random check ("near the camera the nearest get full models", then "still schools at a 10 Hz step"), then passed 3 of 3 re-runs. That fits its known flakiness, but two failures in a row is more than usual, so keep an eye on it.
+     A separate re-run in the first session failed it again, on another check ("still schools at
+     a 10 Hz step"), probably under load from other Godot runs. It's Nature-only, and P1 didn't
+     touch it.
+
+### Handoff (fourth 2026-10-17 session)
 **State:** the answers to the open questions (D9 to D16) are built and probed. So are the first
 batch of powerups (D14) and the Boss and Cursed tiers (D13). See "The first powerup batch" and "Boss
 and Cursed powerups" below. Nothing is half-done. The user does all the git.
@@ -52,6 +85,11 @@ and Cursed powerups" below. Nothing is half-done. The user does all the git.
 4. **Equipment** (D13): after phase 9. See §7c.
 5. Phase 8 leftovers: D3's slow-mo for the picker; teammates' small health bars.
 6. **Perf pass 2 (split-screen) is built**; see the next section. Awaiting the user's 3-player test.
+7. **The playability pass: P1 is built (2026-10-18); P2 to P7 aren't.** P1 is weapon and tome
+   slots, facets and milestones, XP on kill, pearls as currency and chest prices. See
+   "Playability pass" before "Existing pieces to reuse" (its "P1 as built" note), and D17 to D27.
+   It takes in phase 9's juice and damage numbers (its phase P3). Awaiting the user's play-test of
+   P1 before P2.
 
 ### Perf pass 2: split-screen (fifth 2026-10-17 session, built)
 The user found 3-player split-screen "extremely laggy". Measured with the new
@@ -498,6 +536,352 @@ Open for the next test:
 - the twists' strength, especially Glide (drag) and Frenzy;
 - whether the Koi's leap should be on a jump or a double jump.
 
+## Playability pass (planned 2026-10-18, not built)
+This comes from `brainstorm_playability.md`, with the user's answers in its §1.10 (D17 to D27
+below). **The goal:** today every powerup and stat stacks without a ceiling, so power multiplies
+far past the difficulty curve and costs frames. Runs should instead **lock in** a build that then
+grows deeper, not wider. Every number below is a panel setting with a wide range ([flexible
+tuning]). Naming follows the house rules: batteries, Battered Fish, Fish Fry.
+
+The phases run in the brainstorm's order (D27). Each one ends with probes passing, a build and the
+user's play-test.
+
+### P1. Weapons, Tomes and Items, XP on kill, pearls as currency
+**P1a. The three kinds.**
+
+| Kind | What it is | From | Limit |
+|---|---|---|---|
+| **Weapon** | Does damage by itself, on its own timer | Level-up cards | `weapon_slots` **2**; the fish's attack is one of them (D17) |
+| **Tome** | A global stat that levels up | Level-up cards | `tome_slots` **2** (D17) |
+| **Item** | Procs, on-hurt, on-battery, utility, small stats | Chests (also boss and cursed chests) | No slots; stacking flattens out in P4 |
+
+More slots come from meta-progression (P6). Until then, the Test Tank and the panel set them
+(range 1 to 8 each).
+
+**Where today's powerups go** (D18 to D20):
+- **Weapons:** the fish's attack (it fills a slot from the start and can't be removed), Greek Fire,
+  Jellyfish Halo, Depth Charges, Remora Buddy, and Leviathan's Coil (a boss weapon; see question 1).
+- **Items:** everything else. That's Torpedo Launcher, Chain Lightning, Electric Eel, Tsunami
+  Heart, Pufferfish Spines, Bubble Wrap, Anglerfish Lure and Bow Grow Bow. It's also Barnacle
+  Plating, Hermit Shell, Fizzy Soda, Speedy Seahorse, Drowned Fin and the five cursed items.
+- Chests offer **items only**. Weapons only come from cards, except the boss weapon.
+
+**Tomes** (D21): the 18 stats fold into 12 tomes. A tome card adds one step of each of its stats,
+multiplied by the card's rarity, as stat cards do now.
+
+| Tome | Stats |
+|---|---|
+| Tome of Teeth | damage |
+| Tome of Tides | attack speed |
+| Tome of the Reef | area |
+| Tome of Schools | projectile count |
+| Tome of Currents | projectile speed, knockback |
+| Tome of the Kill | crit chance, crit damage |
+| Tome of Fins | swim speed, stride power |
+| Tome of the Ram | battery damage |
+| Tome of the Shell | max hp, armour, regen |
+| Tome of Pearls | XP gain, pearl drop chance (new stat `pearl_chance`), pickup range (D22) |
+| Tome of Fortune | luck |
+| Tome of Ages | duration |
+
+The fish's **signature stat** keeps its free +1 per level and needs no slot. The tomes sit on top
+of `StatBlock`, so every stat read stays as it is.
+
+**P1b. Level-up cards.** There are still three cards. Each one is drawn from:
+1. upgrade a weapon you have (weight 40);
+2. upgrade a tome you have (30);
+3. a new weapon, only while a weapon slot is free (15);
+4. a new tome, only while a tome slot is free (15).
+
+The weights are settings. Once the slots are full, every card is an upgrade. With 2 + 2 slots that
+happens within the first few levels, which is the point (D17). When a weapon or tome reaches its
+cap (`weapon_max_level` and `tome_max_level`, 20 and 99 since the P1 play-test), its cards stop showing. If fewer than three
+real options are left, the rest are **fallback cards**: a pearl purse or a team heal.
+
+**The card says what you get and what you have** (§4 of the brainstorm). For example: *"Greek Fire
+Lv 4 → 5: +20% burn damage, +1.5 s patch life"*, with "Weapons 2/2 · Tomes 1/2" underneath.
+
+**P1c. Partial weapon upgrades (facets).** Each weapon has 4 or 5 facets. A card rolls which facets
+it improves. Its rarity decides how many facets and by how much: Common 1 ×1, Uncommon 1 ×1.5,
+Rare 2 ×1.5, Epic 2 ×2, Legendary 3 ×2.5 (a settings table). Each facet's base and step are in
+`PowerupSettings`, next to that weapon's other numbers.
+
+| Weapon | Facets |
+|---|---|
+| Greek Fire | burn damage, patch life, patch radius, patch spacing, max patches |
+| Jellyfish Halo | jelly count, sting damage, orbit radius, orbit speed, sting rate |
+| Depth Charges | blast damage, blast radius, drop rate, mines out at once, arm time |
+| Remora Buddy | remora count, bite damage, bite rate, reach |
+| Leviathan's Coil | segment count, segment damage, segment size, hit rate |
+| Ghost Bite (Shark) | damage, jaw size, bite rate, knockback, bleed |
+| Anemone Sting (Clownfish) | damage, pulse radius, pulse rate, slow on hit |
+| Shock Lash (Ray) | damage, lash reach, lash rate, arc jumps |
+| Bill Thrust (Swordfish) | damage, spear speed, thrust rate, pierce count |
+| Bubble Volley (Koi) | damage, bubbles per volley, volley rate, homing turn rate |
+| Spine Burst (Boxfish) | damage, spine count, burst rate, spine range |
+
+Weapons lose their "stacks". The panel's stacks override becomes a **level** override plus a
+per-facet override, for the Test Tank.
+
+**P1d. Milestones.** At Lv 5 and Lv 10 each weapon gains a new behaviour, so it feels stronger,
+not just bigger. First drafts:
+- Greek Fire: 5, a burning zombie spreads fire to the patches it touches; 10, the trail fans out wide.
+- Jellyfish Halo: 5, jellies leave a short sting trail; 10, they pulse outward every few seconds.
+- Depth Charges: 5, blasts pull zombies in before they go off; 10, one charge in four is a cluster
+  bomb.
+- Remora Buddy: 5, remoras latch on for a moment; 10, a kill splits a remora into two for a few
+  seconds.
+- Ghost Bite: 5, a second set of jaws snaps behind you; 10, jaws on both sides.
+- The other five fish attacks get theirs while P1 is being built, and go to the user with the build.
+
+**P1e. XP on kill; pearls become the currency** (D22, D23). This applies to **Unnatural only**.
+Nature's pearls don't change: `UnnaturalSettings` gets its own pearl group, and Nature keeps
+`NatureSettings`.
+- **XP is credited on the kill**, with no pickup. In co-op it goes to the shared team level, and the
+  authority credits it when it confirms the kill (as now, but without the pearl step). The XP sizes
+  stay: the kind's `xp`, ×`ELITE_XP` for elites, `shark_xp` for bosses.
+- **Pearls are the currency.** They drop **by chance**: `pearl_drop_chance` 0.12 for a zombie, ×
+  `pearl_chance`. Elites always drop one, worth 3. A boss drops 25. That keeps the map clear (the
+  user doesn't want more pickups around it).
+  - `drop_pearl` and the net claims (`pearl_claimed` and `pearl_taken`) carry a pearl's value as
+    currency, not XP.
+  - `max_pearls` merging stays.
+  - The Magnet pickup pulls them in.
+- **Chests cost pearls** (`chest_cost_on`, on by default; off gives free chests to compare). The
+  price is `chest_price_base` (8) × (1 + `chest_price_growth` (0.25) × minutes). A cursed chest
+  costs ×1.5; a boss chest is free.
+  - Opening works as now (battering, or holding still). Short of pearls, the chest shows its price
+    and stays shut.
+  - The price shows over every chest in range, and the purse sits next to the level on the HUD.
+- **The scoreboard's PEARLS column** becomes pearls collected; it no longer counts XP.
+
+**P1f. HUD.** Two slot rows (weapons and tomes), each with level pips and empty slots outlined. An
+item strip with stack counts (the current powerup icons) sits under them. The pearl purse goes by
+the XP bar.
+
+**P1g. Code (rough).**
+- `Powerup` gains a `kind` (WEAPON or ITEM). Weapons gain `level` and `facets`. A new
+  `powerups/weapon.gd` base holds the facet rolls and milestones.
+- The fish attacks (`attacks/fish_attack.gd`) read their numbers from facets.
+- A new `tome.gd` maps tomes to `StatBlock` ids. `StatBlock.pool()` gives way to the four card
+  types.
+- `LevelUpCards` draws the facet lines and the slot line.
+- `Powerup.pick_for_chest` filters to items.
+- `UnnaturalSettings` gets the slots, caps, card weights, rarity facet table and pearl and chest
+  prices.
+- `unnatural_run.gd` gets XP on kill, the purse and chest prices. `treasure_chest.gd` gets the price.
+- `coop_session.gd` carries the purse, weapon levels and tomes in the world snapshot.
+
+### P2. The run simulator and balance tooling (§8)
+- **`tests/run_sim.tscn`:** a bot fish that steers away from the horde, batters when it can and
+  picks cards (random or greedy). Every minute it logs:
+  - its damage per second;
+  - the time to kill an average zombie;
+  - damage taken;
+  - its level, slots and pearls;
+  - when it dies.
+  It runs headless at speed. `--runs 50` gives a power curve to set against the difficulty curve.
+- **A target curve:** the time to kill an average zombie stays between 0.3 and 1 s all run
+  (settings). A build outside it is reported as a balance bug.
+- **Run logs** at the end of every real run, in `user://run_logs/`: picks, damage by source (the
+  existing `by_source`), pearls, chests and the cause of death. That way play-tests come back with
+  data.
+- **Test Tank presets:** one button for "all slots full, Lv 10" and one for "all slots full, Lv 5",
+  for power and frame benchmarks.
+
+### P3. Feel and readability (§2; takes in phase 9's juice)
+- **Damage numbers** at scale (phase 9's plan). Crits are bigger and coloured, and a
+  `damage_numbers_min` setting shows only big hits.
+- **Hit flash and kill pop:** a one-frame white flash through a MultiMesh instance uniform, and a
+  small burst on a kill.
+- **A target marker** on what each auto-attack is aiming at.
+- **Threat arrows** at the screen edge for elites and bosses out of view, and the boss health bar.
+- **Telegraphs:** lunges and boss attacks glow before they land.
+- **Hurt feedback:** a red vignette pulse and a low thud. Low hp adds a heartbeat.
+- **Pickup clarity:** each drop has its own silhouette and colour, readable through the murk.
+- **Camera:** it pulls out a little as the horde thickens or area grows (`camera_crowd_pull`).
+- **Depth assist** (`depth_assist`, from 0 = off to strong): the horde drifts toward the player's
+  depth, and auto-aim favours zombies near it.
+
+### P4. Choice tools and limiters (§1.6)
+- **Item stacking curves:** the first stack is strong, and later ones add less (per item, e.g.
+  100%, 60%, 40%...). Chances (crit, procs, blocks) go hyperbolic. Cooldowns get a floor
+  (`min_cooldown`), and area gets a soft cap.
+- **Effect caps as the visible rule:** "at most N in the water at once" (`torpedo_max`,
+  `lightning_max_rate`, and the like for every weapon).
+- **Proc coefficients for weapons:** low for weapons that hit often. Greek Fire's ticks start at 0.
+- **Rarer chests later:** the chest drop chance and the buried count fall with stage time.
+- **Weapon card frequency** drops as weapons level, so tomes get a turn.
+- **Rerolls, skips and banishes** are built here, but a run starts with **0 of each** (D25). They
+  come from meta (P6); until then the panel can give them. A banished weapon, tome or item leaves
+  the pool for the rest of the run.
+
+### P5. Pacing (§3)
+- **Sunken shrines:** a few per stage. They're fixed spots on the seabed, not pickups.
+  - *Tide:* hold its ring for 10 s while the horde comes, and win a chest.
+  - *Chance:* pay pearls for a chance at an item.
+  - *Deep:* the stage gets harder (more elites), but bosses drop two chests.
+  - *Pearls:* a magnet burst that pulls every pearl to the team.
+- **Elite modifiers** (RoR2 style):
+  - Burning: leaves fire behind.
+  - Electric: shocks on death.
+  - Frozen: slows you on hit.
+  - Bloated: bursts into small ones.
+  Elites drop chests more often.
+- **Stage objectives and a next stage.** A beaten Blood Leviathan drops its boss chest (so
+  Leviathan's Coil can be earned) and opens the way on. The way on leads to a next stage, with a new
+  seabed and harder zombies, or you can stay for endless. This answers the Handoff's open question
+  (item 2).
+- **Quiet moments:** a few seconds between waves, from the director's swarm ends.
+- **Run lengths:** short (10 min), standard and endless, picked before the run.
+
+### P6. Agency and meta-progression (§4, §5)
+**In a run:**
+- **A logbook:** every weapon, tome and item you've found, with its real numbers.
+- **Pause tooltips:** each item's stacks and what it's adding right now.
+- **A damage meter** per source on the scoreboard (Greek Fire 34%, Ghost Bite 28%...).
+- **The hermit crab trader:** a rare visitor who swaps one item for another of the same tier.
+- **A starting choice:** pick one of two starter items or tomes (once unlocked).
+
+**Between runs** (a save in `user://unnatural_meta.cfg`):
+- **Shells:** earned per run (time, kills, bosses).
+- **The shop (Shells):** rerolls, skips, and small permanent upgrades, kept small so skill still
+  matters most (D26).
+- **Challenges:** they unlock the 3rd and 4th weapon and tome slots, banishes, and items. Examples:
+  "Reach Lv 20", "Beat the Leviathan", "Batter 500 zombies in one run" (D26). A smaller starting
+  item pool keeps early runs easy to learn.
+- **Fish passives:** a small one for each fish, besides its attack and twist.
+- **Difficulty tiers:** Calm, Swell, Storm and Blood Tide. Higher ones unlock as you win, and they
+  scale the difficulty curve and the director.
+
+### P7. Co-op extras, batteries, and every mode (§6, §7, §9)
+**Co-op:**
+- **A ping** (a stick click or the D-pad): marks a chest, a drop or a zombie for the team.
+- **Team items:** a Cleaner Wrasse that heals whoever's close, and a Pilot Fish that gives speed.
+- **Revive juice:** the revive ring fills visibly. A revived player gets a second of being
+  untouchable, and a shock ring.
+- **Downed players** steer a small ghost that collects **pearls** (now the currency).
+- **The picker's slow-mo** (D3, a phase 8 leftover), and teammates' small health bars.
+
+**Batteries:**
+- More items that fire on battery.
+- A battery refunds part of every weapon's cooldown (`battery_cooldown_refund`).
+- **Fish Fry** gives a short power spike: a few seconds of double fire rate.
+- **The Battered Fish count** on Unnatural's HUD, with streak rewards.
+
+**Every mode (§9):**
+- Hunt and Nature get the damage meter and logbook ideas, and Fish Fry as a power spike.
+- A short "how to play" card per mode, shown on first start.
+- A controls reminder when the pause menu opens.
+
+### Later
+- **Evolutions** (D24): a max-level weapon plus a set tome evolves into a stronger weapon from a
+  boss chest. Examples: Greek Fire + Tome of Ages → Sea of Flame; Halo + Reef → Man o' War; Depth
+  Charges + Schools → Minefield; Remora + Teeth → Lamprey Pack.
+  - P1's weapon data keeps a slot for an `evolves_with` and an `evolved_id`, so they can be added
+    without a rework.
+- **Equipment** (§7c), with Drowned Fin a likely first candidate (D20).
+
+### Probes
+- **`slots_probe`** (P1):
+  - the card pools follow the slot state (no new weapon with full slots, capped ones gone, fallback
+    cards when needed);
+  - facet rolls match the rarity table over 10,000 rolls;
+  - milestones switch on at Lv 5 and 10;
+  - tomes add the right `StatBlock` steps;
+  - chests give items only.
+- **`pearl_currency_probe`** (P1):
+  - XP lands on the kill, with no pearl;
+  - the pearl drop rate matches `pearl_drop_chance` × `pearl_chance`;
+  - chest prices follow the formula, and a chest won't open short of pearls;
+  - Nature's pearls are unchanged.
+- **`coop_net_peer`** additions (P1): the purse, weapon levels and tomes agree between host and
+  guest, and a late joiner gets them.
+- **`run_sim`** (P2): reported, not pass/fail. It becomes the gate for the numbers of every later
+  phase.
+- **`limits_probe`** (P4):
+  - stacking curves and hyperbolic chances never pass their caps;
+  - banished entries never show;
+  - rerolls and skips start at 0.
+- **`stage_probe`** additions (P5): a beaten Leviathan drops its chest and opens the next stage;
+  shrines pay out.
+- **`meta_probe`** (P6): Shells add up, unlocks persist across a save and load, and challenges fire.
+
+### P1 as built (2026-10-18)
+The open questions were built with defaults, for the user to confirm or change:
+1. **Leviathan's Coil with full weapon slots:** the swap is offered (a card per held weapon, and
+   "Keep yours"). It arrives at `coil_arrive_level` (5). It can't drop yet: the Leviathan still
+   ends the run (P5 changes that).
+2. **The pearl purse: one per player**, not the team's. Each player already opens each chest for
+   themselves, and their own purse needs no round trip to the host. A pearl two players reach at
+   once online can land in both purses (rare; the board counts it once).
+3. **Sunken Idol** takes items only: weapons and tomes aren't chest stacks any more.
+
+What's in it, by file:
+- **New:** `weapons.gd` (facet tables, rolls, milestone lines), `tomes.gd`, `loadout.gd` (per
+  player), `card_deck.gd` (the four card kinds and fallbacks).
+- **Weapons:** Greek Fire, the Halo, Depth Charges, Remoras and the Coil read facets. Each has its
+  two milestones. `Horde.shove()` is new (for the pull and the slow). The six fish attacks take
+  facets through `_apply_stats` (damage, rate, size, knockback, count, speed) and each has two
+  milestones (echo jaws and pulses, a second lash, pierce and burst spears, a big bubble, a
+  second spine ring).
+- **Settings:** UNNATURAL > Survivor gets "Weapons and Tomes" and "Pearls"; POWERUPS gets a
+  Weapons tab (facet steps; the `*_stacks` overrides are level overrides; `attack_level` for the
+  attack). The per-stack settings Greek Fire and Depth Charges no longer use are gone.
+- **HUD:** weapon and tome slot rows with levels and empty slots, items under them, the purse
+  under the XP bar's right end, and each chest ping showing its price (red when you're short).
+  The results panel lists weapons and tomes.
+- **Online:** guests claim their kills' XP; the host rolls pearls and sends them in batches;
+  guests send their Pearl Chance; late joiners get the pearls out. Each machine runs its own
+  players' loadouts, so nothing more needs sending (the planned snapshot additions weren't
+  needed).
+- **Probes:** new `slots_probe` and `pearl_currency_probe`. levels, drops, powerup,
+  powerup_batch, combat, stage and `unnatural_net_peer` were updated for the new rules.
+
+**After the P1 play-test (2026-10-18):** the slots' fill speed is fine and the milestones are
+liked. The three defaults above are accepted. Pearls and chests dropped too often:
+`pearl_drop_chance` 0.12 → **0.05**, `chest_drop_chance` 0.006 → **0.002**. The level caps went up:
+`weapon_max_level` 10 → **20** and `tome_max_level` 10 → **99**. Past 20 pips, a card shows one
+level bar (`LevelUpCards.MAX_PIPS`). The milestones are still only at Lv 5 and 10.
+
+### P2 as built (2026-10-18)
+- **`RunLog`** (`scripts/unnatural/run_log.gd`): every Unnatural run has one; the Test Tank doesn't.
+  - Each minute it takes a sample: level, kills, team dps, ttk, average zombie hp, zombies alive,
+    difficulty, damage taken, pearls and chests dropped, pearls taken, the purse, chests opened,
+    and each player's build (weapons and tomes with levels, items with stacks).
+  - It logs every card picked, with its rarity.
+  - The ending records the outcome (down, won, quit or time), the cause of death, and each
+    player's totals and `by_source`. The cause comes from the new `cause` argument of `hurt()`:
+    a zombie's kind (elites marked), a boss's title, a burst cloud, the Leviathan's bolt or a curse.
+  - It saves to `user://run_logs/run_<date>.json` and keeps the newest `run_logs_keep` (50).
+    The settings are under UNNATURAL > Run Logs.
+- **ttk** = the average max hp of the zombies out now ÷ the team's dps that minute: how long the
+  whole build takes to chew through one average zombie. The target is `ttk_target_min` (0.3) to
+  `ttk_target_max` (1.0).
+- **`SurvivorBot`** (`scripts/unnatural/survivor_bot.gd`, extends HunterBot for its strides):
+  - It hunts the nearest zombie while fewer than 6 are within 10 m, and kites round the middle
+    when crowded. It steers off close zombies in both cases.
+  - At speed, it rams a lone zombie close ahead.
+  - It collects pearls nearby, and swims through (or stops by) a chest it can afford.
+  - It picks cards greedily or at random.
+- **`tests/run_sim.tscn`:**
+  `Godot_console.exe --headless --fixed-fps 120 --path . res://tests/run_sim.tscn -- --runs 6`.
+  - Options: `--minutes` (20), `--fish` (a family or `all`), `--picks` (greedy, random or mixed),
+    `--god`, `--seed` and `--out`.
+  - It prints a per-minute table (averages over the runs still going) and flags the minutes
+    outside the ttk target. It also prints outcomes, down times and causes, and the cards picked
+    by kind.
+  - It saves JSON and CSV to `user://run_logs/sim/`.
+  - It runs at about 3x real time per process, so run several processes side by side.
+- **Test Tank presets:** UNNATURAL > Test Tank > `tank_preset` (Off, or Full slots Lv 5, 10 or 20).
+  - It sets the weapons' level overrides: the attack, then Greek Fire, Halo, Depth Charges, Remora
+    and the Coil, up to `weapon_slots`.
+  - It sets the tank's stats as that many common tome cards: Teeth, Tides, Reef, Shell... up to
+    `tome_slots`.
+  - Off clears what it set.
+- **Probe:** new `run_log_probe` (samples, picks, cause, saving and pruning, restart, the tank
+  presets).
+
 ## Existing pieces to reuse
 | Piece | Where | Use in Unnatural |
 |---|---|---|
@@ -655,6 +1039,8 @@ alive, intensity, next event) when `show_director` is on.
   They can be turned off.
 
 ### 6. XP, levels and level-up picks
+*The playability pass (D17 to D23) replaces XP pearls with XP on kill, and replaces stat cards
+with weapon and tome cards. This section describes what's built today.*
 - **XP pearls.** Killed enemies drop XP pearls (`Pearl`, reused), sized and coloured by value. The
   *pickup range* stat is the magnet radius. Pearls merge when many lie close, to keep the count
   down.
@@ -1040,6 +1426,29 @@ These replace the earlier open questions. Where a section above differs, these w
     - Legendary: Tsunami Heart.
 15. **D15: Bow Grow Bow** moves to **Common**.
 16. **D16: Actives** come only as the Equipment tier (D13), later.
+
+**2026-10-18, playability interview** (`brainstorm_playability.md` §1.10). These are built in the
+"Playability pass" section above.
+
+17. **D17: Slots.** There are 2 weapon slots and 2 tome slots to start. The fish's attack counts
+    as one weapon. More slots come from meta-progression. Both are panel settings.
+18. **D18: Torpedo Launcher** stays an item (an on-hit proc).
+19. **D19: Anglerfish Lure** is an item.
+20. **D20: Drowned Fin** stays an item for now. Revisit it with Equipment.
+21. **D21: Tomes.** There are about 12 broad tomes (the table in the playability pass).
+22. **D22: XP on kill.** There are no XP pearls in Unnatural, and the XP feeds the shared team
+    level. Tome of Pearls becomes XP gain + pearl drop chance (with pickup range). This is
+    Unnatural only; Nature's pearls stay as they are.
+23. **D23: Pearls are the currency.** They drop by chance, not from every kill, so there are no
+    extra pickups on the map. Chests cost pearls at a price that rises over the run. It's a
+    setting, so free chests stay an option.
+24. **D24: Evolutions** come later. The weapon data leaves room for them.
+25. **D25: Rerolls, skips and banishes.** A run starts with none of them. All of them are
+    unlocked through meta-progression.
+26. **D26: Meta unlocks** mix Shells and challenges. Shells buy rerolls and skips. Challenges
+    unlock the extra slots and banishes.
+27. **D27: Order.** All of the brainstorm's §2 to §9 are in. They're built in its suggested order:
+    slots, then the simulator, feel, choice tools, pacing, meta, and co-op/batteries.
 
 ## Risks
 - **Scale over the network.** Thousands of enemies on guests is the riskiest part. The pack-seed

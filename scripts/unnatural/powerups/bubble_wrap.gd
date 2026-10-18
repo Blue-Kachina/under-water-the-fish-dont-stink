@@ -32,7 +32,7 @@ func blocks_hit(_amount: float) -> bool:
 	blocked += 1
 	if _worn and is_instance_valid(_worn):
 		_worn.visible = false
-	PowerupFx.flash(run, fish.global_position, fish.hitbox_length * 0.9, color(id), 0.3)
+	PowerupFx.pop(run, fish.global_position, fish.hitbox_length * 0.75, color(id), 0.3)
 	return true
 
 
@@ -49,18 +49,8 @@ func make_worn() -> Node3D:
 	sphere.height = sphere.radius * 2.0
 	sphere.radial_segments = 16
 	sphere.rings = 8
-	var film := StandardMaterial3D.new()
-	film.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	film.albedo_color = Color(color(id), 0.12)
-	film.rim_enabled = true
-	film.rim = 1.0
-	film.rim_tint = 0.2
-	film.emission_enabled = true
-	film.emission = color(id)
-	film.emission_energy_multiplier = 0.15
-	film.cull_mode = BaseMaterial3D.CULL_DISABLED
-	film.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
-	sphere.material = film
+	# A soap-film skin: clear face on, bright round the rim, a glint up top.
+	sphere.material = FxKit.rim(Color(color(id).lerp(Color.WHITE, 0.3), 0.7), 0.03, 0.7)
 	bubble.mesh = sphere
 	bubble.scale = Vector3(0.75, 0.6, 1.0)
 	bubble.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

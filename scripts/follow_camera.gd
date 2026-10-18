@@ -321,6 +321,11 @@ func _process(delta: float) -> void:
 		# top, which would flip the view as it passed straight up.
 		var target_forward := to_ball.normalized() if tracking_ball else _chase_forward(subject, fish_xform, delta)
 		var frame_up := fish_up if surface_roll and absf(target_forward.dot(fish_up)) < 0.95 else _target_up(target_forward, fish_up, tracking_ball, _up)
+		# The frame a run starts as the game unpauses (the home screen's mode
+		# picker), the fish's interpolated transform can still be empty.
+		if target_forward.is_zero_approx() or frame_up.is_zero_approx():
+			target_forward = -Basis(_rotation).z
+			frame_up = Vector3.UP
 		target_rotation = Basis.looking_at(target_forward, frame_up).get_rotation_quaternion()
 		# A ball cam toggle swings over at the transition speed instead.
 		if _transition_left > 0.0:

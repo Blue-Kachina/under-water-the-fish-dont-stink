@@ -5,8 +5,13 @@ extends FishAttack
 ## lash_arcs more (one more per Projectiles stat), each the nearest not yet
 ## struck within lash_arc_range of the last, for lash_arc_share of the damage
 ## (and a lower proc coefficient).
+##
+## As a weapon (Weapons): at its first milestone each lash whips the second
+## nearest zombie too (arcing on from it as well); at its second, the arcs
+## jump FAR_ARCS times as far.
 
 const COLOR := Color(1.0, 0.95, 0.45, 1.0)
+const FAR_ARCS := 2.0
 const LIFE := 0.22
 const ARC_PROC := 0.5
 
@@ -46,15 +51,32 @@ func tail() -> Vector3:
 
 
 func fire() -> bool:
-	var from := tail()
 	var first := horde.nearest_in_cone(origin(), nose(), reach(), -1.0)
 	if first < 0:
 		return false
+	var struck_now := {}
+	_lash(first, struck_now)
+	if milestones >= 1:
+		var second := -1
+		var gap := INF
+		for j in horde.query_sphere(origin(), reach()):
+			var d := horde.enemy_position(j).distance_squared_to(origin())
+			if not struck_now.has(j) and d < gap:
+				gap = d
+				second = j
+		if second >= 0:
+			_lash(second, struck_now)
+	return true
+
+
+## One lash at zombie `first`, arcing on to the nearest not in `struck_now`.
+func _lash(first: int, struck_now: Dictionary) -> void:
+	var from := tail()
 	var path := PackedVector3Array([from, horde.enemy_position(first)])
 	strike(first, settings.lash_damage, toward(from, first, nose()))
-	var struck_now := {first: true}
+	struck_now[first] = true
 	var last := horde.enemy_position(first)
-	var arc_reach := settings.lash_arc_range * area_scale
+	var arc_reach := settings.lash_arc_range * area_scale * (FAR_ARCS if milestones >= 2 else 1.0)
 	for n in arcs():
 		var best := -1
 		var best_gap := INF
@@ -77,46 +99,39 @@ func fire() -> bool:
 	whip.path = path
 	whip.bend = fish.global_basis.y
 	add_child(whip)
-	return true
 
 
-## The lash: a curved crack from the tail, then jagged arcs, for a moment.
+## The lash, for a moment: a curved crack from the tail (a thick FxKit
+## ribbon, tapering to the zombie, with a thinner strand round it), then
+## jagged arcs on from zombie to zombie, flickering out.
 class Whip extends MeshInstance3D:
+	const CRACK := 0.2
+	const ARC := 0.11
 	var path := PackedVector3Array()
 	var bend := Vector3.UP
 	var _age := 0.0
-	var _material := FishAttack.ghost_material(ShockLash.COLOR)
+	var _material := FxKit.glow(ShockLash.COLOR, FxKit.across())
 
 	func _ready() -> void:
 		top_level = true
 		global_transform = Transform3D.IDENTITY
 		cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		var lines := ImmediateMesh.new()
-		lines.surface_begin(Mesh.PRIMITIVE_LINES, _material)
 		var dice := RandomNumberGenerator.new()
 		dice.seed = int(path[0].x * 31.0) ^ path.size()
-		for strand in 3:
-			for i in path.size() - 1:
-				var a := path[i]
-				var b := path[i + 1]
-				var last := a
-				var steps := 10 if i == 0 else 5
-				for k in range(1, steps + 1):
-					var t := float(k) / steps
-					var p := a.lerp(b, t)
-					if i == 0:
-						p += bend * sin(t * PI) * a.distance_to(b) * 0.25  # the whip's curve
-					if k < steps:
-						p += Vector3(dice.randf_range(-1, 1), dice.randf_range(-1, 1), dice.randf_range(-1, 1)) * (0.12 if i == 0 else 0.35)
-					lines.surface_add_vertex(last)
-					lines.surface_add_vertex(p)
-					last = p
-		lines.surface_end()
-		mesh = lines
+		var reach := path[0].distance_to(path[1])
+		var crack := FxKit.jagged(path[0], path[1], 12, 0.08, dice, bend * reach * 0.25)
+		var strands := [crack, FxKit.jagged(path[0], path[1], 10, 0.2, dice, bend * reach * 0.25)]
+		var widths := [CRACK, ARC * 0.6]
+		for i in range(1, path.size() - 1):
+			strands.append(FxKit.jagged(path[i], path[i + 1], 5, 0.35, dice))
+			widths.append(ARC)
+		mesh = FxKit.ribbons(strands, widths)
+		if mesh.get_surface_count() > 0:
+			mesh.surface_set_material(0, _material)
 
 	func _process(delta: float) -> void:
 		_age += delta
 		if _age >= ShockLash.LIFE:
 			queue_free()
 			return
-		_material.albedo_color.a = 1.0 - _age / ShockLash.LIFE
+		_material.albedo_color.a = (1.0 - _age / ShockLash.LIFE) * (0.75 + 0.25 * sin(_age * 80.0))

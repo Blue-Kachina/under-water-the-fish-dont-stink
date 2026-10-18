@@ -1,10 +1,11 @@
 extends Node
-## The settings panel's Mode picker and presets: each mode builds its
-## environment (and 1v1 its match); Replays sets the live fish aside and shows
-## the replay bar with nothing loaded, loads a replay, and closing goes back to
-## the mode before. Then Save/Load of a preset file (defaults under a partial
-## preset), the shipped Water preset copied to the presets folder, and the
-## Game section's Gameplay and UI panels.
+## Modes and presets: each mode builds its environment (and 1v1 its match);
+## the mode picker's start_mode starts a match with no card (afresh when
+## picked again); Replays sets the live fish aside and shows the replay bar
+## with nothing loaded, loads a replay, and closing goes back to the mode
+## before. Then Save/Load of a preset file (defaults under a partial preset),
+## the shipped Water preset copied to the presets folder, and the settings'
+## sections and Game, Display and Controls options.
 ##   Godot_console.exe --headless --path . res://tests/modes_probe.tscn
 
 const FIXTURE := "res://tests/fixtures/replay_fixture.rlreplay.json"
@@ -31,11 +32,8 @@ func check(ok: bool, what: String) -> void:
 
 func _run() -> void:
 	print("modes:")
-	var picker: OptionButton = panel._mode_picker
-	var names := []
-	for i in picker.item_count:
-		names.append(picker.get_item_text(i))
-	check(names == main.MODES, "Mode picker lists %s" % [names])
+	var tiled: Array = main.MODES.filter(func(mode: String) -> bool: return main.MODE_TILES.has(mode))
+	check(tiled.size() == main.MODES.size() - 1 and not main.MODE_TILES.has(main.REPLAYS), "every mode but Replays has a picker tile")
 	for mode: String in [main.FREE_SWIM, main.OBSTACLE_COURSE, main.ONE_V_ONE, main.FREE_PLAY]:
 		main.set_mode(mode)
 		await _frames(3)
@@ -43,7 +41,18 @@ func _run() -> void:
 		check(main.match_1v1 == null, "%s: no match yet" % mode)
 		check((main._match_card != null) == (mode == main.ONE_V_ONE), "%s: match card only in 1v1" % mode)
 		check(fish.visible == (mode != main.ONE_V_ONE), "%s: fish sits out only on the match card" % mode)
-		check(picker.get_item_text(picker.selected) == mode, "%s shown in the picker" % mode)
+
+	print("start_mode (the mode picker):")
+	main.start_mode(main.ONE_V_ONE)
+	await _frames(3)
+	check(main._match_card == null and main.match_1v1 != null and fish.visible, "a match mode starts straight away, no card")
+	var first: Match1v1 = main.match_1v1
+	main.start_mode(main.ONE_V_ONE)
+	await _frames(3)
+	check(main.match_1v1 != null and main.match_1v1 != first and main._match_card == null, "picking it again starts it afresh")
+	main.start_mode(main.FREE_PLAY)
+	await _frames(3)
+	check(main.match_1v1 == null and main.current_mode == main.FREE_PLAY and fish.visible, "Free Play from a match: just playing")
 
 	print("match card:")
 	main.set_mode(main.ONE_V_ONE)
@@ -129,10 +138,12 @@ func _run() -> void:
 	check(is_equal_approx(main.get_node("FollowCamera").field_of_view, default_fov), "Default camera back")
 
 	print("game section:")
-	var folds := []
-	for node in panel.find_children("*", "FoldableContainer", true, false):
-		folds.append((node as FoldableContainer).title)
-	check(folds.slice(0, 2) == ["Gameplay", "UI"], "Gameplay and UI panels first: %s" % [folds.slice(0, 4)])
+	var sections: Array = panel._section_buttons.keys()
+	check(sections == ["game", "display", "controls", "camera", "fish", "ball", "nature", "unnatural", "powerups"],
+			"the settings' sections: %s" % [sections])
+	for key: String in ["game/player_name", "game/character", "game/goal_replays", "game/preset_save", "display/fullscreen",
+			"display/show_stats", "display/show_input_overlay", "controls/profile"]:
+		check(panel._rows.has(key), "%s has a row" % key)
 
 	print("modes_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)

@@ -1,8 +1,9 @@
 class_name Powerups
 extends RefCounted
 ## A player's powerups in Unnatural (planning_unnatural.md §7): each one held
-## (Powerup) with its stacks, and the hooks fired on them all. Its stacks are
-## what chests gave, or PowerupSettings' testing override if that's more.
+## (Powerup) with its stacks, and the hooks fired on them all. An item's stacks
+## are what chests gave, or PowerupSettings' testing override if that's more;
+## a weapon's (Weapons) are its level in the player's Loadout.
 
 var run: UnnaturalRun
 var fish: FishController
@@ -18,8 +19,14 @@ func _init(owner_run: UnnaturalRun, owner_fish: FishController) -> void:
 	fish = owner_fish
 
 
-## One more stack of `id`.
+## One more stack of item `id`. A weapon levels up in the Loadout instead (its
+## facets spread evenly), slots or not: for tests and the panel.
 func add(id: String) -> void:
+	if Powerup.is_weapon(id):
+		var loadout := run.loadout_of(fish)
+		loadout.add_weapon(id, loadout.earned_level(id) + 1)
+		refresh()
+		return
 	_earned[id] = _earned.get(id, 0) + 1
 	refresh()
 
@@ -37,13 +44,19 @@ func list() -> Array:
 	return all
 
 
+## The items alone (no weapons), likewise.
+func items() -> Array:
+	return list().filter(func(entry: Array) -> bool: return not Powerup.is_weapon(entry[0]))
+
+
 ## Stacks from what was earned and the testing override; makes, updates or
 ## drops powerups to match. Their stats (Powerup.stat_bonus()) go on the
 ## player's StatBlock when anything changed.
 func refresh() -> void:
 	var changed := false
+	var loadout := run.loadout_of(fish)
 	for id in Powerup.ids():
-		var wanted := maxi(_earned.get(id, 0), settings.stacks_override(id))
+		var wanted := loadout.level(id) if Powerup.is_weapon(id) else maxi(_earned.get(id, 0), settings.stacks_override(id))
 		var powerup: Powerup = held.get(id)
 		if wanted <= 0:
 			if powerup:

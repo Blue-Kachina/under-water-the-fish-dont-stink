@@ -2,9 +2,10 @@ extends Node
 ## Unnatural's levels (planning_unnatural.md §6, phase 3): the XP curve;
 ## rarity rolls over 10,000 match the weights, and luck shifts them up as the
 ## formula says; in the real game a level-up pauses a solo run and offers
-## three cards, each a different stat, picked with the controls; the pick
-## raises that stat (and it does what it says: damage, attack speed, area,
-## swim speed, armour, max hp), each level gives the fish's signature stat,
+## three cards, each a different weapon or tome (CardDeck; slots_probe has
+## the pools), picked with the controls; the pick does what it says, the
+## stats do what they say (damage, attack speed, area, swim speed, armour,
+## max hp), each level gives the fish's signature stat,
 ## several levels at once queue their picks, and leaving the mode puts the
 ## fish's swimming back.
 ##   Godot_console.exe --headless --path . res://tests/levels_probe.tscn
@@ -82,11 +83,12 @@ func _run() -> void:
 	check(run.levels.level == 2 and offers.size() == 1, "a level-up offers cards")
 	check(get_tree().paused, "solo, the game pauses while they're up")
 	var cards: Array = offers[0][0]
-	var stats := cards.map(func(c: Dictionary) -> String: return c.stat)
+	var targets := cards.map(func(c: Dictionary) -> String: return "%s:%s" % [c.kind, c.get("weapon", c.get("tome", ""))])
 	var distinct := {}
-	for st: String in stats:
-		distinct[st] = true
-	check(cards.size() == 3 and distinct.size() == 3, "three cards, each a different stat (%s)" % [stats])
+	for t: String in targets:
+		distinct[t] = true
+	check(cards.size() == 3 and distinct.size() == 3, "three cards, each a different weapon or tome (%s)" % [targets])
+	check(offers[0][2].contains("WEAPONS 1/2") and offers[0][2].contains("TOMES 0/2"), "the line under says the slots (%s)" % offers[0][2])
 	check(is_equal_approx(block.value("damage"), StatBlock.amount("damage")), "the Shark's signature: +1 step of Damage (%.2f)" % block.value("damage"))
 	check(run.is_picking(fish) and not run.horde.chaseable.is_empty() and run.horde.chaseable[0] == 0, "the picker can't be chased")
 	var hud: UnnaturalHud = main._unnatural_hud
@@ -101,7 +103,8 @@ func _run() -> void:
 	await _frames(2)
 	check(hud._cards.selected == 1, "the stick moves the choice")
 	var chosen: Dictionary = cards[1]
-	var before := block.value(chosen.stat)
+	var loadout := run.loadout_of(fish)
+	var before := _state(run, fish, chosen)
 	Input.action_press("ui_accept")
 	Input.flush_buffered_events()
 	await _frames(3)
@@ -109,7 +112,8 @@ func _run() -> void:
 	Input.flush_buffered_events()
 	await _frames(2)
 	check(not run.is_picking(fish) and not get_tree().paused, "A picks it and the game goes on")
-	check(is_equal_approx(block.value(chosen.stat), before + chosen.amount), "%s went up by %.2f" % [chosen.stat, chosen.amount])
+	check(_took(run, fish, chosen, before), "the %s card did what it said (%s)" % [chosen.kind, chosen])
+	check(loadout.weapons[0] == Weapons.ATTACK, "the fish's own attack is the first weapon")
 
 	print("what stats do:")
 	block.add("attack_speed", 0.5)
@@ -170,6 +174,33 @@ func _run() -> void:
 
 	print("FAILURES: %d" % failures if failures else "ALL PASS")
 	get_tree().quit(1 if failures else 0)
+
+
+## What `card` would change, before it's taken.
+func _state(run: UnnaturalRun, who: FishController, card: Dictionary) -> Dictionary:
+	var loadout := run.loadout_of(who)
+	var stats := {}
+	for stat: String in StatBlock.STATS:
+		stats[stat] = run.block_of(who).value(stat)
+	return {"level": loadout.earned_level(card.get("weapon", "")), "tome": loadout.tome_level(card.get("tome", "")), "stats": stats,
+			"purse": run.purse_of(who)}
+
+
+## Whether `card` was taken: its weapon or tome a level up (its stats on the
+## block), or its fallback paid out.
+func _took(run: UnnaturalRun, who: FishController, card: Dictionary, before: Dictionary) -> bool:
+	var loadout := run.loadout_of(who)
+	match card.kind:
+		"weapon", "new_weapon":
+			return loadout.earned_level(card.weapon) == before.level + 1
+		"tome", "new_tome":
+			var ok: bool = loadout.tome_level(card.tome) == before.tome + 1
+			for stat: String in card.gives:
+				ok = ok and is_equal_approx(run.block_of(who).value(stat), before.stats[stat] + card.gives[stat])
+			return ok
+		"fallback":
+			return card.what != "pearls" or run.purse_of(who) == before.purse + card.amount
+	return false
 
 
 func _roll(rng: RandomNumberGenerator, settings: UnnaturalSettings, luck: float) -> Array:

@@ -1,9 +1,14 @@
 class_name LevelUpCards
 extends Control
-## Unnatural's level-up cards (planning_unnatural.md §6, §7, §11): a row of
-## cards, each a stat upgrade framed in its rarity's colour (Rarity), the
-## rarer the bolder (a glow, and a pulse for legendary); or a chest's
-## powerups, each in its own colour, saying which stack it would be. Picked with the left stick, A/D
+## Unnatural's level-up cards (planning_unnatural.md §6, §7, §11, and the
+## Playability pass), drawn as Gem Frame cards (UI Redesign Handoff): a row of
+## cards framed in their rarity's colour (Rarity, UITheme.RARITY), each with a
+## glyph (HexBadge). A level's (CardDeck): a weapon's upgrade (the level it
+## reaches, the facets it raises, a milestone if it reaches one), a new
+## weapon, a tome (what it gives), or a fallback; level pips along the
+## bottom. A chest's: its powerups, which stack each would be, stacks as pips.
+## A boss weapon with no slot free: a card per weapon to swap, and one to keep
+## yours. Picked with the left stick, A/D
 ## or the arrow keys and A / Enter / Space, the number keys 1-3, or the mouse.
 ## Runs while the game's paused (solo, the cards pause it). For the first
 ## ARM_TIME it ignores the pick button, so a held or mashed A doesn't choose
@@ -11,12 +16,21 @@ extends Control
 
 signal picked(index: int)
 
-const CARD_SIZE := Vector2(250.0, 330.0)
+## At the 1280×720 design's scale (scaled to the view as they draw).
+const CARD_SIZE := Vector2(290.0, 410.0)
+const FOCUSED_SIZE := Vector2(320.0, 450.0)
 const GAP := 28.0
+const PIPS := 5
+## More level pips than this (a high level cap) and the card shows one bar instead.
+const MAX_PIPS := 20
 const ARM_TIME := 0.4
 
-## Each card: {"stat", "tier", "amount"} or {"powerup", "stacks", "tier"} (UnnaturalRun's offer).
+## Each card: a level's (CardDeck), {"powerup", "stacks", "tier"} (a chest's),
+## or a swap's {"kind": "swap"/"keep", "weapon", ...} (UnnaturalRun's offer).
 var cards: Array = []
+## The fish's attack's kind (its weapon card's name and glyph), and the level caps.
+var attack_kind := FishAttack.Kind.BITE
+var max_levels := Vector2i(10, 10)
 ## The title ("LEVEL 4", "TREASURE!") and the line under it.
 var heading := ""
 var line := ""
@@ -29,6 +43,7 @@ var selected := 0
 
 var _age := 0.0
 var _stick_was := 0
+var _hints := ControllerHints.new()
 
 
 func _init() -> void:
@@ -36,6 +51,9 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	visible = false
+	_hints.hints = [["◀ ▶", "Choose"], ["A", "Take it"]]
+	_hints.visible = false
+	add_child(_hints)
 
 
 ## Shows `offer`, under `title` and `subtitle`.
@@ -107,11 +125,26 @@ func _pick(index: int) -> void:
 	picked.emit(index)
 
 
+## How much bigger than the 1280×720 design the cards draw here: the view's
+## scale, shrunk if the row of cards wouldn't fit across (a split-screen view).
+func _scale() -> float:
+	var k := minf(size.x / UITheme.REF_SIZE.x, size.y / UITheme.REF_SIZE.y)
+	var row := cards.size() * CARD_SIZE.x + (cards.size() - 1) * GAP + (FOCUSED_SIZE.x - CARD_SIZE.x)
+	k = minf(k, size.x * 0.96 / maxf(row, 1.0))
+	return maxf(k, 0.2)
+
+
+## Where the cards' row is centred (the heading sits above it).
+func _row_centre() -> Vector2:
+	return Vector2(size.x * 0.5, size.y * 0.5 + 34.0 * _scale())
+
+
 func _card_rect(index: int) -> Rect2:
-	var total := cards.size() * CARD_SIZE.x + (cards.size() - 1) * GAP
-	var left := (size.x - total) / 2.0
-	var top := size.y * 0.5 - CARD_SIZE.y * 0.45
-	return Rect2(Vector2(left + index * (CARD_SIZE.x + GAP), top), CARD_SIZE)
+	var k := _scale()
+	var pitch := (CARD_SIZE.x + GAP) * k
+	var centre := _row_centre() + Vector2((index - (cards.size() - 1) * 0.5) * pitch, 0.0)
+	var card_size := (FOCUSED_SIZE if index == selected else CARD_SIZE) * k
+	return Rect2(centre - card_size * 0.5, card_size)
 
 
 func _card_at(point: Vector2) -> int:
@@ -124,84 +157,194 @@ func _card_at(point: Vector2) -> int:
 func _draw() -> void:
 	if not is_open():
 		return
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.0, 0.0, 0.0, 0.45))
-	var head := Rect2(0.0, _card_rect(0).position.y - 118.0, size.x, 52.0)
-	BroadcastUI.text(self, head, heading, 44, BroadcastUI.GOLD, HORIZONTAL_ALIGNMENT_CENTER, 800)
+	var k := _scale()
+	draw_rect(Rect2(Vector2.ZERO, size), UITheme.DIM)
+	var top := _row_centre().y - FOCUSED_SIZE.y * 0.5 * k
+	var chest: bool = not cards.is_empty() and cards[0].has("powerup")
+	var swap: bool = not cards.is_empty() and cards[0].get("kind", "") in ["swap", "keep"]
+	var cursed := heading.begins_with("CURSED")
+	var label_px := roundi(16.0 * k)
+	UITheme.draw_text(self, Rect2(0.0, top - 132.0 * k, size.x, 24.0 * k), heading.to_upper(), UITheme.caps(label_px, 700, 0.3), label_px,
+			UITheme.rarity(Rarity.Tier.CURSED) if cursed else UITheme.GOLD)
+	var ask := "Swap a weapon?" if swap else ("Pick a powerup" if chest else "Pick an upgrade")
+	UITheme.draw_text(self, Rect2(0.0, top - 106.0 * k, size.x, 50.0 * k), ask, UITheme.display(600), roundi(40.0 * k), UITheme.INK)
 	if line:
-		BroadcastUI.text(self, Rect2(0.0, head.end.y, size.x, 28.0), line, 18, Color(1, 1, 1, 0.8), HORIZONTAL_ALIGNMENT_CENTER, 700)
+		var line_px := roundi(14.0 * k)
+		UITheme.draw_text(self, Rect2(0.0, top - 54.0 * k, size.x, 22.0 * k), line.to_upper(), UITheme.caps(line_px, 600, 0.18), line_px,
+				UITheme.MUTED)
 	for i in cards.size():
-		_draw_card(i)
-	var hint := Rect2(0.0, _card_rect(0).end.y + 24.0, size.x, 24.0)
-	BroadcastUI.text(self, hint, "◀ ▶ CHOOSE    ·    A / ENTER PICK    ·    1 2 3", 16, Color(1, 1, 1, 0.6), HORIZONTAL_ALIGNMENT_CENTER, 700)
+		if i != selected:
+			_draw_card(i)
+	if selected >= 0 and selected < cards.size():
+		_draw_card(selected)  # on top
+	_hints.s = k
+	_hints.size = _hints.custom_minimum_size
+	_hints.position = Vector2((size.x - _hints.size.x) * 0.5, top + FOCUSED_SIZE.y * k + 26.0 * k)
+	_hints.visible = true
 
 
+## What weapon `id` gains reaching `level`, if that's a milestone ("" if not).
+func _milestone_line(id: String, level: int) -> String:
+	var lines := Weapons.milestones(id, attack_kind)
+	var settings := UnnaturalSettings.shared()
+	if lines.size() >= 1 and level == settings.milestone_first:
+		return lines[0]
+	if lines.size() >= 2 and level == settings.milestone_second:
+		return lines[1]
+	return ""
+
+
+## One Gem Frame card (UI Redesign Handoff, Cards A): the rarity frame and
+## its ribbon, the hexagon medallion, the name, which stack, what it does, and
+## the stack pips. A level's stat card shows its amount in the medallion.
 func _draw_card(i: int) -> void:
 	var card: Dictionary = cards[i]
-	if card.has("powerup"):
-		_draw_powerup(i, card)
-		return
-	var tier: int = card.tier
-	var color: Color = Rarity.COLORS[tier]
-	var rect := _card_rect(i)
 	var chosen := i == selected
-	if chosen:
-		rect = rect.grow(10.0)
-	var glow := 0.0
-	if tier >= Rarity.Tier.RARE:
-		glow = 0.25 * (mini(tier, Rarity.Tier.LEGENDARY) - 1)
-	if tier == Rarity.Tier.LEGENDARY:
-		glow += 0.25 * (0.5 + 0.5 * sin(_age * 6.0))
-	if glow > 0.0:
-		for ring in 4:
-			draw_rect(rect.grow(6.0 + ring * 6.0), Color(color, glow * (0.3 - ring * 0.06)))
-	draw_rect(rect, Color(BroadcastUI.INK, 0.95))
-	draw_rect(rect, color, false, 6.0 if chosen else 3.0)
-	var band := Rect2(rect.position, Vector2(rect.size.x, 40.0))
-	draw_rect(band, Color(color, 0.85))
-	BroadcastUI.text(self, band, Rarity.NAMES[tier], 18, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 800)
-	var id: String = card.stat
-	BroadcastUI.text(self, Rect2(rect.position + Vector2(10.0, 70.0), Vector2(rect.size.x - 20.0, 40.0)), StatBlock.title(id).to_upper(), 24,
-			Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 800)
-	BroadcastUI.text(self, Rect2(rect.position + Vector2(10.0, 150.0), Vector2(rect.size.x - 20.0, 60.0)), StatBlock.describe(id, card.amount), 30,
-			color.lightened(0.3), HORIZONTAL_ALIGNMENT_CENTER, 800)
-	BroadcastUI.text(self, Rect2(rect.position + Vector2(0.0, rect.size.y - 46.0), Vector2(rect.size.x, 30.0)), str(i + 1), 20,
-			Color(1, 1, 1, 0.5), HORIZONTAL_ALIGNMENT_CENTER, 700)
-
-
-## A chest's powerup card: its colour, name, which stack, what it does.
-func _draw_powerup(i: int, card: Dictionary) -> void:
-	var id: String = card.powerup
-	var color := Powerup.color(id)
 	var rect := _card_rect(i)
-	var chosen := i == selected
+	var g := rect.size.x / CARD_SIZE.x  # this card's scale (k, or more when focused)
+	var powerup: String = card.get("powerup", "")
+	var tier: int = card.get("tier", Powerup.tier(powerup) if powerup else Rarity.Tier.COMMON)
+	var rim := UITheme.rarity(tier)
+	var fade := 1.0 if chosen else 0.86
+	var a := func(color: Color) -> Color: return Color(color, color.a * fade)
+
 	if chosen:
-		rect = rect.grow(10.0)
-	for ring in 3:
-		draw_rect(rect.grow(6.0 + ring * 6.0), Color(color, (0.2 - ring * 0.06) * (0.6 + 0.4 * sin(_age * 4.0))))
-	draw_rect(rect, Color(BroadcastUI.INK, 0.95))
-	draw_rect(rect, color, false, 6.0 if chosen else 3.0)
-	var band := Rect2(rect.position, Vector2(rect.size.x, 40.0))
-	draw_rect(band, Color(color, 0.85))
-	var stacks: int = card.stacks
-	var tier: int = card.get("tier", Powerup.tier(id))
-	draw_rect(Rect2(rect.position + Vector2(0.0, rect.size.y - 8.0), Vector2(rect.size.x, 8.0)), Rarity.COLORS[tier])
-	BroadcastUI.text(self, band, "%s  ·  %s" % [Rarity.NAMES[tier], "NEW" if stacks <= 1 else "STACK %d" % stacks], 16, Color.WHITE,
-			HORIZONTAL_ALIGNMENT_CENTER, 800)
-	var badge := Rect2(rect.position + Vector2(rect.size.x * 0.5 - 34.0, 56.0), Vector2(68.0, 68.0))
-	draw_rect(badge, Color(color, 0.3))
-	draw_rect(badge, color, false, 3.0)
-	BroadcastUI.text(self, badge, Powerup.tag(id), 28, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 800)
-	BroadcastUI.text(self, Rect2(rect.position + Vector2(8.0, 134.0), Vector2(rect.size.x - 16.0, 34.0)), Powerup.title(id).to_upper(), 20,
-			Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 800)
-	var words := Powerup.blurb(id).split(" ")
-	var rows: Array[String] = [""]
-	for word in words:
-		if (rows[-1] + " " + word).length() > 26:
-			rows.append(word)
-		else:
-			rows[-1] = (rows[-1] + " " + word).strip_edges()
-	for r in rows.size():
-		BroadcastUI.text(self, Rect2(rect.position + Vector2(10.0, 182.0 + r * 24.0), Vector2(rect.size.x - 20.0, 24.0)), rows[r], 15,
-				Color(1, 1, 1, 0.85), HORIZONTAL_ALIGNMENT_CENTER, 600)
-	BroadcastUI.text(self, Rect2(rect.position + Vector2(0.0, rect.size.y - 46.0), Vector2(rect.size.x, 30.0)), str(i + 1), 20,
-			Color(1, 1, 1, 0.5), HORIZONTAL_ALIGNMENT_CENTER, 700)
+		UITheme.draw_box(self, Rect2(rect.position + Vector2(0.0, 12.0 * g), rect.size).grow(4.0 * g), Color(0, 0, 0, 0.4), 24.0 * g)
+		var pulse := 0.12 + 0.02 * sin(_age * 4.0)
+		UITheme.draw_box(self, rect.grow(6.0 * g), Color(rim, pulse), 26.0 * g)
+	UITheme.draw_box(self, rect, a.call(UITheme.CARD), 20.0 * g, a.call(rim), (3.0 if chosen else 2.0) * g)
+
+	# The ribbon hanging from the top edge, the tier on it.
+	var tier_px := roundi(14.0 * g)
+	var tier_font := UITheme.caps(tier_px, 700, 0.22)
+	var tier_name: String = Rarity.NAMES[tier]
+	var ribbon_width := tier_font.get_string_size(tier_name, HORIZONTAL_ALIGNMENT_LEFT, -1, tier_px).x + 30.0 * g
+	var ribbon := Rect2(rect.position.x + (rect.size.x - ribbon_width) * 0.5, rect.position.y, ribbon_width, 30.0 * g)
+	UITheme.draw_box(self, ribbon, a.call(rim), 8.0 * g)
+	draw_rect(Rect2(ribbon.position, Vector2(ribbon.size.x, 10.0 * g)), a.call(rim))
+	UITheme.draw_text(self, ribbon, tier_name, tier_font, tier_px, a.call(UITheme.GROUND))
+
+	# The medallion: the powerup's glyph, or the stat's amount.
+	var medal := Vector2(rect.position.x + rect.size.x * 0.5, rect.position.y + 128.0 * g)
+	HexBadge.draw_hex(self, medal, 132.0 * g, a.call(UITheme.CARD.lerp(rim, 0.18)), a.call(rim), 3.0 * g)
+	var name_text := ""
+	var stack_text := ""
+	var words := ""
+	var curse := ""
+	var milestone := ""
+	## Level pips: [held, this pick's, cap] (cap 0: the chest's stack pips instead).
+	var pips := Vector3i(0, 0, 0)
+	var kind: String = card.get("kind", "")
+	if powerup:
+		HexBadge.draw_glyph(self, powerup, medal, 60.0 * g, a.call(rim), 1.8)
+		name_text = Powerup.title(powerup)
+		var stacks: int = card.get("stacks", 1)
+		stack_text = "NEW" if stacks <= 1 else "STACK %d → %d" % [stacks - 1, stacks]
+		words = Powerup.blurb(powerup)
+		if Powerup.is_weapon(powerup):
+			stack_text = "BOSS WEAPON"
+		if tier == Rarity.Tier.CURSED:
+			var split := words.find(". ")
+			if split > 0:
+				curse = words.substr(split + 2)
+				words = words.substr(0, split + 1)
+	elif kind in ["weapon", "new_weapon", "swap", "keep"]:
+		var id: String = card.weapon
+		HexBadge.draw_glyph(self, Weapons.glyph(id, attack_kind), medal, 60.0 * g, a.call(rim), 1.8)
+		name_text = Weapons.title(id, attack_kind)
+		var level: int = card.get("level", 1)
+		match kind:
+			"weapon":
+				stack_text = "LV %d → %d" % [level - 1, level]
+				var lines := PackedStringArray()
+				var gains: Dictionary = card.gains
+				for facet: String in gains:
+					lines.append(Weapons.describe(Weapons.facet_def(id, facet, attack_kind), gains[facet]))
+				words = ", ".join(lines)
+				milestone = _milestone_line(id, level)
+				pips = Vector3i(level - 1, 1, max_levels.x)
+			"new_weapon":
+				stack_text = "NEW WEAPON"
+				words = Powerup.blurb(id)
+				pips = Vector3i(0, 1, max_levels.x)
+			"swap":
+				stack_text = "SWAP OUT  ·  LV %d" % level
+				words = "Drop it for %s." % Powerup.title(card.incoming)
+			"keep":
+				name_text = "Keep yours"
+				stack_text = "NO SWAP"
+				words = "Leave %s behind." % Powerup.title(id)
+	elif kind in ["tome", "new_tome"]:
+		var id: String = card.tome
+		HexBadge.draw_glyph(self, Tomes.glyph(id), medal, 60.0 * g, a.call(rim), 1.8)
+		name_text = Tomes.title(id)
+		var level: int = card.get("level", 1)
+		stack_text = "NEW TOME" if kind == "new_tome" else "LV %d → %d" % [level - 1, level]
+		words = Tomes.describe(card.gives)
+		pips = Vector3i(level - 1, 1, max_levels.y)
+	elif kind == "fallback":
+		var pearls: bool = card.what == "pearls"
+		var amount := ("+%d" % card.amount) if pearls else ("+%d%%" % roundi(card.amount * 100.0))
+		UITheme.draw_text(self, Rect2(medal - Vector2(54.0, 26.0) * g, Vector2(108.0, 52.0) * g), amount, UITheme.display(700),
+				roundi(34.0 * g), a.call(rim.lightened(0.15)))
+		name_text = "Pearl Purse" if pearls else "Second Wind"
+		stack_text = "NOTHING LEFT TO LEARN"
+		words = "%d pearls to spend on chests." % card.amount if pearls else "Heals the whole team."
+	UITheme.draw_text(self, Rect2(rect.position.x + 12.0 * g, rect.position.y + 204.0 * g, rect.size.x - 24.0 * g, 36.0 * g), name_text,
+			UITheme.display(600), roundi(26.0 * g), a.call(UITheme.INK))
+	var stack_px := roundi(14.0 * g)
+	UITheme.draw_text(self, Rect2(rect.position.x, rect.position.y + 242.0 * g, rect.size.x, 20.0 * g), stack_text,
+			UITheme.caps(stack_px, 700, 0.2), stack_px, a.call(rim.lightened(0.1)))
+	var text_rect := Rect2(rect.position.x + 22.0 * g, rect.position.y + 276.0 * g, rect.size.x - 44.0 * g, 80.0 * g)
+	var used := UITheme.draw_wrapped(self, text_rect, words, UITheme.body(400), roundi(16.0 * g), a.call(UITheme.INK_SOFT))
+	if milestone:
+		var gold := UITheme.GOLD
+		var mile_px := roundi(15.0 * g)
+		UITheme.draw_wrapped(self, Rect2(text_rect.position.x, text_rect.position.y + used + 6.0 * g, text_rect.size.x, 60.0 * g),
+				"New: " + milestone, UITheme.body(600), mile_px, a.call(gold))
+	if curse:
+		var red := UITheme.rarity(Rarity.Tier.CURSED)
+		var curse_px := roundi(15.0 * g)
+		var curse_lines := UITheme.wrap_lines("Curse: " + curse, UITheme.body(600), curse_px, text_rect.size.x - 16.0 * g)
+		var strip := Rect2(text_rect.position.x - 6.0 * g, text_rect.position.y + used + 6.0 * g, text_rect.size.x + 12.0 * g,
+				curse_lines.size() * curse_px * 1.25 + 10.0 * g)
+		UITheme.draw_box(self, strip, a.call(Color(red, 0.18)), 8.0 * g)
+		UITheme.draw_wrapped(self, strip.grow_individual(-8.0 * g, -5.0 * g, -8.0 * g, 0.0), "Curse: " + curse, UITheme.body(600), curse_px,
+				a.call(red.lightened(0.35)))
+
+	# Level pips: held levels in the rarity's colour, this pick's in white, the rest dark.
+	# Past MAX_PIPS (a high cap) one bar instead, filled the same way.
+	if pips.z > MAX_PIPS:
+		var bar := Rect2(rect.position.x + 30.0 * g, rect.end.y - 28.0 * g, rect.size.x - 60.0 * g, 6.0 * g)
+		UITheme.draw_box(self, bar, a.call(Color(UITheme.GROUND, 0.9)), 3.0 * g)
+		var held := bar.size.x * pips.x / pips.z
+		var this_pick := maxf(bar.size.x * pips.y / pips.z, 4.0 * g)
+		UITheme.draw_box(self, Rect2(bar.position, Vector2(held + this_pick, bar.size.y)), a.call(UITheme.INK), 3.0 * g)
+		if held > 0.0:
+			UITheme.draw_box(self, Rect2(bar.position, Vector2(held, bar.size.y)), a.call(rim), 3.0 * g)
+	elif pips.z > 0:
+		var pip := Vector2(minf(22.0, (rect.size.x / g - 60.0) / pips.z - 4.0), 6.0) * g
+		var gap := 4.0 * g
+		var left := rect.position.x + (rect.size.x - (pips.z * pip.x + (pips.z - 1) * gap)) * 0.5
+		var y := rect.end.y - 28.0 * g
+		for n in pips.z:
+			var color := Color(UITheme.GROUND, 0.9)
+			if n < pips.x:
+				color = rim
+			elif n < pips.x + pips.y:
+				color = UITheme.INK
+			UITheme.draw_box(self, Rect2(left + n * (pip.x + gap), y, pip.x, pip.y), a.call(color), 3.0 * g)
+	# Pips: held stacks in the rarity's colour, this pick's in white, the rest dark.
+	if powerup:
+		var stacks: int = card.get("stacks", 1)
+		var pip := Vector2(22.0, 6.0) * g
+		var gap := 6.0 * g
+		var left := rect.position.x + (rect.size.x - (PIPS * pip.x + (PIPS - 1) * gap)) * 0.5
+		var y := rect.end.y - 28.0 * g
+		for n in PIPS:
+			var color := Color(UITheme.GROUND, 0.9)
+			if n < stacks - 1:
+				color = rim
+			elif n == stacks - 1:
+				color = UITheme.INK
+			UITheme.draw_box(self, Rect2(left + n * (pip.x + gap), y, pip.x, pip.y), a.call(color), 3.0 * g)

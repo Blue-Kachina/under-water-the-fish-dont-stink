@@ -118,6 +118,9 @@ func _strength(action: StringName, raw: bool) -> float:
 		if event is InputEventKey:
 			if keyboard and Input.is_physical_key_pressed((event as InputEventKey).physical_keycode):
 				return 1.0
+		elif event is InputEventMouseButton:  # a rebind (Controls) can put an action on the mouse
+			if keyboard and Input.is_mouse_button_pressed((event as InputEventMouseButton).button_index):
+				return 1.0
 		elif event is InputEventJoypadButton:
 			if _pad_ok(event.device) and Input.is_joy_button_pressed(_pad(event.device), (event as InputEventJoypadButton).button_index):
 				return 1.0

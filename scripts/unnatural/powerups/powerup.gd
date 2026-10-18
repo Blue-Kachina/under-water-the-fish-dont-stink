@@ -120,7 +120,7 @@ static func tier(powerup_id: String) -> int:
 
 ## Up to `count` different powerups for a chest of rarity `rolled`: its own
 ## first, then the tiers below it (nearest first), then above, each tier's in
-## a random order.
+## a random order. Items only: weapons come from level-up cards.
 static func pick_for_chest(rng: RandomNumberGenerator, rolled: int, count: int) -> Array[String]:
 	var order: Array[int] = [rolled]
 	for t in range(rolled - 1, -1, -1):
@@ -138,7 +138,7 @@ static func pick_for_chest(rng: RandomNumberGenerator, rolled: int, count: int) 
 static func pick_from_tier(rng: RandomNumberGenerator, wanted: int, count: int) -> Array[String]:
 	var pool: Array[String] = []
 	for id in ids():
-		if tier(id) == wanted:
+		if tier(id) == wanted and not is_weapon(id):
 			pool.append(id)
 	var picked: Array[String] = []
 	while not pool.is_empty() and picked.size() < count:
@@ -146,9 +146,38 @@ static func pick_from_tier(rng: RandomNumberGenerator, wanted: int, count: int) 
 	return picked
 
 
+## Whether `powerup_id` is a weapon (Weapons): it levels up from cards, and
+## chests don't offer it.
+static func is_weapon(powerup_id: String) -> bool:
+	return powerup_id in Weapons.POWERUPS
+
+
 ## Rolls `chance` (0..1).
 func roll(chance: float) -> bool:
 	return chance > 0.0 and run.rng.randf() < chance
+
+
+## A weapon's facet `facet_id` (its total from upgrades, Loadout.facet).
+func facet(facet_id: String) -> float:
+	return run.loadout_of(fish).facet(id, facet_id) if run and is_instance_valid(fish) else 0.0
+
+
+## A weapon's whole-number facet (a count).
+func facet_count(facet_id: String) -> int:
+	return roundi(facet(facet_id))
+
+
+## Whether a weapon has reached milestone `n` (1: Lv milestone_first, 2: Lv milestone_second).
+func milestone(n: int) -> bool:
+	if run == null or n <= 0:
+		return false
+	var at: int = run.settings.milestone_first if n == 1 else run.settings.milestone_second
+	return at > 0 and stacks >= at
+
+
+## 1 + the player's Duration (Tome of Ages): how much longer timed effects last.
+func duration_scale() -> float:
+	return 1.0 + run.block_of(fish).value("duration") if run and is_instance_valid(fish) else 1.0
 
 
 func on_hit(_index: int, _damage: float, _source: String, _proc: float, _chain: Array) -> void:

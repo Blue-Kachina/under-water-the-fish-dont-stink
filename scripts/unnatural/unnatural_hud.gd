@@ -7,8 +7,9 @@ extends CanvasLayer
 ## - the stage clock (counting up) under it, with the kills under that;
 ## - a splash for each level-up, and when the run's over;
 ## - the results board (BroadcastUI.StatsBoard): held on D-pad up / B, and up
-##   by itself once everyone's down. R starts again. Beside it, your own fish:
-##   its attack, level and hp, every stat it has, and its powerups (StatsPanel).
+##   by itself once everyone's down. R starts again. Under each name, that
+##   player's powerups as badges in their rarity's colour. Beside it, your own
+##   fish: its attack, level and hp, and every stat it has (StatsPanel).
 ## - the minimap (Minimap) in the bottom-right.
 ## With show_director on, the director's live numbers sit under the clock. In
 ## the Test Tank a DPS readout (TestTank's numbers) sits on the right.
@@ -123,6 +124,9 @@ func _ready() -> void:
 		run.cards_offered.connect(func(for_fish: FishController, cards: Array, heading: String, line: String) -> void:
 			if for_fish == fish:
 				_cards.pauses = run.cards_pause_game()
+				var attack := run.attack_of(fish)
+				_cards.attack_kind = attack.kind if attack else FishAttack.Kind.BITE
+				_cards.max_levels = Vector2i(run.settings.weapon_max_level, run.settings.tome_max_level)
 				_cards.open(cards, heading, line, fish.input_source))
 		_cards.picked.connect(func(index: int) -> void: run.pick(fish, index))
 		run.card_picked.connect(func(for_fish: FishController, _card: Dictionary) -> void:
@@ -186,10 +190,12 @@ func _process(delta: float) -> void:
 	_cam_note.modulate.a = move_toward(_cam_note.modulate.a, 0.0, delta * 0.8)
 	_clock.text = _time_text(run.elapsed)
 	_kills.text = "%d KILLS" % run.kills
+	_clock.visible = not _cards.is_open()  # the cards' heading is there
+	_kills.visible = _clock.visible
 	var next := run.timeline.next_event() if run.timeline and not run.tank else {}
 	if not next.is_empty() and not run.is_over:
 		_kills.text += "    ·    %s IN %s" % [StageTimeline.headline(next.id).trim_prefix("THE "), _time_text(maxf(next.time - run.elapsed, 0.0))]
-	_director.visible = run.settings.show_director
+	_director.visible = run.settings.show_director and _clock.visible
 	if _director.visible:
 		var director := run.director
 		_director.text = "DIRECTOR  alive %d / %d  ·  pressure x%.2f  ·  intensity %.2f%s  ·  kills/s %.1f  ·  pack %d  ·  elite %d%%  ·  difficulty %.1f" % [
@@ -219,9 +225,12 @@ func _update_board() -> void:
 			continue
 		var stats := run.stats_of(player)
 		var by: Dictionary = stats.by_source
+		var badges := []
+		for entry: Array in run.powerups_of(player).list():
+			badges.append([entry[0], UITheme.rarity(Powerup.tier(entry[0]))])
 		rows.append({"name": player.display_name if player.display_name else "Player", "focus": player == fish, "values": [
 			stats.kills, roundi(stats.damage), roundi(_attack_damage(by)), roundi(by.get("battery", 0.0)), stats.battered,
-			stats.pearls, roundi(stats.top_speed * 3.6)]})
+			stats.pearls, roundi(stats.top_speed * 3.6)], "badges": badges})
 	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.values[0] > b.values[0])
 	_board.teams = [{"name": "Survivors" if rows.size() > 1 else "Survivor", "score": run.kills, "color": BOARD_COLOR, "rows": rows}]
 
@@ -282,8 +291,8 @@ class DpsPanel extends Control:
 
 
 ## Your own fish beside the results board: your fish and its attack, your
-## level and hp, every stat you have (the signature marked), and your
-## powerups with their stacks, each in its rarity's colour.
+## level and hp, and every stat you have (the signature marked). The
+## powerups are badges under each name on the board.
 class StatsPanel extends Control:
 	const WIDTH := 360.0
 	const ROW := 22.0
@@ -303,7 +312,17 @@ class StatsPanel extends Control:
 		lines.append(["%s  ·  %s" % [FishCharacter.display_name(fish.character).to_upper(),
 				FishAttack.title(attack.kind).to_upper() if attack else "?"], BroadcastUI.GOLD, 16])
 		var health := run.health_of(fish)
-		lines.append(["LEVEL %d    ·    HP %d / %d" % [run.levels.level, roundi(health.hp), roundi(health.max_hp)], Color.WHITE, 15])
+		lines.append(["LEVEL %d    ·    HP %d / %d    ·    %d PEARLS" % [run.levels.level, roundi(health.hp), roundi(health.max_hp),
+				run.purse_of(fish)], Color.WHITE, 15])
+		lines.append(["", Color.WHITE, 8])
+		var loadout := run.loadout_of(fish)
+		var kind := attack.kind if attack else FishAttack.Kind.BITE
+		lines.append(["WEAPONS %d / %d" % [loadout.weapons.size(), run.settings.weapon_slots], Color(1, 1, 1, 0.6), 12])
+		for id in loadout.weapons:
+			lines.append(["%s  ·  LV %d" % [Weapons.title(id, kind), loadout.level(id)], Color.WHITE, 14])
+		lines.append(["TOMES %d / %d" % [loadout.tomes.size(), run.settings.tome_slots], Color(1, 1, 1, 0.6), 12])
+		for id in loadout.tomes:
+			lines.append(["%s  ·  LV %d" % [Tomes.title(id), loadout.tome_level(id)], Tomes.color(id), 14])
 		lines.append(["", Color.WHITE, 8])
 		lines.append(["STATS", Color(1, 1, 1, 0.6), 12])
 		var block := run.block_of(fish)
@@ -317,15 +336,6 @@ class StatsPanel extends Control:
 			lines.append([StatBlock.describe(id, value) + ("   (SIGNATURE)" if id == signature else ""),
 					BroadcastUI.GOLD if id == signature else Color.WHITE, 14])
 		if not any:
-			lines.append(["none yet", Color(1, 1, 1, 0.5), 14])
-		lines.append(["", Color.WHITE, 8])
-		lines.append(["POWERUPS", Color(1, 1, 1, 0.6), 12])
-		var held := run.powerups_of(fish).list()
-		for entry: Array in held:
-			var id: String = entry[0]
-			lines.append(["%s  x%d   ·   %s" % [Powerup.title(id), entry[1], Rarity.NAMES[Powerup.tier(id)]],
-					Rarity.COLORS[Powerup.tier(id)].lightened(0.25), 14])
-		if held.is_empty():
 			lines.append(["none yet", Color(1, 1, 1, 0.5), 14])
 		var height := 0.0
 		for line: Array in lines:
@@ -345,9 +355,16 @@ class StatsPanel extends Control:
 ## within chest_sense_range (at the screen's edge if it's off screen), and a
 ## ring filling round the fish while it opens one by holding still.
 class Bars extends Control:
+	## A held powerup's badge and the gap between them, at the 1280×720 design's scale.
+	const BADGE := 30.0
+	const BADGE_GAP := 5.0
+	## The badges' ×N chips were drawn for 56 px badges; they shrink with them.
+	const CHIP_SCALE := BADGE / 56.0 * 1.15
 	const HP_WIDTH := 96.0
 	const HP_HEIGHT := 9.0
 	const XP_HEIGHT := 10.0
+	const PEARL_COLOR := Color(0.85, 0.92, 1.0)
+	const SLOT_EMPTY := Color(1, 1, 1, 0.22)
 
 	var hud: UnnaturalHud
 	var _shown_hp := 1.0
@@ -372,6 +389,9 @@ class Bars extends Control:
 		_draw_downed(run)
 		var fish := hud.fish
 		if is_instance_valid(fish):
+			# The pearl purse, under the XP bar's right end (D23).
+			BroadcastUI.text(self, Rect2(bar.end.x - 180.0, bar.position.y + 14.0, 180.0, 22.0), "%d PEARLS" % run.purse_of(fish), 17,
+					PEARL_COLOR, HORIZONTAL_ALIGNMENT_RIGHT, 800)
 			_draw_powerups(run, fish)
 			_draw_chests(run, fish)
 		# Health: under the fish, where the camera sees it.
@@ -421,17 +441,64 @@ class Bars extends Control:
 		var name_line := boss.title + ("  ·  ENRAGED" if boss.enraged else "")
 		BroadcastUI.text(self, Rect2(bar.position.x, bar.position.y - 26.0, bar.size.x, 24.0), name_line, 18, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 800)
 
+	## Top-left under the XP bar (the Playability pass, P1f): the weapon slots,
+	## then the tome slots, each badge (HexBadge) with its level on a chip and
+	## each free slot an empty outline; then the items in the order they were
+	## picked up, each rimmed in its rarity's colour, with a ×N chip once it has
+	## 2 or more stacks. The items wrap onto more rows when the view's narrow
+	## (split-screen).
 	func _draw_powerups(run: UnnaturalRun, fish: FishController) -> void:
-		var y := 150.0
-		for entry: Array in run.powerups_of(fish).list():
+		var k := minf(size.x / UITheme.REF_SIZE.x, size.y / UITheme.REF_SIZE.y)
+		var badge := BADGE * k
+		var gap := BADGE_GAP * k
+		var per_row := maxi(floori((size.x * 0.3 + gap) / (badge + gap)), 1)  # clear of the clock and kills
+		var loadout := run.loadout_of(fish)
+		var attack := run.attack_of(fish)
+		var kind := attack.kind if attack else FishAttack.Kind.BITE
+		var row := 0
+		# Weapons.
+		var slots := maxi(run.settings.weapon_slots, loadout.weapons.size())
+		for n in slots:
+			var centre := _slot_at(n, row, badge, gap)
+			if n < loadout.weapons.size():
+				var id := loadout.weapons[n]
+				var tint := UITheme.GOLD if id == Weapons.ATTACK else UITheme.rarity(Powerup.tier(id))
+				HexBadge.draw_badge(self, centre, badge, Weapons.glyph(id, kind), tint, true, UITheme.HUD_FILL)
+				_level_chip(centre, badge, loadout.level(id), k)
+			else:
+				HexBadge.draw_hex(self, centre, badge, Color(UITheme.HUD_FILL, 0.35), SLOT_EMPTY, 2.0 * k)
+		# Tomes.
+		if run.settings.tome_slots > 0 or not loadout.tomes.is_empty():
+			row += 1
+			for n in maxi(run.settings.tome_slots, loadout.tomes.size()):
+				var centre := _slot_at(n, row, badge, gap)
+				if n < loadout.tomes.size():
+					var id := loadout.tomes[n]
+					HexBadge.draw_badge(self, centre, badge, Tomes.glyph(id), Tomes.color(id), true, UITheme.HUD_FILL)
+					_level_chip(centre, badge, loadout.tome_level(id), k)
+				else:
+					HexBadge.draw_hex(self, centre, badge, Color(UITheme.HUD_FILL, 0.35), SLOT_EMPTY, 2.0 * k)
+		# Items.
+		row += 1
+		var n := 0
+		for entry: Array in run.powerups_of(fish).items():
 			var id: String = entry[0]
-			var color := Powerup.color(id)
-			var box := Rect2(16.0, y, 46.0, 46.0)
-			draw_rect(box, Color(BroadcastUI.INK, 0.85))
-			draw_rect(box, color, false, 3.0)
-			BroadcastUI.text(self, box, Powerup.tag(id), 18, color.lightened(0.3), HORIZONTAL_ALIGNMENT_CENTER, 800)
-			BroadcastUI.text(self, Rect2(box.end.x + 6.0, y + 10.0, 60.0, 26.0), "x%d" % entry[1], 18, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, 800)
-			y += 54.0
+			var stacks: int = entry[1]
+			var centre := _slot_at(n % per_row, row + n / per_row, badge, gap)
+			HexBadge.draw_badge(self, centre, badge, id, UITheme.rarity(Powerup.tier(id)), true, UITheme.HUD_FILL)
+			if stacks >= 2:
+				HexBadge.draw_stack_chip(self, centre, badge, stacks, k * CHIP_SCALE)
+			n += 1
+
+	func _slot_at(column: int, row: int, badge: float, gap: float) -> Vector2:
+		return Vector2(16.0 + badge * 0.5 + column * (badge + gap), 40.0 + badge * 0.5 + row * (badge + gap))
+
+	## A small level number on a slot's bottom-right.
+	func _level_chip(centre: Vector2, badge: float, level: int, k: float) -> void:
+		var px := roundi(11.0 * k)
+		var rect := Rect2(centre + Vector2(badge * 0.5 - 15.0 * k, badge * 0.5 - 13.0 * k), Vector2(17.0 * k, 14.0 * k))
+		UITheme.draw_box(self, rect, UITheme.INK, 7.0 * k)
+		UITheme.draw_text(self, rect, str(level), UITheme.condensed(700), px, UITheme.GROUND)
 
 	func _draw_chests(run: UnnaturalRun, fish: FishController) -> void:
 		var camera := get_viewport().get_camera_3d()
@@ -459,7 +526,12 @@ class Bars extends Control:
 			var diamond := PackedVector2Array([spot + Vector2(0, -12), spot + Vector2(10, 0), spot + Vector2(0, 12), spot + Vector2(-10, 0)])
 			var tint := chest.tint()
 			draw_colored_polygon(diamond, Color(tint, 0.5 + 0.4 * pulse))
-			BroadcastUI.text(self, Rect2(spot.x - 40.0, spot.y + 12.0, 80.0, 18.0), "%d M" % roundi(gap), 13, tint,
+			var price := run.chest_price(chest)
+			var label := "%d M" % roundi(gap)
+			if price > 0:
+				label += "  ·  %d PEARLS" % price
+			var afford := run.can_afford(fish, chest)
+			BroadcastUI.text(self, Rect2(spot.x - 60.0, spot.y + 12.0, 120.0, 18.0), label, 13, tint if afford else Color(1.0, 0.45, 0.4),
 					HORIZONTAL_ALIGNMENT_CENTER, 700)
 			if chest.progress_of(fish) > 0.0 and inside:
 				draw_arc(spot, 22.0, -PI / 2.0, -PI / 2.0 + TAU * chest.progress_of(fish), 32, tint, 4.0)

@@ -91,7 +91,7 @@ func _run(main: Node) -> void:
 		horde.spawn(kind % horde.kinds.size(), centre + direction * rng.randf_range(8.0, maxf(spread, 8.0)) + Vector3.UP * 6.0, -direction)
 	for n in pearls:
 		var direction := Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.3, 0.3), rng.randf_range(-1, 1)).normalized()
-		run.drop_pearl(centre + direction * rng.randf_range(10.0, spread) + Vector3.UP * 6.0, 1.0)
+		run.drop_pearl(centre + direction * rng.randf_range(10.0, spread) + Vector3.UP * 6.0, 1)
 	var split: SplitScreen = main.get_node_or_null("SplitScreen")
 	var viewports: Array[RID] = []
 	if split:

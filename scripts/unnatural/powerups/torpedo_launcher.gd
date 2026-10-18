@@ -142,7 +142,7 @@ class TorpedoSwarm extends MultiMeshInstance3D:
 	const RETARGET_TICKS := 6
 	const RETARGET_REACH := 15.0
 
-	static var _mesh: CapsuleMesh
+	static var _mesh: ArrayMesh
 
 	var launcher: TorpedoLauncher
 	var _position := PackedVector3Array()
@@ -156,18 +156,7 @@ class TorpedoSwarm extends MultiMeshInstance3D:
 		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 		cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		if _mesh == null:
-			_mesh = CapsuleMesh.new()
-			_mesh.radius = 0.12
-			_mesh.height = 0.7
-			_mesh.radial_segments = 8
-			_mesh.rings = 2
-			var metal := StandardMaterial3D.new()
-			metal.albedo_color = Color(0.5, 0.52, 0.55)
-			metal.metallic = 0.7
-			metal.emission_enabled = true
-			metal.emission = Powerup.color("torpedo")
-			metal.emission_energy_multiplier = 0.8
-			_mesh.material = metal
+			_mesh = _torpedo_mesh()
 		multimesh = MultiMesh.new()
 		multimesh.transform_format = MultiMesh.TRANSFORM_3D
 		multimesh.mesh = _mesh
@@ -243,6 +232,95 @@ class TorpedoSwarm extends MultiMeshInstance3D:
 		for i in n:
 			var forward := _velocity[i].normalized() if _velocity[i].length_squared() > 0.01 else Vector3.FORWARD
 			var up := Vector3.UP if absf(forward.y) < 0.98 else Vector3.BACK
-			# The capsule's long axis is y: lie it along the way it's going.
-			var basis := Basis.looking_at(forward, up) * Basis(Vector3.RIGHT, PI / 2.0)
+			# The torpedo's nose is -z: point it the way it's going, spinning slowly on its axis.
+			var basis := Basis.looking_at(forward, up) * Basis(Vector3.BACK, _age[i] * 9.0)
 			multimesh.set_instance_transform(i, Transform3D(basis, _position[i]))
+
+	## One torpedo, nose along -z, as one mesh for the MultiMesh: a slim
+	## gunmetal body with a tapered tail, a nose cap and a propeller ring
+	## glowing in the launcher's colour, cross tail fins, and a faint wake
+	## streaming behind. A surface per material (3), so the whole swarm is
+	## 3 draw calls.
+	static func _torpedo_mesh() -> ArrayMesh:
+		const R := 0.055  # the body's radius
+		const BODY := 0.6
+		var along := Basis(Vector3.RIGHT, -PI / 2.0)  # a primitive's y axis onto -z (nose forward)
+		var gunmetal := StandardMaterial3D.new()
+		gunmetal.albedo_color = Color(0.3, 0.33, 0.37)
+		gunmetal.metallic = 0.75
+		gunmetal.roughness = 0.35
+		var glow := StandardMaterial3D.new()
+		glow.albedo_color = Powerup.color("torpedo")
+		glow.emission_enabled = true
+		glow.emission = Powerup.color("torpedo")
+		glow.emission_energy_multiplier = 2.2
+		var wake := StandardMaterial3D.new()
+		wake.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		wake.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		wake.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		wake.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		wake.cull_mode = BaseMaterial3D.CULL_DISABLED
+		wake.albedo_color = Color(Powerup.color("torpedo").lerp(Color.WHITE, 0.4), 0.18)
+		var fade := Gradient.new()  # along the streak: strong at the tail, gone at its end
+		fade.set_color(0, Color(1, 1, 1, 0))
+		fade.set_color(1, Color(1, 1, 1, 1))
+		var streak := GradientTexture2D.new()
+		streak.gradient = fade
+		streak.fill_from = Vector2(0.5, 1.0)
+		streak.fill_to = Vector2(0.5, 0.0)
+		streak.width = 4
+		streak.height = 32
+		wake.albedo_texture = streak
+
+		var body := CylinderMesh.new()
+		body.top_radius = R
+		body.bottom_radius = R
+		body.height = BODY
+		body.radial_segments = 10
+		body.rings = 1
+		var tail := CylinderMesh.new()
+		tail.top_radius = R
+		tail.bottom_radius = R * 0.35
+		tail.height = 0.14
+		tail.radial_segments = 10
+		tail.rings = 1
+		var fin_flat := BoxMesh.new()
+		fin_flat.size = Vector3(R * 4.4, 0.012, 0.1)
+		var fin_up := BoxMesh.new()
+		fin_up.size = Vector3(0.012, R * 4.4, 0.1)
+		var nose := SphereMesh.new()
+		nose.radius = R
+		nose.height = R * 2.0
+		nose.radial_segments = 10
+		nose.rings = 5
+		var ring := TorusMesh.new()
+		ring.inner_radius = R * 0.45
+		ring.outer_radius = R * 0.85
+		ring.rings = 10
+		ring.ring_segments = 5
+		var trail := CylinderMesh.new()
+		trail.top_radius = R * 0.9
+		trail.bottom_radius = 0.0
+		trail.height = 0.6
+		trail.radial_segments = 6
+		trail.rings = 1
+		trail.cap_top = false
+		trail.cap_bottom = false
+
+		var tail_z := BODY * 0.5 + 0.07
+		var mesh := ArrayMesh.new()
+		for surface: Array in [
+			[gunmetal, [[body, Transform3D(along, Vector3.ZERO)], [tail, Transform3D(along, Vector3(0, 0, tail_z))],
+				[fin_flat, Transform3D(Basis(), Vector3(0, 0, tail_z))], [fin_up, Transform3D(Basis(), Vector3(0, 0, tail_z))]]],
+			# The nose cap stretched to a point; the ring behind the tail.
+			[glow, [[nose, Transform3D(Basis().scaled(Vector3(1.0, 1.0, 1.8)), Vector3(0, 0, -BODY * 0.5))],
+				[ring, Transform3D(along, Vector3(0, 0, tail_z + 0.08))]]],
+			[wake, [[trail, Transform3D(along, Vector3(0, 0, tail_z + 0.08 + 0.3))]]],
+		]:
+			var tool := SurfaceTool.new()
+			tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+			for part: Array in surface[1]:
+				tool.append_from(part[0], 0, part[1])
+			tool.commit(mesh)
+			mesh.surface_set_material(mesh.get_surface_count() - 1, surface[0])
+		return mesh

@@ -125,37 +125,31 @@ func make_worn() -> Node3D:
 	return coil
 
 
-## A jagged bolt along `path`, there for a moment.
+## A jagged bolt along `path`, there for a moment, flickering as it goes:
+## three strands of FxKit ribbons, soft at the edges with a white-hot core,
+## the first the main one and the other two thinner.
 class Bolt extends MeshInstance3D:
 	const LIFE := 0.2
+	## The main strand's width and the others' (m).
+	const WIDTH := 0.16
+	const THIN := 0.07
 	var path := PackedVector3Array()
 	var _age := 0.0
-	var _material := StandardMaterial3D.new()
+	var _material := FxKit.glow(Color(0.6, 0.9, 1.0), FxKit.across())
 
 	func _ready() -> void:
-		_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		_material.albedo_color = Color(0.6, 0.9, 1.0, 1.0)
-		_material.vertex_color_use_as_albedo = false
-		var lines := ImmediateMesh.new()
-		lines.surface_begin(Mesh.PRIMITIVE_LINES, _material)
 		var dice := RandomNumberGenerator.new()
 		dice.seed = path.size() * 7919 + int(path[0].x * 13.0)
+		var strands := []
 		for strand in 3:
+			var line := PackedVector3Array([path[0]])
 			for i in path.size() - 1:
-				var a := path[i]
-				var b := path[i + 1]
-				var last := a
-				for k in range(1, 6):
-					var p := a.lerp(b, k / 5.0)
-					if k < 5:
-						p += Vector3(dice.randf_range(-1, 1), dice.randf_range(-1, 1), dice.randf_range(-1, 1)) * 0.35
-					lines.surface_add_vertex(last)
-					lines.surface_add_vertex(p)
-					last = p
-		lines.surface_end()
-		mesh = lines
+				var leg := FxKit.jagged(path[i], path[i + 1], 5, 0.35, dice)
+				line.append_array(leg.slice(1))
+			strands.append(line)
+		mesh = FxKit.ribbons(strands, [WIDTH, THIN, THIN])
+		if mesh.get_surface_count() > 0:
+			mesh.surface_set_material(0, _material)
 		cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	func _process(delta: float) -> void:
@@ -163,4 +157,4 @@ class Bolt extends MeshInstance3D:
 		if _age >= LIFE:
 			queue_free()
 			return
-		_material.albedo_color.a = 1.0 - _age / LIFE
+		_material.albedo_color.a = (1.0 - _age / LIFE) * (0.75 + 0.25 * sin(_age * 90.0))
