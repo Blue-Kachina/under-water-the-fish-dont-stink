@@ -219,9 +219,9 @@ func _score(card: Dictionary) -> float:
 			var level := int(card.get("level", 1))
 			return 50.0 + tier * 10.0 + (15.0 if level == 5 or level == 10 else 0.0)
 		"new_tome":
-			return 40.0 if card.tome in ["teeth", "tides", "shell", "reef"] else 30.0
+			return 75.0 if card.tome in ["teeth", "tides", "shell", "reef"] else 65.0  # a slot filled, as a player would
 		"tome":
-			return 30.0 + tier * 10.0
+			return 45.0 + tier * 10.0
 		"fallback":
 			var health := run.health_of(fish)
 			return 60.0 if card.what == "heal" and health and health.share() < 0.5 else 1.0

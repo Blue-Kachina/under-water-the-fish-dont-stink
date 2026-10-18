@@ -164,6 +164,9 @@ static func shared() -> UnnaturalSettings:
 ## difficulty_size bigger, up to difficulty_size_max times its size.
 @export_range(0.0, 5.0, 0.05, "or_greater") var difficulty_per_minute := 0.5
 @export_range(0.0, 5.0, 0.01, "or_greater") var difficulty_hp := 0.3
+## How hp grows with the difficulty level: 1 + difficulty_hp x level ^ this
+## (1: in a line; more: faster and faster, to keep up with a build's power).
+@export_range(0.5, 3.0, 0.05, "or_greater") var difficulty_hp_curve := 1.0
 @export_range(0.0, 5.0, 0.01, "or_greater") var difficulty_damage := 0.15
 @export_range(0.0, 2.0, 0.01, "or_greater") var difficulty_speed := 0.04
 @export_range(0.0, 2.0, 0.01, "or_greater") var difficulty_size := 0.08
@@ -234,7 +237,7 @@ static func shared() -> UnnaturalSettings:
 
 @export_group("Ghost Bite")
 ## The Shark's auto-attack: huge spectral jaws that snap shut on the zone in front.
-@export_range(0.0, 1000.0, 1.0, "or_greater") var bite_damage := 30.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var bite_damage := 13.0
 ## Seconds between bites.
 @export_range(0.05, 10.0, 0.05, "or_greater") var bite_cooldown := 1.1
 ## How far the jaws reach (m) and their half-width (m)...
@@ -248,7 +251,7 @@ static func shared() -> UnnaturalSettings:
 
 @export_group("Anemone Sting")
 ## The Clownfish's: a stinging pulse all round it that hits everything inside.
-@export_range(0.0, 1000.0, 1.0, "or_greater") var sting_damage := 16.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var sting_damage := 10.0
 @export_range(0.05, 10.0, 0.05, "or_greater") var sting_cooldown := 0.9
 ## The pulse's radius (m)...
 @export_range(0.0, 60.0, 0.5, "or_greater") var sting_radius := 6.5
@@ -260,7 +263,7 @@ static func shared() -> UnnaturalSettings:
 ## The String Ray's: its tail whips the nearest zombie within lash_range (m),
 ## and the shock arcs on to lash_arcs more (one more per Projectiles), each
 ## within lash_arc_range (m) of the last, for lash_arc_share of the damage.
-@export_range(0.0, 1000.0, 1.0, "or_greater") var lash_damage := 26.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var lash_damage := 47.0
 @export_range(0.05, 10.0, 0.05, "or_greater") var lash_cooldown := 0.8
 @export_range(0.0, 100.0, 0.5, "or_greater") var lash_range := 14.0
 @export_range(0, 20, 1, "or_greater") var lash_arcs := 1
@@ -285,7 +288,7 @@ static func shared() -> UnnaturalSettings:
 ## The Butterfly Koi's: bubble_count homing bubbles (plus Projectiles) at the
 ## nearest zombies within bubble_range (m); each pops on the first it touches,
 ## hurting everything within bubble_pop (m).
-@export_range(0.0, 1000.0, 1.0, "or_greater") var bubble_damage := 12.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var bubble_damage := 9.0
 @export_range(0.05, 10.0, 0.05, "or_greater") var bubble_cooldown := 1.2
 @export_range(1, 50, 1, "or_greater") var bubble_count := 4
 @export_range(1.0, 200.0, 1.0, "or_greater") var bubble_speed := 18.0
@@ -300,7 +303,7 @@ static func shared() -> UnnaturalSettings:
 ## The Boxfish's: spine_count spines (plus 4 per Projectiles) out in every
 ## direction whenever a zombie is within spine_range (m), each piercing up to
 ## spine_pierce zombies.
-@export_range(0.0, 1000.0, 1.0, "or_greater") var spine_damage := 14.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var spine_damage := 26.0
 @export_range(0.05, 10.0, 0.05, "or_greater") var spine_cooldown := 1.4
 @export_range(1, 200, 1, "or_greater") var spine_count := 18
 @export_range(1.0, 300.0, 1.0, "or_greater") var spine_speed := 30.0
@@ -473,10 +476,11 @@ static func shared() -> UnnaturalSettings:
 ## A buried chest's chance of being cursed (blood red): it offers cursed
 ## powerups, strong with a catch. Luck doesn't change it (D13).
 @export_range(0.0, 1.0, 0.01) var cursed_chest_chance := 0.1
-## Each kill has this chance of dropping a chest (an elite's: 5x), times 1 +
-## the killer's luck x chest_drop_luck (which lifts the drops' chances too).
-## Every chest is every player's: each opens it for themselves.
+## Each kill has this chance of dropping a chest (an elite's: elite_chest_scale
+## times it), times 1 + the killer's luck x chest_drop_luck (which lifts the
+## drops' chances too). Every chest is every player's: each opens it for themselves.
 @export_range(0.0, 1.0, 0.0005) var chest_drop_chance := 0.002
+@export_range(0.0, 50.0, 0.5, "or_greater") var elite_chest_scale := 5.0
 @export_range(0.0, 20.0, 0.1, "or_greater") var chest_drop_luck := 2.0
 ## Chests cost pearls (D23; off: free). The price is chest_price_base x (1 +
 ## chest_price_growth x minutes into the run); a cursed chest's is
@@ -485,6 +489,9 @@ static func shared() -> UnnaturalSettings:
 @export var chest_cost := true
 @export_range(0.0, 1000.0, 1.0, "or_greater") var chest_price_base := 8.0
 @export_range(0.0, 5.0, 0.05, "or_greater") var chest_price_growth := 0.25
+## Each chest a player has paid for raises their next one's price by this
+## share of it (0.15: the 10th costs 2.35x the first, at the same minute).
+@export_range(0.0, 2.0, 0.01, "or_greater") var chest_price_step := 0.15
 @export_range(0.0, 10.0, 0.05, "or_greater") var chest_cursed_price := 1.5
 
 @export_group("Drops")
@@ -648,3 +655,8 @@ func milestones_at(level: int) -> int:
 		var at := milestone_level(n)
 		reached += 1 if at > 0 and level >= at else 0
 	return reached
+
+
+## A zombie's hp multiplier at difficulty `level`: 1 + difficulty_hp x level ^ difficulty_hp_curve.
+func hp_growth(level: float) -> float:
+	return 1.0 + difficulty_hp * pow(maxf(level, 0.0), difficulty_hp_curve)

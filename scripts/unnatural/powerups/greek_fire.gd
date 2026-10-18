@@ -12,10 +12,10 @@ extends Powerup
 
 const BURN_TICK := 0.25
 const FLARE_EVERY := 3.0
-const FLARE_REACH := 1.8
-const FLARE_BURN := 2.0
-const CREEP_REACH := 8.0
-const CREEP_SPEED := 2.5
+const FLARE_REACH := 1.4
+const FLARE_BURN := 0.5
+const CREEP_REACH := 5.0
+const CREEP_SPEED := 1.0
 ## The fan's side patches sit this many patch radii off the middle one.
 const FAN_SPREAD := 1.6
 ## A burnt zombie's patch: at most one this often (s), so a crowd burning

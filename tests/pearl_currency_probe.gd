@@ -125,6 +125,8 @@ func _run() -> void:
 		if chest.is_open_for(fish):
 			break
 	check(chest.is_open_for(fish) and run.purse_of(fish) == 5, "with the pearls it opens, and costs 20 (%d left)" % run.purse_of(fish))
+	var next := run.add_chest(far + Vector3(30, 0, 0), 0.0)
+	check(run.chest_price(next, fish) == roundi(20 * (1.0 + settings.chest_price_step)), "each chest paid for raises your next price by chest_price_step (%d)" % run.chest_price(next, fish))
 	settings.chest_cost = false
 	check(run.chest_price(cursed) == 0, "chest_cost off: free")
 	settings.chest_cost = true

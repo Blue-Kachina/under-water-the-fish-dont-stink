@@ -526,7 +526,7 @@ class Bars extends Control:
 			var diamond := PackedVector2Array([spot + Vector2(0, -12), spot + Vector2(10, 0), spot + Vector2(0, 12), spot + Vector2(-10, 0)])
 			var tint := chest.tint()
 			draw_colored_polygon(diamond, Color(tint, 0.5 + 0.4 * pulse))
-			var price := run.chest_price(chest)
+			var price := run.chest_price(chest, fish)
 			var label := "%d M" % roundi(gap)
 			if price > 0:
 				label += "  ·  %d PEARLS" % price

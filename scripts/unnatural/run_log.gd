@@ -5,8 +5,10 @@ extends Node
 ## time to kill, damage taken, level, pearls, chests, and each player's build),
 ## every card picked, and how it ended (the cause of death, damage by source).
 ## UnnaturalRun keeps one (not in the Test Tank) and saves it to
-## user://run_logs/ when the run ends, if UnnaturalSettings.run_logs is on. The
-## run simulator (tests/run_sim.tscn) reads the same samples.
+## user://run_logs/ after every sample (so a run cut short keeps what it had)
+## and when the run ends, the game closes or quits, if UnnaturalSettings.run_logs
+## is on. Only the real game saves (not probes, unless they set save_anywhere).
+## The run simulator (tests/run_sim.tscn) reads the same samples.
 ##
 ## Time to kill (ttk) is the zombies' average hp out now over the team's damage
 ## per second that minute: how long the whole build takes to chew through one
@@ -14,6 +16,11 @@ extends Node
 ## balanced build keeps within all run.
 
 const DIR := "user://run_logs"
+
+## Where logs go (a probe points it elsewhere, so it never prunes real ones).
+static var dir := DIR
+## Save outside the real game too (the probes that test saving).
+static var save_anywhere := false
 
 var run: UnnaturalRun
 var settings := UnnaturalSettings.shared()
@@ -65,6 +72,23 @@ func _physics_process(_delta: float) -> void:
 	if ending.is_empty() and not run.is_over and run.elapsed >= _next_sample:
 		samples.append(_sample(60.0))
 		_next_sample += 60.0
+		if settings.run_logs and may_save():
+			save()  # in progress: a run cut short keeps what it had
+
+
+## The game closing or quitting mid-run: the log, as quit.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_EXIT_TREE:
+		if ending.is_empty() and is_instance_valid(run) and run.elapsed >= 10.0:
+			finish("quit")
+
+
+## Whether this is the real game (its main scene), or a probe allowed to.
+func may_save() -> bool:
+	if save_anywhere:
+		return true
+	var scene := get_tree().current_scene if is_inside_tree() else null
+	return scene != null and scene.scene_file_path == "res://scenes/main.tscn"
 
 
 ## What hurt `fish` last (its cause of death if it goes down).
@@ -97,21 +121,22 @@ func finish(outcome: String) -> void:
 		})
 	ending = {"t": snappedf(run.elapsed, 0.1), "outcome": outcome, "cause": cause, "level": run.levels.level,
 			"kills": run.kills, "pearls_dropped": pearls_dropped, "chests_dropped": chests_dropped, "players": players}
-	if settings.run_logs:
+	if settings.run_logs and may_save():
 		save()
 
 
 ## The whole log as one Dictionary (what's saved).
 func to_dict() -> Dictionary:
-	return {"started": _started, "minutes": snappedf(run.elapsed / 60.0, 0.01), "settings": _settings_snapshot(),
+	return {"started": _started, "minutes": snappedf(run.elapsed / 60.0, 0.01), "in_progress": ending.is_empty(), "settings": _settings_snapshot(),
 			"samples": samples, "picks": picks, "ending": ending}
 
 
-## Saves it to user://run_logs/run_<date>.json, keeping the newest run_logs_keep.
+## Saves it to user://run_logs/run_<date>.json (the same file all run), keeping
+## the newest run_logs_keep.
 func save() -> String:
-	DirAccess.make_dir_recursive_absolute(DIR)
+	DirAccess.make_dir_recursive_absolute(dir)
 	var stamp := _started.replace(":", "-").replace("T", "_")
-	var path := "%s/run_%s.json" % [DIR, stamp]
+	var path := "%s/run_%s.json" % [dir, stamp]
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		return ""
@@ -174,7 +199,7 @@ func _average_hp() -> float:
 	if count > 0:
 		return total / count
 	var plain: EnemyKind = run.horde.kinds[0]
-	return plain.hp * settings.enemy_hp_scale * (1.0 + settings.difficulty_hp * run.difficulty())
+	return plain.hp * settings.enemy_hp_scale * settings.hp_growth(run.difficulty())
 
 
 ## `fish`'s weapons and tomes with their levels, and items with their stacks.
@@ -216,7 +241,7 @@ func _on_card_picked(fish: FishController, card: Dictionary) -> void:
 func _settings_snapshot() -> Dictionary:
 	var keys := ["pearl_drop_chance", "pearl_elite_value", "boss_pearls", "chest_drop_chance", "chest_count", "chest_interval",
 			"chest_cost", "chest_price_base", "chest_price_growth", "weapon_slots", "tome_slots", "card_choices",
-			"difficulty_per_minute", "difficulty_hp", "enemy_hp_scale", "enemy_damage_scale", "base_hp"]
+			"difficulty_per_minute", "difficulty_hp", "difficulty_hp_curve", "xp_base", "xp_curve", "enemy_hp_scale", "enemy_damage_scale", "base_hp"]
 	var snapshot := {}
 	for key: String in keys:
 		snapshot[key] = settings.get(key)
@@ -226,12 +251,12 @@ func _settings_snapshot() -> Dictionary:
 ## Only the newest run_logs_keep files stay.
 func _prune() -> void:
 	var names: Array[String] = []
-	for file in DirAccess.get_files_at(DIR):
+	for file in DirAccess.get_files_at(dir):
 		if file.begins_with("run_") and file.ends_with(".json"):
 			names.append(file)
 	names.sort()
 	while names.size() > maxi(settings.run_logs_keep, 1):
-		DirAccess.remove_absolute("%s/%s" % [DIR, names.pop_front()])
+		DirAccess.remove_absolute("%s/%s" % [dir, names.pop_front()])
 
 
 static func _rounded(by_source: Dictionary) -> Dictionary:

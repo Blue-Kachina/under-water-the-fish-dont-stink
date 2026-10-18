@@ -54,14 +54,14 @@ static func shared() -> PowerupSettings:
 @export_range(0.2, 20.0, 0.1, "or_greater") var fire_spacing := 1.6
 @export_range(0.2, 20.0, 0.1, "or_greater") var fire_radius := 1.6
 @export_range(0.1, 30.0, 0.1, "or_greater") var fire_life := 2.0
-@export_range(0.0, 30.0, 0.1, "or_greater") var fire_life_per_stack := 1.0
-@export_range(0.0, 500.0, 1.0, "or_greater") var fire_dps := 12.0
+@export_range(0.0, 30.0, 0.1, "or_greater") var fire_life_per_stack := 0.4
+@export_range(0.0, 500.0, 1.0, "or_greater") var fire_dps := 40.0
 @export_range(0.0, 5.0, 0.05, "or_greater") var fire_dps_step := 0.25
-@export_range(0.0, 2.0, 0.01, "or_greater") var fire_radius_step := 0.15
-@export_range(0.0, 2.0, 0.01, "or_greater") var fire_density_step := 0.2
-@export_range(0, 200, 1, "or_greater") var fire_patches_step := 10
+@export_range(0.0, 2.0, 0.01, "or_greater") var fire_radius_step := 0.1
+@export_range(0.0, 2.0, 0.01, "or_greater") var fire_density_step := 0.12
+@export_range(0, 200, 1, "or_greater") var fire_patches_step := 5
 ## At most this many patches out per player (+ the patches facet).
-@export_range(1, 500, 1, "or_greater") var fire_max_patches := 80
+@export_range(1, 500, 1, "or_greater") var fire_max_patches := 60
 
 @export_group("Chain Lightning")
 ## Any hit has lightning_chance (+ per stack, times the hit's proc
@@ -142,7 +142,7 @@ static func shared() -> PowerupSettings:
 @export_range(0, 10, 1, "or_greater") var remora_count_per_stack := 1
 @export_range(0.05, 20.0, 0.05, "or_greater") var remora_interval := 1.5
 @export_range(0.5, 60.0, 0.5, "or_greater") var remora_range := 7.0
-@export_range(0.0, 1000.0, 1.0, "or_greater") var remora_damage := 14.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var remora_damage := 45.0
 @export_range(0.0, 1.0, 0.05) var remora_proc := 0.5
 @export_range(0.0, 2.0, 0.01, "or_greater") var remora_damage_step := 0.25
 @export_range(0.0, 2.0, 0.01, "or_greater") var remora_rate_step := 0.15
@@ -182,7 +182,7 @@ static func shared() -> PowerupSettings:
 @export_range(0.5, 30.0, 0.1, "or_greater") var halo_radius := 3.2
 @export_range(0.0, 5.0, 0.05, "or_greater") var halo_spin := 0.5
 @export_range(0.1, 10.0, 0.05, "or_greater") var jelly_radius := 1.0
-@export_range(0.0, 1000.0, 1.0, "or_greater") var jelly_damage := 10.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var jelly_damage := 30.0
 @export_range(0.05, 5.0, 0.05, "or_greater") var jelly_tick := 0.25
 @export_range(0.0, 1.0, 0.05) var jelly_proc := 0.2
 @export_range(0.0, 2.0, 0.01, "or_greater") var jelly_damage_step := 0.25
@@ -217,7 +217,7 @@ static func shared() -> PowerupSettings:
 @export_range(0.0, 10.0, 0.05, "or_greater") var charge_arm := 0.5
 @export_range(0.2, 20.0, 0.1, "or_greater") var charge_trigger := 2.0
 @export_range(0.5, 120.0, 0.5, "or_greater") var charge_life := 10.0
-@export_range(0.0, 5000.0, 5.0, "or_greater") var charge_damage := 120.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var charge_damage := 52.0
 @export_range(0.5, 40.0, 0.25, "or_greater") var charge_blast := 5.0
 @export_range(1, 200, 1, "or_greater") var charge_max := 12
 @export_range(0.0, 1.0, 0.05) var charge_proc := 0.5
@@ -286,7 +286,7 @@ static func shared() -> PowerupSettings:
 @export_range(0, 50, 1, "or_greater") var coil_segments_per_stack := 3
 @export_range(0.2, 10.0, 0.1, "or_greater") var coil_spacing := 1.4
 @export_range(0.1, 10.0, 0.05, "or_greater") var coil_radius := 0.9
-@export_range(0.0, 1000.0, 1.0, "or_greater") var coil_damage := 16.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var coil_damage := 55.0
 @export_range(0.05, 5.0, 0.05, "or_greater") var coil_tick := 0.25
 @export_range(0.0, 1.0, 0.05) var coil_proc := 0.3
 @export_range(0.0, 2.0, 0.01, "or_greater") var coil_damage_step := 0.25

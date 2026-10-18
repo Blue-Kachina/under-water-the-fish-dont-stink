@@ -13,12 +13,14 @@ extends Node
 ## Options (after --):
 ##   --runs N        runs to play (6)
 ##   --minutes M     a run that lasts this long stops there (20)
-##   --fish F        a FishCharacter family (OCTANE, DOMINUS, PLANK, BREAKOUT,
+##   --fish F        a FishCharacter family or a list (OCTANE,DOMINUS,MERC: in turns; PLANK, BREAKOUT,
 ##                   HYBRID, MERC), or "all" to take turns (all)
 ##   --picks P       greedy, random, or mixed (turns) (greedy)
 ##   --god           the bot can't go down (to see the power curve all run)
 ##   --seed S        the bot's dice (random)
 ##   --out NAME      the report's name in user://run_logs/sim/ (sim_<date>)
+##   --set K=V,...   tuning for this sim only (UnnaturalSettings or
+##                   PowerupSettings names), e.g. --set xp_curve=1.7,pearl_elite_value=1
 ## --fixed-fps 120 (the physics rate) runs it unhinged from the clock: without
 ## it the sim only goes at real time.
 
@@ -28,7 +30,7 @@ const SAMPLE_KEYS := ["level", "kills", "dps", "ttk", "avg_hp", "alive", "taken"
 var main: Node
 var fish: FishController
 var settings := UnnaturalSettings.shared()
-var options := {"runs": 6, "minutes": 20.0, "fish": "all", "picks": "greedy", "god": false, "seed": -1, "out": ""}
+var options := {"runs": 6, "minutes": 20.0, "fish": "all", "picks": "greedy", "god": false, "seed": -1, "out": "", "set": {}}
 var logs: Array[Dictionary] = []
 var _bot_picks := {}
 
@@ -65,6 +67,12 @@ func _parse(args: PackedStringArray) -> void:
 				n += 1
 			"god":
 				options.god = true
+			"set":
+				for pair in value.split(",", false):
+					var parts := pair.split("=")
+					if parts.size() == 2:
+						options["set"][parts[0].strip_edges()] = str_to_var(parts[1].strip_edges())
+				n += 1
 		n += 1
 
 
@@ -72,6 +80,13 @@ func _run() -> void:
 	var was_logging := settings.run_logs
 	settings.run_logs = false  # the sim keeps its own
 	settings.god_mode = options.god
+	for key: String in options["set"]:
+		var target: Object = settings if key in settings else (PowerupSettings.shared() if key in PowerupSettings.shared() else null)
+		if target == null:
+			print("run_sim: no setting called %s" % key)
+			continue
+		target.set(key, options["set"][key])
+		print("run_sim: %s = %s" % [key, str(target.get(key))])
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	fish = main.get_node("Fish")
@@ -81,7 +96,8 @@ func _run() -> void:
 			options.picks, ", god mode" if options.god else ""])
 	var clock := Time.get_ticks_msec()
 	for n in options.runs:
-		var family: int = n % families.size() if options.fish == "all" else maxi(families.find(options.fish), 0)
+		var listed: PackedStringArray = (options.fish as String).split(",", false)
+		var family: int = n % families.size() if options.fish == "all" else maxi(families.find(listed[n % listed.size()]), 0)
 		var picks := SurvivorBot.Picks.GREEDY
 		if options.picks == "random" or (options.picks == "mixed" and n % 2 == 1):
 			picks = SurvivorBot.Picks.RANDOM

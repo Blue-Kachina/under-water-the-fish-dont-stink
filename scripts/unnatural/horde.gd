@@ -355,7 +355,7 @@ func spawn(kind: int, at: Vector3, heading := Vector3.ZERO, elite := false, undy
 	_level[i] = level
 	_speed_scale[i] = 1.0 + settings.difficulty_speed * level
 	var grow := minf(1.0 + settings.difficulty_size * level, maxf(settings.difficulty_size_max, 1.0))
-	var hp := info.hp * settings.enemy_hp_scale * (ELITE_HP if elite else 1.0) * (1.0 + settings.difficulty_hp * level)
+	var hp := info.hp * settings.enemy_hp_scale * (ELITE_HP if elite else 1.0) * settings.hp_growth(level)
 	_hp[i] = maxf(hp, 1.0)
 	_max_hp[i] = _hp[i]
 	_size[i] = info.size * (ELITE_SIZE if elite else 1.0) * grow

@@ -1806,10 +1806,12 @@ func _open_chests(fish: FishController, delta: float) -> void:
 ## Opens `chest` for `fish` (each player opens each chest for themselves): a
 ## powerup pick for them, and it's gone from their view.
 func open_chest(chest: TreasureChest, fish: FishController) -> void:
-	var price := chest_price(chest)
+	var price := chest_price(chest, fish)
 	if not chest.open_for(fish, layer_of(fish)):
 		return
 	add_pearls(fish, -price)
+	if price > 0:
+		stats_of(fish)["paid_chests"] = stats_of(fish).get("paid_chests", 0) + 1
 	_opening.erase(fish)
 	stats_of(fish)["chests"] = stats_of(fish).get("chests", 0) + 1
 	chest_opened.emit(chest, fish)
@@ -1824,13 +1826,16 @@ func open_chest(chest: TreasureChest, fish: FishController) -> void:
 
 
 ## What `chest` costs to open now, in pearls (D23): chest_price_base, growing
-## with the run's minutes (chest_price_growth), a cursed one's
-## chest_cursed_price times that; a boss's free, and every one free with
-## chest_cost off or in the Test Tank.
-func chest_price(chest: TreasureChest) -> int:
+## with the run's minutes (chest_price_growth), and for `fish` with each chest
+## they've paid for (chest_price_step each); a cursed one's chest_cursed_price
+## times that; a boss's free, and every one free with chest_cost off or in the
+## Test Tank.
+func chest_price(chest: TreasureChest, fish: FishController = null) -> int:
 	if not settings.chest_cost or tank or test_tank or chest.kind == TreasureChest.Kind.BOSS:
 		return 0
 	var price := settings.chest_price_base * (1.0 + settings.chest_price_growth * elapsed / 60.0)
+	if is_instance_valid(fish):
+		price *= 1.0 + settings.chest_price_step * float(stats_of(fish).get("paid_chests", 0))
 	if chest.kind == TreasureChest.Kind.CURSED:
 		price *= settings.chest_cursed_price
 	return roundi(price)
@@ -1838,7 +1843,7 @@ func chest_price(chest: TreasureChest) -> int:
 
 ## Whether `fish` has the pearls to open `chest`.
 func can_afford(fish: FishController, chest: TreasureChest) -> bool:
-	return purse_of(fish) >= chest_price(chest)
+	return purse_of(fish) >= chest_price(chest, fish)
 
 
 ## Chest `index` opened by `fish`, a player elsewhere (online): it's still
@@ -1858,10 +1863,10 @@ func _clear_chest(chest: TreasureChest) -> void:
 
 
 ## Whether a kill by `by` drops a chest: chest_drop_chance (elite: x
-## ELITE_CHEST), raised by their luck.
+## elite_chest_scale), raised by their luck.
 func _rolls_chest(by: FishController, elite: bool) -> bool:
 	var luck := block_of(by).value("luck") if is_instance_valid(by) and _blocks.has(by) else 0.0
-	var chance := settings.chest_drop_chance * (ELITE_CHEST if elite else 1.0) * maxf(1.0 + luck * settings.chest_drop_luck, 0.0)
+	var chance := settings.chest_drop_chance * (settings.elite_chest_scale if elite else 1.0) * maxf(1.0 + luck * settings.chest_drop_luck, 0.0)
 	return chance > 0.0 and rng.randf() < chance
 
 

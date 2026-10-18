@@ -39,6 +39,8 @@ func _run() -> void:
 	settings.hourglass_chance = 0.0
 	settings.run_logs = true
 	settings.run_logs_keep = 3
+	RunLog.dir = "user://run_logs_probe"  # never the real logs (this prunes to 3)
+	RunLog.save_anywhere = true
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	fish = main.get_node("Fish")
@@ -74,6 +76,8 @@ func _run() -> void:
 	var hp := run.horde.enemy_max_hp(survivor)
 	check(absf(float(sample.get("ttk", 0.0)) - hp / expected_dps) < 0.01, "ttk is the zombies' average hp / dps (%.3f s)" % float(sample.get("ttk", 0.0)))
 	check((sample.get("builds", []) as Array).size() == 1 and (sample.builds[0].weapons as Dictionary).has("attack:BITE"), "and each player's build")
+	check(log_of.saved_path != "" and JSON.parse_string(FileAccess.get_file_as_string(log_of.saved_path)).get("in_progress", false),
+			"a sample saves the log as it goes (in progress)")
 
 	print("picks:")
 	var levels_before := log_of.picks.size()
@@ -102,11 +106,11 @@ func _run() -> void:
 	check(parsed is Dictionary and (parsed.samples as Array).size() >= 1 and parsed.ending.outcome == "down", "the file holds the samples and the ending")
 	# Pruning: make more old files than run_logs_keep, then save again.
 	for n in 4:
-		var stale := FileAccess.open("%s/run_0000-00-0%d_00-00-00.json" % [RunLog.DIR, n], FileAccess.WRITE)
+		var stale := FileAccess.open("%s/run_0000-00-0%d_00-00-00.json" % [RunLog.dir, n], FileAccess.WRITE)
 		stale.store_string("{}")
 		stale.close()
 	log_of.save()
-	var left := Array(DirAccess.get_files_at(RunLog.DIR)).filter(func(f: String) -> bool: return f.begins_with("run_") and f.ends_with(".json"))
+	var left := Array(DirAccess.get_files_at(RunLog.dir)).filter(func(f: String) -> bool: return f.begins_with("run_") and f.ends_with(".json"))
 	check(left.size() == settings.run_logs_keep and log_of.saved_path.get_file() in left, "only the newest %d stay (%d)" % [settings.run_logs_keep, left.size()])
 	run.start()
 	await _ticks(2)
@@ -138,6 +142,8 @@ func _run() -> void:
 	settings.weapon_slots = 2
 
 	settings.run_logs_keep = 50
+	RunLog.dir = RunLog.DIR
+	RunLog.save_anywhere = false
 	main.set_mode(main.FREE_SWIM)
 	await _ticks(3)
 	print("FAILURES: %d" % failures if failures else "ALL PASS")
