@@ -85,7 +85,7 @@ func _run() -> void:
 	if shark == null:
 		_finish()
 		return
-	check(shark.parts.size() == DrownedShark.PARTS and horde.alive_count() == 0, "its body is %d proxies, not counted as zombies" % shark.parts.size())
+	check(shark.parts.size() >= DrownedShark.MIN_PARTS and horde.alive_count() == 0, "its body is %d proxies, not counted as zombies" % shark.parts.size())
 	# Put it right ahead and let the bite at it.
 	shark.global_position = fish.global_position + Vector3(0, 0, -7)
 	shark._place_parts()

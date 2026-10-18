@@ -9,8 +9,8 @@ extends Boss
 
 enum Mode { HUNT, TELEGRAPH, CHARGE }
 
-## Its body as proxies: this many, spread along it.
-const PARTS := 3
+## Its body as proxies: at least this many, spread along it (more as it grows).
+const MIN_PARTS := 3
 const ROT := Color(0.36, 0.42, 0.34)
 
 var mode := Mode.HUNT
@@ -37,19 +37,24 @@ func _ready() -> void:
 	add_child(_model)
 	if _model.has_method("set_body_color"):
 		_model.call("set_body_color", ROT)
-	var hitbox := FishCharacter.hitbox_size(FishCharacter.Family.DOMINUS) * FishCharacter.M_PER_UU
-	_length = hitbox.x * settings.shark_size
-	var half_width := hitbox.y * 0.5 * settings.shark_size
+	# Already in metres: x across, y up, z nose to tail.
+	var hitbox := FishCharacter.hitbox_size(FishCharacter.Family.DOMINUS)
+	_length = hitbox.z * settings.shark_size
+	var half_width := hitbox.x * 0.5 * settings.shark_size
+	var half_height := hitbox.y * 0.5 * settings.shark_size
 	for side: float in [-1.0, 1.0]:
 		var e := Boss.eye(0.09 * settings.shark_size)
-		e.position = Vector3(side * half_width * 0.55, hitbox.z * 0.15 * settings.shark_size, -_length * 0.38)
+		e.position = Vector3(side * half_width * 0.55, half_height * 0.3, -_length * 0.38)
 		add_child(e)
 	_glow.light_color = Color(1.0, 0.1, 0.05)
 	_glow.omni_range = _length * 1.5
 	_glow.light_energy = 0.0
 	add_child(_glow)
-	for n in PARTS:
-		add_part(global_position, minf(half_width * 1.1, 2.5))
+	# Enough proxies, each as thick as the body, to cover it nose to tail.
+	var radius := (half_width + half_height) * 0.5
+	var count := maxi(MIN_PARTS, ceili(_length * 0.7 / radius) + 1)
+	for n in count:
+		add_part(global_position, radius)
 	_place_parts()
 
 

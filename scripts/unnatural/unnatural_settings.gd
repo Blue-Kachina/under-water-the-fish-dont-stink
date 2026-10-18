@@ -367,7 +367,7 @@ static func shared() -> UnnaturalSettings:
 ## player), swim speed (m/s), size (times the Shark's) and contact damage.
 @export_range(1.0, 100000.0, 50.0, "or_greater") var shark_hp := 2500.0
 @export_range(0.0, 60.0, 0.5, "or_greater") var shark_speed := 8.0
-@export_range(1.0, 15.0, 0.25, "or_greater") var shark_size := 5.0
+@export_range(1.0, 15.0, 0.25, "or_greater") var shark_size := 15.0
 @export_range(0.0, 500.0, 1.0, "or_greater") var shark_contact := 25.0
 ## Every shark_charge_every s it glows red for shark_telegraph s, then charges
 ## at shark_charge_speed (m/s) for shark_charge_time s.
@@ -387,7 +387,7 @@ static func shared() -> UnnaturalSettings:
 @export_range(1.0, 1000000.0, 100.0, "or_greater") var leviathan_hp := 9000.0
 @export_range(0.0, 60.0, 0.5, "or_greater") var leviathan_speed := 11.0
 @export_range(2, 60, 1, "or_greater") var leviathan_segments := 14
-@export_range(0.5, 6.0, 0.1, "or_greater") var leviathan_girth := 2.2
+@export_range(0.5, 6.0, 0.1, "or_greater") var leviathan_girth := 6.0
 @export_range(0.0, 500.0, 1.0, "or_greater") var leviathan_contact := 30.0
 ## From two thirds of its hp down it spits leviathan_bolts blood bolts every
 ## leviathan_bolt_every s (leviathan_bolt_damage each); under a third it

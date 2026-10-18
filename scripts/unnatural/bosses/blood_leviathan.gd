@@ -65,7 +65,7 @@ func _ready() -> void:
 		segment.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 		add_child(segment)
 		_segments.append(segment)
-		add_part(global_position, minf(radius, 2.5))
+		add_part(global_position, radius)
 		if n == 0:
 			# The head: longer, with jaws and red eyes.
 			segment.scale = Vector3(0.9, 0.75, 1.5)
