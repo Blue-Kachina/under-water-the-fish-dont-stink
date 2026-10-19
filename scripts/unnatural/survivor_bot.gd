@@ -34,6 +34,8 @@ const HUNT_RANGE := 80.0
 const RAM_RANGE := 12.0
 const RAM_CONE := 0.85
 const RAM_CROWD := 4.0
+## Seconds it lingers after the final boss before heading for the whirlpool.
+const LINGER := 15.0
 ## Seconds between card picks (the game waits for it anyway).
 const PICK_DELAY := 0.05
 
@@ -85,7 +87,9 @@ func _choose_goal() -> Vector3:
 		closest = minf(closest, gap)
 		crowd += 1 if gap < CROWD_RANGE else 0
 		away += offset.normalized() / (gap * gap)
-	var goal := _chest_goal(me, closest)
+	var goal := _whirlpool_goal(me)
+	if goal == Vector3.INF:
+		goal = _chest_goal(me, closest)
 	if goal == Vector3.INF:
 		goal = _ram_goal(me)
 	if goal == Vector3.INF:
@@ -100,6 +104,16 @@ func _choose_goal() -> Vector3:
 		var line := (goal - me).normalized()
 		goal = me + (line * (1.0 - push) + away.normalized() * push).normalized() * maxf(me.distance_to(goal), 15.0)
 	return _keep_in(goal)
+
+
+## Once the final boss is down and it's lingered a while (LINGER s), swim to the
+## whirlpool and enter it, so a simulated run ends.
+func _whirlpool_goal(me: Vector3) -> Vector3:
+	if not is_instance_valid(run.whirlpool) or run.elapsed - run.cleared_at < LINGER:
+		return Vector3.INF
+	if run.near_whirlpool(fish):
+		run.enter_whirlpool(fish)
+	return run.whirlpool.global_position
 
 
 ## The nearest chest it can afford, if it's worth going for: open, by

@@ -40,7 +40,7 @@ func on_tick(delta: float) -> void:
 			Sfx.stop_loop(_loop)
 			_loop = 0
 	else:
-		_cool = maxf(_cool - delta, 0.0)
+		_cool = maxf(_cool - delta * rate_scale(), 0.0)
 		if is_ready() and not fish.puppet and fish._player_input().just_pressed("boost"):
 			dash()
 
@@ -67,7 +67,7 @@ func dash() -> void:
 
 func _dash_step() -> void:
 	var at := fish.global_position
-	for i in run.horde.query_sphere(at, settings.fin_radius):
+	for i in run.horde.query_sphere(at, settings.fin_radius * area_scale()):
 		if _hit.has(i):
 			continue
 		_hit[i] = true

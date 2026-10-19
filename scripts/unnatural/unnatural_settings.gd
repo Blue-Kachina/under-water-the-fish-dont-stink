@@ -220,9 +220,9 @@ static func shared() -> UnnaturalSettings:
 @export_group("Batteries")
 ## A battery (ramming a zombie at nature_batter_speed or faster, the bow wave
 ## counting) does this much damage at the battering speed...
-@export_range(0.0, 1000.0, 1.0, "or_greater") var battery_damage := 40.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var battery_damage := 60.0
 ## ...times (speed / battering speed) to this power, so faster hits harder.
-@export_range(0.0, 4.0, 0.05, "or_greater") var battery_speed_power := 1.0
+@export_range(0.0, 4.0, 0.05, "or_greater") var battery_speed_power := 1.5
 ## Ramming at speed is rewarded: a battery gives this many seconds of i-frames.
 @export_range(0.0, 2.0, 0.05, "or_greater") var battery_iframes := 0.3
 ## Battering a big zombie (size 1.5 or more) takes this share of your speed; small ones you plough through.
@@ -365,7 +365,7 @@ static func shared() -> UnnaturalSettings:
 @export_group("Drowned Shark")
 ## The mini-boss: a huge zombie shark. Its hp (times 1 + coop_scale per extra
 ## player), swim speed (m/s), size (times the Shark's) and contact damage.
-@export_range(1.0, 100000.0, 50.0, "or_greater") var shark_hp := 2500.0
+@export_range(1.0, 100000.0, 50.0, "or_greater") var shark_hp := 9000.0
 @export_range(0.0, 60.0, 0.5, "or_greater") var shark_speed := 8.0
 @export_range(1.0, 15.0, 0.25, "or_greater") var shark_size := 15.0
 @export_range(0.0, 500.0, 1.0, "or_greater") var shark_contact := 25.0
@@ -384,7 +384,10 @@ static func shared() -> UnnaturalSettings:
 @export_group("Blood Leviathan")
 ## The boss: a giant serpent. Beating it completes the stage. Its hp (times 1 +
 ## coop_scale per extra player), swim speed (m/s), segments and contact damage.
-@export_range(1.0, 1000000.0, 100.0, "or_greater") var leviathan_hp := 9000.0
+@export_range(1.0, 1000000.0, 100.0, "or_greater") var leviathan_hp := 27000.0
+## The whirlpool that opens where it falls: swim within this many metres and press
+## Jump to enter it, which is what completes the stage (the run goes on until you do).
+@export_range(1.0, 100.0, 1.0, "or_greater") var whirlpool_range := 15.0
 @export_range(0.0, 60.0, 0.5, "or_greater") var leviathan_speed := 11.0
 @export_range(2, 60, 1, "or_greater") var leviathan_segments := 14
 @export_range(0.5, 6.0, 0.1, "or_greater") var leviathan_girth := 6.0

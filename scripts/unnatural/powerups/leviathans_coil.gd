@@ -47,11 +47,11 @@ func damage() -> float:
 
 
 func size() -> float:
-	return settings.coil_radius * (1.0 + facet("size"))
+	return settings.coil_radius * (1.0 + facet("size")) * area_scale()
 
 
 func tick() -> float:
-	return settings.coil_tick / (1.0 + facet("rate"))
+	return settings.coil_tick / (1.0 + facet("rate")) / rate_scale()
 
 
 func on_removed() -> void:

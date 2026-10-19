@@ -14,8 +14,12 @@ signal chosen(mode: String)
 signal closed
 
 ## The big modes, in order; the featured one comes out of here (or MORE).
-const PRIMARY := ["Unnatural", "1v1", "Hunt", "Nature", "Free Play"]
-const MORE := ["Free Swim (Ocean)", "Obstacle Course", "Test Tank"]
+const PRIMARY := ["Unnatural", "Fish Sticks", "Hunt", "Nature", "Obstacle Course"]
+const MORE := ["Test Tank"]  # (Free Swim is retired: refining_weaponry.md §2.8)
+## Fish Sticks is one tile for the ball modes; choosing it asks which: its variants
+## (main.gd mode ids).
+const FISH_STICKS := "Fish Sticks"
+const FISH_STICKS_MODES := ["1v1", "Free Play"]
 const PANEL_SIZE := Vector2(1120.0, 616.0)
 
 var s := 1.0
@@ -32,6 +36,8 @@ var _rules_dim: ColorRect
 var _rules_title: Label
 var _rules_text: Label
 var _rules_mode := ""
+var _variants: PanelContainer
+var _variant_buttons: Array[Button] = []
 ## What had focus last (in the picker), for the MORE row's way back up.
 var _last_focus: Control
 var _nav := MenuNav.new()
@@ -114,7 +120,7 @@ func _ready() -> void:
 	for tile: Tile in [_featured] + _grid + _more:
 		tile.pressed.connect(func() -> void:
 			if tile.mode:
-				chosen.emit(tile.mode))
+				_choose(tile.mode))
 
 	var hints := ControllerHints.new()
 	hints.s = s
@@ -151,12 +157,53 @@ func _ready() -> void:
 	rules_hints.hints = [["A", "Play"], ["B", "Back"]]
 	rules_column.add_child(rules_hints)
 
+	# Fish Sticks: which one (1v1 or Free Play), over the wall (dimmed).
+	_variants = PanelContainer.new()
+	var variants_box := UITheme.box(UITheme.PANEL, 20.0 * s, UITheme.AQUA, 2.0 * s)
+	variants_box.set_content_margin_all(28.0 * s)
+	_variants.add_theme_stylebox_override("panel", variants_box)
+	_variants.position = Vector2(PANEL_SIZE.x * s * 0.5 - 260.0 * s, 170.0 * s)
+	_variants.custom_minimum_size = Vector2(520.0 * s, 0.0)
+	_variants.visible = false
+	_panel.add_child(_variants)
+	var variants_column := VBoxContainer.new()
+	variants_column.add_theme_constant_override("separation", roundi(12.0 * s))
+	_variants.add_child(variants_column)
+	variants_column.add_child(UITheme.label("Fish Sticks", "caps", 12.0, UITheme.AQUA, s, 700))
+	var variants_line := UITheme.label("Fish-ball in the aquarium arena. How do you want to play?", "body", 17.0, UITheme.INK_SOFT, s)
+	variants_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	variants_column.add_child(variants_line)
+	var variants_row := HBoxContainer.new()
+	variants_row.add_theme_constant_override("separation", roundi(14.0 * s))
+	variants_column.add_child(variants_row)
+	for variant: String in FISH_STICKS_MODES:
+		var button := Button.new()
+		button.text = "1v1 against a bot" if variant == "1v1" else "Free Play"
+		button.custom_minimum_size = Vector2(230.0, 64.0) * s
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.add_theme_font_override("font", UITheme.display(600))
+		button.add_theme_font_size_override("font_size", roundi(20.0 * s))
+		button.add_theme_stylebox_override("normal", UITheme.box(UITheme.GROUND, 14.0 * s, Color(UITheme.MUTED, 0.4), maxf(1.0, s)))
+		button.add_theme_stylebox_override("hover", UITheme.box(UITheme.GROUND.lightened(0.08), 14.0 * s, UITheme.AQUA, maxf(1.0, 1.5 * s)))
+		button.add_theme_stylebox_override("focus", UITheme.box(Color(UITheme.AQUA, 0.14), 14.0 * s, UITheme.AQUA, 3.0 * s))
+		button.pressed.connect(func() -> void:
+			_hide_variants(false)
+			chosen.emit(variant))
+		variants_row.add_child(button)
+		_variant_buttons.append(button)
+	var variants_hints := ControllerHints.new()
+	variants_hints.s = s
+	variants_hints.hints = [["A", "Play"], ["B", "Back"]]
+	variants_column.add_child(variants_hints)
+
 
 ## Shows the wall: `tiles` is main.gd's MODE_TILES, `featured` the mode last
 ## played, `rules_for` the match card text for a mode.
 func open(tiles: Dictionary, featured: String, rules_for: Callable) -> void:
 	_tiles = tiles
 	_rules_for = rules_for
+	if featured in FISH_STICKS_MODES:
+		featured = FISH_STICKS
 	if not tiles.has(featured):
 		featured = PRIMARY[0]
 	var singles: Array = PRIMARY.filter(func(mode: String) -> bool: return mode != featured)
@@ -170,6 +217,8 @@ func open(tiles: Dictionary, featured: String, rules_for: Callable) -> void:
 		_more[i].show_mode(more[i] if i < more.size() else "", tiles.get(more[i], {}) if i < more.size() else {})
 		_more[i].visible = i < more.size()
 	_rules.visible = false
+	_variants.visible = false
+	_rules_dim.visible = false
 	visible = true
 	_link()
 	_featured.grab_focus.call_deferred()
@@ -241,7 +290,30 @@ func _above(tile: Tile) -> Control:
 	return _grid[2] if middle < _grid[3].position.x else _grid[3]
 
 
+## Plays `mode`; Fish Sticks first asks which of its two.
+func _choose(mode: String) -> void:
+	if mode == FISH_STICKS:
+		_rules.visible = false
+		_variants.visible = true
+		_rules_dim.visible = true
+		_variant_buttons[0].grab_focus.call_deferred()
+	else:
+		chosen.emit(mode)
+
+
+func _hide_variants(refocus := true) -> void:
+	_variants.visible = false
+	_rules_dim.visible = false
+	if refocus:
+		for tile: Tile in [_featured] + _grid + _more:
+			if tile.mode == FISH_STICKS:
+				tile.grab_focus()
+
+
 func _cancel() -> void:
+	if _variants.visible:
+		_hide_variants()
+		return
 	if _rules.visible:
 		_hide_rules()
 		return
@@ -276,13 +348,23 @@ func _input(event: InputEvent) -> void:
 	if MenuNav.is_direction(event):
 		# Round the wall only, never out to the menu behind it (nor under the rules).
 		var toward := _nav.side(event)
-		if toward >= 0 and not _rules.visible:
+		if toward >= 0 and _variants.visible:
+			if toward == SIDE_LEFT:
+				_variant_buttons[0].grab_focus()
+			elif toward == SIDE_RIGHT:
+				_variant_buttons[1].grab_focus()
+		elif toward >= 0 and not _rules.visible:
 			MenuNav.step(get_viewport().gui_get_focus_owner(), toward, _panel)
 		get_viewport().set_input_as_handled()
 		return
+	if _variants.visible:
+		if event.is_action_pressed("ui_cancel"):
+			_hide_variants()
+			get_viewport().set_input_as_handled()
+		return  # A: the focused button's own
 	if _rules.visible:
 		if event.is_action_pressed("ui_accept"):
-			chosen.emit(_rules_mode)
+			_choose(_rules_mode)
 		elif event.is_action_pressed("ui_cancel") or event.is_action_pressed("ui_rules"):
 			_hide_rules()
 		else:

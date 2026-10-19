@@ -15,6 +15,8 @@ extends Control
 ## blind. `picked` says which.
 
 signal picked(index: int)
+## B (or Backspace) on a chest's cards before the first pick: put the chest back.
+signal cancelled
 
 ## At the 1280×720 design's scale (scaled to the view as they draw).
 const CARD_SIZE := Vector2(290.0, 410.0)
@@ -39,6 +41,8 @@ var input: PlayerInput
 ## The game stays paused while they're up (solo): closing the pause menu
 ## over them doesn't let it run.
 var pauses := false
+## Whether B puts a chest back (set before open(): a chest's first pick only).
+var cancelable := false
 var selected := 0
 
 var _age := 0.0
@@ -65,6 +69,7 @@ func open(offer: Array, title: String, subtitle: String, player_input: PlayerInp
 	selected = 0
 	_age = 0.0
 	_stick_was = 0
+	_hints.hints = [["◀ ▶", "Choose"], ["A", "Take it"]] + ([["B", "Put it back"]] if cancelable else [])
 	visible = true
 	queue_redraw()
 
@@ -101,6 +106,11 @@ func _process(delta: float) -> void:
 				return
 		if reader.just_pressed("ui_accept") or reader.just_pressed("jump"):
 			_pick(selected)
+			return
+		# B puts a chest back (Esc is the pause menu's).
+		if cancelable and ((reader.just_pressed("ui_cancel") and not Input.is_key_pressed(KEY_ESCAPE)) or Input.is_action_just_pressed("ui_text_backspace")):
+			close()
+			cancelled.emit()
 			return
 	queue_redraw()
 

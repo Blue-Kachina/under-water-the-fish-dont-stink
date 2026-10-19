@@ -45,7 +45,7 @@ const SECTIONS := [["game", "Game"], ["display", "Display"], ["audio", "Audio"],
 const USED_BY := {
 	"camera": "the follow camera, in every mode",
 	"fish": "your fish, in every mode",
-	"ball": "the ball in Free Play and 1v1",
+	"ball": "the ball in Fish Sticks",
 	"nature": "Nature, Hunt and Unnatural",
 	"unnatural": "Unnatural and the Test Tank",
 	"powerups": "Unnatural's powerups",
@@ -53,11 +53,11 @@ const USED_BY := {
 ## The Game, Display and Controls options: key -> [title, group, description, used by].
 const GAME_OPTIONS := {
 	"game/player_name": ["Player name", "Player", "Your name on the scoreboard, over your fish, and to the people you play with online.", "the scoreboard and online co-op"],
-	"game/character": ["Fish", "Player", "The fish you swim as. Each one has the hitbox of a Rocket League car (the name in brackets) and, in Unnatural, its own signature stat.", "every mode"],
-	"game/goal_replays": ["Goal replays", "Matches", "A replay of each goal in a 1v1, and of each battery in Hunt, from the net. Any button skips one.", "1v1 and Hunt"],
+	"game/character": ["Fish", "Player", "The fish you swim as. Each has its own body shape and, in Unnatural, its own weapon, signature stat and twist (press Y on the home screen to read them).", "every mode"],
+	"game/goal_replays": ["Goal replays", "Matches", "A replay of each goal in a Fish Sticks 1v1, and of each battery in Hunt, from the net. Any button skips one.", "Fish Sticks and Hunt"],
 	"game/preset_save": ["Save tuning preset", "Tuning presets", "Saves every tuning section (Camera to Powerups) as a preset file. The last preset saved or loaded loads at startup.", "the tuning sections"],
 	"game/preset_load": ["Load tuning preset", "Tuning presets", "Loads a preset file over the defaults, so a preset only needs to list what it changes. The shipped presets are in the same folder.", "the tuning sections"],
-	"game/preset_default": ["Default tuning", "Tuning presets", "Puts every tuning section back to its defaults (Rocket League's). Not saved until you save a preset.", "the tuning sections"],
+	"game/preset_default": ["Default tuning", "Tuning presets", "Puts every tuning section back to its defaults. Not saved until you save a preset.", "the tuning sections"],
 	"game/preset_copy": ["Copy tuning", "Tuning presets", "Copies the tuning as preset text to the clipboard, to paste into a file or a message.", "the tuning sections"],
 	"display/fullscreen": ["Fullscreen", "Window", "Fills the screen. F11 or Alt+Enter switches it any time. The game always starts fullscreen.", "the window"],
 	"display/show_stats": ["Stats panel", "Tuning aids", "A readout of the fish's speed, forward speed, drift and more, for tuning.", "the HUD"],
@@ -98,6 +98,16 @@ const TABS := {
 	"controls": [["Keyboard & Mouse", []], ["Controller", []]],
 	"audio": [["Sound", []], ["Sound Board", []]],
 }
+## Options never shown: Rocket League behaviours that are always left on (the
+## code keeps their switches; nobody is meant to turn them off).
+const HIDDEN := ["fish/rl_roll_timing", "fish/rl_air_control", "fish/rl_dodge_timing", "fish/rl_flip_z_damp", "fish/rl_surface_mechanics",
+		"fish/rl_suspension", "fish/rl_tyres", "fish/rl_auto_roll", "ball/rl_hit_impulse", "ball/kickoff_float", "camera/roll_with_surface"]
+## The options everyone sees. Everything else waits behind Show Debug Tweaks
+## (SELECT in Settings): the tuning presets, the stats panel and controller
+## overlay, the sound tools, and every tuning section but the camera, plus the
+## fish's controller options.
+const EVERYDAY := ["game/player_name", "game/character", "game/goal_replays", "display/fullscreen", "audio/profile", "audio/music_profile",
+		"audio/master_volume", "audio/sfx_volume", "audio/music_volume", "audio/voice_volume"]
 ## A held left/right repeats after this, this often (s).
 const REPEAT_DELAY := 0.38
 const REPEAT_EVERY := 0.06
@@ -537,7 +547,7 @@ func _prune_tabs() -> void:
 
 ## The list shown for `section` now: its current tab's, or its own.
 func _shown_list(section: String) -> VBoxContainer:
-	var tabs: Array = _tabs.get(section, [])
+	var tabs: Array = _visible_tabs(section)
 	if tabs.is_empty():
 		return _section_lists[section]
 	return tabs[clampi(_tab_at[section], 0, tabs.size() - 1)].list
@@ -545,13 +555,15 @@ func _shown_list(section: String) -> VBoxContainer:
 
 ## Shows tab `index` of `section`, and its tab bar.
 func _show_tab(section: String, index: int) -> void:
-	var tabs: Array = _tabs.get(section, [])
+	var tabs: Array = _visible_tabs(section)
 	_tab_at[section] = clampi(index, 0, maxi(tabs.size() - 1, 0))
+	for tab: Dictionary in _tabs.get(section, []):
+		tab.list.visible = false
 	for i in tabs.size():
 		tabs[i].list.visible = i == _tab_at[section]
 	_tab_bar.visible = tabs.size() > 1
 	_hints.hints = ([["LB/RB", "Tab"]] if tabs.size() > 1 else []) + [["LT/RT", "Section"], ["◀ ▶", "Change"], ["Y", "Default"],
-			["B", "Back"]]
+			["SELECT", "Debug tweaks"], ["B", "Back"]]
 	for child in _tab_strip.get_children():
 		_tab_strip.remove_child(child)
 		child.queue_free()
@@ -575,7 +587,7 @@ func _show_tab(section: String, index: int) -> void:
 ## bumpers never leave the section (LT / RT do that); with no tabs they do
 ## nothing. Focus stays in its column.
 func _step_tab(direction: int) -> void:
-	var tabs: Array = _tabs.get(_section, [])
+	var tabs: Array = _visible_tabs(_section)
 	if tabs.size() < 2:
 		return
 	var focus := get_viewport().gui_get_focus_owner()
@@ -1083,7 +1095,11 @@ func _step_section(direction: int) -> void:
 	for i in SECTIONS.size():
 		if SECTIONS[i][0] == _section:
 			at = i
-	_step_section_to(SECTIONS[posmod(at + direction, SECTIONS.size())][0])
+	for n in SECTIONS.size():
+		var next: String = SECTIONS[posmod(at + direction * (n + 1), SECTIONS.size())][0]
+		if (_section_buttons[next] as Button).visible:
+			_step_section_to(next)
+			return
 
 
 ## Over to `section`, focus staying in its column (the section buttons or the options).
@@ -1313,7 +1329,10 @@ func _input(event: InputEvent) -> void:
 	if event.is_echo() and (event.is_action("ui_up") or event.is_action("ui_down")) and (focus is Row or focus is SectionButton):
 		get_viewport().set_input_as_handled()  # held: _process moves it, at its own pace
 		return
-	if event.is_action_pressed("ui_page_previous") and not typing:
+	if not typing and ((event is InputEventJoypadButton and event.is_pressed() and (event as InputEventJoypadButton).button_index == JOY_BUTTON_BACK) \
+			or (event is InputEventKey and event.is_pressed() and not event.is_echo() and (event as InputEventKey).keycode == KEY_F2)):
+		_toggle_debug_tweaks()
+	elif event.is_action_pressed("ui_page_previous") and not typing:
 		_step_tab(-1)
 	elif event.is_action_pressed("ui_page_next") and not typing:
 		_step_tab(1)
@@ -1401,16 +1420,69 @@ func _trigger_pulled(action: String) -> bool:
 ## Hides options a target says don't apply right now (via an optional
 ## is_option_active(property) method), and headings left with none.
 func _refresh_visibility() -> void:
+	var debug := UISettings.show_debug_tweaks
 	for key: String in _rows:
 		var section := key.get_slice("/", 0)
-		if not _targets.has(section):
-			continue
-		var target: Object = _targets[section]
-		_rows[key].visible = not target.has_method("is_option_active") or target.is_option_active(key.get_slice("/", 1))
+		var active := true
+		if _targets.has(section):
+			var target: Object = _targets[section]
+			active = not target.has_method("is_option_active") or target.is_option_active(key.get_slice("/", 1))
+		_rows[key].visible = active and key not in HIDDEN and (debug or _is_everyday(key))
 	for heading: Label in _group_headings:
 		heading.visible = _group_headings[heading].any(func(key: String) -> bool: return _rows[key].visible)
+	for id: String in _section_buttons:
+		(_section_buttons[id] as Button).visible = _section_has_rows(id)
+	_link_sections()
 	if _section_lists.has(_section):
+		if not (_section_buttons[_section] as Button).visible:
+			_section = "game"
 		_link_rows(_section)
+
+
+## Whether option `key` shows without Show Debug Tweaks.
+func _is_everyday(key: String) -> bool:
+	var section := key.get_slice("/", 0)
+	return section in ["controls", "camera"] or key in EVERYDAY or (section == "fish" and _meta.get(key, {}).get("group", "") == "Controller")
+
+
+func _section_has_rows(section: String) -> bool:
+	for key: String in _rows:
+		if key.get_slice("/", 0) == section and _rows[key].visible:
+			return true
+	return false
+
+
+## Up/down through the sections shown only, stopping at the ends (held, it keeps going).
+func _link_sections() -> void:
+	var shown: Array[Button] = []
+	for id: String in _section_buttons:
+		if (_section_buttons[id] as Button).visible:
+			shown.append(_section_buttons[id])
+	for i in shown.size():
+		shown[i].focus_neighbor_top = shown[i].get_path_to(shown[maxi(i - 1, 0)])
+		shown[i].focus_neighbor_bottom = shown[i].get_path_to(shown[mini(i + 1, shown.size() - 1)])
+
+
+## The tabs of `section` with something to show.
+func _visible_tabs(section: String) -> Array:
+	var shown := []
+	for tab: Dictionary in _tabs.get(section, []):
+		if (tab.list as Control).get_children().any(func(child: Node) -> bool: return child is Row and (child as Row).visible):
+			shown.append(tab)
+	return shown
+
+
+## SELECT (or F2) turns Show Debug Tweaks on or off.
+func _toggle_debug_tweaks() -> void:
+	UISettings.set_value("show_debug_tweaks", not UISettings.show_debug_tweaks)
+	_refresh_visibility()
+	var focus := get_viewport().gui_get_focus_owner()
+	_show_section(_section)
+	if focus is Row and not (focus as Row).is_visible_in_tree():
+		(_section_buttons[_section] as Button).grab_focus()
+	var on := UISettings.show_debug_tweaks
+	Sfx.play("ui/toggle_on" if on else "ui/toggle_off")
+	show_status("Debug tweaks %s" % ("on: every tuning option shows" if on else "off: only the everyday settings show"))
 
 
 # --- Tuning model -------------------------------------------------------------

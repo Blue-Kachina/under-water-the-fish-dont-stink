@@ -252,6 +252,12 @@ func _buses() -> void:
 	check((Sfx.play("ui/move") as AudioStreamPlayer).process_mode == Node.PROCESS_MODE_ALWAYS
 			and (Sfx.play_at("ball/hit", Vector3.ZERO) as Node).process_mode == Node.PROCESS_MODE_PAUSABLE,
 			"menu sounds play through a pause, the world's pause with it")
+	var bed := Sfx.start_loop("amb/ocean_loop")
+	var moon := Sfx.start_loop("stage/blood_moon_loop")
+	check(Sfx._loops[bed].player.process_mode == Node.PROCESS_MODE_ALWAYS and Sfx._loops[moon].player.process_mode == Node.PROCESS_MODE_ALWAYS,
+			"ambient beds and the blood moon's loop keep playing while paused (card picks)")
+	Sfx.stop_loop(bed)
+	Sfx.stop_loop(moon)
 
 
 func _panel() -> void:

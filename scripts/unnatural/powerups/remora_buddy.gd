@@ -20,8 +20,14 @@ const TEAR_SHARE := 0.5
 const HEAL_SHARE := 0.01
 const HEAL_GAP := 0.25
 
+## How long a remora takes to dart out to its zombie, and to swim back (s).
+const LUNGE_TIME := 0.09
+const RETURN_TIME := 0.25
+
 ## Nips so far, for the probes.
 var nips := 0
+## Remoras sent darting out (the nips you can see), for the probes.
+var lunges := 0
 ## Tears into the zombies round a nip (the third milestone), for the probes.
 var tears := 0
 var _next := 0.0
@@ -41,11 +47,11 @@ func damage() -> float:
 
 
 func interval() -> float:
-	return settings.remora_interval / (1.0 + facet("rate"))
+	return settings.remora_interval / (1.0 + facet("rate")) / rate_scale()
 
 
 func reach() -> float:
-	return settings.remora_range * (1.0 + facet("reach"))
+	return settings.remora_range * (1.0 + facet("reach")) * area_scale()
 
 
 func on_stacks_changed() -> void:
@@ -71,6 +77,7 @@ func on_tick(delta: float) -> void:
 		return
 	nips += 1
 	var to := run.horde.enemy_position(target)
+	_lunge(nips, to)
 	PowerupFx.flash(run, to, 0.8, color(id), 0.2)
 	run.hit(target, damage(), fish, id, (to - at).normalized(), settings.remora_proc, [id])
 	if milestone(3):
@@ -80,6 +87,38 @@ func on_tick(delta: float) -> void:
 				run.hit(i, damage() * TEAR_SHARE, fish, id, (run.horde.enemy_position(i) - to).normalized(), settings.remora_proc * TEAR_SHARE, [id])
 	if milestone(1) and run.horde.is_alive(target):
 		_latched.append([target, LATCH_BITES, LATCH_GAP])
+
+
+## A worn remora (the `turn`th nip's, in turn) darts off its flank to the zombie
+## at `to`, then swims back: what you see of a nip. (The damage itself lands at
+## once, so the timing stays the same wherever the zombie is.)
+func _lunge(turn: int, to: Vector3) -> void:
+	if _worn == null or not is_instance_valid(_worn) or _worn.get_child_count() == 0:
+		return
+	var home := _worn.get_child(turn % _worn.get_child_count()) as MeshInstance3D
+	if home == null or not home.visible or not home.is_inside_tree():
+		return  # already out
+	var from := home.global_position
+	var direction := (to - from).normalized() if to.distance_to(from) > 0.01 else Vector3.FORWARD
+	var dart := MeshInstance3D.new()
+	dart.mesh = home.mesh
+	dart.material_override = home.material_override
+	dart.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	run.add_child(dart)
+	var up := Vector3.UP if absf(direction.y) < 0.98 else Vector3.RIGHT
+	dart.global_transform = Transform3D(Basis.looking_at(direction, up) * Basis(Vector3.RIGHT, PI / 2.0), from)
+	dart.scale = home.global_transform.basis.get_scale()
+	home.visible = false
+	lunges += 1
+	var tween := dart.create_tween()
+	tween.tween_property(dart, "global_position", to, LUNGE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_method(func(t: float) -> void:
+		if is_instance_valid(home) and home.is_inside_tree():
+			dart.global_position = to.lerp(home.global_position, t), 0.0, 1.0, RETURN_TIME)
+	tween.tween_callback(func() -> void:
+		if is_instance_valid(home):
+			home.visible = true
+		dart.queue_free())
 
 
 ## The second milestone: a remora's kill splits one off for a while.

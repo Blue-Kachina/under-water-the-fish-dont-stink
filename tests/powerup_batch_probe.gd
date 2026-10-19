@@ -103,6 +103,7 @@ func _run() -> void:
 	horde.spawn(2, fish.global_position + Vector3(2, 0, -4))
 	await _seconds(2.0)
 	check(remora.nips >= 1 and _dealt("remora_buddy") > 0.0, "it nips the zombie near (%d nips)" % remora.nips)
+	check(remora.lunges >= 1, "and you see a remora dart out to do it (%d lunges)" % remora.lunges)
 	powers.remora_stacks = 3
 	await _ticks(2)
 	check(remora.count() == powers.remora_count + remora.facet_count("count") and remora.count() >= 2 and fish.find_child("Remoras", false, false).get_child_count() == remora.count(),
@@ -235,6 +236,17 @@ func _run() -> void:
 	await _seconds(2.0)
 	check(lure.burst == 1 and run.decoys.is_empty(), "then it bursts, and the horde forgets it")
 	settings.enemy_speed_scale = 0.0
+	# Tome of Ages stretches a decoy's life; Tides drop it sooner; the Reef widens the blast.
+	block = run.block_of(fish)
+	check(is_equal_approx(lure.life(), powers.lure_life) and is_equal_approx(lure.blast(), powers.lure_blast) and is_equal_approx(lure.interval(), powers.lure_interval),
+			"no tomes: its life, blast and interval are the base ones")
+	block.add("duration", 0.5)
+	block.add("attack_speed", 0.25)
+	block.add("area", 0.5)
+	check(is_equal_approx(lure.life(), powers.lure_life * 1.5), "Tome of Ages: a decoy lasts 50%% longer (%.1f s)" % lure.life())
+	check(is_equal_approx(lure.interval(), powers.lure_interval / 1.25), "Tome of Tides: it's dropped sooner (%.1f s)" % lure.interval())
+	check(is_equal_approx(lure.blast(), powers.lure_blast * 1.5), "Tome of the Reef: the burst is wider (%.1f m)" % lure.blast())
+	block.reset()
 	powers.lure_stacks = 0
 	powers.lure_interval = 10.0
 	powers.lure_life = 5.0

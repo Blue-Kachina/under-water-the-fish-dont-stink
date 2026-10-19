@@ -32,11 +32,11 @@ var flares := 0
 
 
 func spacing() -> float:
-	return settings.fire_spacing / (1.0 + facet("density"))
+	return settings.fire_spacing / (1.0 + facet("density")) / rate_scale()
 
 
 func radius() -> float:
-	return settings.fire_radius * (1.0 + facet("radius"))
+	return settings.fire_radius * (1.0 + facet("radius")) * area_scale()
 
 
 func life() -> float:

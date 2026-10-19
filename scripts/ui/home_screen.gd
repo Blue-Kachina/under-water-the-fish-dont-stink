@@ -36,6 +36,10 @@ var _chip_initial: Label
 var _hints: ControllerHints
 var _picker: ModePicker
 var _back: Control
+var _konami := KonamiCode.new()
+var _replays_button: Button
+var _details: PanelContainer
+var _details_body: VBoxContainer
 var _s := 1.0
 ## B goes back to the game (opened from the pause menu, with a game on).
 var _can_resume := false
@@ -98,7 +102,6 @@ func _ready() -> void:
 	play_text.add_child(_play_note)
 
 	_menu_button("Co-op", func() -> void: coop_requested.emit())
-	_menu_button("Replays", func() -> void: replays_requested.emit())
 	_menu_button("Settings", func() -> void: settings_requested.emit())
 	var quit := _menu_button("Quit", func() -> void: get_tree().quit())
 	quit.add_theme_color_override("font_color", UITheme.MUTED)
@@ -138,6 +141,41 @@ func _ready() -> void:
 	_fish_bias.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	names.add_child(_fish_bias)
 	caption.add_child(_arrow("›", 1))
+	var details_button := Button.new()
+	details_button.text = "Details  (Y)"
+	details_button.focus_mode = Control.FOCUS_NONE
+	details_button.anchor_left = 0.5
+	details_button.anchor_right = 1.0
+	details_button.anchor_top = 1.0
+	details_button.anchor_bottom = 1.0
+	details_button.offset_left = 190.0 * s
+	details_button.offset_right = -190.0 * s
+	details_button.offset_top = -100.0 * s
+	details_button.offset_bottom = -64.0 * s
+	details_button.add_theme_font_override("font", UITheme.display(500))
+	details_button.add_theme_font_size_override("font_size", roundi(16.0 * s))
+	details_button.add_theme_stylebox_override("normal", UITheme.box(Color(UITheme.PANEL, 0.8), 18.0 * s, Color(UITheme.MUTED, 0.4), maxf(1.0, s)))
+	details_button.add_theme_stylebox_override("hover", UITheme.box(UITheme.PANEL.lightened(0.1), 18.0 * s, UITheme.AQUA, maxf(1.0, 1.5 * s)))
+	details_button.pressed.connect(_toggle_details)
+	_root.add_child(details_button)
+	_details = PanelContainer.new()
+	_details.visible = false
+	_details.anchor_left = 0.5
+	_details.anchor_right = 1.0
+	_details.anchor_top = 0.0
+	_details.anchor_bottom = 1.0
+	_details.offset_left = 20.0 * s
+	_details.offset_right = -40.0 * s
+	_details.offset_top = 96.0 * s
+	_details.offset_bottom = -110.0 * s
+	var details_box := UITheme.box(Color(UITheme.DEEP, 0.0), 18.0 * s, Color(UITheme.AQUA, 0.5), maxf(1.0, 1.5 * s))
+	details_box.bg_color = Color(UITheme.GROUND, 0.94)
+	details_box.set_content_margin_all(22.0 * s)
+	_details.add_theme_stylebox_override("panel", details_box)
+	_root.add_child(_details)
+	_details_body = VBoxContainer.new()
+	_details_body.add_theme_constant_override("separation", roundi(8.0 * s))
+	_details.add_child(_details_body)
 
 	# Top right: the player chip.
 	var chip := PanelContainer.new()
@@ -181,6 +219,7 @@ func _ready() -> void:
 	_hints.offset_bottom = -30.0 * s
 	_root.add_child(_hints)
 
+	_show_replays_button()  # once the Konami code's been entered
 	_picker = ModePicker.new()
 	_picker.s = s
 	_picker.visible = false
@@ -258,7 +297,7 @@ func _refresh() -> void:
 	var last := _last_mode()
 	var tile: Dictionary = main.MODE_TILES.get(last, {}) if main else {}
 	_play_note.text = "%s · last played" % tile.get("title", last) if last else "Pick a mode"
-	_hints.hints = [["A", "Select"], ["LB/RB", "Fish"]] + ([["B", "Back to game"]] if _can_resume else [])
+	_hints.hints = [["A", "Select"], ["LB/RB", "Fish"], ["Y", "Fish details"]] +([["B", "Back to game"]] if _can_resume else [])
 	_show_fish(_character())
 	_refresh_chip()
 
@@ -278,8 +317,30 @@ func _character() -> FishCharacter.Family:
 func _show_fish(character: FishCharacter.Family) -> void:
 	_showcase.show_fish(character)
 	_fish_name.text = FishCharacter.CARS[character].fish
-	_fish_bias.text = "%s body  ·  %s +" % [FishCharacter.CARS[character].car, StatBlock.title(StatBlock.signature(character))]
-	_fish_bias.text = _fish_bias.text.to_upper()
+	_fish_bias.text = ("%s +  ·  %s" % [StatBlock.title(StatBlock.signature(character)), Traversal.title(character)]).to_upper()
+	_refresh_details()
+
+
+## Shows or hides the Details panel (the fish's weapon, growth stat and twist).
+func _toggle_details() -> void:
+	_details.visible = not _details.visible
+	_refresh_details()
+
+
+func _refresh_details() -> void:
+	for child in _details_body.get_children():
+		child.queue_free()
+	if not _details.visible:
+		return
+	var s := _s
+	var character := _character()
+	_details_body.add_child(UITheme.label(FishCharacter.CARS[character].fish, "display", 26.0, UITheme.INK, s, 600))
+	for section: Array in FishDetails.sections(character):
+		_details_body.add_child(UITheme.label(String(section[0]).to_upper(), "caps", 13.0, UITheme.CORAL, s, 700))
+		var body := UITheme.label(section[1], "body", 16.0, UITheme.INK, s, 500)
+		body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.custom_minimum_size.x = 440.0 * s
+		_details_body.add_child(body)
 
 
 ## The next (+1) or previous (-1) fish.
@@ -296,26 +357,71 @@ func _input(event: InputEvent) -> void:
 		return
 	if _picker.visible:
 		return  # the picker's own
+	if _watch_konami(event):
+		get_viewport().set_input_as_handled()
+		return
 	if MenuNav.is_direction(event):
 		# Up/down along the menu (wrapping), left/right the fish, like ‹ ›.
 		match _nav.side(event):
 			SIDE_TOP:
+				_feed_konami("up")
 				_menu_step(-1)
 			SIDE_BOTTOM:
+				_feed_konami("down")
 				_menu_step(1)
 			SIDE_LEFT:
+				_feed_konami("left")
 				_cycle_fish(-1)
 			SIDE_RIGHT:
+				_feed_konami("right")
 				_cycle_fish(1)
 	elif event.is_action_pressed("ui_page_previous"):
 		_cycle_fish(-1)
 	elif event.is_action_pressed("ui_page_next"):
 		_cycle_fish(1)
+	elif (event is InputEventJoypadButton and event.is_pressed() and (event as InputEventJoypadButton).button_index == JOY_BUTTON_Y) \
+			or (event is InputEventKey and event.is_pressed() and not event.is_echo() and (event as InputEventKey).keycode == KEY_I):
+		_toggle_details()
+	elif event.is_action_pressed("ui_cancel") and _details.visible:
+		_toggle_details()
 	elif event.is_action_pressed("ui_cancel") and _can_resume:
 		close()
 	else:
 		return
 	get_viewport().set_input_as_handled()
+
+
+## Feeds the Konami code (directions as the menu reads them, B, A, SELECT, START).
+## True when `event` is a B or A that belongs to a code about to finish, so it
+## doesn't also press a button. Left and right still cycle the fish meanwhile.
+func _watch_konami(event: InputEvent) -> bool:
+	var token := KonamiCode.token_of(event)
+	if token.is_empty():
+		return false
+	var claimed := _konami.claims(token)
+	_feed_konami(token)
+	return claimed
+
+
+func _feed_konami(token: String) -> void:
+	if _konami.feed(token):
+		_unlock_replays()
+
+
+## The Konami code was entered: the Replays button shows from now on (and is remembered).
+func _unlock_replays() -> void:
+	if UISettings.replays_unlocked:
+		return
+	UISettings.set_value("replays_unlocked", true)
+	_show_replays_button()
+	Sfx.play("ui/mode_chosen")
+
+
+func _show_replays_button() -> void:
+	if _replays_button != null or not UISettings.replays_unlocked:
+		return
+	_replays_button = _menu_button("Replays", func() -> void: replays_requested.emit())
+	_menu.move_child(_replays_button, _menu.get_child_count() - 3)  # above Settings and Quit
 
 
 ## Focus the menu button `step` along from the focused one, wrapping round.

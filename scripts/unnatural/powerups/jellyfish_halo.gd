@@ -44,7 +44,7 @@ func count() -> int:
 
 
 func orbit_radius() -> float:
-	var reach := settings.halo_radius * (1.0 + facet("radius"))
+	var reach := settings.halo_radius * (1.0 + facet("radius")) * area_scale()
 	if milestone(2) and _pulse_age < PULSE_TIME:
 		reach *= 1.0 + (PULSE_REACH - 1.0) * sin(PI * _pulse_age / PULSE_TIME)
 	return reach
@@ -59,7 +59,7 @@ func damage() -> float:
 
 
 func sting_tick() -> float:
-	return settings.jelly_tick / (1.0 + facet("rate"))
+	return settings.jelly_tick / (1.0 + facet("rate")) / rate_scale()
 
 
 func on_stacks_changed() -> void:

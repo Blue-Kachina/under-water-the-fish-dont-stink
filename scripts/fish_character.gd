@@ -60,9 +60,9 @@ const TYRE_HALF_WIDTH := 5.5
 const M_PER_UU := 0.01
 
 
-## "Clownfish (Octane)": how the picker lists it.
+## "Clownfish": how the picker lists it (the hitbox's car name stays out of the UI).
 static func display_name(family: Family) -> String:
-	return "%s (%s)" % [CARS[family].fish, CARS[family].car]
+	return CARS[family].fish
 
 
 ## The family for a replay's hitbox_family key ("octane", ...); Octane if unknown.

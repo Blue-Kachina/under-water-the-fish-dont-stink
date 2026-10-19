@@ -15,7 +15,16 @@ var _next := 0.0
 
 
 func interval() -> float:
-	return settings.lure_interval * pow(1.0 - settings.lure_interval_per_stack, stacks - 1)
+	return settings.lure_interval * pow(1.0 - settings.lure_interval_per_stack, stacks - 1) / rate_scale()
+
+
+## How long a decoy lasts before it bursts (Tome of Ages stretches it).
+func life() -> float:
+	return settings.lure_life * duration_scale()
+
+
+func blast() -> float:
+	return settings.lure_blast * area_scale()
 
 
 func damage() -> float:
@@ -38,7 +47,7 @@ func on_tick(delta: float) -> void:
 			lures.remove_at(k)
 			continue
 		lure.age += delta
-		if lure.age >= settings.lure_life:
+		if lure.age >= lure.life:
 			lures.remove_at(k)
 			pop(lure.global_position)
 			lure.queue_free()
@@ -49,6 +58,7 @@ func drop() -> void:
 	var lure := Lure.new()
 	lure.tint = color(id)
 	lure.pull = settings.lure_pull
+	lure.life = life()
 	run.add_child(lure)
 	lure.global_position = fish.global_position
 	lures.append(lure)
@@ -60,10 +70,11 @@ func drop() -> void:
 
 func pop(at: Vector3) -> void:
 	burst += 1
-	Explosion.spawn(run.ocean, at, color(id), settings.lure_blast, 0.0, 0.3)
+	var reach := blast()
+	Explosion.spawn(run.ocean, at, color(id), reach, 0.0, 0.3)
 	Sfx.play_at("pw/lure_burst", at)
-	Sfx.play_at("fx/explosion", at, clampf(settings.lure_blast / 6.0, 0.0, 1.0))
-	for i in run.horde.query_sphere(at, settings.lure_blast):
+	Sfx.play_at("fx/explosion", at, clampf(reach / 6.0, 0.0, 1.0))
+	for i in run.horde.query_sphere(at, reach):
 		var push := run.horde.enemy_position(i) - at
 		run.hit(i, damage(), fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP, settings.lure_proc, [id])
 
@@ -109,6 +120,7 @@ func make_worn() -> Node3D:
 ## and bigger as it nears its burst. Fades near the camera.
 class Lure extends Node3D:
 	var age := 0.0
+	var life := 5.0
 	var pull := 3.0
 	var tint := Color.WHITE
 	var _glow := StandardMaterial3D.new()
@@ -177,7 +189,7 @@ class Lure extends Node3D:
 
 	func _process(_delta: float) -> void:
 		# Quicker and bigger toward the burst.
-		var urgency := clampf(age / maxf(PowerupSettings.shared().lure_life, 0.1), 0.0, 1.0)
+		var urgency := clampf(age / maxf(life, 0.1), 0.0, 1.0)
 		var beat := sin(age * lerpf(7.0, 18.0, urgency))
 		var throb := 1.0 + 0.12 * beat + urgency * 0.35
 		_ball.scale = Vector3.ONE * throb

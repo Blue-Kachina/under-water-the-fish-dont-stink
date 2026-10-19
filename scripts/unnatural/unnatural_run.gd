@@ -90,6 +90,12 @@ signal stage_event(event: String)
 ## A boss came, was beaten, or enraged.
 signal boss_arrived(boss: Boss)
 signal boss_defeated(boss: Boss, by: FishController)
+## The final boss fell: its whirlpool is open (the run goes on until someone enters it).
+signal whirlpool_opened(at: Vector3)
+## `fish` entered the whirlpool (the host's call online; everyone then sees the stage complete).
+signal whirlpool_entered(fish: FishController)
+## A guest's player asks the host to let them in.
+signal whirlpool_claimed(fish: FishController)
 signal boss_enraged(boss: Boss)
 ## The Leviathan's beaten: the stage is complete (the run's over, won).
 signal stage_completed
@@ -100,6 +106,11 @@ signal hit_claimed(net_id: int, amount: float, source: String, by: FishControlle
 signal pearl_claimed(id: int, by: FishController)
 signal xp_claimed(xp: float)
 signal chest_claimed(index: int, by: FishController)
+## `fish` backed out of a chest (cancel_offer): shut for them again. A guest says so to the host (chest_unclaimed).
+signal chest_reshut(chest: TreasureChest, fish: FishController)
+signal chest_unclaimed(index: int, by: FishController)
+## `fish` cancelled the chest it was choosing from (the HUD closes the cards).
+signal offer_cancelled(fish: FishController)
 ## The host's: a pearl dropped (worth `value`), or taken (so the guests'
 ## copies go); a chest buried.
 signal pearl_dropped(id: int, at: Vector3, value: int)
@@ -161,6 +172,10 @@ var director: EvilDirector
 var timeline: StageTimeline
 ## The bosses out now.
 var bosses: Array[Boss] = []
+## The way out, once the final boss is down (null before). Entering it ends the run in a win.
+var whirlpool: Whirlpool
+## Run seconds since the final boss fell (-1: not yet).
+var cleared_at := -1.0
 ## The stage is won (the Leviathan beaten), or the Leviathan enraged.
 var stage_complete := false
 var enraged := false
@@ -201,6 +216,11 @@ var _attack_levels := {}
 var _remote_pearl_chance := {}
 var _pending := {}
 var _chest_pending := {}
+## Each player's chest being chosen from: {chest, price, committed} (until their first pick: cancel_offer).
+var _chest_offer := {}
+## The cards rolled for a chest, per player: chest -> {fish -> {cards, heading, line}}, so putting it back and
+## opening it again can't reroll them.
+var _chest_rolls := {}
 ## Sunken Idol's extra picks left from the chest `fish` has up.
 var _extra_picks := {}
 var _offers := {}
@@ -289,11 +309,17 @@ func start() -> void:
 	_offer_kind.clear()
 	_pending.clear()
 	_chest_pending.clear()
+	_chest_offer.clear()
+	_chest_rolls.clear()
 	_extra_picks.clear()
 	_opening.clear()
 	_revive.clear()
 	_bury_chests()
 	_clear_bosses()
+	if is_instance_valid(whirlpool):
+		whirlpool.queue_free()
+	whirlpool = null
+	cleared_at = -1.0
 	horde.clear()
 	director.reset()
 	timeline.reset()
@@ -559,6 +585,7 @@ func _leave(fish: FishController) -> void:
 	_offer_kind.erase(fish)
 	_pending.erase(fish)
 	_chest_pending.erase(fish)
+	_chest_offer.erase(fish)
 	_opening.erase(fish)
 	_revive.erase(fish)
 	_blocks.erase(fish)
@@ -592,6 +619,7 @@ func _reset_player(fish: FishController) -> void:
 	_offer_kind.erase(fish)
 	_pending.erase(fish)
 	_chest_pending.erase(fish)
+	_chest_offer.erase(fish)
 	_opening.erase(fish)
 	var health: FishHealth = _health.get(fish)
 	if health:
@@ -715,6 +743,7 @@ func _physics_process(delta: float) -> void:
 			continue
 		powerups.on_tick(delta)
 		_open_chests(fish, delta)
+		_try_whirlpool(fish)
 		_batter_zombies(fish)
 		if not tank or settings.tank_contact:
 			_touch_zombies(fish)
@@ -849,7 +878,7 @@ func _batter_zombies(fish: FishController) -> void:
 		health.shield(settings.battery_iframes)
 		if horde.enemy_size(i) >= 1.5:
 			_slow(fish, settings.big_enemy_slow)
-		hit(i, damage, fish, "battery", nose)
+		hit(i, damage, fish, "battery", nose * maxf(fish.speed / maxf(fish.nature_batter_speed, 0.1), 1.0))  # faster rams knock harder
 		powerups_of(fish).on_battery(i)
 
 
@@ -1288,10 +1317,50 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 			var spill := Vector3(sin(n * 2.4), 0.3 * sin(n * 1.3), cos(n * 2.4)) * BOSS_PEARL_SPREAD * sqrt((n + 1.0) / maxf(settings.boss_pearls, 1.0))
 			drop_pearl(boss.global_position + spill, 1, BOSS_PEARL - boss.boss_id * 1000 - n, false)
 	elif boss is BloodLeviathan:
-		stage_complete = true
-		is_over = true
-		_hold_for_cards(false)
-		stage_completed.emit()
+		# The run goes on: swim, batter and loot as long as you like. Entering the whirlpool wins.
+		_open_whirlpool(boss.global_position)
+
+
+## Opens the way out at `at` (on every machine: each sees the boss beaten).
+func _open_whirlpool(at: Vector3) -> void:
+	if is_instance_valid(whirlpool):
+		return
+	cleared_at = elapsed
+	whirlpool = Whirlpool.new()
+	whirlpool.position = at
+	add_child(whirlpool)
+	whirlpool_opened.emit(at)
+
+
+## Whether `fish` is close enough to the whirlpool to enter it.
+func near_whirlpool(fish: FishController) -> bool:
+	return is_instance_valid(whirlpool) and is_instance_valid(fish) and not is_over and is_up(fish) \
+			and fish.global_position.distance_to(whirlpool.global_position) <= settings.whirlpool_range
+
+
+## `fish` enters the whirlpool: the stage is complete, and the run is won.
+func enter_whirlpool(fish: FishController) -> void:
+	if is_over or not is_instance_valid(whirlpool):
+		return
+	stage_complete = true
+	is_over = true
+	_hold_for_cards(false)
+	whirlpool_entered.emit(fish)
+	stage_completed.emit()
+
+
+## Each local player within range presses Jump/interact to enter the whirlpool
+## (a guest asks the host, who completes it for everyone).
+func _try_whirlpool(fish: FishController) -> void:
+	if not near_whirlpool(fish) or is_picking(fish):
+		return
+	var input: PlayerInput = fish.input_source if fish.input_source else PlayerInput.everyone()
+	if not input.just_pressed("jump"):
+		return
+	if authority:
+		enter_whirlpool(fish)
+	else:
+		whirlpool_claimed.emit(fish)
 
 
 ## Every boss gone at once (a new start).
@@ -1479,10 +1548,23 @@ func _offer_level(fish: FishController) -> void:
 func _offer_chest(fish: FishController) -> void:
 	var queue: Array = _chest_pending.get(fish, [])
 	var spec: Array = queue.pop_front() if not queue.is_empty() else [TreasureChest.Kind.TREASURE, ""]
+	var chest: TreasureChest = spec[2] if spec.size() > 2 else null
+	var price: int = spec[3] if spec.size() > 3 else 0
+	var rolled_before: Dictionary = (_chest_rolls.get(chest, {}) as Dictionary).get(fish, {}) if chest else {}
 	var cards := []
 	var heading := ""
 	var line := "PICK A POWERUP  ·  THE SAME ONE AGAIN STACKS"
+	if not rolled_before.is_empty():
+		# Put back and opened again: the same cards (their stacks as they are now).
+		cards = (rolled_before.cards as Array).duplicate(true)
+		for card: Dictionary in cards:
+			card.stacks = powerups_of(fish).stacks(card.powerup) + 1
+		heading = rolled_before.heading
+		line = rolled_before.line
+		spec = [-1]  # nothing to roll
 	match spec[0]:
+		-1:
+			pass
 		TreasureChest.Kind.CURSED:
 			for id in Powerup.pick_from_tier(rng, Rarity.Tier.CURSED, settings.chest_choices):
 				cards.append(_powerup_card(fish, id))
@@ -1503,6 +1585,11 @@ func _offer_chest(fish: FishController) -> void:
 		_offer_next(fish)
 		return
 	_extra_picks[fish] = mini(powerups_of(fish).stacks("sunken_idol"), cards.size() - 1)
+	if chest:
+		if not _chest_rolls.has(chest):
+			_chest_rolls[chest] = {}
+		(_chest_rolls[chest] as Dictionary)[fish] = {"cards": cards.duplicate(true), "heading": heading, "line": line}
+		_chest_offer[fish] = {"chest": chest, "price": price, "committed": false}
 	if _extra_picks[fish] > 0:
 		line = "PICK %d  ·  THE SUNKEN IDOL'S GIFT" % (_extra_picks[fish] + 1)
 	_offers[fish] = cards
@@ -1526,6 +1613,8 @@ func pick(fish: FishController, index: int) -> void:
 		return
 	var card: Dictionary = cards[clampi(index, 0, cards.size() - 1)]
 	var offer_kind: String = _offer_kind.get(fish, "level")
+	if offer_kind == "chest":
+		_commit_chest(fish)
 	if offer_kind == "swap":
 		if card.kind == "swap":
 			_take_boss_weapon(fish, card.incoming, card.weapon)
@@ -1558,6 +1647,19 @@ func pick(fish: FishController, index: int) -> void:
 	_offer_kind.erase(fish)
 	card_picked.emit(fish, card)
 	_offer_next(fish)
+
+
+## `fish` took a card from its chest: that's final (no more cancelling), and the
+## chest can go now.
+func _commit_chest(fish: FishController) -> void:
+	var info: Dictionary = _chest_offer.get(fish, {})
+	if info.is_empty() or info.committed:
+		return
+	info.committed = true
+	_chest_offer.erase(fish)
+	if _chest_rolls.has(info.chest):
+		(_chest_rolls[info.chest] as Dictionary).erase(fish)
+	_clear_chest(info.chest)
 
 
 ## What a level's card does for `fish` (CardDeck's kinds).
@@ -1826,10 +1928,62 @@ func open_chest(chest: TreasureChest, fish: FishController) -> void:
 		chest_claimed.emit(chests.find(chest), fish)
 	if not _chest_pending.has(fish):
 		_chest_pending[fish] = []
-	(_chest_pending[fish] as Array).append([chest.kind, chest.item])
+	(_chest_pending[fish] as Array).append([chest.kind, chest.item, chest, price])
 	if not _offers.has(fish):
 		_offer_next(fish)
-	_clear_chest(chest)
+	_clear_chest(chest)  # (not while its pick can still be cancelled)
+
+
+## Whether `fish` can back out of the chest it's choosing from: before they take
+## a card (the Sunken Idol's extra picks and a weapon swap can't), and while
+## the chest is still there to put back.
+func can_cancel(fish: FishController) -> bool:
+	var info: Dictionary = _chest_offer.get(fish, {})
+	return not info.is_empty() and _offer_kind.get(fish, "") == "chest" and not info.committed \
+			and is_instance_valid(info.chest) and not (info.chest as TreasureChest).is_queued_for_deletion()
+
+
+## `fish` backs out of the chest: the pearls come back and the chest is shut
+## for them again. Their cards stay rolled (_chest_rolls), so opening it
+## again offers the same ones: no free rerolls.
+func cancel_offer(fish: FishController) -> void:
+	if not can_cancel(fish):
+		return
+	var info: Dictionary = _chest_offer[fish]
+	var chest: TreasureChest = info.chest
+	chest.reshut_for(fish, layer_of(fish))
+	add_pearls(fish, info.price)
+	var stats := stats_of(fish)
+	stats["chests"] = maxi(stats.get("chests", 0) - 1, 0)
+	if info.price > 0:
+		stats["paid_chests"] = maxi(stats.get("paid_chests", 0) - 1, 0)
+	_chest_offer.erase(fish)
+	_offers.erase(fish)
+	_offer_kind.erase(fish)
+	_extra_picks.erase(fish)
+	chest_reshut.emit(chest, fish)
+	if not authority:
+		chest_unclaimed.emit(chests.find(chest), fish)
+	offer_cancelled.emit(fish)
+	_offer_next(fish)
+
+
+## `fish`, a player elsewhere (online), put chest `index` back.
+func apply_chest_reshut(index: int, fish: FishController) -> void:
+	if index < 0 or index >= chests.size() or not is_instance_valid(chests[index]) or fish == null:
+		return
+	if chests[index].reshut_for(fish, layer_of(fish)):
+		var stats := stats_of(fish)
+		stats["chests"] = maxi(stats.get("chests", 0) - 1, 0)
+
+
+## A chest everyone's opened goes, unless someone's still choosing from it
+## and may put it back.
+func _chest_in_use(chest: TreasureChest) -> bool:
+	for info: Dictionary in _chest_offer.values():
+		if info.chest == chest and not info.committed:
+			return true
+	return false
 
 
 ## What `chest` costs to open now, in pearls (D23): chest_price_base, growing
@@ -1865,7 +2019,7 @@ func apply_chest_opened(index: int, fish: FishController) -> void:
 
 ## A chest everyone's opened goes (its place in `chests` stays, for online's indices).
 func _clear_chest(chest: TreasureChest) -> void:
-	if is_instance_valid(chest) and chest.open_for_all(players) and not chest.is_queued_for_deletion():
+	if is_instance_valid(chest) and chest.open_for_all(players) and not chest.is_queued_for_deletion() and not _chest_in_use(chest):
 		chest.vanish()
 
 

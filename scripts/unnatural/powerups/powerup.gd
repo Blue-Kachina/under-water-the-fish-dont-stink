@@ -180,6 +180,16 @@ func duration_scale() -> float:
 	return 1.0 + run.block_of(fish).value("duration") if run and is_instance_valid(fish) else 1.0
 
 
+## 1 + the player's Attack Speed (Tome of Tides): how much faster timed weapons fire/drop/tick.
+func rate_scale() -> float:
+	return maxf(1.0 + run.block_of(fish).value("attack_speed"), 0.1) if run and is_instance_valid(fish) else 1.0
+
+
+## 1 + the player's Area (Tome of the Reef): how much bigger weapons' reach and blasts are.
+func area_scale() -> float:
+	return maxf(1.0 + run.block_of(fish).value("area"), 0.1) if run and is_instance_valid(fish) else 1.0
+
+
 func on_hit(_index: int, _damage: float, _source: String, _proc: float, _chain: Array) -> void:
 	pass
 

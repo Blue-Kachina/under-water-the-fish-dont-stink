@@ -116,9 +116,10 @@ func _run() -> void:
 	run.pick(fish, 0)
 	run.open_chest(dropped, second.fish)
 	await _ticks(2)
-	check(not is_instance_valid(dropped) or not dropped._shut.visible, "both opened it: it goes")
+	check(is_instance_valid(dropped) and not dropped.is_queued_for_deletion(), "both opened it: it stays while the second's choosing (they could put it back)")
 	run.pick(second.fish, 0)
 	await _ticks(2)
+	check(not is_instance_valid(dropped) or not dropped._shut.visible, "and once they've picked: it goes")
 	var mine := run.health_of(fish)
 	var theirs := run.health_of(second.fish)
 	mine.hp = mine.max_hp * 0.2

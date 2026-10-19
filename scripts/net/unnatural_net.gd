@@ -81,8 +81,11 @@ func hook(game_run: UnnaturalRun) -> void:
 		run.pearl_taken.connect(_on_pearl_taken)
 		run.chest_buried.connect(_on_chest_buried)
 		run.chest_opened.connect(_on_chest_opened)
+		run.chest_reshut.connect(func(chest: TreasureChest, fish: FishController) -> void:
+			_send_all("_chest_reshut", [run.chests.find(chest), _pid(fish)], true))
 		run.boss_arrived.connect(_on_boss_arrived)
 		run.boss_defeated.connect(_on_boss_defeated)
+		run.whirlpool_entered.connect(func(fish: FishController) -> void: _send_all("_stage_done", [_pid(fish)], true))
 		run.pickup_dropped.connect(_on_pickup_dropped)
 		run.pickup_taken.connect(_on_pickup_taken)
 	else:
@@ -90,6 +93,9 @@ func hook(game_run: UnnaturalRun) -> void:
 		run.pearl_claimed.connect(_on_pearl_claimed)
 		run.xp_claimed.connect(func(xp: float) -> void: _out_xp += xp)
 		run.chest_claimed.connect(_on_chest_claimed)
+		run.chest_unclaimed.connect(func(index: int, by: FishController) -> void:
+			_send_host("_unclaim_chest", [index, _pid(by)], true))
+		run.whirlpool_claimed.connect(_on_whirlpool_claimed)
 		run.pickup_claimed.connect(_on_pickup_claimed)
 	run.player_down.connect(_on_down.bind(true))
 	run.player_revived.connect(_on_down.bind(false))
@@ -273,6 +279,10 @@ func _send_gains() -> void:
 			_send_host("_gains", [pid, value], true)
 
 
+func _on_whirlpool_claimed(by: FishController) -> void:
+	_send_host("_claim_whirlpool", [_pid(by)], true)
+
+
 func _on_chest_claimed(index: int, by: FishController) -> void:
 	_send_host("_claim_chest", [index, _pid(by)], true)
 
@@ -436,6 +446,12 @@ func _chest_opened(index: int, pid: int) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
+func _chest_reshut(index: int, pid: int) -> void:
+	if _guest_run():
+		run.apply_chest_reshut(index, coop.fish_of(pid))
+
+
+@rpc("authority", "call_remote", "reliable")
 func _drop(id: int, kind: int, at: Vector3) -> void:
 	if _guest_run() and run.pickup_by_id(id) == null:
 		run.drop_pickup(kind, at, id)
@@ -473,6 +489,20 @@ func _boss_bolts(id: int, from: Vector3, directions: PackedVector3Array) -> void
 	var boss := run.boss_by_id(id) as BloodLeviathan
 	if boss:
 		boss.add_bolts(from, directions)
+
+
+## A guest's player entered the whirlpool: the host completes the stage for everyone.
+@rpc("any_peer", "call_remote", "reliable")
+func _claim_whirlpool(pid: int) -> void:
+	if not is_host():
+		return
+	run.enter_whirlpool(coop.fish_of(pid))  # (whirlpool_entered tells everyone)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _stage_done(pid: int) -> void:
+	if _guest_run():
+		run.enter_whirlpool(coop.fish_of(pid))
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -520,6 +550,14 @@ func _claim_chest(index: int, pid: int) -> void:
 		return
 	run.apply_chest_opened(index, coop.fish_of(pid))
 	_send_all("_chest_opened", [index, pid], true)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _unclaim_chest(index: int, pid: int) -> void:
+	if not is_host() or index < 0 or index >= run.chests.size():
+		return
+	run.apply_chest_reshut(index, coop.fish_of(pid))
+	_send_all("_chest_reshut", [index, pid], true)
 
 
 @rpc("any_peer", "call_remote", "reliable")

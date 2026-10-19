@@ -72,7 +72,10 @@ const MODE_TILES := {
 	UNNATURAL: {"title": "Unnatural", "icon": "mode_unnatural", "colors": [Color(0.25, 0.04, 0.08), Color(0.93, 0.25, 0.3)],
 		"pitch": "A blood moon has turned every fish but you. Survive the zombie horde, level up and stack powerups from chests.",
 		"short": "Survive the zombie horde", "play": ["Solo", "Split-screen", "Online"]},
-	ONE_V_ONE: {"title": "1v1", "icon": "mode_1v1", "colors": [Color(0.04, 0.17, 0.3), Color(0.35, 0.65, 1.0)],
+	"Fish Sticks": {"title": "Fish Sticks", "icon": "mode_1v1", "colors": [Color(0.04, 0.17, 0.3), Color(0.35, 0.65, 1.0)],
+		"pitch": "Fish-ball in the aquarium arena: play a 1v1 against a bot, or Free Play with no clock.",
+		"short": "1v1 or Free Play with a ball", "play": ["Solo"]},
+	ONE_V_ONE: {"title": "Fish Sticks: 1v1", "icon": "mode_1v1", "colors": [Color(0.04, 0.17, 0.3), Color(0.35, 0.65, 1.0)],
 		"pitch": "Fish-ball in the aquarium against a bot: five minutes on the clock, overtime on a tie.",
 		"short": "Fish-ball against a bot", "play": ["Solo"]},
 	HUNT: {"title": "Hunt", "icon": "mode_hunt", "colors": [Color(0.27, 0.1, 0.06), Color(1.0, 0.54, 0.36)],
@@ -81,7 +84,7 @@ const MODE_TILES := {
 	NATURE: {"title": "Nature", "icon": "mode_nature", "colors": [Color(0.03, 0.2, 0.17), Color(0.3, 0.88, 0.62)],
 		"pitch": "Swim like a real fish: sweep, stride and build speed, then batter the schools for points.",
 		"short": "Stride, sweep and batter schools", "play": ["Solo", "Split-screen", "Online"]},
-	FREE_PLAY: {"title": "Free Play", "icon": "mode_free_play", "colors": [Color(0.05, 0.14, 0.24), Color(0.22, 0.89, 0.84)],
+	FREE_PLAY: {"title": "Fish Sticks: Free Play", "icon": "mode_free_play", "colors": [Color(0.05, 0.14, 0.24), Color(0.22, 0.89, 0.84)],
 		"pitch": "The aquarium arena and a ball, no clock: practise touches, aerials and shots.",
 		"short": "The arena and a ball, no clock", "play": ["Solo"]},
 	FREE_SWIM: {"title": "Free Swim", "icon": "mode_free_swim", "colors": [Color(0.04, 0.16, 0.24), Color(0.45, 0.8, 0.95)],
@@ -265,10 +268,10 @@ func _saved_mode(settings: ConfigFile) -> String:
 	var mode: String = settings.get_value("playground", "mode", FREE_PLAY)
 	match settings.get_value("playground", "environment", ""):
 		"Ocean":
-			mode = FREE_SWIM
+			mode = FREE_PLAY  # Free Swim is retired from the menus
 		"Obstacle Course":
 			mode = OBSTACLE_COURSE
-	return mode if mode in MODES and mode != REPLAYS else FREE_PLAY
+	return mode if mode in MODES and mode != REPLAYS and mode != FREE_SWIM else FREE_PLAY
 
 
 ## Builds `env_name` (one of ENVIRONMENTS) and plays the current mode in it.

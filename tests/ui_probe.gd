@@ -37,6 +37,7 @@ func _run() -> void:
 	_check_glyphs()
 	await _check_home()
 	await _check_settings()
+	UISettings.set_value("show_debug_tweaks", false)  # back as it was (it saves to this PC)
 	_check_cards()
 	print("ui_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)
@@ -111,7 +112,8 @@ func _check_home() -> void:
 	for tile: ModePicker.Tile in picker._grid + picker._more:
 		if tile.visible and tile.mode:
 			shown.append(tile.mode)
-	var expected: Array = main.MODE_TILES.keys()
+	var expected: Array = main.MODE_TILES.keys().filter(func(mode: String) -> bool:
+		return mode not in [main.ONE_V_ONE, main.FREE_PLAY, main.FREE_SWIM])  # 1v1 and Free Play are Fish Sticks'; Free Swim's retired
 	shown.sort()
 	expected.sort()
 	check(shown == expected, "every mode once: %s" % [shown])
@@ -163,16 +165,34 @@ func _check_home() -> void:
 	check(escapes.is_empty(), "no step leads out of the picker (%s)" % [escapes])
 	var free_play: ModePicker.Tile
 	for tile: ModePicker.Tile in picker._grid:
-		if tile.mode == main.FREE_PLAY:
+		if tile.mode == main.OBSTACLE_COURSE:
 			free_play = tile
 	for button: JoyButton in [JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_DOWN]:
 		await _button(button)
-	check(get_viewport().gui_get_focus_owner() == free_play, "right, right, down: Free Play")
+	check(get_viewport().gui_get_focus_owner() == free_play, "right, right, down: Obstacle Course")
 	await _button(JOY_BUTTON_DPAD_DOWN)
 	var focus_more: Control = get_viewport().gui_get_focus_owner()
 	check(focus_more in picker._more, "down again: the MORE row (%s)" % focus_more.get("mode"))
 	await _button(JOY_BUTTON_DPAD_UP)
-	check(get_viewport().gui_get_focus_owner() == free_play, "and up: back to Free Play")
+	check(get_viewport().gui_get_focus_owner() == free_play, "and up: back to Obstacle Course")
+	await _button(JOY_BUTTON_B)
+	await _frames(2)
+
+	# Fish Sticks asks which: 1v1 or Free Play.
+	home.open_picker()
+	await _frames(2)
+	var sticks: ModePicker.Tile
+	for tile: ModePicker.Tile in picker._grid:
+		if tile.mode == ModePicker.FISH_STICKS:
+			sticks = tile
+	sticks.grab_focus()
+	await _button(JOY_BUTTON_A)
+	await _frames(2)
+	check(picker._variants.visible and picker._variant_buttons[0].has_focus(), "A on Fish Sticks: asks 1v1 or Free Play")
+	await _button(JOY_BUTTON_DPAD_RIGHT)
+	check(picker._variant_buttons[1].has_focus(), "right: Free Play")
+	await _button(JOY_BUTTON_B)
+	check(not picker._variants.visible and picker.visible and sticks.has_focus(), "B: back on the Fish Sticks tile")
 	await _button(JOY_BUTTON_B)
 	await _frames(2)
 
@@ -192,10 +212,22 @@ func _check_home() -> void:
 
 
 func _check_settings() -> void:
-	print("settings:")
+	print("debug tweaks:")
 	var panel: Node = main._panel
+	UISettings.show_debug_tweaks = false
 	panel.set_open(true)
 	await _frames(3)
+	check(not panel._rows["fish/thrust"].visible if panel._rows.has("fish/thrust") else true, "off by default: Fish's tuning options are hidden")
+	check(not panel._section_buttons["ball"].visible and not panel._section_buttons["unnatural"].visible and not panel._section_buttons["powerups"].visible,
+			"Ball, Nature, Unnatural and Powerups are gone")
+	check(panel._section_buttons["game"].visible and panel._section_buttons["controls"].visible and panel._section_buttons["camera"].visible,
+			"Game, Controls and Camera stay")
+	check(not panel._rows["game/preset_save"].visible and panel._rows["game/player_name"].visible, "presets hide, the player name stays")
+	await _button(JOY_BUTTON_BACK)
+	check(UISettings.show_debug_tweaks and panel._section_buttons["unnatural"].visible and panel._rows["unnatural/battery_damage"].visible,
+			"SELECT: Show Debug Tweaks on, the tuning sections are back")
+	check(not panel._rows["fish/rl_tyres"].visible and not panel._rows["camera/roll_with_surface"].visible, "the always-on switches stay hidden")
+	print("settings:")
 	var focus := get_viewport().gui_get_focus_owner()
 	check(panel.is_open() and focus == panel._section_buttons["game"], "open on the sections, Game focused")
 	for i in 5:

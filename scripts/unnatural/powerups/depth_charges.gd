@@ -39,7 +39,7 @@ var aftershocks := 0
 
 
 func interval() -> float:
-	return settings.charge_interval / (1.0 + facet("rate"))
+	return settings.charge_interval / (1.0 + facet("rate")) / rate_scale()
 
 
 func damage() -> float:
@@ -47,7 +47,7 @@ func damage() -> float:
 
 
 func blast() -> float:
-	return settings.charge_blast * (1.0 + facet("blast"))
+	return settings.charge_blast * (1.0 + facet("blast")) * area_scale()
 
 
 func arm_time() -> float:

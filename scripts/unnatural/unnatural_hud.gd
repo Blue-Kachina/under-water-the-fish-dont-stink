@@ -127,8 +127,13 @@ func _ready() -> void:
 				var attack := run.attack_of(fish)
 				_cards.attack_kind = attack.kind if attack else FishAttack.Kind.BITE
 				_cards.max_levels = Vector2i(run.settings.weapon_max_level, run.settings.tome_max_level)
+				_cards.cancelable = run.can_cancel(fish)  # a chest, before the first pick
 				_cards.open(cards, heading, line, fish.input_source))
 		_cards.picked.connect(func(index: int) -> void: run.pick(fish, index))
+		_cards.cancelled.connect(func() -> void: run.cancel_offer(fish))
+		run.offer_cancelled.connect(func(for_fish: FishController) -> void:
+			if for_fish == fish and not run.is_picking(fish):
+				_cards.close())
 		run.card_picked.connect(func(for_fish: FishController, _card: Dictionary) -> void:
 			if for_fish == fish and not run.is_picking(fish):
 				_cards.close())
@@ -147,6 +152,8 @@ func _ready() -> void:
 						TreasureChest.STEEL, 2.4))
 		run.boss_enraged.connect(func(_boss: Boss) -> void:
 			_splash.play("THE LEVIATHAN ENRAGES", "NO TIME LIMIT", "AND THE DEAD KEEP COMING", HP_COLOR, 2.4))
+		run.whirlpool_opened.connect(func(_at: Vector3) -> void:
+			_splash.play("THE LEVIATHAN FALLS", "A WHIRLPOOL OPENS", "FISH ON  ·  ENTER IT WHEN YOU'RE READY", TreasureChest.GOLD, 3.0))
 		run.stage_completed.connect(func() -> void:
 			_over_age = 0.0
 			_splash.play("STAGE COMPLETE", "THE NIGHT IS OVER", "%s  ·  %d KILLS" % [_time_text(run.elapsed), run.kills], TreasureChest.GOLD, OVER_SPLASH))
@@ -188,6 +195,8 @@ func _process(delta: float) -> void:
 		return
 	_hurt.color.a = move_toward(_hurt.color.a, 0.0, delta * 0.9)
 	_cam_note.modulate.a = move_toward(_cam_note.modulate.a, 0.0, delta * 0.8)
+	if is_instance_valid(fish) and run.near_whirlpool(fish):
+		_note("JUMP  ·  ENTER THE WHIRLPOOL AND FINISH THE RUN", TreasureChest.GOLD)  # held while you're near
 	_clock.text = _time_text(run.elapsed)
 	_kills.text = "%d KILLS" % run.kills
 	_clock.visible = not _cards.is_open()  # the cards' heading is there
@@ -337,6 +346,7 @@ class StatsPanel extends Control:
 					BroadcastUI.GOLD if id == signature else Color.WHITE, 14])
 		if not any:
 			lines.append(["none yet", Color(1, 1, 1, 0.5), 14])
+		UnnaturalHud._add_damage_lines(lines, run.stats_of(fish))
 		var height := 0.0
 		for line: Array in lines:
 			height += ROW if line[2] > 8 else 8.0
@@ -348,6 +358,45 @@ class StatsPanel extends Control:
 			if line[0] != "":
 				BroadcastUI.text(self, Rect2(16.0, y, WIDTH - 28.0, tall), line[0], line[2], line[1], HORIZONTAL_ALIGNMENT_LEFT, 700)
 			y += tall
+
+
+## What a hit's `source` is called on the results: an attack, a powerup, ramming...
+static func source_title(source: String) -> String:
+	for kind: FishAttack.Kind in FishAttack.INFO:
+		if FishAttack.INFO[kind][1] == source:
+			return FishAttack.INFO[kind][0]
+	match source:
+		"battery":
+			return "Battered (ramming)"
+		"splash":
+			return "Koi splashdown"
+		"contact":
+			return "Contact"
+	return Powerup.title(source) if Powerup.ids().has(source) else source.capitalize()
+
+
+## The DAMAGE block: each source's damage, its share of the total and a bar,
+## biggest first (win or lose: how much each way of hurting them did).
+static func _add_damage_lines(lines: Array, stats: Dictionary) -> void:
+	var by: Dictionary = stats.by_source
+	var rows := []
+	var total := 0.0
+	for source: String in by:
+		rows.append([source, float(by[source])])
+		total += float(by[source])
+	if rows.is_empty():
+		return
+	rows.sort_custom(func(a: Array, b: Array) -> bool: return a[1] > b[1])
+	lines.append(["", Color.WHITE, 8])
+	lines.append(["DAMAGE  ·  %s TOTAL" % _compact(total), Color(1, 1, 1, 0.6), 12])
+	for k in mini(rows.size(), 10):
+		var share: float = float(rows[k][1]) / maxf(total, 1.0)
+		lines.append(["%s  ·  %s  ·  %d%%  %s" % [source_title(rows[k][0]), _compact(rows[k][1]), roundi(share * 100.0),
+				"|".repeat(maxi(roundi(share * 16.0), 1))], Powerup.color(rows[k][0]) if Powerup.ids().has(rows[k][0]) else Color.WHITE, 14])
+
+
+static func _compact(value: float) -> String:
+	return "%.1fk" % (value / 1000.0) if value >= 10000.0 else str(roundi(value))
 
 
 ## The health bar under the fish and the XP bar along the top; the player's

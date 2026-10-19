@@ -13,7 +13,7 @@ var _cool := 0.0
 
 
 func width() -> float:
-	return settings.tsunami_width + settings.tsunami_width_per_stack * (stacks - 1)
+	return (settings.tsunami_width + settings.tsunami_width_per_stack * (stacks - 1)) * area_scale()
 
 
 func damage() -> float:
@@ -21,7 +21,7 @@ func damage() -> float:
 
 
 func on_tick(delta: float) -> void:
-	_cool = maxf(_cool - delta, 0.0)
+	_cool = maxf(_cool - delta * rate_scale(), 0.0)
 
 
 func on_battery(_index: int) -> void:

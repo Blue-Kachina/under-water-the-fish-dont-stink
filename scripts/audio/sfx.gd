@@ -22,6 +22,8 @@ signal profile_loaded
 signal requested(id: String)
 
 const SETTINGS_PATH := "user://playground.cfg"
+## Loops that carry on while the game is paused (card picks, menus), though they sit on the World bus.
+const ALWAYS_LOOPS: Array[String] = ["stage/blood_moon_loop"]
 const SECTION := "audio"
 const PROFILE_DIR := "res://audio/profiles"
 const NONE := "none"
@@ -161,7 +163,7 @@ func start_loop(id: String, follow: Node = null) -> int:
 	else:
 		player = AudioStreamPlayer.new()
 	player.bus = info.get("bus", "World")
-	player.process_mode = _process_mode_for(player.bus)
+	player.process_mode = Node.PROCESS_MODE_ALWAYS if id in ALWAYS_LOOPS else _process_mode_for(player.bus)
 	add_child(player)
 	var handle := _next_loop
 	_next_loop += 1
@@ -503,9 +505,9 @@ func _tune_loop(loop: Dictionary) -> void:
 	player.pitch_scale = maxf(loop.pitch, 0.01)
 
 
-## UI, callouts and music carry on while paused; the world's sounds pause with it.
+## UI, callouts, music and ambient beds carry on while paused (card picks, menus); the world's sounds pause with it.
 func _process_mode_for(bus: String) -> ProcessMode:
-	return Node.PROCESS_MODE_ALWAYS if bus in ["UI", "Voice", "Music"] else Node.PROCESS_MODE_PAUSABLE
+	return Node.PROCESS_MODE_ALWAYS if bus in ["UI", "Voice", "Music", "Ambience"] else Node.PROCESS_MODE_PAUSABLE
 
 
 func _check_id(id: String) -> void:

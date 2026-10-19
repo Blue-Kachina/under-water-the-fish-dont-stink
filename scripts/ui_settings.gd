@@ -21,7 +21,12 @@ var fullscreen := true
 ## Shown on the scoreboard and when you score.
 var player_name := DEFAULT_NAME
 
-const KEYS := ["show_stats", "show_input_overlay", "goal_replays", "fullscreen", "player_name"]
+## Set once the Konami code has been entered on the home screen: the Replays button shows from then on.
+var replays_unlocked := false
+## Shows the tuning options that aren't for everyday use (SELECT toggles it in Settings).
+var show_debug_tweaks := false
+
+const KEYS := ["show_stats", "show_input_overlay", "goal_replays", "fullscreen", "player_name", "replays_unlocked", "show_debug_tweaks"]
 
 
 func _ready() -> void:

@@ -37,6 +37,7 @@ var opened_by: Array[FishController] = []
 ## A dropped chest sinks to this height; -INF: it's where it's meant to be.
 var sink_to := -INF
 
+var _vanished := false
 var _progress := {}
 ## The player layers it still shows on, shut.
 var _shown := PLAYER_LAYERS
@@ -179,8 +180,22 @@ func open_for(fish: FishController, layer := 0) -> bool:
 	return true
 
 
+## `fish` backs out of having opened it: shut for them again (false: it wasn't
+## opened, or it's already going). `layer`: as for open_for.
+func reshut_for(fish: FishController, layer := 0) -> bool:
+	if fish not in opened_by or is_queued_for_deletion() or _vanished:
+		return false
+	opened_by.erase(fish)
+	if layer != 0 and is_inside_tree():
+		_shown |= layer
+		_set_layers(_shut, _shown)
+		_shut.visible = true
+	return true
+
+
 ## Gone for good (everyone's opened it, or it's no more on the host).
 func vanish() -> void:
+	_vanished = true
 	_shown = 0
 	_shut.visible = false
 	var timer := get_tree().create_timer(OPEN_TIME + 0.2) if is_inside_tree() else null
