@@ -126,7 +126,7 @@ func _ready() -> void:
 	if run:
 		run.leveled_up.connect(func(level: int) -> void:
 			if run.settings.card_choices <= 0:
-				_splash.play("LEVEL UP", "LEVEL %d" % level, "+%d MAX HP" % roundi(run.settings.hp_per_level), XP_COLOR, 1.8))
+				_splash.play("LEVEL UP", "LEVEL %d" % level, "MAX HP +%d" % roundi(run.settings.hp_per_level), XP_COLOR, 1.8))
 		run.cards_offered.connect(func(for_fish: FishController, cards: Array, heading: String, line: String) -> void:
 			if for_fish == fish:
 				_cards.pauses = run.cards_pause_game()
@@ -211,7 +211,9 @@ func _process(delta: float) -> void:
 	_kills.visible = _clock.visible
 	_update_skill()
 	var next := run.timeline.next_event() if run.timeline and not run.tank else {}
-	if not next.is_empty() and not run.is_over:
+	if run.swarm_left() > 0.0 and not run.is_over:
+		_kills.text += "    ·    %s  ·  SURVIVE %s" % [StageTimeline.headline(run.swarm.id).trim_prefix("THE "), _time_text(run.swarm_left())]
+	elif not next.is_empty() and not run.is_over:
 		_kills.text += "    ·    %s IN %s" % [StageTimeline.headline(next.id).trim_prefix("THE "), _time_text(maxf(next.time - run.elapsed, 0.0))]
 	_director.visible = run.settings.show_director and _clock.visible
 	if _director.visible:
@@ -528,7 +530,8 @@ class Bars extends Control:
 			var centre := _slot_at(n, row, badge, gap)
 			if n < loadout.weapons.size():
 				var id := loadout.weapons[n]
-				var tint := UITheme.GOLD if id == Weapons.ATTACK else UITheme.rarity(Powerup.tier(id))
+				# Weapons have no rarity of their own (a boss's keeps its colour).
+				var tint := UITheme.rarity(Rarity.Tier.BOSS) if id in Weapons.BOSS_ONLY else UITheme.GOLD
 				HexBadge.draw_badge(self, centre, badge, Weapons.glyph(id, kind), tint, true, UITheme.HUD_FILL)
 				_level_chip(centre, badge, loadout.level(id), k)
 			else:

@@ -33,6 +33,7 @@ func check(ok: bool, what: String) -> void:
 func _run() -> void:
 	settings.spawning = false
 	settings.difficulty_per_minute = 0.0  # exact damage checks
+	settings.enemy_damage_scale = 1.0  # at the kinds' own contact damage
 	settings.fish_attack = FishAttack.Kind.BITE  # these checks are the bite's (attack_probe has the rest)
 	settings.twists = false  # and no fish's twist skews them
 	settings.card_choices = 0  # level-ups without cards here (levels_probe has them)
@@ -124,7 +125,9 @@ func _run() -> void:
 	await _ticks(4)
 	check(run._clouds.size() == 1, "a boxfish bursts into a cloud when it dies")
 	await _ticks(40)
-	check(is_equal_approx(health.hp, run.max_hp() - settings.burst_damage), "the cloud hurts a fish inside it (%.0f hp)" % health.hp)
+	# Less any armour from the level-up's signature stat (the Boxfish's is armour).
+	var burst := maxf(settings.burst_damage - run.block_of(fish).value("armour"), 1.0)
+	check(is_equal_approx(health.hp, run.max_hp() - burst), "the cloud hurts a fish inside it (%.0f hp)" % health.hp)
 	await _ticks(int(settings.burst_time * 120.0))
 	check(run._clouds.is_empty(), "then it fades away")
 	settings.bite_damage = 30.0

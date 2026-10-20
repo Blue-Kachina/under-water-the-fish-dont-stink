@@ -18,7 +18,9 @@ extends RefCounted
 ## (UnnaturalRun.spawn_point()). The kinds are a weighted mix of those unlocked
 ## by now (EnemyKind.unlock_minute), each zombie elite by elite_chance(). While
 ## `hushed` (a stage event coming: StageTimeline.hushed()) it sends none; after
-## the Leviathan enrages, `escalation` multiplies the target too.
+## the Leviathan enrages, `escalation` multiplies the target too. Once the final
+## boss falls, `cleared` sends packs cleared_spawn_rate times as often, and
+## cleared_alive_scale more of them.
 
 ## Kills over this many seconds make the kill rate.
 const KILL_WINDOW := 10.0
@@ -36,6 +38,8 @@ var players := 1
 ## No packs while set (a stage event is close), and a multiplier on the target (enraged).
 var hushed := false
 var escalation := 1.0
+## The final boss is beaten (the whirlpool's open): packs come faster.
+var cleared := false
 ## Seconds until the next pack may come, and packs sent so far.
 var next_pack := 0.0
 var packs := 0
@@ -68,6 +72,7 @@ func reset() -> void:
 	reliefs = 0
 	hushed = false
 	escalation = 1.0
+	cleared = false
 	_kill_times.clear()
 	_read_left = READ_INTERVAL
 
@@ -113,7 +118,8 @@ func baseline() -> float:
 
 ## How many zombies it wants out now.
 func target_alive() -> int:
-	return mini(roundi(baseline() * pressure * escalation), horde.capacity)
+	var after := settings.cleared_alive_scale if cleared else 1.0
+	return mini(roundi(baseline() * pressure * escalation * after), horde.capacity)
 
 
 ## How big a pack is now.
@@ -146,7 +152,7 @@ func update(delta: float, around: PackedVector3Array) -> void:
 	var missing := target_alive() - horde.alive_count()
 	if missing <= 0:
 		return
-	next_pack = settings.spawn_interval
+	next_pack = settings.spawn_interval / (maxf(settings.cleared_spawn_rate, 0.05) if cleared else 1.0)
 	var kind := pick_kind()
 	var count := mini(swarm_size() * (2 if horde.kinds[kind].behaviour == EnemyKind.Behaviour.SWARM else 1), missing)
 	var near := around[rng.randi_range(0, around.size() - 1)]

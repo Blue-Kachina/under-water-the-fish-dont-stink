@@ -40,12 +40,16 @@ func has_tome(id: String) -> bool:
 	return id in tomes
 
 
-## A new weapon at `at_level` (its facets spread evenly over the upgrades below it).
-func add_weapon(id: String, at_level := 1) -> void:
+## A new weapon at `at_level` (its facets spread evenly over the upgrades below
+## it), plus `gains` (facet id -> amount: a new weapon card's rolled rarity).
+func add_weapon(id: String, at_level := 1, gains := {}) -> void:
 	if not has_weapon(id):
 		weapons.append(id)
 	_levels[id] = maxi(at_level, 1)
-	_facets[id] = _spread(id, at_level)
+	var held := _spread(id, at_level)
+	for facet: String in gains:
+		held[facet] = held.get(facet, 0.0) + float(gains[facet])
+	_facets[id] = held
 
 
 ## Weapon `id` gone (swapped out for a boss weapon).

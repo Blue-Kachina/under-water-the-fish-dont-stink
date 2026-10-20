@@ -127,6 +127,11 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 100.0, 0.5, "or_greater") var swarm_per_minute := 4.0
 ## ...at most one pack every this many seconds.
 @export_range(0.05, 20.0, 0.05, "or_greater") var spawn_interval := 1.2
+## Once the final boss falls (the whirlpool's open), packs come cleared_spawn_rate
+## times as often, and the director wants cleared_alive_scale times as many out
+## (1, 1: no change).
+@export_range(1.0, 10.0, 0.05, "or_greater") var cleared_spawn_rate := 2.0
+@export_range(1.0, 10.0, 0.05, "or_greater") var cleared_alive_scale := 1.5
 ## Packs turn up this far from a player (m): out of every player's view, or
 ## anywhere round them in the murk (murk_spawn_anywhere).
 @export_range(5.0, 200.0, 1.0, "or_greater") var spawn_distance_min := 35.0
@@ -157,7 +162,7 @@ static func shared() -> UnnaturalSettings:
 ## Every zombie's hp, speed and contact damage are multiplied by these.
 @export_range(0.0, 10.0, 0.05, "or_greater") var enemy_hp_scale := 1.0
 @export_range(0.0, 5.0, 0.05, "or_greater") var enemy_speed_scale := 1.0
-@export_range(0.0, 10.0, 0.05, "or_greater") var enemy_damage_scale := 1.0
+@export_range(0.0, 10.0, 0.05, "or_greater") var enemy_damage_scale := 1.2
 ## Difficulty: a level that grows difficulty_per_minute a minute. Each zombie
 ## keeps the level it spawned at: per level, difficulty_hp more hp,
 ## difficulty_damage more contact damage, difficulty_speed more speed, and
@@ -229,6 +234,13 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 1.0, 0.01) var big_enemy_slow := 0.2
 ## The same zombie can't be battered again for this long (s).
 @export_range(0.0, 2.0, 0.05, "or_greater") var battery_repeat := 0.35
+## Swimming into a zombie doesn't hurt you (even below battering speed, say
+## between strides): one within safe_ram_cone degrees of the way you're
+## swimming, while you're faster than it. With the bow wave up, every zombie
+## ahead of you (in front of your middle) is safe while you're swimming
+## forward. Bosses' bodies still bite.
+@export var safe_ramming := true
+@export_range(0.0, 90.0, 1.0) var safe_ram_cone := 60.0
 
 @export_group("Attacks")
 ## Each fish fires its own auto-attack (FishAttack.FOR_FAMILY); pick one here
@@ -420,6 +432,13 @@ static func shared() -> UnnaturalSettings:
 @export_range(5.0, 100.0, 1.0, "or_greater") var ring_radius := 22.0
 @export_range(0, 3000, 10, "or_greater") var stampede_count := 160
 @export_range(0, 3000, 10, "or_greater") var tide_count := 120
+## The ring, stampede and tide are swarm events: each lasts swarm_event_time s,
+## a fresh wave (another ring, bait ball or wall, from a new side) every
+## swarm_wave_every s, each swarm_wave_ramp bigger than the first (0.25: the
+## fifth is twice the first). The HUD counts it down. 0 s: one wave, as before.
+@export_range(0.0, 300.0, 1.0, "or_greater") var swarm_event_time := 30.0
+@export_range(1.0, 60.0, 0.5, "or_greater") var swarm_wave_every := 6.0
+@export_range(0.0, 2.0, 0.05, "or_greater") var swarm_wave_ramp := 0.25
 ## When the boss comes, the zombies further than this from every player (m)
 ## are cleared away (0: none are).
 @export_range(0.0, 300.0, 5.0, "or_greater") var boss_cleanup := 40.0
@@ -427,7 +446,7 @@ static func shared() -> UnnaturalSettings:
 @export_group("Drowned Shark")
 ## The mini-boss: a huge zombie shark. Its hp (times 1 + coop_scale per extra
 ## player), swim speed (m/s), size (times the Shark's) and contact damage.
-@export_range(1.0, 100000.0, 50.0, "or_greater") var shark_hp := 20000.0
+@export_range(1.0, 100000.0, 50.0, "or_greater") var shark_hp := 30000.0
 @export_range(0.0, 60.0, 0.5, "or_greater") var shark_speed := 12.0
 @export_range(1.0, 15.0, 0.25, "or_greater") var shark_size := 15.0
 @export_range(0.0, 500.0, 1.0, "or_greater") var shark_contact := 25.0
@@ -446,7 +465,7 @@ static func shared() -> UnnaturalSettings:
 @export_group("Blood Leviathan")
 ## The boss: a giant serpent. Beating it completes the stage. Its hp (times 1 +
 ## coop_scale per extra player), swim speed (m/s), segments and contact damage.
-@export_range(1.0, 1000000.0, 100.0, "or_greater") var leviathan_hp := 60000.0
+@export_range(1.0, 1000000.0, 100.0, "or_greater") var leviathan_hp := 90000.0
 ## The whirlpool that opens where it falls: swim within this many metres and press
 ## Jump to enter it, which is what completes the stage (the run goes on until you do).
 @export_range(1.0, 100.0, 1.0, "or_greater") var whirlpool_range := 15.0
@@ -473,7 +492,9 @@ static func shared() -> UnnaturalSettings:
 ## times its value.
 @export_range(0.0, 10.0, 0.05, "or_greater") var xp_gain := 1.0
 ## Each level-up offers this many cards, each a different weapon or tome (0:
-## no cards, just the hp and signature stat).
+## no cards, just the hp and signature stat). Every weapon (each fish's own
+## attack and the powerup weapons) is equally likely as a new one, and a card's
+## rarity is rolled for it, not fixed by the weapon.
 @export_range(0, 6, 1) var card_choices := 3
 ## Solo, the game pauses while the cards are up (co-op: the picker can't be
 ## hurt or seen by zombies instead).
@@ -548,15 +569,15 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 50.0, 0.5, "or_greater") var elite_chest_scale := 2.0
 @export_range(0.0, 20.0, 0.1, "or_greater") var chest_drop_luck := 1.0
 ## Chests cost pearls (D23; off: free). The price is chest_price_base x (1 +
-## chest_price_growth x minutes into the run); a cursed chest's is
-## chest_cursed_price times that, a boss's free. Each player pays from their
-## own purse for the chests they open.
+## chest_price_growth x minutes into the run; 0: no growth over time); a cursed
+## chest's is chest_cursed_price times that, a boss's free. Each player pays
+## from their own purse for the chests they open.
 @export var chest_cost := true
 @export_range(0.0, 1000.0, 1.0, "or_greater") var chest_price_base := 8.0
-@export_range(0.0, 5.0, 0.05, "or_greater") var chest_price_growth := 0.4
-## Each chest a player has paid for raises their next one's price by this
-## share of it (0.15: the 10th costs 2.35x the first, at the same minute).
-@export_range(0.0, 2.0, 0.01, "or_greater") var chest_price_step := 0.15
+@export_range(0.0, 5.0, 0.05, "or_greater") var chest_price_growth := 0.0
+## Each chest a player has paid for on this map raises their next one's price
+## by this share of the base (0.25: the 10th costs 3.25x the first).
+@export_range(0.0, 2.0, 0.01, "or_greater") var chest_price_step := 0.25
 @export_range(0.0, 10.0, 0.05, "or_greater") var chest_cursed_price := 1.5
 
 @export_group("Drops")
@@ -595,7 +616,7 @@ static func shared() -> UnnaturalSettings:
 @export_range(1, 100, 1, "or_greater") var pearl_elite_value := 1
 @export_range(0, 1000, 1, "or_greater") var boss_pearls := 25
 ## Pearls this near a fish (m) are drawn in: the pickup range.
-@export_range(0.0, 60.0, 0.5, "or_greater") var pickup_range := 7.0
+@export_range(0.0, 60.0, 0.5, "or_greater") var pickup_range := 10.0
 @export_range(0.0, 100.0, 0.5, "or_greater") var pickup_pull := 12.0
 ## Pearls never fade: they wait until someone takes them.
 @export_range(0.05, 3.0, 0.01, "or_greater") var pearl_size := 0.18

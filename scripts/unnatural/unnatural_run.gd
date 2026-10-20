@@ -178,6 +178,9 @@ var bosses: Array[Boss] = []
 var whirlpool: Whirlpool
 ## Run seconds since the final boss fell (-1: not yet).
 var cleared_at := -1.0
+## The swarm event on ({} none): {"id", "left" (s), "next" (s to its next wave), "wave"}.
+var swarm := {}
+const SWARM_EVENTS: Array[String] = ["ring", "stampede", "tide"]
 ## The stage is won (the Leviathan beaten), or the Leviathan enraged.
 var stage_complete := false
 var enraged := false
@@ -223,8 +226,10 @@ var _chest_offer := {}
 ## The cards rolled for a chest, per player: chest -> {fish -> {cards, heading, line}}, so putting it back and
 ## opening it again can't reroll them.
 var _chest_rolls := {}
-## Sunken Idol's extra picks left from the chest `fish` has up.
+## Sunken Idol's extra picks left from the chest `fish` has up, and Moon
+## Pearl's from the level's cards they have up.
 var _extra_picks := {}
+var _level_extra := {}
 var _offers := {}
 var _offer_kind := {}
 var _opening := {}
@@ -316,6 +321,7 @@ func start() -> void:
 	_chest_offer.clear()
 	_chest_rolls.clear()
 	_extra_picks.clear()
+	_level_extra.clear()
 	_opening.clear()
 	_backed_out.clear()
 	_revive.clear()
@@ -325,6 +331,7 @@ func start() -> void:
 		whirlpool.queue_free()
 	whirlpool = null
 	cleared_at = -1.0
+	swarm = {}
 	horde.clear()
 	director.reset()
 	timeline.reset()
@@ -605,6 +612,7 @@ func _leave(fish: FishController) -> void:
 	_opening.erase(fish)
 	_backed_out.erase(fish)
 	_revive.erase(fish)
+	_level_extra.erase(fish)
 	_blocks.erase(fish)
 	_loadouts.erase(fish)
 	_purses.erase(fish)
@@ -725,6 +733,7 @@ func _physics_process(delta: float) -> void:
 			seabed.set_murk(settings.murk_density)
 	if not tank and not is_over:
 		timeline.update(elapsed)  # a guest's only announces (the host's elapsed corrects ours)
+		_update_swarm(delta)
 	if tank:
 		tank.update(delta)
 	elif authority and not is_over:
@@ -736,6 +745,7 @@ func _physics_process(delta: float) -> void:
 		director.players = maxi(around.size(), 1)
 		director.hushed = timeline.hushed(elapsed)
 		director.escalation = (settings.enrage_scale if enraged else 1.0) * horde_scale()
+		director.cleared = cleared_at >= 0.0
 		director.update(delta, around)
 		horde.difficulty = difficulty()
 		_relocate_strays(delta)
@@ -832,12 +842,17 @@ func hit(index: int, amount: float, by: FishController, source: String, push := 
 		var twist: Traversal = _twists.get(by)
 		if twist:
 			amount *= twist.damage_factor(source)
-		if _powerups.has(by):
-			amount *= (_powerups[by] as Powerups).damage_scale()
+		var powerups: Powerups = _powerups.get(by)
+		if powerups:
+			amount *= powerups.damage_scale() * (1.0 + powerups.bonus_on(index))  # Momentum Fin, Sonar Pinger's marks
 		var stats := stats_of(by)
 		if block.value("crit_chance") > 0.0 and rng.randf() < block.value("crit_chance"):
 			amount *= 1.5 + block.value("crit_damage")
 			stats.crits += 1
+			# Megalodon Tooth: a crit that leaves it under the share finishes it (not a boss).
+			var execute := powerups.execute_share() if powerups else 0.0
+			if execute > 0.0 and not boss_at(index) and horde.enemy_hp(index) - amount < horde.enemy_max_hp(index) * execute:
+				amount = maxf(amount, horde.enemy_hp(index) + 1.0)
 		push *= 1.0 + block.value("knockback")
 		stats.damage += amount
 		stats.by_source[source] = stats.by_source.get(source, 0.0) + amount
@@ -910,7 +925,7 @@ func _batter_zombies(fish: FishController) -> void:
 		powerups_of(fish).on_battery(i)
 
 
-## A zombie touching `fish` (not one it's battering) hurts it, then i-frames.
+## A zombie touching `fish` (not one it's battering, or swimming into: rammed()) hurts it, then i-frames.
 func _touch_zombies(fish: FishController) -> void:
 	var health: FishHealth = _health[fish]
 	if health.iframes_left > 0.0 or settings.enemy_damage_scale <= 0.0:
@@ -923,6 +938,8 @@ func _touch_zombies(fish: FishController) -> void:
 		var offset := horde.enemy_position(i) - at
 		if battering and offset.length_squared() > 0.0001 and offset.normalized().dot(nose) >= Battery.FRONT:
 			continue  # it's being battered, not biting
+		if rammed(fish, i):
+			continue  # we swam into it: our charge, not its bite
 		var kind := horde.enemy_kind(i)
 		var amount := kind.contact_damage * settings.enemy_damage_scale * (2.0 if horde.is_elite(i) else 1.0) * horde.damage_scale(i)
 		var boss := boss_at(i)
@@ -935,6 +952,28 @@ func _touch_zombies(fish: FishController) -> void:
 		var away := offset.normalized() if offset.length_squared() > 0.0001 else -nose
 		horde.damage(i, 0.0, "contact", null, away)  # knocked back off the fish
 		return
+
+
+## Whether `fish` is swimming into zombie `index` rather than being bitten by
+## it (safe_ramming): it's within safe_ram_cone of the way the fish swims and
+## the fish is the faster of the two, say mid-stride with accelerate let go;
+## or, with the bow wave up, it's anywhere ahead of the fish's middle while
+## the fish swims forward. A boss's body always bites.
+func rammed(fish: FishController, index: int) -> bool:
+	if not settings.safe_ramming or boss_at(index):
+		return false
+	var velocity := fish.swim_velocity()
+	var speed := velocity.length()
+	var offset := horde.enemy_position(index) - fish.global_position
+	if speed < 0.5 or offset.length_squared() < 0.0001:
+		return false
+	var toward := offset.normalized()
+	var nose := -fish.global_basis.z
+	if fish.bow_amount > 0.0 and toward.dot(nose) > 0.0 and velocity.dot(nose) > 0.5:
+		return true
+	if toward.dot(velocity / speed) < cos(deg_to_rad(settings.safe_ram_cone)):
+		return false
+	return speed > horde.enemy_velocity(index).length()
 
 
 ## A boxfish's burst cloud `fish` is in hurts it.
@@ -1218,12 +1257,16 @@ func boss_at(index: int) -> Boss:
 	return null
 
 
-## A stage event starts (StageTimeline): a swarm or a boss.
+## A stage event starts (StageTimeline): a swarm or a boss. A swarm (the ring,
+## stampede, tide) lasts swarm_event_time, its first wave now and the rest in
+## _update_swarm().
 func _start_event(event: String) -> void:
 	stage_event.emit(event)
 	for fish in local_players():
 		if _powerups.has(fish):
 			(_powerups[fish] as Powerups).on_stage_event(event)
+	if event in SWARM_EVENTS:
+		swarm = {"id": event, "left": settings.swarm_event_time, "next": settings.swarm_wave_every, "wave": 0}
 	if not authority:
 		return  # the host makes it happen; its zombies and bosses come over the network
 	var around := PackedVector3Array()
@@ -1234,27 +1277,63 @@ func _start_event(event: String) -> void:
 		return
 	var crowd := 1.0 + settings.coop_scale * maxi(around.size() - 1, 0)
 	match event:
+		"ring", "stampede", "tide":
+			_swarm_wave(event, 0, around)
+		"miniboss":
+			_add_boss(DrownedShark.new(), spawn_point(around[0]), settings.shark_hp * crowd)
+		"boss":
+			_clean_up(around)
+			_add_boss(BloodLeviathan.new(), spawn_point(around[0]), settings.leviathan_hp * crowd)
+
+
+## Swarm event `event`'s wave `wave` round the players up (`around`): each
+## swarm_wave_ramp bigger than the first. A ring closes round each player; a
+## bait ball charges from a fresh side; a wall comes from a fresh side.
+func _swarm_wave(event: String, wave: int, around: PackedVector3Array) -> void:
+	var crowd := (1.0 + settings.coop_scale * maxi(around.size() - 1, 0)) * (1.0 + settings.swarm_wave_ramp * wave)
+	var p := around[rng.randi_range(0, around.size() - 1)]
+	var from := Vector3.FORWARD.rotated(Vector3.UP, rng.randf() * TAU)
+	match event:
 		"ring":
 			for at in around:
 				_ring(at, roundi(settings.ring_count * crowd / around.size()), settings.ring_radius)
 		"stampede":
-			var p := around[0]
-			var from := Vector3.FORWARD.rotated(Vector3.UP, rng.randf() * TAU)
 			horde.spawn_pack(0, roundi(settings.stampede_count * crowd), p + from * 45.0, 6.0, -from, 0.0)
 		"tide":
-			var p := around[0]
-			var from := Vector3.FORWARD.rotated(Vector3.UP, rng.randf() * TAU)
 			var across := Vector3.UP.cross(from)
 			var count := roundi(settings.tide_count * crowd)
 			for n in count:
 				var along := (float(n) / maxf(count - 1, 1) - 0.5) * 70.0
 				var at := p + from * 40.0 + across * along + Vector3.UP * rng.randf_range(-5.0, 5.0)
 				horde.spawn(director.pick_kind(), at, -from, rng.randf() < director.elite_chance())
-		"miniboss":
-			_add_boss(DrownedShark.new(), spawn_point(around[0]), settings.shark_hp * crowd)
-		"boss":
-			_clean_up(around)
-			_add_boss(BloodLeviathan.new(), spawn_point(around[0]), settings.leviathan_hp * crowd)
+
+
+## The swarm event on (if any): its time left, and its next wave when due (the host's).
+func _update_swarm(delta: float) -> void:
+	if swarm.is_empty():
+		return
+	swarm.left -= delta
+	if swarm.left <= 0.0:
+		swarm = {}
+		return
+	swarm.next -= delta
+	if swarm.next > 0.0:
+		return
+	swarm.next += settings.swarm_wave_every
+	swarm.wave += 1
+	if not authority:
+		return
+	var around := PackedVector3Array()
+	for fish in players:
+		if is_up(fish):
+			around.append(fish.global_position)
+	if not around.is_empty():
+		_swarm_wave(swarm.id, swarm.wave, around)
+
+
+## Seconds left of the swarm event on (0: none).
+func swarm_left() -> float:
+	return maxf(swarm.get("left", 0.0), 0.0)
 
 
 ## `count` zombies in a ring `radius` m round `at`, facing in.
@@ -1569,8 +1648,9 @@ func _offer_level(fish: FishController) -> void:
 		return
 	_offers[fish] = cards
 	_offer_kind[fish] = "level"
+	_level_extra[fish] = powerups_of(fish).extra_level_picks()
 	var signature := StatBlock.signature(fish.character)
-	var gave := "+%d MAX HP  ·  %s (SIGNATURE)  ·  %s" % [roundi(settings.hp_per_level),
+	var gave := "MAX HP +%d  ·  %s (SIGNATURE)  ·  %s" % [roundi(settings.hp_per_level),
 			StatBlock.describe(signature, StatBlock.amount(signature, settings.signature_steps)).to_upper(), CardDeck.slot_line(self, fish)]
 	if cards_pause_game():
 		_hold_for_cards(true)
@@ -1682,6 +1762,27 @@ func pick(fish: FishController, index: int) -> void:
 		_extra_picks.erase(fish)
 	else:
 		take_card(fish, card)
+		if offer_kind == "level" and _level_extra.get(fish, 0) > 0:
+			# Moon Pearl: another card from what's left of the same level's offer
+			# (a new weapon or tome only while a slot's still free).
+			_level_extra[fish] -= 1
+			var loadout := loadout_of(fish)
+			var rest := []
+			for n in cards.size():
+				var other: Dictionary = cards[n]
+				if n == clampi(index, 0, cards.size() - 1) or other.get("kind", "") == "fallback":
+					continue
+				if other.kind == "new_weapon" and (loadout.weapons.size() >= settings.weapon_slots or loadout.has_weapon(other.weapon)):
+					continue
+				if other.kind == "new_tome" and (loadout.tomes.size() >= settings.tome_slots or loadout.has_tome(other.tome)):
+					continue
+				rest.append(other)
+			if not rest.is_empty():
+				_offers[fish] = rest
+				card_picked.emit(fish, card)
+				cards_offered.emit(fish, rest, "ANOTHER PICK", "THE MOON PEARL'S GIFT")
+				return
+		_level_extra.erase(fish)
 		_pending[fish] = _pending.get(fish, 1) - 1
 	_offers.erase(fish)
 	_offer_kind.erase(fish)
@@ -1711,7 +1812,7 @@ func take_card(fish: FishController, card: Dictionary) -> void:
 			if loadout.has_weapon(id):
 				loadout.upgrade_weapon(id, card.gains)
 			else:
-				loadout.add_weapon(id)
+				loadout.add_weapon(id, 1, card.get("gains", {}))
 			if id != Weapons.ATTACK:
 				powerups_of(fish).refresh()
 		"tome", "new_tome":

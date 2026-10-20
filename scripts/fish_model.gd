@@ -29,6 +29,9 @@ var fin_right: Node3D
 
 ## Scaled by react() to squash and stretch, if the model has one.
 var squash: Node3D
+## How much it squashes and stretches (0: not at all, the realistic models'
+## default; 1: the old jelly-sweet boxfish).
+var squash_strength := 0.0
 
 ## What the swimmer is doing, set before react(): resting on a surface, and
 ## an Extra Swishy stride's tail swing (SwishySwim.tail_swing) and power, 0..1.
@@ -149,7 +152,7 @@ func react(delta: float, velocity: Vector3) -> void:
 	_acceleration = _acceleration.lerp(raw, 1.0 - exp(-15.0 * delta))
 	var to_local := global_basis.orthonormalized().inverse()
 	var local := to_local * _acceleration
-	var target := Vector2(clampf(-local.z / 35.0, -0.3, 0.35), clampf(-local.y / 45.0, -0.35, 0.2))
+	var target := Vector2(clampf(-local.z / 35.0, -0.3, 0.35), clampf(-local.y / 45.0, -0.35, 0.2)) * squash_strength
 	_stretch_speed += ((target - _stretch) * 160.0 - _stretch_speed * 11.0) * delta
 	_stretch += _stretch_speed * delta
 	var along := 1.0 + _stretch.x

@@ -14,39 +14,63 @@ extends RefCounted
 ## INFO has each one's name, colour and short tag; create() makes one by id.
 
 ## Id -> [name, colour, tag, what it does, rarity (Rarity.Tier)]. A chest
-## rolls a rarity with the opener's luck and offers powerups of it.
+## rolls a rarity with the opener's luck and offers powerups of it. What it
+## does: one effect a line ("\n" between), the stat first then its change; a
+## line starting "!" is a curse's downside. A weapon's rarity isn't used (its
+## cards roll their own).
 const INFO := {
-	"kelp_wrap": ["Kelp Wrap", Color(0.35, 0.75, 0.35), "KW", "+0.5 HP a second: kelp ribbons mend you as you swim.", Rarity.Tier.COMMON],
-	"sea_salt": ["Sea Salt", Color(0.95, 0.95, 1.0), "SA", "+5% crit chance.", Rarity.Tier.COMMON],
-	"coral_knuckles": ["Coral Knuckles", Color(1.0, 0.5, 0.45), "CK", "+20% battery damage: coral on the nose.", Rarity.Tier.COMMON],
-	"divers_goggles": ["Diver's Goggles", Color(0.3, 0.75, 0.95), "DG", "+25% pickup range: you spot pearls from further.", Rarity.Tier.COMMON],
-	"lucky_sand_dollar": ["Lucky Sand Dollar", Color(0.95, 0.88, 0.7), "LD", "+0.1 luck: better cards and chests.", Rarity.Tier.COMMON],
-	"lamprey": ["Lamprey", Color(0.55, 0.5, 0.6), "LP", "Every kill heals you 1 HP.", Rarity.Tier.UNCOMMON],
-	"clam_shield": ["Clam Shield", Color(0.9, 0.8, 0.85), "CS", "Every 12 s a clam takes the next hit for you.", Rarity.Tier.UNCOMMON],
-	"momentum_fin": ["Momentum Fin", Color(0.7, 0.95, 0.6), "MF", "Hit harder the faster you swim: +10% per 10 m/s.", Rarity.Tier.UNCOMMON],
-	"treasure_map": ["Treasure Map", Color(0.85, 0.7, 0.4), "TM", "Zombies drop 30% more chests, and chests are pinged further.", Rarity.Tier.UNCOMMON],
+	"kelp_wrap": ["Kelp Wrap", Color(0.35, 0.75, 0.35), "KW", "Regen +0.5 HP/s", Rarity.Tier.COMMON],
+	"sea_salt": ["Sea Salt", Color(0.95, 0.95, 1.0), "SA", "Crit Chance +5%", Rarity.Tier.COMMON],
+	"coral_knuckles": ["Coral Knuckles", Color(1.0, 0.5, 0.45), "CK", "Battery Damage +20%", Rarity.Tier.COMMON],
+	"divers_goggles": ["Diver's Goggles", Color(0.3, 0.75, 0.95), "DG", "Pickup Range +25%", Rarity.Tier.COMMON],
+	"lucky_sand_dollar": ["Lucky Sand Dollar", Color(0.95, 0.88, 0.7), "LD", "Luck +0.1", Rarity.Tier.COMMON],
+	"sticky_anemone": ["Sticky Anemone", Color(1.0, 0.55, 0.8), "AN", "Hits: 10% chance to slow a zombie 40% for 2 s", Rarity.Tier.COMMON],
+	"ink_sac": ["Ink Sac", Color(0.45, 0.35, 0.6), "IS", "When hurt: an ink cloud blinds zombies near you for 2 s", Rarity.Tier.COMMON],
+	"lamprey": ["Lamprey", Color(0.55, 0.5, 0.6), "LP", "Heal per kill +1 HP", Rarity.Tier.UNCOMMON],
+	"clam_shield": ["Clam Shield", Color(0.9, 0.8, 0.85), "CS", "Blocks a hit every 12 s", Rarity.Tier.UNCOMMON],
+	"momentum_fin": ["Momentum Fin", Color(0.7, 0.95, 0.6), "MF", "Damage +10% per 10 m/s you swim", Rarity.Tier.UNCOMMON],
+	"treasure_map": ["Treasure Map", Color(0.85, 0.7, 0.4), "TM", "Chest Drops +30%\nChest Ping Range +10 m", Rarity.Tier.UNCOMMON],
+	"sonar_pinger": ["Sonar Pinger", Color(0.4, 0.95, 0.85), "SP", "Every 6 s a pulse marks the zombies near you\nDamage to marked zombies +25%", Rarity.Tier.UNCOMMON],
+	"cold_seep": ["Cold Seep", Color(0.65, 0.9, 1.0), "CO", "Hits: 8% chance to freeze a zombie for 1.5 s", Rarity.Tier.UNCOMMON],
+	"whirlpool_charm": ["Whirlpool Charm", Color(0.35, 0.7, 0.95), "WC", "Kills: 6% chance to open a whirlpool that pulls zombies in and grinds them", Rarity.Tier.UNCOMMON],
 	"greek_fire": ["Greek Fire Trail", Color(1.0, 0.45, 0.1), "GF", "Burning patches behind you burn the zombies in them.", Rarity.Tier.UNCOMMON],
 	"chain_lightning": ["Chain Lightning", Color(0.45, 0.8, 1.0), "CL", "Hits may start lightning that jumps between zombies.", Rarity.Tier.UNCOMMON],
 	"torpedo": ["Torpedo Launcher", Color(0.9, 0.85, 0.3), "TL", "Hits may fire heat-seeking torpedoes that explode.", Rarity.Tier.RARE],
-	"bow_grow_bow": ["Bow Grow Bow", Color(1.0, 0.3, 0.55), "BB", "Wear the bow: a much bigger bow wave to batter with.", Rarity.Tier.COMMON],
-	"barnacle_plating": ["Barnacle Plating", Color(0.8, 0.75, 0.62), "BP", "+2 armour: every hit you take is smaller.", Rarity.Tier.COMMON],
-	"hermit_shell": ["Hermit Shell", Color(0.95, 0.6, 0.45), "HS", "+15 max HP.", Rarity.Tier.COMMON],
-	"fizzy_soda": ["Fizzy Soda", Color(0.55, 1.0, 0.75), "FS", "+8% attack speed.", Rarity.Tier.COMMON],
-	"speedy_seahorse": ["Speedy Seahorse", Color(1.0, 0.8, 0.3), "SH", "+6% swim speed.", Rarity.Tier.COMMON],
+	"krakens_grasp": ["Kraken's Grasp", Color(0.7, 0.3, 0.55), "KG", "Hits: 5% chance a tentacle slams the area\nZombies it hits are held still", Rarity.Tier.RARE],
+	"ghost_swordfish": ["Ghost Swordfish", Color(0.75, 0.85, 1.0), "GS", "Every 3 s a phantom swordfish dashes through a line of zombies", Rarity.Tier.RARE],
+	"ammonite_spiral": ["Ammonite Spiral", Color(0.9, 0.75, 0.55), "AS", "Projectile hits split into 3 shards", Rarity.Tier.RARE],
+	"riptide": ["Riptide", Color(0.3, 0.55, 0.9), "RT", "Perfectly timed strides leave a current behind you\nZombies in it are dragged back and hurt", Rarity.Tier.RARE],
+	"reef_guardian": ["Reef Guardian", Color(1.0, 0.5, 0.4), "RG", "Under 25% HP: untouchable for 3 s\nRecharges in 60 s", Rarity.Tier.RARE],
+	"bioluminescence": ["Bioluminescence", Color(0.5, 1.0, 0.7), "BL", "Level-ups and chests send out a flash\nFlash damage grows with your level", Rarity.Tier.RARE],
+	"bow_grow_bow": ["Bow Grow Bow", Color(1.0, 0.3, 0.55), "BB", "Bow Wave: much bigger, to batter with", Rarity.Tier.COMMON],
+	"barnacle_plating": ["Barnacle Plating", Color(0.8, 0.75, 0.62), "BP", "Armour +2", Rarity.Tier.COMMON],
+	"hermit_shell": ["Hermit Shell", Color(0.95, 0.6, 0.45), "HS", "Max HP +15", Rarity.Tier.COMMON],
+	"fizzy_soda": ["Fizzy Soda", Color(0.55, 1.0, 0.75), "FS", "Attack Speed +8%", Rarity.Tier.COMMON],
+	"speedy_seahorse": ["Speedy Seahorse", Color(1.0, 0.8, 0.3), "SH", "Swim Speed +6%", Rarity.Tier.COMMON],
 	"remora_buddy": ["Remora Buddy", Color(0.62, 0.68, 0.8), "RB", "A remora rides along, nipping the nearest zombie. More: more remoras.", Rarity.Tier.COMMON],
-	"bubble_wrap": ["Bubble Wrap", Color(0.7, 0.9, 1.0), "BW", "After 8 s untouched, a bubble takes the next hit for you.", Rarity.Tier.COMMON],
-	"pufferfish_spines": ["Pufferfish Spines", Color(0.95, 0.85, 0.4), "PS", "Zombies that touch you get it back, and spines burst out.", Rarity.Tier.UNCOMMON],
+	"bubble_wrap": ["Bubble Wrap", Color(0.7, 0.9, 1.0), "BW", "Blocks the next hit after 8 s untouched", Rarity.Tier.COMMON],
+	"pufferfish_spines": ["Pufferfish Spines", Color(0.95, 0.85, 0.4), "PS", "Zombies that touch you take damage back\nSpines burst out when you're touched", Rarity.Tier.UNCOMMON],
 	"jellyfish_halo": ["Jellyfish Halo", Color(0.85, 0.5, 1.0), "JH", "Jellies orbit you, stinging what they touch.", Rarity.Tier.UNCOMMON],
-	"electric_eel": ["Electric Eel", Color(0.4, 1.0, 0.9), "EE", "Batteries send out a shock ring.", Rarity.Tier.UNCOMMON],
+	"electric_eel": ["Electric Eel", Color(0.4, 1.0, 0.9), "EE", "Batteries send out a shock ring", Rarity.Tier.UNCOMMON],
 	"depth_charges": ["Depth Charges", Color(0.6, 0.66, 0.55), "DC", "Drops mines behind you that blow up the zombies that follow.", Rarity.Tier.RARE],
-	"anglerfish_lure": ["Anglerfish Lure", Color(0.6, 1.0, 0.5), "AL", "Drops a glowing decoy the zombies chase. Then it bursts.", Rarity.Tier.RARE],
-	"tsunami_heart": ["Tsunami Heart", Color(0.3, 0.6, 1.0), "TH", "Batteries send a wave rolling along your heading.", Rarity.Tier.LEGENDARY],
+	"anglerfish_lure": ["Anglerfish Lure", Color(0.6, 1.0, 0.5), "AL", "Drops a glowing decoy the zombies chase\nIt bursts after a while", Rarity.Tier.RARE],
+	"tsunami_heart": ["Tsunami Heart", Color(0.3, 0.6, 1.0), "TH", "Batteries send a wave rolling along your heading", Rarity.Tier.LEGENDARY],
+	"poseidons_trident": ["Poseidon's Trident", Color(0.4, 0.75, 1.0), "PT", "Every 3rd attack calls lightning down on the biggest zombie near", Rarity.Tier.LEGENDARY],
+	"megalodon_tooth": ["Megalodon Tooth", Color(0.95, 0.92, 0.85), "MT", "Crits finish off zombies under 15% HP (not bosses)", Rarity.Tier.LEGENDARY],
+	"moon_pearl": ["Moon Pearl", Color(0.85, 0.88, 1.0), "MP", "Level-Up Picks +1", Rarity.Tier.LEGENDARY],
+	"abyssal_engine": ["Abyssal Engine", Color(0.5, 0.25, 0.75), "AE", "Projectiles +1\nArea +15%", Rarity.Tier.LEGENDARY],
 	"leviathans_coil": ["Leviathan's Coil", Color(0.85, 0.15, 0.2), "LC", "A trail of coils behind you hurts whatever they touch.", Rarity.Tier.BOSS],
-	"blood_moon_shard": ["Blood Moon Shard", Color(0.9, 0.1, 0.15), "BM", "+100% damage. You take +50% damage.", Rarity.Tier.CURSED],
-	"glass_coral": ["Glass Coral", Color(1.0, 0.55, 0.65), "GC", "+100% damage. Your max HP is halved.", Rarity.Tier.CURSED],
-	"sirens_song": ["Siren's Song", Color(0.75, 0.45, 0.95), "SS", "Double XP. 50% more zombies come.", Rarity.Tier.CURSED],
-	"abyssal_hunger": ["Abyssal Hunger", Color(0.45, 0.1, 0.25), "AH", "Kills heal you. You lose 2% HP a second.", Rarity.Tier.CURSED],
-	"sunken_idol": ["Sunken Idol", Color(0.75, 0.6, 0.3), "SI", "One more pick from every chest. Each stage event takes a powerup.", Rarity.Tier.CURSED],
+	"attack_sting": ["Anemone Sting", Color(1.0, 0.55, 0.3), "ST", "A stinging pulse all round you hits everything inside.", Rarity.Tier.COMMON],
+	"attack_bite": ["Ghost Bite", Color(0.7, 0.85, 1.0), "GB", "Huge spectral jaws snap shut on the zombies ahead.", Rarity.Tier.COMMON],
+	"attack_lash": ["Shock Lash", Color(0.5, 0.8, 1.0), "SL", "Your tail whips the nearest zombie, and the shock arcs on.", Rarity.Tier.COMMON],
+	"attack_thrust": ["Bill Thrust", Color(0.95, 0.9, 0.6), "BT", "Spears of light fly ahead, piercing a line of zombies.", Rarity.Tier.COMMON],
+	"attack_bubbles": ["Bubble Volley", Color(0.6, 0.9, 1.0), "BV", "Homing bubbles pop on the nearest zombies.", Rarity.Tier.COMMON],
+	"attack_spines": ["Spine Burst", Color(0.95, 0.8, 0.45), "SB", "Spines burst out every way when zombies come close.", Rarity.Tier.COMMON],
+	"blood_moon_shard": ["Blood Moon Shard", Color(0.9, 0.1, 0.15), "BM", "Damage +100%\n!Damage Taken +50%", Rarity.Tier.CURSED],
+	"glass_coral": ["Glass Coral", Color(1.0, 0.55, 0.65), "GC", "Damage +100%\n!Max HP -50%", Rarity.Tier.CURSED],
+	"sirens_song": ["Siren's Song", Color(0.75, 0.45, 0.95), "SS", "XP Gain +100%\n!Zombies +50%", Rarity.Tier.CURSED],
+	"abyssal_hunger": ["Abyssal Hunger", Color(0.45, 0.1, 0.25), "AH", "Kills heal you\n!HP -2% a second", Rarity.Tier.CURSED],
+	"sunken_idol": ["Sunken Idol", Color(0.75, 0.6, 0.3), "SI", "Chest Picks +1\n!Each stage event takes a powerup", Rarity.Tier.CURSED],
 }
 
 var id := ""
@@ -99,6 +123,30 @@ static func create(powerup_id: String) -> Powerup:
 			made = LeviathansCoil.new()
 		"blood_moon_shard", "glass_coral", "sirens_song", "abyssal_hunger", "sunken_idol":
 			made = CursedPowerup.new()
+		"attack_sting", "attack_bite", "attack_lash", "attack_thrust", "attack_bubbles", "attack_spines":
+			made = AttackWeapon.new()
+		"sticky_anemone", "cold_seep", "krakens_grasp":
+			made = HitProc.new()
+		"ink_sac":
+			made = InkSac.new()
+		"sonar_pinger":
+			made = SonarPinger.new()
+		"whirlpool_charm":
+			made = WhirlpoolCharm.new()
+		"ghost_swordfish":
+			made = GhostSwordfish.new()
+		"ammonite_spiral":
+			made = AmmoniteSpiral.new()
+		"riptide":
+			made = Riptide.new()
+		"reef_guardian":
+			made = ReefGuardian.new()
+		"bioluminescence":
+			made = Bioluminescence.new()
+		"poseidons_trident":
+			made = PoseidonsTrident.new()
+		"megalodon_tooth", "moon_pearl", "abyssal_engine":
+			made = LegendaryPassive.new()
 		_:
 			made = Powerup.new()
 	made.id = powerup_id
@@ -124,8 +172,31 @@ static func tag(powerup_id: String) -> String:
 	return INFO[powerup_id][2] if INFO.has(powerup_id) else "?"
 
 
+## What it does, as one line (its effects joined).
 static func blurb(powerup_id: String) -> String:
-	return INFO[powerup_id][3] if INFO.has(powerup_id) else ""
+	return ". ".join(blurb_lines(powerup_id) + curse_lines(powerup_id))
+
+
+## Its upsides, one effect a line.
+static func blurb_lines(powerup_id: String) -> PackedStringArray:
+	var lines := PackedStringArray()
+	for line in _lines(powerup_id):
+		if not line.begins_with("!"):
+			lines.append(line)
+	return lines
+
+
+## A curse's downsides, one a line.
+static func curse_lines(powerup_id: String) -> PackedStringArray:
+	var lines := PackedStringArray()
+	for line in _lines(powerup_id):
+		if line.begins_with("!"):
+			lines.append(line.substr(1))
+	return lines
+
+
+static func _lines(powerup_id: String) -> PackedStringArray:
+	return (INFO[powerup_id][3] as String).split("\n", false) if INFO.has(powerup_id) else PackedStringArray()
 
 
 static func tier(powerup_id: String) -> int:
@@ -270,6 +341,21 @@ func chest_drop_factor() -> float:
 
 func chest_ping_bonus() -> float:
 	return 0.0
+
+
+## How much more its hits do to zombie `index` (Sonar Pinger's marks: 0.25 = +25%).
+func bonus_on(_index: int) -> float:
+	return 0.0
+
+
+## The share of its hp under which a crit finishes a zombie (Megalodon Tooth; 0: none).
+func execute_share() -> float:
+	return 0.0
+
+
+## More cards to take from each level-up's offer (Moon Pearl).
+func extra_level_picks() -> int:
+	return 0
 
 
 ## A stage event started (a swarm, a boss).

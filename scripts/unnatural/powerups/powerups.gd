@@ -176,6 +176,30 @@ func chest_ping_bonus() -> float:
 	return more
 
 
+## How much more this player's hits do to zombie `index` (Sonar Pinger's marks).
+func bonus_on(index: int) -> float:
+	var more := 0.0
+	for id: String in held:
+		more += (held[id] as Powerup).bonus_on(index)
+	return more
+
+
+## The share of its hp under which this player's crit finishes a zombie (Megalodon Tooth).
+func execute_share() -> float:
+	var share := 0.0
+	for id: String in held:
+		share = maxf(share, (held[id] as Powerup).execute_share())
+	return share
+
+
+## More cards to take from each level-up's offer (Moon Pearl).
+func extra_level_picks() -> int:
+	var more := 0
+	for id: String in held:
+		more += (held[id] as Powerup).extra_level_picks()
+	return more
+
+
 ## One stack of `id` gone (Sunken Idol's toll). Testing overrides still hold.
 func remove_stack(id: String) -> void:
 	if _earned.get(id, 0) > 0:
@@ -210,7 +234,8 @@ func on_battery(index: int) -> void:
 
 
 ## Items that fire by themselves besides the weapons: the Jelly's quiet stops them too.
-const SELF_FIRING: Array[String] = ["anglerfish_lure", "torpedo", "electric_eel", "tsunami_heart"]
+const SELF_FIRING: Array[String] = ["anglerfish_lure", "torpedo", "electric_eel", "tsunami_heart", "ghost_swordfish",
+		"poseidons_trident", "sonar_pinger"]
 
 
 func on_tick(delta: float) -> void:

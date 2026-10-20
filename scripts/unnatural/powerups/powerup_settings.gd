@@ -357,8 +357,185 @@ static func shared() -> PowerupSettings:
 @export_range(0.0, 10.0, 0.05, "or_greater") var treasure_chests := 0.3
 @export_range(0.0, 500.0, 1.0, "or_greater") var treasure_ping := 10.0
 
+@export_group("Sticky Anemone")
+## A tuft of anemone (common): a hit has anemone_chance (more
+## anemone_chance_per_stack a stack, times the hit's proc) to take
+## anemone_slow of the zombie's speed for anemone_time s.
+@export_range(0, 20, 1, "or_greater") var anemone_stacks := 0
+@export_range(0.0, 1.0, 0.01) var anemone_chance := 0.1
+@export_range(0.0, 1.0, 0.01) var anemone_chance_per_stack := 0.05
+@export_range(0.0, 1.0, 0.05) var anemone_slow := 0.4
+@export_range(0.0, 20.0, 0.1, "or_greater") var anemone_time := 2.0
+
+@export_group("Ink Sac")
+## A dark sac (common): when you're hurt, an ink cloud ink_radius m round you
+## blinds the zombies in it for ink_time s (more ink_time_per_stack a stack):
+## they lose you (all but ink_blind of their speed) and are pushed off you. At
+## most once every ink_cooldown s.
+@export_range(0, 20, 1, "or_greater") var ink_stacks := 0
+@export_range(0.5, 40.0, 0.5, "or_greater") var ink_radius := 6.0
+@export_range(0.0, 20.0, 0.1, "or_greater") var ink_time := 2.0
+@export_range(0.0, 10.0, 0.1, "or_greater") var ink_time_per_stack := 0.5
+@export_range(0.0, 1.0, 0.05) var ink_blind := 0.9
+@export_range(0.0, 30.0, 0.5, "or_greater") var ink_cooldown := 3.0
+
+@export_group("Sonar Pinger")
+## A dish on the head (uncommon): every sonar_every s a pulse marks every
+## zombie within sonar_radius m till the next one; your hits on marked zombies
+## do sonar_bonus more damage (more sonar_bonus_per_stack a stack).
+@export_range(0, 20, 1, "or_greater") var sonar_stacks := 0
+@export_range(0.5, 60.0, 0.5, "or_greater") var sonar_every := 6.0
+@export_range(1.0, 200.0, 1.0, "or_greater") var sonar_radius := 25.0
+@export_range(0.0, 5.0, 0.05, "or_greater") var sonar_bonus := 0.25
+@export_range(0.0, 5.0, 0.05, "or_greater") var sonar_bonus_per_stack := 0.1
+
+@export_group("Cold Seep")
+## Frosted fins (uncommon): a hit has seep_chance (more seep_chance_per_stack
+## a stack, times the hit's proc) to freeze the zombie solid for seep_time s.
+## Bosses shrug it off.
+@export_range(0, 20, 1, "or_greater") var seep_stacks := 0
+@export_range(0.0, 1.0, 0.01) var seep_chance := 0.08
+@export_range(0.0, 1.0, 0.01) var seep_chance_per_stack := 0.04
+@export_range(0.0, 20.0, 0.1, "or_greater") var seep_time := 1.5
+
+@export_group("Whirlpool Charm")
+## A spiral shell (uncommon): a kill has charm_chance (more
+## charm_chance_per_stack a stack) to open a little whirlpool there for
+## charm_time s: it pulls zombies within charm_radius m in (charm_pull m/s)
+## and grinds them, charm_dps a second (more charm_dps_per_stack a stack). At
+## most charm_max out at once.
+@export_range(0, 20, 1, "or_greater") var charm_stacks := 0
+@export_range(0.0, 1.0, 0.01) var charm_chance := 0.06
+@export_range(0.0, 1.0, 0.01) var charm_chance_per_stack := 0.03
+@export_range(0.5, 40.0, 0.5, "or_greater") var charm_radius := 6.0
+@export_range(0.0, 60.0, 0.5, "or_greater") var charm_pull := 12.0
+@export_range(0.0, 2000.0, 1.0, "or_greater") var charm_dps := 30.0
+@export_range(0.0, 2000.0, 1.0, "or_greater") var charm_dps_per_stack := 15.0
+@export_range(0.1, 30.0, 0.1, "or_greater") var charm_time := 3.0
+@export_range(1, 50, 1, "or_greater") var charm_max := 4
+
+@export_group("Kraken's Grasp")
+## A tentacle (rare): a hit has kraken_chance (more kraken_chance_per_stack a
+## stack, times the hit's proc) to bring a tentacle slamming down on the
+## zombie: kraken_damage (more kraken_damage_per_stack a stack) to every
+## zombie within kraken_radius m, held still for kraken_hold s. At most
+## kraken_max_rate slams a second.
+@export_range(0, 20, 1, "or_greater") var kraken_stacks := 0
+@export_range(0.0, 1.0, 0.01) var kraken_chance := 0.05
+@export_range(0.0, 1.0, 0.01) var kraken_chance_per_stack := 0.025
+@export_range(0.0, 5000.0, 5.0, "or_greater") var kraken_damage := 120.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var kraken_damage_per_stack := 60.0
+@export_range(0.5, 30.0, 0.5, "or_greater") var kraken_radius := 4.5
+@export_range(0.0, 10.0, 0.1, "or_greater") var kraken_hold := 1.5
+@export_range(0.1, 20.0, 0.1, "or_greater") var kraken_max_rate := 2.0
+
+@export_group("Ghost Swordfish")
+## A phantom swordfish escort (rare): every ghost_every s each (one a stack)
+## dashes ghost_length m through the nearest line of zombies within
+## ghost_range m, ghost_damage to each within ghost_width m of its path.
+@export_range(0, 20, 1, "or_greater") var ghost_stacks := 0
+@export_range(0.2, 30.0, 0.1, "or_greater") var ghost_every := 3.0
+@export_range(1.0, 100.0, 1.0, "or_greater") var ghost_range := 20.0
+@export_range(1.0, 100.0, 1.0, "or_greater") var ghost_length := 18.0
+@export_range(0.1, 10.0, 0.1, "or_greater") var ghost_width := 1.5
+@export_range(0.0, 5000.0, 5.0, "or_greater") var ghost_damage := 60.0
+
+@export_group("Ammonite Spiral")
+## A spiral shell (rare): a projectile's hit (spears, bubbles, spines,
+## torpedoes) splits into ammonite_splits shards (one more a stack), each to
+## another zombie within ammonite_range m for ammonite_share of the hit. At
+## most ammonite_max_rate splits a second.
+@export_range(0, 20, 1, "or_greater") var ammonite_stacks := 0
+@export_range(1, 20, 1, "or_greater") var ammonite_splits := 3
+@export_range(0.0, 2.0, 0.05, "or_greater") var ammonite_share := 0.35
+@export_range(1.0, 50.0, 0.5, "or_greater") var ammonite_range := 8.0
+@export_range(1.0, 200.0, 1.0, "or_greater") var ammonite_max_rate := 20.0
+
+@export_group("Riptide")
+## Swirling water (rare): a stride timed at its peak (timing riptide_timing or
+## better) leaves a current riptide_length m behind you for riptide_time s:
+## zombies in it (riptide_width m either side) are dragged back riptide_drag
+## m/s and take riptide_dps a second (more riptide_dps_per_stack a stack).
+@export_range(0, 20, 1, "or_greater") var riptide_stacks := 0
+@export_range(0.0, 1.0, 0.05) var riptide_timing := 0.75
+@export_range(1.0, 60.0, 0.5, "or_greater") var riptide_length := 10.0
+@export_range(0.5, 20.0, 0.5, "or_greater") var riptide_width := 2.5
+@export_range(0.1, 20.0, 0.1, "or_greater") var riptide_time := 3.0
+@export_range(0.0, 100.0, 0.5, "or_greater") var riptide_drag := 8.0
+@export_range(0.0, 2000.0, 1.0, "or_greater") var riptide_dps := 25.0
+@export_range(0.0, 2000.0, 1.0, "or_greater") var riptide_dps_per_stack := 12.0
+
+@export_group("Reef Guardian")
+## A coral crown (rare): dropping under guardian_threshold of your max hp makes
+## you untouchable for guardian_time s, then it rests guardian_cooldown s (each
+## more stack takes guardian_cooldown_per_stack of that off).
+@export_range(0, 20, 1, "or_greater") var guardian_stacks := 0
+@export_range(0.0, 1.0, 0.05) var guardian_threshold := 0.25
+@export_range(0.0, 20.0, 0.25, "or_greater") var guardian_time := 3.0
+@export_range(1.0, 600.0, 1.0, "or_greater") var guardian_cooldown := 60.0
+@export_range(0.0, 0.9, 0.05) var guardian_cooldown_per_stack := 0.15
+
+@export_group("Bioluminescence")
+## Glowing spots (rare): every level-up and chest you open sends out a flash
+## biolum_radius m round you (more biolum_radius_per_stack a stack), doing
+## biolum_damage per team level (more biolum_damage_per_stack a stack).
+@export_range(0, 20, 1, "or_greater") var biolum_stacks := 0
+@export_range(1.0, 100.0, 1.0, "or_greater") var biolum_radius := 12.0
+@export_range(0.0, 50.0, 0.5, "or_greater") var biolum_radius_per_stack := 2.0
+@export_range(0.0, 500.0, 1.0, "or_greater") var biolum_damage := 10.0
+@export_range(0.0, 500.0, 1.0, "or_greater") var biolum_damage_per_stack := 5.0
+
+@export_group("Poseidon's Trident")
+## A trident (legendary): every trident_every-th attack (a fish with no attack
+## of its own: every trident_every s) calls lightning down on the biggest
+## zombie within trident_range m: trident_damage (more trident_damage_per_stack
+## a stack) to everything within trident_radius m of it.
+@export_range(0, 20, 1, "or_greater") var trident_stacks := 0
+@export_range(1, 20, 1, "or_greater") var trident_every := 3
+@export_range(1.0, 100.0, 1.0, "or_greater") var trident_range := 30.0
+@export_range(0.5, 20.0, 0.5, "or_greater") var trident_radius := 4.0
+@export_range(0.0, 10000.0, 10.0, "or_greater") var trident_damage := 250.0
+@export_range(0.0, 10000.0, 10.0, "or_greater") var trident_damage_per_stack := 150.0
+
+@export_group("Megalodon Tooth")
+## A huge tooth (legendary): a crit finishes off a zombie left under
+## tooth_execute of its hp (more tooth_execute_per_stack a stack, up to
+## tooth_execute_max). Not bosses.
+@export_range(0, 20, 1, "or_greater") var tooth_stacks := 0
+@export_range(0.0, 1.0, 0.01) var tooth_execute := 0.15
+@export_range(0.0, 1.0, 0.01) var tooth_execute_per_stack := 0.05
+@export_range(0.0, 1.0, 0.01) var tooth_execute_max := 0.5
+
+@export_group("Moon Pearl")
+## A pearl on a chain (legendary): every level-up lets you take pearl_picks more
+## cards (a stack) from the same offer.
+@export_range(0, 20, 1, "or_greater") var moon_pearl_stacks := 0
+@export_range(0, 5, 1, "or_greater") var pearl_picks := 1
+
+@export_group("Abyssal Engine")
+## A churning engine (legendary): engine_projectiles more projectiles and
+## engine_area more area (0.15: +15%) to every attack, a stack.
+@export_range(0, 20, 1, "or_greater") var engine_stacks := 0
+@export_range(0.0, 10.0, 1.0, "or_greater") var engine_projectiles := 1.0
+@export_range(0.0, 2.0, 0.05, "or_greater") var engine_area := 0.15
+
 ## Powerup id -> its testing override's setting.
 const STACKS := {
+	"sticky_anemone": "anemone_stacks",
+	"ink_sac": "ink_stacks",
+	"sonar_pinger": "sonar_stacks",
+	"cold_seep": "seep_stacks",
+	"whirlpool_charm": "charm_stacks",
+	"krakens_grasp": "kraken_stacks",
+	"ghost_swordfish": "ghost_stacks",
+	"ammonite_spiral": "ammonite_stacks",
+	"riptide": "riptide_stacks",
+	"reef_guardian": "guardian_stacks",
+	"bioluminescence": "biolum_stacks",
+	"poseidons_trident": "trident_stacks",
+	"megalodon_tooth": "tooth_stacks",
+	"moon_pearl": "moon_pearl_stacks",
+	"abyssal_engine": "engine_stacks",
 	"kelp_wrap": "kelp_stacks",
 	"sea_salt": "salt_stacks",
 	"coral_knuckles": "knuckles_stacks",

@@ -57,9 +57,9 @@ static func gives(id: String, multiplier: float, settings: UnnaturalSettings) ->
 	return given
 
 
-## "+15% Damage, +2 Armour".
-static func describe(given: Dictionary) -> String:
+## ["Damage +15%", "Armour +2"]: one stat a line.
+static func describe(given: Dictionary) -> PackedStringArray:
 	var parts := PackedStringArray()
 	for stat: String in given:
 		parts.append(StatBlock.describe(stat, given[stat]))
-	return ", ".join(parts)
+	return parts

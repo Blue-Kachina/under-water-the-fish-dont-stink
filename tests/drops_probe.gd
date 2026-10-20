@@ -94,8 +94,10 @@ func _run() -> void:
 	settings.chest_drop_chance = 0.0
 	var legendary := Powerup.pick_for_chest(run.rng, Rarity.Tier.LEGENDARY, 3)
 	var common := Powerup.pick_for_chest(run.rng, Rarity.Tier.COMMON, 3)
-	check(legendary[0] == "tsunami_heart" and legendary.size() == 3 and Powerup.tier(legendary[1]) == Rarity.Tier.RARE,
-			"a legendary chest offers the legendary first, then fills from below (%s)" % [legendary])
+	var all_legendary := legendary.all(func(id: String) -> bool: return Powerup.tier(id) == Rarity.Tier.LEGENDARY)
+	var rare_fill := Powerup.pick_for_chest(run.rng, Rarity.Tier.LEGENDARY, 6)
+	check(legendary.size() == 3 and all_legendary and Powerup.tier(rare_fill[-1]) == Rarity.Tier.RARE,
+			"a legendary chest offers legendaries first, then fills from below (%s)" % [rare_fill])
 	check(common.size() == 3 and common.all(func(id: String) -> bool: return Powerup.tier(id) == Rarity.Tier.COMMON),
 			"a common chest: all common (%s)" % [common])
 

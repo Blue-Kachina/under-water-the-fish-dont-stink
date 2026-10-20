@@ -7,8 +7,9 @@ extends RefCounted
 ## a short soft tail stalk that bends into the tail fan (FishModel._bend_body);
 ## the shell itself never bends, only the stalk, fins and tail move, as a real
 ## boxfish swims. Real eyes on low mounds, and for the cowfish, horns on the brow
-## and under the rear of the shell. The whole fish squashes and stretches like a
-## jelly sweet (FishModel.react) through a unit Squash node.
+## and under the rear of the shell. The whole fish sits in a unit Squash node,
+## which FishModel.react can squash and stretch like a jelly sweet (off now,
+## squash_strength 0, for the realistic look).
 ##
 ## Skins: 0 Yellow Boxfish (Ostracion cubicus), 1 Longhorn Cowfish (Lactoria
 ## cornuta), 2 Spotted Boxfish male (Ostracion meleagris), 3 Scrawled Cowfish

@@ -96,11 +96,11 @@ func _run() -> void:
 			"a teammate close by revives them (%.0f hp)" % health.hp)
 	var first_health := run.health_of(fish)
 	first_health.iframes_left = 0.0
-	run.hurt(fish, first_health.hp + 10.0)
+	run.hurt(fish, first_health.hp * 10.0 + 100.0)  # well past any armour or twist (a Boxfish's Armoured)
 	await _ticks(2)
-	check(not run.is_over, "one down: not over")
+	check(first_health.down and not run.is_over, "one down: not over")
 	health.iframes_left = 0.0
-	run.hurt(second.fish, health.hp + 10.0)
+	run.hurt(second.fish, health.hp * 10.0 + 100.0)
 	await _ticks(2)
 	check(run.is_over, "both down: the run's over")
 	main.reset_play()

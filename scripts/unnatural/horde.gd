@@ -172,6 +172,12 @@ var _net := PackedInt32Array()
 ## The difficulty level each was spawned at, and the speed it gives.
 var _level := PackedFloat32Array()
 var _speed_scale := PackedFloat32Array()
+## Per zombie: a slow (its share of speed taken, 1: held still) until a time
+## (Sticky Anemone, Cold Seep, Kraken's Grasp, Ink Sac), and a mark until a
+## time (Sonar Pinger: hits on it do more).
+var _slow_share := PackedFloat32Array()
+var _slow_until := PackedFloat32Array()
+var _mark_until := PackedFloat32Array()
 ## The frozen look's strength (eases in and out).
 var _ice := 0.0
 ## Net id -> slot, for the live and dying.
@@ -257,6 +263,9 @@ func setup(horde_settings: UnnaturalSettings, horde_kinds: Array[EnemyKind], max
 	_net.resize(capacity)
 	_level.resize(capacity)
 	_speed_scale.resize(capacity)
+	_slow_share.resize(capacity)
+	_slow_until.resize(capacity)
+	_mark_until.resize(capacity)
 	_mode.resize(capacity)
 	_mode_left.resize(capacity)
 	_lunge.resize(capacity)
@@ -356,6 +365,9 @@ func spawn(kind: int, at: Vector3, heading := Vector3.ZERO, elite := false, undy
 		level = difficulty
 	_level[i] = level
 	_speed_scale[i] = 1.0 + settings.difficulty_speed * level
+	_slow_share[i] = 0.0
+	_slow_until[i] = 0.0
+	_mark_until[i] = 0.0
 	var grow := minf(1.0 + settings.difficulty_size * level, maxf(settings.difficulty_size_max, 1.0))
 	var hp := info.hp * settings.enemy_hp_scale * (ELITE_HP if elite else 1.0) * settings.hp_growth(level)
 	_hp[i] = maxf(hp, 1.0)
@@ -520,6 +532,34 @@ func freeze(seconds: float) -> void:
 
 func is_frozen() -> bool:
 	return frozen_left > 0.0
+
+
+## Zombie `index` loses `share` of its speed (1: held still) for `seconds`; a
+## stronger or longer slow already on it isn't cut short. Bosses' bodies
+## (proxies) shrug it off.
+func slow(index: int, share: float, seconds: float) -> void:
+	if not is_alive(index) or is_proxy(index) or share <= 0.0 or seconds <= 0.0:
+		return
+	var current := slow_share(index)
+	_slow_share[index] = maxf(current, clampf(share, 0.0, 1.0))
+	_slow_until[index] = maxf(_slow_until[index] if current > 0.0 else 0.0, _time + seconds)
+	if share >= 1.0:
+		_velocity[index] = Vector3.ZERO
+
+
+## The share of its speed zombie `index` has lost now (0: none).
+func slow_share(index: int) -> float:
+	return _slow_share[index] if _time < _slow_until[index] else 0.0
+
+
+## Zombie `index` is marked for `seconds` (Sonar Pinger): hits on it do more.
+func mark(index: int, seconds: float) -> void:
+	if is_alive(index):
+		_mark_until[index] = maxf(_mark_until[index], _time + seconds)
+
+
+func is_marked(index: int) -> bool:
+	return _time < _mark_until[index]
 
 
 func is_elite(index: int) -> bool:
@@ -726,6 +766,11 @@ func _steer(delta: float) -> void:
 			var kind := _kind[i]
 			var speed := _kind_speed[kind] * _speed_scale[i]
 			var accel := _kind_accel[kind] * _speed_scale[i]
+			if _time < _slow_until[i]:
+				speed *= 1.0 - _slow_share[i]
+				if _slow_share[i] >= 1.0:
+					_velocity[i] = Vector3.ZERO  # held still
+					continue
 			if speed <= 0.0:
 				# A kind that doesn't swim (the Test Tank's dummies): it drifts back to rest.
 				_velocity[i] = velocity.move_toward(Vector3.ZERO, maxf(accel, 6.0) * dt)

@@ -203,6 +203,18 @@ func _milestone_line(id: String, level: int) -> String:
 	return ""
 
 
+## `lines` down from the top of `area`, wrapped: bulleted when there's more
+## than one. Returns the height they took.
+func _draw_lines(area: Rect2, lines: PackedStringArray, font: Font, px: int, color: Color) -> float:
+	var used := 0.0
+	var bullet := lines.size() > 1
+	for text in lines:
+		var at := Rect2(area.position.x, area.position.y + used, area.size.x, maxf(area.size.y - used, px))
+		var align := HORIZONTAL_ALIGNMENT_LEFT if bullet else HORIZONTAL_ALIGNMENT_CENTER
+		used += UITheme.draw_wrapped(self, at, ("• " if bullet else "") + text, font, px, color, align) + (2.0 if bullet else 0.0)
+	return used
+
+
 ## One Gem Frame card (UI Redesign Handoff, Cards A): the rarity frame and
 ## its ribbon, the hexagon medallion, the name, which stack, what it does, and
 ## the stack pips. A level's stat card shows its amount in the medallion.
@@ -238,8 +250,10 @@ func _draw_card(i: int) -> void:
 	HexBadge.draw_hex(self, medal, 132.0 * g, a.call(UITheme.CARD.lerp(rim, 0.18)), a.call(rim), 3.0 * g)
 	var name_text := ""
 	var stack_text := ""
-	var words := ""
-	var curse := ""
+	## What it does, one effect a line (bulleted when there's more than one),
+	## and a curse's downsides likewise.
+	var lines := PackedStringArray()
+	var curses := PackedStringArray()
 	var milestone := ""
 	## Level pips: [held, this pick's, cap] (cap 0: the chest's stack pips instead).
 	var pips := Vector3i(0, 0, 0)
@@ -249,14 +263,10 @@ func _draw_card(i: int) -> void:
 		name_text = Powerup.title(powerup)
 		var stacks: int = card.get("stacks", 1)
 		stack_text = "NEW" if stacks <= 1 else "STACK %d → %d" % [stacks - 1, stacks]
-		words = Powerup.blurb(powerup)
+		lines = Powerup.blurb_lines(powerup)
+		curses = Powerup.curse_lines(powerup)
 		if Powerup.is_weapon(powerup):
 			stack_text = "BOSS WEAPON"
-		if tier == Rarity.Tier.CURSED:
-			var split := words.find(". ")
-			if split > 0:
-				curse = words.substr(split + 2)
-				words = words.substr(0, split + 1)
 	elif kind in ["weapon", "new_weapon", "swap", "keep"]:
 		var id: String = card.weapon
 		HexBadge.draw_glyph(self, Weapons.glyph(id, attack_kind), medal, 60.0 * g, a.call(rim), 1.8)
@@ -265,31 +275,28 @@ func _draw_card(i: int) -> void:
 		match kind:
 			"weapon":
 				stack_text = "LV %d → %d" % [level - 1, level]
-				var lines := PackedStringArray()
-				var gains: Dictionary = card.gains
-				for facet: String in gains:
-					lines.append(Weapons.describe(Weapons.facet_def(id, facet, attack_kind), gains[facet]))
-				words = ", ".join(lines)
+				lines = Weapons.describe_all(id, card.gains, attack_kind)
 				milestone = _milestone_line(id, level)
 				pips = Vector3i(level - 1, 1, max_levels.x)
 			"new_weapon":
 				stack_text = "NEW WEAPON"
-				words = Powerup.blurb(id)
+				lines = Powerup.blurb_lines(id)
+				lines.append_array(Weapons.describe_all(id, card.get("gains", {}), attack_kind))
 				pips = Vector3i(0, 1, max_levels.x)
 			"swap":
 				stack_text = "SWAP OUT  ·  LV %d" % level
-				words = "Drop it for %s." % Powerup.title(card.incoming)
+				lines = PackedStringArray(["Drop it for %s." % Powerup.title(card.incoming)])
 			"keep":
 				name_text = "Keep yours"
 				stack_text = "NO SWAP"
-				words = "Leave %s behind." % Powerup.title(id)
+				lines = PackedStringArray(["Leave %s behind." % Powerup.title(id)])
 	elif kind in ["tome", "new_tome"]:
 		var id: String = card.tome
 		HexBadge.draw_glyph(self, Tomes.glyph(id), medal, 60.0 * g, a.call(rim), 1.8)
 		name_text = Tomes.title(id)
 		var level: int = card.get("level", 1)
 		stack_text = "NEW TOME" if kind == "new_tome" else "LV %d → %d" % [level - 1, level]
-		words = Tomes.describe(card.gives)
+		lines = Tomes.describe(card.gives)
 		pips = Vector3i(level - 1, 1, max_levels.y)
 	elif kind == "fallback":
 		var pearls: bool = card.what == "pearls"
@@ -298,28 +305,39 @@ func _draw_card(i: int) -> void:
 				roundi(34.0 * g), a.call(rim.lightened(0.15)))
 		name_text = "Pearl Purse" if pearls else "Second Wind"
 		stack_text = "NOTHING LEFT TO LEARN"
-		words = "%d pearls to spend on chests." % card.amount if pearls else "Heals the whole team."
+		lines = PackedStringArray(["%d pearls to spend on chests." % card.amount if pearls else "Heals the whole team."])
 	UITheme.draw_text(self, Rect2(rect.position.x + 12.0 * g, rect.position.y + 204.0 * g, rect.size.x - 24.0 * g, 36.0 * g), name_text,
 			UITheme.display(600), roundi(26.0 * g), a.call(UITheme.INK))
 	var stack_px := roundi(14.0 * g)
 	UITheme.draw_text(self, Rect2(rect.position.x, rect.position.y + 242.0 * g, rect.size.x, 20.0 * g), stack_text,
 			UITheme.caps(stack_px, 700, 0.2), stack_px, a.call(rim.lightened(0.1)))
 	var text_rect := Rect2(rect.position.x + 22.0 * g, rect.position.y + 276.0 * g, rect.size.x - 44.0 * g, 80.0 * g)
-	var used := UITheme.draw_wrapped(self, text_rect, words, UITheme.body(400), roundi(16.0 * g), a.call(UITheme.INK_SOFT))
+	var text_px := roundi((16.0 if lines.size() <= 3 else 14.0) * g)
+	var used := _draw_lines(text_rect, lines, UITheme.body(400), text_px, a.call(UITheme.INK_SOFT))
 	if milestone:
 		var gold := UITheme.GOLD
 		var mile_px := roundi(15.0 * g)
 		UITheme.draw_wrapped(self, Rect2(text_rect.position.x, text_rect.position.y + used + 6.0 * g, text_rect.size.x, 60.0 * g),
 				"New: " + milestone, UITheme.body(600), mile_px, a.call(gold))
-	if curse:
+	if not curses.is_empty():
 		var red := UITheme.rarity(Rarity.Tier.CURSED)
 		var curse_px := roundi(15.0 * g)
-		var curse_lines := UITheme.wrap_lines("Curse: " + curse, UITheme.body(600), curse_px, text_rect.size.x - 16.0 * g)
+		var shown := PackedStringArray()
+		for text in curses:
+			shown.append(("Curse: " if curses.size() == 1 else "") + text)
+		var rows := 0
+		for text in shown:
+			rows += UITheme.wrap_lines(("• " if shown.size() > 1 else "") + text, UITheme.body(600), curse_px, text_rect.size.x - 16.0 * g).size()
+		if shown.size() > 1:
+			rows += 1  # the "Curse:" heading
 		var strip := Rect2(text_rect.position.x - 6.0 * g, text_rect.position.y + used + 6.0 * g, text_rect.size.x + 12.0 * g,
-				curse_lines.size() * curse_px * 1.25 + 10.0 * g)
+				rows * curse_px * 1.25 + 10.0 * g)
 		UITheme.draw_box(self, strip, a.call(Color(red, 0.18)), 8.0 * g)
-		UITheme.draw_wrapped(self, strip.grow_individual(-8.0 * g, -5.0 * g, -8.0 * g, 0.0), "Curse: " + curse, UITheme.body(600), curse_px,
-				a.call(red.lightened(0.35)))
+		var inner := strip.grow_individual(-8.0 * g, -5.0 * g, -8.0 * g, 0.0)
+		if shown.size() > 1:
+			UITheme.draw_wrapped(self, inner, "Curse:", UITheme.body(700), curse_px, a.call(red.lightened(0.35)), HORIZONTAL_ALIGNMENT_LEFT)
+			inner = inner.grow_individual(0.0, -curse_px * 1.25, 0.0, 0.0)
+		_draw_lines(inner, shown, UITheme.body(600), curse_px, a.call(red.lightened(0.35)))
 
 	# Level pips: held levels in the rarity's colour, this pick's in white, the rest dark.
 	# Past MAX_PIPS (a high cap) one bar instead, filled the same way.

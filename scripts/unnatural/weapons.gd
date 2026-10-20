@@ -15,10 +15,22 @@ class_name Weapons
 
 ## The fish's own attack's weapon id.
 const ATTACK := "attack"
-## The chest powerups that are weapons, in the order cards list them.
-const POWERUPS: Array[String] = ["greek_fire", "jellyfish_halo", "depth_charges", "remora_buddy", "leviathans_coil"]
+## The chest powerups that are weapons, in the order cards list them. The
+## attack_* ones are the fish's attacks held as an extra weapon (AttackWeapon):
+## every fish's weapon can be any fish's second (not its own again).
+const POWERUPS: Array[String] = ["greek_fire", "jellyfish_halo", "depth_charges", "remora_buddy", "leviathans_coil",
+		"attack_sting", "attack_bite", "attack_lash", "attack_thrust", "attack_bubbles", "attack_spines"]
 ## Weapons only a boss gives (never offered on a level-up card).
 const BOSS_ONLY: Array[String] = ["leviathans_coil"]
+## The fish attacks as extra weapons: weapon id -> its attack's kind.
+const ATTACK_WEAPONS := {
+	"attack_sting": FishAttack.Kind.STING,
+	"attack_bite": FishAttack.Kind.BITE,
+	"attack_lash": FishAttack.Kind.LASH,
+	"attack_thrust": FishAttack.Kind.THRUST,
+	"attack_bubbles": FishAttack.Kind.BUBBLES,
+	"attack_spines": FishAttack.Kind.SPINES,
+}
 
 ## Weapon id -> [[facet id, label, kind, step setting, unit]...]. The fish's
 ## attack's depend on its kind (ATTACK_FACETS).
@@ -127,19 +139,30 @@ static func is_weapon(id: String) -> bool:
 	return id == ATTACK or id in POWERUPS
 
 
-## The weapons a level-up card may offer as new (not the attack, not boss ones).
-static func card_pool() -> Array[String]:
+## The weapons a level-up card may offer as new to a fish whose own attack is
+## `own` (not boss ones, not its own attack again), each equally likely.
+static func card_pool(own := FishAttack.Kind.NONE) -> Array[String]:
 	var pool: Array[String] = []
 	for id in POWERUPS:
-		if id not in BOSS_ONLY:
+		if id not in BOSS_ONLY and ATTACK_WEAPONS.get(id, -1) != own:
 			pool.append(id)
 	return pool
+
+
+## The attack kind weapon `id` fires: the fish's own (`kind`) for ATTACK, an
+## extra attack's own, or NONE (a powerup weapon).
+static func attack_kind_of(id: String, kind := FishAttack.Kind.BITE) -> FishAttack.Kind:
+	if id == ATTACK:
+		return kind
+	return ATTACK_WEAPONS.get(id, FishAttack.Kind.NONE)
 
 
 ## Weapon `id`'s facets, for a fish whose attack is `kind`.
 static func facets(id: String, kind := FishAttack.Kind.BITE) -> Array:
 	if id == ATTACK:
 		return ATTACK_FACETS.get(kind, ATTACK_FACETS[FishAttack.Kind.BITE])
+	if ATTACK_WEAPONS.has(id):
+		return ATTACK_FACETS[ATTACK_WEAPONS[id]]
 	return FACETS.get(id, [])
 
 
@@ -162,6 +185,8 @@ static func glyph(id: String, kind := FishAttack.Kind.BITE) -> String:
 
 ## Its milestone lines ([first, second, third, fourth]).
 static func milestones(id: String, kind := FishAttack.Kind.BITE) -> Array:
+	if ATTACK_WEAPONS.has(id):
+		return MILESTONES.get(ATTACK_WEAPONS[id], [])
 	return MILESTONES.get(kind if id == ATTACK else id, [])
 
 
@@ -185,6 +210,16 @@ static func roll(rng: RandomNumberGenerator, id: String, kind: FishAttack.Kind, 
 		var entry: Array = pool.pop_at(rng.randi_range(0, pool.size() - 1))
 		gains[entry[0]] = step_amount(entry, size, powerup_settings)
 	return gains
+
+
+## Each of `gains` (facet id -> amount) described, one a line, stat first.
+static func describe_all(id: String, gains: Dictionary, kind := FishAttack.Kind.BITE) -> PackedStringArray:
+	var lines := PackedStringArray()
+	for facet: String in gains:
+		var entry := facet_def(id, facet, kind)
+		if not entry.is_empty():
+			lines.append(describe(entry, gains[facet]))
+	return lines
 
 
 ## "Burn damage +20%", "Patch life +1.5 s", "Jellies +1".

@@ -84,10 +84,11 @@ static func title(id: String) -> String:
 
 
 ## "+15% Damage", "+12 Max HP": how a card says what it gives.
+## "Damage +15%", "Armour +2": the stat first, then its change.
 static func describe(id: String, given: float) -> String:
 	if STATS[id][2]:
-		return "+%s%% %s" % [_number(given * 100.0), title(id)]
-	return "+%s %s" % [_number(given), title(id)]
+		return "%s +%s%%" % [title(id), _number(given * 100.0)]
+	return "%s +%s" % [title(id), _number(given)]
 
 
 ## The stats a card can offer, with those only `attack` uses (if given).

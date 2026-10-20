@@ -31,7 +31,7 @@ static func deal(run: UnnaturalRun, fish: FishController, count: int) -> Array:
 		"new_tome": [] as Array[String],
 	}
 	if loadout.weapons.size() < settings.weapon_slots:
-		for id in Weapons.card_pool():
+		for id in Weapons.card_pool(attack.kind if attack else FishAttack.Kind.NONE):
 			if not loadout.has_weapon(id):
 				pools.new_weapon.append(id)
 	if loadout.tomes.size() < settings.tome_slots:
@@ -57,7 +57,9 @@ static func deal(run: UnnaturalRun, fish: FishController, count: int) -> Array:
 				cards.append({"kind": "weapon", "weapon": id, "tier": tier, "level": loadout.earned_level(id) + 1,
 						"gains": Weapons.roll(run.rng, id, loadout.attack_kind, tier, settings, run.powerup_settings)})
 			"new_weapon":
-				cards.append({"kind": "new_weapon", "weapon": id, "tier": Powerup.tier(id), "level": 1, "gains": {}})
+				# No fixed rarity: it rolls one like any card, and arrives with that rarity's facets raised.
+				cards.append({"kind": "new_weapon", "weapon": id, "tier": tier, "level": 1,
+						"gains": Weapons.roll(run.rng, id, loadout.attack_kind, tier, settings, run.powerup_settings)})
 			"tome", "new_tome":
 				cards.append({"kind": kind, "tome": id, "tier": tier, "level": loadout.tome_level(id) + 1,
 						"gives": Tomes.gives(id, Rarity.multiplier(settings, tier), settings)})
@@ -78,7 +80,12 @@ static func tome_useful(run: UnnaturalRun, fish: FishController, id: String) -> 
 	match id:
 		"schools":
 			var attack := run.attack_of(fish)
-			return attack != null and attack.uses_stat("projectile_count")
+			if attack != null and attack.uses_stat("projectile_count"):
+				return true
+			for held: String in run.loadout_of(fish).weapons:
+				if FishAttack.kind_uses_stat(Weapons.attack_kind_of(held), "projectile_count"):
+					return true
+			return false
 		"ages":
 			var loadout := run.loadout_of(fish)
 			var powerups := run.powerups_of(fish)

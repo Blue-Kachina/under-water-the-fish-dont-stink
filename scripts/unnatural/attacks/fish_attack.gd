@@ -142,7 +142,17 @@ func proc() -> float:
 
 ## Whether the player's stat `id` does anything for it (projectile stats are
 ## offered on cards only to fish whose attack uses them).
-func uses_stat(_id: String) -> bool:
+func uses_stat(id: String) -> bool:
+	return kind_uses_stat(kind, id)
+
+
+## Whether an attack of `attack_kind` uses the player's stat `id` (projectiles).
+static func kind_uses_stat(attack_kind: Kind, id: String) -> bool:
+	match attack_kind:
+		Kind.THRUST, Kind.BUBBLES, Kind.SPINES:
+			return id == "projectile_count" or id == "projectile_speed"
+		Kind.LASH:
+			return id == "projectile_count"
 	return false
 
 
