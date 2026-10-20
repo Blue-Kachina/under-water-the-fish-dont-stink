@@ -61,10 +61,10 @@ func _run() -> void:
 		tiers[Powerup.tier(id)] = tiers.get(Powerup.tier(id), 0) + 1
 		var made := Powerup.create(id)
 		made_all = made_all and made.get_script() != Powerup and powers.STACKS.has(id)
-	check(Powerup.ids().size() == 23 and made_all, "23 powerups, each its own kind with a testing override")
-	check(tiers.get(Rarity.Tier.COMMON, 0) == 7 and tiers.get(Rarity.Tier.UNCOMMON, 0) == 5 and tiers.get(Rarity.Tier.RARE, 0) == 3
-			and tiers.get(Rarity.Tier.LEGENDARY, 0) == 1 and tiers.get(Rarity.Tier.BOSS, 0) == 2 and tiers.get(Rarity.Tier.CURSED, 0) == 5,
-			"tiers: 7 common (Bow Grow Bow among them, D15), 5 uncommon, 3 rare, 1 legendary, 2 boss, 5 cursed (%s)" % [tiers])
+	check(Powerup.ids().size() == 31 and made_all, "31 powerups, each its own kind with a testing override")
+	check(tiers.get(Rarity.Tier.COMMON, 0) == 12 and tiers.get(Rarity.Tier.UNCOMMON, 0) == 9 and tiers.get(Rarity.Tier.RARE, 0) == 3
+			and tiers.get(Rarity.Tier.LEGENDARY, 0) == 1 and tiers.get(Rarity.Tier.BOSS, 0) == 1 and tiers.get(Rarity.Tier.CURSED, 0) == 5,
+			"tiers: 12 common (Bow Grow Bow among them, D15), 9 uncommon, 3 rare, 1 legendary, 1 boss, 5 cursed (%s)" % [tiers])
 
 	print("stat commons:")
 	var block := run.block_of(fish)
@@ -238,6 +238,7 @@ func _run() -> void:
 	settings.enemy_speed_scale = 0.0
 	# Tome of Ages stretches a decoy's life; Tides drop it sooner; the Reef widens the blast.
 	block = run.block_of(fish)
+	block.reset()  # (a level-up on the way may have grown its signature stat)
 	check(is_equal_approx(lure.life(), powers.lure_life) and is_equal_approx(lure.blast(), powers.lure_blast) and is_equal_approx(lure.interval(), powers.lure_interval),
 			"no tomes: its life, blast and interval are the base ones")
 	block.add("duration", 0.5)

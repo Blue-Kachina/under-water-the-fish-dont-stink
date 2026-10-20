@@ -16,7 +16,7 @@ extends Node3D
 ## The attack went off (fire() returned true).
 signal fired
 
-enum Kind { OWN, STING, BITE, LASH, THRUST, BUBBLES, SPINES }
+enum Kind { OWN, STING, BITE, LASH, THRUST, BUBBLES, SPINES, NONE }
 ## Each fish's own.
 const FOR_FAMILY := {
 	FishCharacter.Family.OCTANE: Kind.STING,
@@ -25,6 +25,18 @@ const FOR_FAMILY := {
 	FishCharacter.Family.BREAKOUT: Kind.THRUST,
 	FishCharacter.Family.HYBRID: Kind.BUBBLES,
 	FishCharacter.Family.MERC: Kind.SPINES,
+	# The later fish start with a powerup weapon instead (STARTING_WEAPON): no attack of their own.
+	FishCharacter.Family.LIONFISH: Kind.NONE,
+	FishCharacter.Family.MOON_JELLY: Kind.NONE,
+	FishCharacter.Family.MANTIS: Kind.NONE,
+	FishCharacter.Family.WHALE_SHARK: Kind.NONE,
+}
+## The weapon (Weapons.POWERUPS) each later fish starts with, in the slot a fish's own attack takes.
+const STARTING_WEAPON := {
+	FishCharacter.Family.LIONFISH: "greek_fire",
+	FishCharacter.Family.MOON_JELLY: "jellyfish_halo",
+	FishCharacter.Family.MANTIS: "depth_charges",
+	FishCharacter.Family.WHALE_SHARK: "remora_buddy",
 }
 ## Kind -> [name, hit source].
 const INFO := {
@@ -82,6 +94,8 @@ static func make(attack_kind: Kind) -> FishAttack:
 			attack = BubbleVolley.new()
 		Kind.SPINES:
 			attack = SpineBurst.new()
+		Kind.NONE:
+			attack = FishAttack.new()  # never fires: the fish's weapon is a powerup
 		_:
 			attack = GhostBite.new()
 			attack_kind = Kind.BITE
@@ -190,3 +204,8 @@ static func ghost_material(color: Color) -> StandardMaterial3D:
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material.albedo_color = color
 	return material
+
+
+## The powerup weapon `family` starts with instead of an attack ("": it has an attack).
+static func starting_weapon(family: FishCharacter.Family) -> String:
+	return STARTING_WEAPON.get(family, "")

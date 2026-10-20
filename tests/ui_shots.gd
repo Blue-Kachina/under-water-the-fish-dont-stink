@@ -84,7 +84,7 @@ func _run() -> void:
 	UnnaturalSettings.shared().spawning = false
 	var held := run.powerups_of(fish)
 	for id: String in ["chain_lightning", "chain_lightning", "torpedo", "hermit_shell", "hermit_shell", "hermit_shell",
-			"tsunami_heart", "drowned_fin", "blood_moon_shard"]:
+			"tsunami_heart", "leviathans_coil", "blood_moon_shard"]:
 		held.add(id)
 	# The slots: the attack and Greek Fire at Lv 3 and 5; one tome, one free.
 	var loadout := run.loadout_of(fish)

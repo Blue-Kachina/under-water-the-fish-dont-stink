@@ -121,7 +121,7 @@ func _run() -> void:
 	check(run.chest_price(chest) == 20, "the price: base x (1 + growth x minutes) (%d at 2:00)" % run.chest_price(chest))
 	var cursed := run.add_chest(far + Vector3(10, 0, 0), 0.0, -INF, TreasureChest.Kind.CURSED)
 	check(run.chest_price(cursed) == 30, "a cursed one's x chest_cursed_price (%d)" % run.chest_price(cursed))
-	var boss := run.add_chest(far + Vector3(20, 0, 0), 0.0, -INF, TreasureChest.Kind.BOSS, "drowned_fin")
+	var boss := run.add_chest(far + Vector3(20, 0, 0), 0.0, -INF, TreasureChest.Kind.BOSS, "leviathans_coil")
 	check(run.chest_price(boss) == 0, "a boss's is free")
 	run._purses[fish] = 5
 	fish.global_position = chest.global_position + Vector3(0, 1, 2)
@@ -132,6 +132,7 @@ func _run() -> void:
 	run._purses[fish] = 25
 	for n in roundi(settings.chest_open_time * 120.0) + 60:
 		await get_tree().physics_frame
+		run.open_unlocked(fish)
 		if chest.is_open_for(fish):
 			break
 	check(chest.is_open_for(fish) and run.purse_of(fish) == 5, "with the pearls it opens, and costs 20 (%d left)" % run.purse_of(fish))

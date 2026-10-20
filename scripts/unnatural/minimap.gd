@@ -215,6 +215,8 @@ class Marks extends Control:
 				continue
 			var spot := map.to_map(boss.global_position)
 			_draw_skull(map.to_rim(spot, 9.0), 9.0 if boss is BloodLeviathan else 6.5)
+		if is_instance_valid(run.whirlpool):
+			_draw_whirlpool(map.to_rim(map.to_map(run.whirlpool.global_position), 9.0), 8.0)
 		for fish in run.players:
 			if is_instance_valid(fish) and fish != me:
 				_draw_player(run, fish, false)
@@ -240,6 +242,17 @@ class Marks extends Control:
 		draw_rect(box.grow(1.5), Color(BroadcastUI.INK, 0.9))
 		draw_rect(box, tint)
 		draw_line(Vector2(box.position.x, box.get_center().y - 1.0), Vector2(box.end.x, box.get_center().y - 1.0), Color(0.35, 0.2, 0.05), 1.0)
+
+	## The way out: a pale spiral on a dark disc, pinned to the rim when it's out of range.
+	func _draw_whirlpool(spot: Vector2, radius: float) -> void:
+		var phase := Time.get_ticks_msec() / 900.0
+		draw_circle(spot, radius + 1.5, Color(BroadcastUI.INK, 0.9))
+		draw_circle(spot, radius, Color(0.1, 0.3, 0.45))
+		var points := PackedVector2Array()
+		for n in 24:
+			var t := n / 23.0
+			points.append(spot + Vector2.from_angle(phase + t * TAU * 1.5) * radius * 0.9 * t)
+		draw_polyline(points, Whirlpool.COLOR, 2.0, true)
 
 	func _draw_skull(spot: Vector2, radius: float) -> void:
 		draw_circle(spot, radius + 1.5, Color(BroadcastUI.INK, 0.9))

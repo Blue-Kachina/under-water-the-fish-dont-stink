@@ -152,6 +152,30 @@ func horde_scale() -> float:
 	return scale
 
 
+## What the damage this player deals is multiplied by now (Momentum Fin).
+func damage_scale() -> float:
+	var scale := 1.0
+	for id: String in held:
+		scale *= (held[id] as Powerup).damage_factor()
+	return scale
+
+
+## What the chance their kills drop a chest is multiplied by (Treasure Map).
+func chest_drop_scale() -> float:
+	var scale := 1.0
+	for id: String in held:
+		scale *= (held[id] as Powerup).chest_drop_factor()
+	return scale
+
+
+## How many more metres chests are pinged (Treasure Map).
+func chest_ping_bonus() -> float:
+	var more := 0.0
+	for id: String in held:
+		more += (held[id] as Powerup).chest_ping_bonus()
+	return more
+
+
 ## One stack of `id` gone (Sunken Idol's toll). Testing overrides still hold.
 func remove_stack(id: String) -> void:
 	if _earned.get(id, 0) > 0:
@@ -185,8 +209,15 @@ func on_battery(index: int) -> void:
 		(held[id] as Powerup).on_battery(index)
 
 
+## Items that fire by themselves besides the weapons: the Jelly's quiet stops them too.
+const SELF_FIRING: Array[String] = ["anglerfish_lure", "torpedo", "electric_eel", "tsunami_heart"]
+
+
 func on_tick(delta: float) -> void:
+	var quiet := run.is_quiet(fish)
 	for id: String in held:
+		if quiet and (Powerup.is_weapon(id) or id in SELF_FIRING):
+			continue
 		(held[id] as Powerup).on_tick(delta)
 
 

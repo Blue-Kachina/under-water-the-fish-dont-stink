@@ -93,16 +93,16 @@ func _run() -> void:
 	for chest in run.chests:
 		if is_instance_valid(chest) and chest.kind == TreasureChest.Kind.BOSS:
 			boss_chest = chest
-	check(boss_chest != null and boss_chest.item == "drowned_fin" and boss_chest.tint() == TreasureChest.STEEL,
-			"the Drowned Shark beaten drops a steel-blue boss chest holding its Drowned Fin")
+	check(boss_chest != null and boss_chest.item == "" and boss_chest.tint() == TreasureChest.STEEL,
+			"the Drowned Shark beaten drops a steel-blue boss chest")
 	if boss_chest:
 		run.open_chest(boss_chest, fish)
 		await _frames(2)
 		var boss_cards: Array = offers[-1][0] if not offers.is_empty() else []
-		check(boss_cards.size() == 1 and boss_cards[0].powerup == "drowned_fin" and offers[-1][1] == "BOSS TREASURE!", "opening it offers the fin alone")
+		check(boss_cards.size() >= 1 and Powerup.tier(boss_cards[0].powerup) == Rarity.Tier.LEGENDARY and offers[-1][1] == "BOSS TREASURE!", "opening it offers a legendary pick")
 		run.pick(fish, 0)
 		await _frames(2)
-		check(run.powerups_of(fish).stacks("drowned_fin") == 1, "and it's yours")
+		check(run.powerups_of(fish).stacks(boss_cards[0].powerup) == 1, "and it's yours")
 	main.reset_play()
 	await _ticks(3)
 	await _park(Vector3(0, 0, 60), Vector3.FORWARD)
@@ -196,37 +196,6 @@ func _run() -> void:
 	main.reset_play()
 	await _ticks(3)
 
-	print("drowned fin:")
-	powers.fin_stacks = 1
-	horde.clear()
-	await _ticks(2)
-	fish.freeze = false
-	fish.revive(Transform3D(Basis.looking_at(Vector3.FORWARD), Vector3(0, 0, 60)))
-	await _ticks(2)
-	var fin: DrownedFin = run.powerups_of(fish).held["drowned_fin"]
-	var line: Array[int] = []
-	for n in 4:
-		line.append(horde.spawn(2, Vector3(0, 0, 54.0 - n * 3.0)))
-	await _ticks(8)
-	check(fin.is_ready(), "the fin's ready")
-	await get_tree().process_frame
-	Input.action_press("boost")
-	await _ticks(3)
-	Input.action_release("boost")
-	check(fin.dashes == 1 and fin.is_dashing(), "pressing boost charges")
-	var top := 0.0
-	var untouchable := true
-	for t in roundi(powers.fin_dash_time * 120.0):
-		top = maxf(top, fish.speed)
-		untouchable = untouchable and (health.iframes_left > 0.0 or not fin.is_dashing())
-		await get_tree().physics_frame
-	check(top >= powers.fin_dash_speed * 0.8, "a dash at %.0f m/s" % top)
-	check(untouchable, "untouchable while it lasts")
-	check(fin.struck >= 3, "striking what's in the way (%d of 4)" % fin.struck)
-	fin.dash()
-	check(fin.dashes == 1, "then it needs its cooldown (%.1f s)" % fin.cooldown())
-	fish.linear_velocity = Vector3.ZERO
-	powers.fin_stacks = 0
 
 	print("leviathan's coil:")
 	powers.coil_stacks = 1

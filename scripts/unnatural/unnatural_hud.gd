@@ -40,6 +40,7 @@ var _bars := Bars.new()
 var _minimap := Minimap.new()
 var _clock := Label.new()
 var _kills := Label.new()
+var _skill := Label.new()
 var _director := Label.new()
 var _splash := BroadcastUI.Splash.new()
 var _board := BroadcastUI.StatsBoard.new()
@@ -62,7 +63,7 @@ func _ready() -> void:
 	add_child(_bars)
 	_minimap.hud = self
 	add_child(_minimap)
-	for label: Label in [_clock, _kills, _director]:
+	for label: Label in [_clock, _kills, _director, _skill]:
 		label.anchor_left = 0.5
 		label.anchor_right = 0.5
 		label.offset_left = -300.0
@@ -78,6 +79,11 @@ func _ready() -> void:
 	_kills.offset_top = 70.0
 	_kills.add_theme_font_size_override("font_size", 20)
 	_kills.add_theme_color_override("font_color", Color(1.0, 0.75, 0.7))
+	_skill.anchor_top = 0.9
+	_skill.anchor_bottom = 0.9
+	_skill.offset_top = -24.0
+	_skill.offset_bottom = 24.0
+	_skill.add_theme_font_size_override("font_size", 22)
 	_director.offset_top = 98.0
 	_director.add_theme_font_size_override("font_size", 14)
 	_director.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
@@ -197,10 +203,13 @@ func _process(delta: float) -> void:
 	_cam_note.modulate.a = move_toward(_cam_note.modulate.a, 0.0, delta * 0.8)
 	if is_instance_valid(fish) and run.near_whirlpool(fish):
 		_note("JUMP  ·  ENTER THE WHIRLPOOL AND FINISH THE RUN", TreasureChest.GOLD)  # held while you're near
+	elif is_instance_valid(fish) and run.unlocked_chest_near(fish):
+		_note("JUMP  ·  OPEN THE CHEST", TreasureChest.GOLD)  # held while it waits
 	_clock.text = _time_text(run.elapsed)
 	_kills.text = "%d KILLS" % run.kills
 	_clock.visible = not _cards.is_open()  # the cards' heading is there
 	_kills.visible = _clock.visible
+	_update_skill()
 	var next := run.timeline.next_event() if run.timeline and not run.tank else {}
 	if not next.is_empty() and not run.is_over:
 		_kills.text += "    ·    %s IN %s" % [StageTimeline.headline(next.id).trim_prefix("THE "), _time_text(maxf(next.time - run.elapsed, 0.0))]
@@ -368,6 +377,14 @@ static func source_title(source: String) -> String:
 	match source:
 		"battery":
 			return "Battered (ramming)"
+		"fin_dash":
+			return "Fin Dash"
+		"flare":
+			return "Flare Dash"
+		"gulp":
+			return "Gulp"
+		"snap":
+			return "Mantis snap"
 		"splash":
 			return "Koi splashdown"
 		"contact":
@@ -557,7 +574,7 @@ class Bars extends Control:
 		for chest in run.shut_chests_for(fish):
 			var at := chest.global_position + Vector3.UP
 			var gap := at.distance_to(fish.global_position)
-			if gap > run.settings.chest_sense_range:
+			if gap > run.settings.chest_sense_range + run.chest_ping_bonus_of(fish):
 				continue
 			var spot: Vector2
 			var behind := camera.is_position_behind(at)
@@ -584,3 +601,15 @@ class Bars extends Control:
 					HORIZONTAL_ALIGNMENT_CENTER, 700)
 			if chest.progress_of(fish) > 0.0 and inside:
 				draw_arc(spot, 22.0, -PI / 2.0, -PI / 2.0 + TAU * chest.progress_of(fish), 32, tint, 4.0)
+
+
+## The mobility skill's readout at the bottom of the view: RB, its name, and
+## READY, ON, or the seconds left on its cooldown.
+func _update_skill() -> void:
+	var twist: Traversal = run.twist_of(fish) if is_instance_valid(fish) else null
+	_skill.visible = twist != null and run.settings.twists and not _cards.is_open() and Traversal.skill_title(fish.character) != ""
+	if not _skill.visible:
+		return
+	var state := "ON  ·  PRESS TO END" if twist.quiet else ("ON" if twist.skill_active() else ("READY" if twist.skill_wait() <= 0.0 else "%.1f" % twist.skill_wait()))
+	_skill.text = "RB  ·  %s  ·  %s" % [Traversal.skill_title(fish.character).to_upper(), state]
+	_skill.add_theme_color_override("font_color", Color(0.75, 1.0, 0.8) if twist.skill_wait() <= 0.0 else Color(1.0, 1.0, 1.0, 0.6))

@@ -40,7 +40,8 @@ var _built := Vector3i(-1, -1, -1)
 
 
 func count() -> int:
-	return settings.jelly_count + facet_count("count")
+	var twist := run.twist_of(fish)
+	return settings.jelly_count + facet_count("count") + (twist.halo_bonus() if twist else 0)
 
 
 func orbit_radius() -> float:

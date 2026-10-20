@@ -7,7 +7,7 @@ extends Node
 ## in and pop; the Spine Burst hits all round; projectile cards are offered only
 ## to fish that shoot. Then the twists: Nimble turns sharper, Glide keeps its
 ## speed, Frenzy speeds up per kill, Armoured takes less and swims slower, Dash
-## bursts on a dodge (untouchable), and Leap splashes down on the zombies.
+## bursts on the mobility button (untouchable), and Leap splashes down on the zombies.
 ##   Godot_console.exe --headless --path . res://tests/attack_probe.tscn
 
 var main: Node
@@ -153,23 +153,23 @@ func _run() -> void:
 	await _be(FishCharacter.Family.BREAKOUT)
 	fish.freeze = false
 	run.health_of(fish).iframes_left = 0.0
-	fish.dodged.emit(Vector3.FORWARD)
+	run.twist_of(fish).mobility()
 	await _ticks(2)
 	check(run.twist_of(fish).dashes == 1 and fish.linear_velocity.dot(Vector3.FORWARD) > settings.dash_speed * 0.5
-			and run.health_of(fish).iframes_left > 0.0, "Swordfish, Dash: a dodge bursts on (%.1f m/s), untouchable" % fish.linear_velocity.dot(Vector3.FORWARD))
+			and run.health_of(fish).iframes_left > 0.0, "Swordfish, Dash: the mobility button bursts on (%.1f m/s), untouchable" % fish.linear_velocity.dot(Vector3.FORWARD))
 
 	await _be(FishCharacter.Family.HYBRID)
 	fish.freeze = false
 	var splashed := horde.spawn(1, Vector3(3, 0, 0))
 	var leap := run.twist_of(fish)
-	fish.jumped.emit()
+	run.twist_of(fish).mobility()
 	for t in 200:
 		await get_tree().physics_frame
 		if leap.splashes > 0:
 			break
 	check(leap.leaps == 1 and leap.splashes == 1 and run.stats_of(fish).by_source.get("splash", 0.0) > 0.0,
 			"Butterfly Koi, Leap: up, then a splash on the zombies (%s)" % _hurt(splashed))
-	fish.jumped.emit()
+	run.twist_of(fish).mobility()
 	await _ticks(2)
 	check(leap.leaps == 1, "then a cooldown before the next")
 

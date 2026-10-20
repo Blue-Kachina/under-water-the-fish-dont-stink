@@ -19,13 +19,16 @@ var _tome_levels := {}
 ## The fish's attack's kind (its facets depend on it).
 var attack_kind := FishAttack.Kind.BITE
 var powerup_settings := PowerupSettings.shared()
+## A powerup weapon held in place of the fish's own attack ("": it has one).
+var starting := ""
 
 
 func reset() -> void:
-	weapons = [Weapons.ATTACK]
+	var first := starting if starting != "" else Weapons.ATTACK
+	weapons = [first]
 	tomes = []
-	_levels = {Weapons.ATTACK: 1}
-	_facets = {Weapons.ATTACK: {}}
+	_levels = {first: 1}
+	_facets = {first: {}}
 	_tome_levels = {}
 
 
@@ -47,7 +50,7 @@ func add_weapon(id: String, at_level := 1) -> void:
 
 ## Weapon `id` gone (swapped out for a boss weapon).
 func remove_weapon(id: String) -> void:
-	if id == Weapons.ATTACK:
+	if id == Weapons.ATTACK or id == starting:
 		return
 	weapons.erase(id)
 	_levels.erase(id)
@@ -137,3 +140,9 @@ func _spread(id: String, at_level: int) -> Dictionary:
 		var entry: Array = list[n % list.size()]
 		spread[entry[0]] = spread.get(entry[0], 0.0) + Weapons.step_amount(entry, 1.0, powerup_settings)
 	return spread
+
+
+## The fish starts with weapon `id` (a powerup) instead of an attack of its own.
+func start_with(id: String) -> void:
+	starting = id
+	reset()

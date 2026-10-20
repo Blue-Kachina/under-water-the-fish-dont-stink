@@ -36,3 +36,21 @@ Probes updated/added: `stage_probe` (whirlpool), `ui_probe` (Fish Sticks, debug 
 
 ## Manual test checklist for the user
 Home: no Replays button; Konami (up up down down left right left right B A) reveals it and it stays; Play shows Fish Sticks (then 1v1 / Free Play), no Free Swim; Y/I or the Details button on a fish. Settings: only everyday options until SELECT/F2. Unnatural: ambience through card picks; B on a chest's cards; remoras darting; ramming feel; beat the Leviathan (needs a very strong build; use Test Tank or panel to lower `leviathan_hp`) and use the whirlpool; end-screen damage list; Lure with Tome of Ages.
+
+## Update 2026-10-19 (later)
+- **Chests now unlock, then Jump opens.** Holding still `chest_open_time` s unlocks a chest (`TreasureChest.is_unlocked_for`, signal `chest_unlocked`); within reach, Jump opens it (`UnnaturalRun.open_unlocked`; HUD prompt "JUMP · OPEN THE CHEST" via `unlocked_chest_near`). Battering still opens at once, except a chest you just cancelled (`_backed_out`) until you swim clear; a cancelled chest stays unlocked (Jump reopens, same cards). Bots press Jump via `open_unlocked`. Probes updated (powerup, pearl_currency).
+- **Bosses tougher:** shark hp 20000, speed 12, charge speed 36; leviathan hp 60000, speed 15. Untuned.
+- **Whirlpool is a full column** seabed to ceiling (`Whirlpool.height`), entered by horizontal distance only; it has a spiral icon on the minimap (`Minimap.Marks._draw_whirlpool`, pinned to the rim).
+- **RL wording sweep done in `setting_docs.gd`** via `_plain()` in `tools/gen_setting_docs.gd` (regenerated; code comments untouched).
+
+## Update 2026-10-19 (content pass: characters, items, Coil)
+- **Four new playable fish** (appended to `FishCharacter.Family`, sharing a hitbox with an older fish; models in `scripts/fish_model_more.gd`, first-pass shapes): Lionfish (starts with Greek Fire, signature duration, twist **Wake**), Moon Jelly (Jellyfish Halo, area, **Drift**), Mantis Shrimp (Depth Charges, knockback, **Snap**), Manta (Remora Buddy, pearl chance, **Escort**). A powerup weapon takes the fish-attack slot: `FishAttack.Kind.NONE` (inert), `FishAttack.STARTING_WEAPON`, `Loadout.starting`/`start_with` (set from `UnnaturalRun._make_attack`); the starting weapon can't be swapped out. Twist numbers are settings (`wake_damage`, `drift_drag`, `snap_*`, `escort_regen`) in the Twists group; `Traversal.damage_factor`, `_snap`. Probe: `new_fish_probe`. Details panel texts in `fish_details.gd`.
+- **Nine new chest items** (by a helper agent): Kelp Wrap, Sea Salt, Coral Knuckles, Diver's Goggles, Lucky Sand Dollar, Lamprey, Clam Shield, Momentum Fin, Treasure Map (probe `items_batch_probe`). Not built (need mechanics): Sticky Anemone, Cold Seep, Ink Sac, Sonar Pinger, Whirlpool Charm.
+- **Leviathan's Coil now drops**: a boss chest beside the whirlpool when the Leviathan dies (`LeviathanChest`).
+- Still not done: Eel/Serpent fish for the Coil, evolutions (§2.10), equipment tier, remaining §7b items, better models/tentacles, balance passes for the new fish.
+
+## Update 2026-10-19 (mobility skills, build 20:00)
+- **Mobility skill per fish on the boost button (RB / Shift)**, in `traversal.gd` (`Traversal.mobility()`, `SKILLS`); boosting is switched off for local fish in Unnatural (restored on leave). Settings: new "Mobility" group in `unnatural_settings.gd`. Skills: Clownfish Wriggle, Shark Fin Dash (the old Drowned Fin item, now deleted; the shark's boss chest offers a legendary pick instead), String Ray Surge, Swordfish Dash, Koi Leap, Boxfish Brace, Lionfish Flare Dash, Moon Jelly Go Quiet (stink off: weapons/self-firing items stop, zombies lose it, a hit ends it; `UnnaturalRun.is_quiet`), Mantis Snap, Baby Whale Shark Gulp (cone suction).
+- **Passives changed:** Swordfish Streamlined (+speed), Koi Graceful (+i-frames), Moon Jelly Many Arms (+1 Halo jelly), Mantis Hammer (the snap shockwave), Whale Shark Escort (heal while still); Lionfish Wake, Clownfish Nimble, Shark Frenzy, Ray Glide, Boxfish Armoured unchanged.
+- Manta replaced by **Baby Whale Shark** (`Family.WHALE_SHARK`, model in `fish_model_more.gd`). HUD readout at the bottom (`_update_skill`). Details panel has a Mobility section (`FishDetails.skill_text`).
+- Probes: `mobility_probe` (new), `new_fish_probe`, `attack_probe` updated. Bots don't use skills yet.

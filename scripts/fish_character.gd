@@ -8,7 +8,7 @@ class_name FishCharacter
 ## bottom sits off the floor with the car settled on its wheels (measured in
 ## RocketSim), which the fish's belly fills.
 
-enum Family { OCTANE, DOMINUS, PLANK, BREAKOUT, HYBRID, MERC }
+enum Family { OCTANE, DOMINUS, PLANK, BREAKOUT, HYBRID, MERC, LIONFISH, MOON_JELLY, MANTIS, WHALE_SHARK }
 
 const CARS := {
 	Family.OCTANE: {
@@ -52,6 +52,35 @@ const CARS := {
 		"front": {"radius": 15.0, "rest": 39.505, "at": Vector3(51.25, 25.9, 21.505)},
 		"back": {"radius": 15.0, "rest": 39.105, "at": Vector3(-33.75, 29.5, 21.505)},
 		"ride": 18.147,
+	},
+	# The later fish share a hitbox with one of the first six (their shapes differ, the boxes don't).
+	Family.LIONFISH: {
+		"key": "lionfish", "car": "Octane", "fish": "Lionfish",
+		"hitbox": Vector3(120.507, 86.6994, 38.6591), "offset": Vector3(13.8757, 0.0, 20.755),
+		"front": {"radius": 12.5, "rest": 38.755, "at": Vector3(51.25, 25.9, 20.755)},
+		"back": {"radius": 15.0, "rest": 37.055, "at": Vector3(-33.75, 29.5, 20.755)},
+		"ride": 18.344,
+	},
+	Family.MOON_JELLY: {
+		"key": "moon_jelly", "car": "Hybrid", "fish": "Moon Jelly",
+		"hitbox": Vector3(129.519, 84.6879, 36.6591), "offset": Vector3(13.8757, 0.0, 20.755),
+		"front": {"radius": 12.5, "rest": 38.755, "at": Vector3(51.25, 25.9, 20.755)},
+		"back": {"radius": 15.0, "rest": 37.055, "at": Vector3(-34.0, 29.5, 20.755)},
+		"ride": 19.342,
+	},
+	Family.MANTIS: {
+		"key": "mantis", "car": "Dominus", "fish": "Mantis Shrimp",
+		"hitbox": Vector3(130.427, 85.7799, 33.8), "offset": Vector3(9.0, 0.0, 15.75),
+		"front": {"radius": 12.0, "rest": 33.95, "at": Vector3(50.3, 31.1, 15.75)},
+		"back": {"radius": 13.5, "rest": 33.85, "at": Vector3(-34.75, 33.0, 15.75)},
+		"ride": 15.923,
+	},
+	Family.WHALE_SHARK: {
+		"key": "whale_shark", "car": "Plank", "fish": "Baby Whale Shark",
+		"hitbox": Vector3(131.32, 87.1704, 31.8944), "offset": Vector3(9.00857, 0.0, 12.0942),
+		"front": {"radius": 12.5, "rest": 31.924, "at": Vector3(49.97, 27.8, 12.0942)},
+		"back": {"radius": 17.0, "rest": 27.924, "at": Vector3(-35.43, 20.28, 12.0942)},
+		"ride": 14.732,
 	},
 }
 ## How far a tyre reaches out past its suspension mount (uu): the belly is this

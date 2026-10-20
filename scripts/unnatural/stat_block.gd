@@ -41,6 +41,10 @@ const SIGNATURE := {
 	FishCharacter.Family.HYBRID: "luck",
 	FishCharacter.Family.MERC: "armour",
 	FishCharacter.Family.PLANK: "attack_speed",
+	FishCharacter.Family.LIONFISH: "duration",
+	FishCharacter.Family.MOON_JELLY: "area",
+	FishCharacter.Family.MANTIS: "knockback",
+	FishCharacter.Family.WHALE_SHARK: "pearl_chance",
 }
 
 var values := {}

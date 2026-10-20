@@ -47,7 +47,7 @@ func _run() -> void:
 
 	# The pops.
 	var up := camera.global_basis.y.lerp(-camera.global_basis.z, 0.5).normalized()  # rings seen at a slant
-	PowerupFx.ring(run, at(-4.5, 1.5, 12.0), 2.5, Powerup.color("drowned_fin"), up, 10.0)
+	PowerupFx.ring(run, at(-4.5, 1.5, 12.0), 2.5, Traversal.FIN_COLOR, up, 10.0)
 	PowerupFx.shock(run, at(4.5, 1.5, 12.0), 3.0, Powerup.color("electric_eel"), up, 10.0)
 	PowerupFx.flash(run, at(-3.0, -1.5, 8.0), 0.6, Powerup.color("remora_buddy"), 10.0)
 	PowerupFx.spikes(run, at(0.0, 2.5, 10.0), 2.5, Powerup.color("pufferfish_spines"), 10.0)

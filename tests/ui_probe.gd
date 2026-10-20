@@ -237,7 +237,7 @@ func _check_settings() -> void:
 	check(fish_tabs.size() >= 3 and panel._tab_bar.visible, "Fish has tabs across the top: %s" % [fish_tabs])
 	check(panel._tabs["game"].is_empty() and not _tab_bar_shown_for(panel, "game"), "Game has none")
 	var powerup_tabs: Array = panel._tabs["powerups"].map(func(tab: Dictionary) -> String: return tab.title)
-	check(powerup_tabs.has("Cursed") and powerup_tabs.has("Boss") and not powerup_tabs.has("Epic"), "Powerups' tabs by rarity: %s" % [powerup_tabs])
+	check(powerup_tabs.has("Cursed") and not powerup_tabs.has("Epic"), "Powerups' tabs by rarity: %s" % [powerup_tabs])
 	await _button(JOY_BUTTON_RIGHT_SHOULDER)
 	check(panel._section == "fish" and panel._tab_at["fish"] == 1, "RB: the next tab (%s)" % fish_tabs[1])
 	await _button(JOY_BUTTON_LEFT_SHOULDER)

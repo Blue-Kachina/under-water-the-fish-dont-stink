@@ -157,6 +157,12 @@ func progress_of(fish: FishController) -> float:
 	return _progress.get(fish, 0.0)
 
 
+## Whether `fish` has held still beside it long enough to unlock it (it then
+## waits for their Jump).
+func is_unlocked_for(fish: FishController) -> bool:
+	return _progress.get(fish, 0.0) >= 1.0
+
+
 func set_progress(fish: FishController, amount: float) -> void:
 	if amount <= 0.0:
 		_progress.erase(fish)
@@ -186,6 +192,7 @@ func reshut_for(fish: FishController, layer := 0) -> bool:
 	if fish not in opened_by or is_queued_for_deletion() or _vanished:
 		return false
 	opened_by.erase(fish)
+	_progress[fish] = 1.0  # still unlocked: Jump opens it again
 	if layer != 0 and is_inside_tree():
 		_shown |= layer
 		_set_layers(_shut, _shown)

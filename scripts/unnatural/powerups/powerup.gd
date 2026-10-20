@@ -16,6 +16,15 @@ extends RefCounted
 ## Id -> [name, colour, tag, what it does, rarity (Rarity.Tier)]. A chest
 ## rolls a rarity with the opener's luck and offers powerups of it.
 const INFO := {
+	"kelp_wrap": ["Kelp Wrap", Color(0.35, 0.75, 0.35), "KW", "+0.5 HP a second: kelp ribbons mend you as you swim.", Rarity.Tier.COMMON],
+	"sea_salt": ["Sea Salt", Color(0.95, 0.95, 1.0), "SA", "+5% crit chance.", Rarity.Tier.COMMON],
+	"coral_knuckles": ["Coral Knuckles", Color(1.0, 0.5, 0.45), "CK", "+20% battery damage: coral on the nose.", Rarity.Tier.COMMON],
+	"divers_goggles": ["Diver's Goggles", Color(0.3, 0.75, 0.95), "DG", "+25% pickup range: you spot pearls from further.", Rarity.Tier.COMMON],
+	"lucky_sand_dollar": ["Lucky Sand Dollar", Color(0.95, 0.88, 0.7), "LD", "+0.1 luck: better cards and chests.", Rarity.Tier.COMMON],
+	"lamprey": ["Lamprey", Color(0.55, 0.5, 0.6), "LP", "Every kill heals you 1 HP.", Rarity.Tier.UNCOMMON],
+	"clam_shield": ["Clam Shield", Color(0.9, 0.8, 0.85), "CS", "Every 12 s a clam takes the next hit for you.", Rarity.Tier.UNCOMMON],
+	"momentum_fin": ["Momentum Fin", Color(0.7, 0.95, 0.6), "MF", "Hit harder the faster you swim: +10% per 10 m/s.", Rarity.Tier.UNCOMMON],
+	"treasure_map": ["Treasure Map", Color(0.85, 0.7, 0.4), "TM", "Zombies drop 30% more chests, and chests are pinged further.", Rarity.Tier.UNCOMMON],
 	"greek_fire": ["Greek Fire Trail", Color(1.0, 0.45, 0.1), "GF", "Burning patches behind you burn the zombies in them.", Rarity.Tier.UNCOMMON],
 	"chain_lightning": ["Chain Lightning", Color(0.45, 0.8, 1.0), "CL", "Hits may start lightning that jumps between zombies.", Rarity.Tier.UNCOMMON],
 	"torpedo": ["Torpedo Launcher", Color(0.9, 0.85, 0.3), "TL", "Hits may fire heat-seeking torpedoes that explode.", Rarity.Tier.RARE],
@@ -32,7 +41,6 @@ const INFO := {
 	"depth_charges": ["Depth Charges", Color(0.6, 0.66, 0.55), "DC", "Drops mines behind you that blow up the zombies that follow.", Rarity.Tier.RARE],
 	"anglerfish_lure": ["Anglerfish Lure", Color(0.6, 1.0, 0.5), "AL", "Drops a glowing decoy the zombies chase. Then it bursts.", Rarity.Tier.RARE],
 	"tsunami_heart": ["Tsunami Heart", Color(0.3, 0.6, 1.0), "TH", "Batteries send a wave rolling along your heading.", Rarity.Tier.LEGENDARY],
-	"drowned_fin": ["Drowned Fin", Color(0.55, 0.75, 0.85), "DF", "Press boost to charge: a dash that batters everything in the way.", Rarity.Tier.BOSS],
 	"leviathans_coil": ["Leviathan's Coil", Color(0.85, 0.15, 0.2), "LC", "A trail of coils behind you hurts whatever they touch.", Rarity.Tier.BOSS],
 	"blood_moon_shard": ["Blood Moon Shard", Color(0.9, 0.1, 0.15), "BM", "+100% damage. You take +50% damage.", Rarity.Tier.CURSED],
 	"glass_coral": ["Glass Coral", Color(1.0, 0.55, 0.65), "GC", "+100% damage. Your max HP is halved.", Rarity.Tier.CURSED],
@@ -61,8 +69,16 @@ static func create(powerup_id: String) -> Powerup:
 			made = TorpedoLauncher.new()
 		"bow_grow_bow":
 			made = BowGrowBow.new()
-		"barnacle_plating", "hermit_shell", "fizzy_soda", "speedy_seahorse":
+		"barnacle_plating", "hermit_shell", "fizzy_soda", "speedy_seahorse", "kelp_wrap", "sea_salt", "coral_knuckles", "divers_goggles", "lucky_sand_dollar":
 			made = StatPowerup.new()
+		"lamprey":
+			made = Lamprey.new()
+		"clam_shield":
+			made = ClamShield.new()
+		"momentum_fin":
+			made = MomentumFin.new()
+		"treasure_map":
+			made = TreasureMap.new()
 		"remora_buddy":
 			made = RemoraBuddy.new()
 		"bubble_wrap":
@@ -79,8 +95,6 @@ static func create(powerup_id: String) -> Powerup:
 			made = AnglerfishLure.new()
 		"tsunami_heart":
 			made = TsunamiHeart.new()
-		"drowned_fin":
-			made = DrownedFin.new()
 		"leviathans_coil":
 			made = LeviathansCoil.new()
 		"blood_moon_shard", "glass_coral", "sirens_song", "abyssal_hunger", "sunken_idol":
@@ -242,6 +256,20 @@ func max_hp_factor() -> float:
 
 func horde_factor() -> float:
 	return 1.0
+
+
+## Multiplies the damage this player deals right now (Momentum Fin), how often
+## their kills drop chests (Treasure Map), and how far chests are pinged (m, added).
+func damage_factor() -> float:
+	return 1.0
+
+
+func chest_drop_factor() -> float:
+	return 1.0
+
+
+func chest_ping_bonus() -> float:
+	return 0.0
 
 
 ## A stage event started (a swarm, a boss).

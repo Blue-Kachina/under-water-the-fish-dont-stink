@@ -66,7 +66,9 @@ func _run() -> void:
 		if run.is_picking(fish) and not offers.size():
 			seen_picking = seen_picking or horde.chaseable[0] == 0
 	check(seen_picking, "holding still beside one: untouchable and unseen while it opens")
-	check(chest.is_open_for(fish) and offers.size() == 1 and (offers[0][1] as String).ends_with("TREASURE!"), "after chest_open_time it opens, offering powerups (%s)" % offers[0][1] if offers.size() else "")
+	check(chest.is_unlocked_for(fish) and not chest.is_open_for(fish), "after chest_open_time it unlocks, and waits for Jump")
+	run.open_unlocked(fish)
+	check(chest.is_open_for(fish) and offers.size() == 1 and (offers[0][1] as String).contains("TREASURE"), "Jump then opens it, offering powerups (%s)" % offers[0][1] if offers.size() else "")
 	var cards: Array = offers[0][0]
 	var ids := cards.map(func(c: Dictionary) -> String: return c.powerup)
 	check(cards.size() == 3 and ids.size() == {ids[0]: 0, ids[1]: 0, ids[2]: 0}.size(), "three different powerups (%s)" % [ids])

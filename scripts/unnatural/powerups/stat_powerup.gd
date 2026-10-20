@@ -16,6 +16,16 @@ func stat_bonus() -> Dictionary:
 			return {"attack_speed": settings.soda_attack_speed * stacks}
 		"speedy_seahorse":
 			return {"swim_speed": settings.seahorse_speed * stacks}
+		"kelp_wrap":
+			return {"regen": settings.kelp_regen * stacks}
+		"sea_salt":
+			return {"crit_chance": settings.salt_crit * stacks}
+		"coral_knuckles":
+			return {"battery_damage": settings.knuckles_battery * stacks}
+		"divers_goggles":
+			return {"pickup_range": settings.goggles_range * stacks}
+		"lucky_sand_dollar":
+			return {"luck": settings.dollar_luck * stacks}
 	return {}
 
 
@@ -29,7 +39,24 @@ func make_worn() -> Node3D:
 			return _bubbles()
 		"speedy_seahorse":
 			return _seahorse()
+		"kelp_wrap", "sea_salt", "coral_knuckles", "divers_goggles", "lucky_sand_dollar":
+			return _trinket()
 	return null
+
+
+## A small glowing charm on the back in the item's colour: the other commons'
+## look (kelp, salt, coral, goggles and the coin are all this, for now).
+func _trinket() -> Node3D:
+	var charm := Node3D.new()
+	charm.name = "Trinket"
+	charm.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.06, 0.0)
+	var gem := SphereMesh.new()
+	gem.radius = 0.07
+	gem.height = 0.14
+	gem.radial_segments = 8
+	gem.rings = 4
+	charm.add_child(worn_mesh(gem, worn_material(0.7), Vector3(0.0, 0.0, fish.hitbox_length * (posmod(hash(id), 5) - 2) * 0.1)))
+	return charm
 
 
 ## Little cones clustered along the back.

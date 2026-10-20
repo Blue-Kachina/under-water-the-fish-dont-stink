@@ -113,7 +113,7 @@ func _whirlpool_goal(me: Vector3) -> Vector3:
 		return Vector3.INF
 	if run.near_whirlpool(fish):
 		run.enter_whirlpool(fish)
-	return run.whirlpool.global_position
+	return Vector3(run.whirlpool.global_position.x, me.y, run.whirlpool.global_position.z)
 
 
 ## The nearest chest it can afford, if it's worth going for: open, by
@@ -135,7 +135,9 @@ func _chest_goal(me: Vector3, closest: float) -> Vector3:
 	var middle := best.global_position + Vector3.UP * TreasureChest.SIZE.y * 0.5
 	var fast := fish.speed >= fish.nature_batter_speed * run.powerups_of(fish).batter_speed_share()
 	if best_gap < run.settings.chest_reach - 1.0 and not fast:
-		_holding = true  # slow and beside it: hold still until it opens
+		if best.is_unlocked_for(fish):
+			run.open_unlocked(fish)  # held still long enough: press Jump
+		_holding = true  # slow and beside it: hold still until it unlocks
 		return me
 	return middle
 

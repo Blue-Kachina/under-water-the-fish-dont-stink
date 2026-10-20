@@ -232,7 +232,7 @@ func _powerups() -> void:
 	print("powerups:")
 	var powers := run.powerups_of(fish)
 	heard.clear()
-	for id in ["depth_charges", "anglerfish_lure", "torpedo", "electric_eel", "tsunami_heart", "drowned_fin", "bubble_wrap",
+	for id in ["depth_charges", "anglerfish_lure", "torpedo", "electric_eel", "tsunami_heart", "bubble_wrap",
 			"pufferfish_spines", "greek_fire", "jellyfish_halo", "leviathans_coil"]:
 		powers.add(id)
 	await _seconds(0.2)
@@ -261,8 +261,6 @@ func _powerups() -> void:
 	(held["pufferfish_spines"] as PufferfishSpines).on_hurt(1.0, -1)
 	check(heard.has("pw/eel_shock_ring") and heard.has("pw/tsunami_wave") and heard.has("pw/puffer_spines"), "the eel's ring, the wave, the spines")
 	heard.clear()
-	(held["drowned_fin"] as DrownedFin).dash()
-	check(heard.has("pw/drowned_fin_dash") and heard.has("pw/drowned_fin_charge_loop"), "the Drowned Fin's dash")
 	heard.clear()
 	var wrap: BubbleWrap = held["bubble_wrap"]
 	wrap.on_tick(wrap.ready_time() + 1.0)

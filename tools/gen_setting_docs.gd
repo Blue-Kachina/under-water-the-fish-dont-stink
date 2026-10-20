@@ -37,7 +37,7 @@ func _init() -> void:
 	var keys := docs.keys()
 	keys.sort()
 	for key: String in keys:
-		lines.append("\t\"%s\": \"%s\"," % [key, String(docs[key]).c_escape()])
+		lines.append("\t\"%s\": \"%s\"," % [key, _plain(String(docs[key])).c_escape()])
 	lines.append("}")
 	lines.append("")
 	var out := FileAccess.open(OUT, FileAccess.WRITE)
@@ -98,3 +98,13 @@ func _join(lines: PackedStringArray) -> String:
 	if not current.is_empty():
 		paragraphs.append(current)
 	return "\n\n".join(paragraphs)
+
+
+## The comment as the player reads it: no mention of the game these physics
+## were measured from (the comments themselves keep the details for the code).
+func _plain(text: String) -> String:
+	for pair: Array in [["Rocket League-style", "arcade-style"], ["Rocket League style", "arcade style"],
+			["Rocket League's", "the reference game's"], ["Rocket League", "the reference game"],
+			["RL: ", "Reference: "], ["RL's", "the reference's"], ["RL-style", "reference-style"], ["RL ", "the reference "]]:
+		text = text.replace(pair[0], pair[1])
+	return text.replace("RL", "the reference")

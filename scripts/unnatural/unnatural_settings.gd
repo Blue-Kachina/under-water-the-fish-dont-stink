@@ -323,10 +323,10 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 20.0, 0.25, "or_greater") var frenzy_time := 3.0
 ## String Ray, Glide: keeps this share of the water's drag when coasting (0: none).
 @export_range(0.0, 1.0, 0.05) var glide_drag := 0.3
-## Swordfish, Dash: a dodge adds dash_speed (m/s) along it, untouchable for dash_iframes s.
+## Swordfish, Dash (mobility): adds dash_speed (m/s) along its nose, untouchable for dash_iframes s.
 @export_range(0.0, 100.0, 0.5, "or_greater") var dash_speed := 14.0
 @export_range(0.0, 2.0, 0.05, "or_greater") var dash_iframes := 0.3
-## Butterfly Koi, Leap: a jump also leaps up leap_impulse (m/s); as it tops
+## Butterfly Koi, Leap (mobility): leaps up leap_impulse (m/s); as it tops
 ## out, it splashes down: leap_damage to every zombie within leap_radius (m).
 ## Then leap_cooldown s before the next.
 @export_range(0.0, 100.0, 0.5, "or_greater") var leap_impulse := 12.0
@@ -336,6 +336,68 @@ static func shared() -> UnnaturalSettings:
 ## Boxfish, Armoured: takes this share of damage, and swims at this share of speed.
 @export_range(0.0, 1.0, 0.05) var armour_taken := 0.7
 @export_range(0.1, 1.0, 0.05) var armour_speed := 0.88
+## Lionfish, Wake: Greek Fire burns up to this much harder (+share) the nearer
+## it swims to battering speed.
+@export_range(0.0, 5.0, 0.05, "or_greater") var wake_damage := 0.6
+## Mantis Shrimp, Snap (mobility): lunges ahead snap_speed (m/s) and cracks a shockwave, snap_damage to every zombie
+## within snap_radius m, then snap_cooldown s before the next.
+@export_range(0.0, 1000.0, 1.0, "or_greater") var snap_damage := 70.0
+@export_range(0.0, 40.0, 0.5, "or_greater") var snap_radius := 6.0
+@export_range(0.0, 20.0, 0.25, "or_greater") var snap_cooldown := 2.0
+@export_range(0.0, 100.0, 0.5, "or_greater") var snap_speed := 18.0
+## Baby Whale Shark, Escort: holding still (slower than chest_still_speed), it heals this
+## many hp a second.
+@export_range(0.0, 100.0, 0.25, "or_greater") var escort_regen := 4.0
+## Swordfish, Streamlined: swims this much faster (+share).
+@export_range(0.0, 1.0, 0.01, "or_greater") var streamline_speed := 0.1
+## Butterfly Koi, Graceful: this many seconds more of i-frames after a hit.
+@export_range(0.0, 3.0, 0.05, "or_greater") var graceful_iframes := 0.5
+## Moon Jelly, Many Arms: its Halo has this many more jellies.
+@export_range(0, 10, 1, "or_greater") var arms_extra := 1
+@export_group("Mobility")
+## Every fish's mobility skill is on the boost button (RB, Shift): it takes
+## the place of boosting in Unnatural. Each has its own cooldown (s).
+@export_range(0.0, 60.0, 0.25, "or_greater") var dash_cooldown := 2.5
+## Shark, Fin Dash: charges ahead at fin_dash_speed (m/s) for fin_dash_time s,
+## untouchable, battering everything in the way; every zombie it passes within
+## fin_radius m takes fin_damage once.
+@export_range(5.0, 200.0, 1.0, "or_greater") var fin_dash_speed := 45.0
+@export_range(0.05, 3.0, 0.05, "or_greater") var fin_dash_time := 0.45
+@export_range(0.5, 20.0, 0.25, "or_greater") var fin_radius := 3.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var fin_damage := 90.0
+@export_range(0.1, 60.0, 0.1, "or_greater") var fin_cooldown := 3.0
+## Clownfish, Wriggle: a burst of wriggle_speed (m/s) sideways (the way the
+## stick leans, else back), untouchable for wriggle_iframes s.
+@export_range(0.0, 100.0, 0.5, "or_greater") var wriggle_speed := 16.0
+@export_range(0.0, 2.0, 0.05, "or_greater") var wriggle_iframes := 0.3
+@export_range(0.1, 60.0, 0.1, "or_greater") var wriggle_cooldown := 2.0
+## String Ray, Surge: a stroke of surge_speed (m/s) forward, with no drag for surge_time s.
+@export_range(0.0, 100.0, 0.5, "or_greater") var surge_speed := 22.0
+@export_range(0.0, 6.0, 0.1, "or_greater") var surge_time := 1.5
+@export_range(0.1, 60.0, 0.1, "or_greater") var surge_cooldown := 4.0
+## Boxfish, Brace: for brace_time s it takes brace_taken of the damage and
+## swims at brace_speed of its speed.
+@export_range(0.0, 20.0, 0.1, "or_greater") var brace_time := 2.5
+@export_range(0.0, 1.0, 0.05) var brace_taken := 0.25
+@export_range(0.1, 1.0, 0.05) var brace_speed := 0.7
+@export_range(0.1, 60.0, 0.1, "or_greater") var brace_cooldown := 8.0
+## Lionfish, Flare Dash: dashes flare_speed (m/s) for flare_time s, its spines
+## flaring: flare_damage to every zombie within flare_radius m on the way.
+@export_range(0.0, 200.0, 1.0, "or_greater") var flare_speed := 30.0
+@export_range(0.05, 3.0, 0.05, "or_greater") var flare_time := 0.35
+@export_range(0.0, 1000.0, 1.0, "or_greater") var flare_damage := 60.0
+@export_range(0.5, 30.0, 0.5, "or_greater") var flare_radius := 4.0
+@export_range(0.1, 60.0, 0.1, "or_greater") var flare_cooldown := 3.5
+## Moon Jelly, Go Quiet: switches its stink off for up to quiet_time s: nothing
+## fires, and zombies lose track of it. Ends if it's hurt; then quiet_cooldown s.
+@export_range(0.5, 60.0, 0.5, "or_greater") var quiet_time := 8.0
+@export_range(0.1, 60.0, 0.1, "or_greater") var quiet_cooldown := 6.0
+## Baby Whale Shark, Gulp: sucks every zombie within gulp_range m ahead of it
+## in (pulled at gulp_pull m/s), gulp_damage each.
+@export_range(1.0, 60.0, 0.5, "or_greater") var gulp_range := 14.0
+@export_range(0.0, 100.0, 0.5, "or_greater") var gulp_pull := 25.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var gulp_damage := 25.0
+@export_range(0.1, 60.0, 0.1, "or_greater") var gulp_cooldown := 5.0
 
 @export_group("Stage")
 ## The stage's timeline (StageTimeline, D5): when each event comes (s into the
@@ -365,15 +427,15 @@ static func shared() -> UnnaturalSettings:
 @export_group("Drowned Shark")
 ## The mini-boss: a huge zombie shark. Its hp (times 1 + coop_scale per extra
 ## player), swim speed (m/s), size (times the Shark's) and contact damage.
-@export_range(1.0, 100000.0, 50.0, "or_greater") var shark_hp := 9000.0
-@export_range(0.0, 60.0, 0.5, "or_greater") var shark_speed := 8.0
+@export_range(1.0, 100000.0, 50.0, "or_greater") var shark_hp := 20000.0
+@export_range(0.0, 60.0, 0.5, "or_greater") var shark_speed := 12.0
 @export_range(1.0, 15.0, 0.25, "or_greater") var shark_size := 15.0
 @export_range(0.0, 500.0, 1.0, "or_greater") var shark_contact := 25.0
 ## Every shark_charge_every s it glows red for shark_telegraph s, then charges
 ## at shark_charge_speed (m/s) for shark_charge_time s.
 @export_range(0.0, 60.0, 0.5, "or_greater") var shark_charge_every := 6.0
 @export_range(0.0, 5.0, 0.05, "or_greater") var shark_telegraph := 1.0
-@export_range(0.0, 100.0, 1.0, "or_greater") var shark_charge_speed := 28.0
+@export_range(0.0, 100.0, 1.0, "or_greater") var shark_charge_speed := 36.0
 @export_range(0.0, 5.0, 0.05, "or_greater") var shark_charge_time := 1.2
 ## Every shark_call_every s it calls a ring of shark_call_count sardines round its target.
 @export_range(0.0, 120.0, 1.0, "or_greater") var shark_call_every := 12.0
@@ -384,11 +446,11 @@ static func shared() -> UnnaturalSettings:
 @export_group("Blood Leviathan")
 ## The boss: a giant serpent. Beating it completes the stage. Its hp (times 1 +
 ## coop_scale per extra player), swim speed (m/s), segments and contact damage.
-@export_range(1.0, 1000000.0, 100.0, "or_greater") var leviathan_hp := 27000.0
+@export_range(1.0, 1000000.0, 100.0, "or_greater") var leviathan_hp := 60000.0
 ## The whirlpool that opens where it falls: swim within this many metres and press
 ## Jump to enter it, which is what completes the stage (the run goes on until you do).
 @export_range(1.0, 100.0, 1.0, "or_greater") var whirlpool_range := 15.0
-@export_range(0.0, 60.0, 0.5, "or_greater") var leviathan_speed := 11.0
+@export_range(0.0, 60.0, 0.5, "or_greater") var leviathan_speed := 15.0
 @export_range(2, 60, 1, "or_greater") var leviathan_segments := 14
 @export_range(0.5, 6.0, 0.1, "or_greater") var leviathan_girth := 6.0
 @export_range(0.0, 500.0, 1.0, "or_greater") var leviathan_contact := 30.0

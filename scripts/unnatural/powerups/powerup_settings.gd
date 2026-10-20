@@ -257,20 +257,6 @@ static func shared() -> PowerupSettings:
 @export_range(0.0, 30.0, 0.05, "or_greater") var tsunami_cooldown := 1.0
 @export_range(0.0, 1.0, 0.05) var tsunami_proc := 1.0
 
-@export_group("Drowned Fin (boss)")
-## The Drowned Shark's: pressing boost with it ready charges, a dash at
-## fin_dash_speed for fin_dash_time s (untouchable), every zombie it passes
-## within fin_radius taking fin_damage (+ per stack) once, proc fin_proc. Then
-## fin_cooldown s (times 1 - fin_cooldown_per_stack a stack).
-@export_range(0, 20, 1, "or_greater") var fin_stacks := 0
-@export_range(5.0, 200.0, 1.0, "or_greater") var fin_dash_speed := 45.0
-@export_range(0.05, 3.0, 0.05, "or_greater") var fin_dash_time := 0.45
-@export_range(0.5, 20.0, 0.25, "or_greater") var fin_radius := 3.0
-@export_range(0.0, 5000.0, 5.0, "or_greater") var fin_damage := 90.0
-@export_range(0.0, 5000.0, 5.0, "or_greater") var fin_damage_per_stack := 45.0
-@export_range(0.1, 60.0, 0.1, "or_greater") var fin_cooldown := 3.0
-@export_range(0.0, 0.9, 0.01) var fin_cooldown_per_stack := 0.15
-@export_range(0.0, 1.0, 0.05) var fin_proc := 1.0
 
 @export_group("Leviathan's Coil (boss)")
 ## A boss weapon, the Blood Leviathan's (it arrives at coil_arrive_level):
@@ -316,8 +302,72 @@ static func shared() -> PowerupSettings:
 ## of a random other powerup, a stack.
 @export_range(0, 20, 1, "or_greater") var idol_stacks := 0
 
+@export_group("Kelp Wrap")
+## Kelp ribbons trailing: +kelp_regen hp a second a stack.
+@export_range(0, 20, 1, "or_greater") var kelp_stacks := 0
+@export_range(0.0, 20.0, 0.1, "or_greater") var kelp_regen := 0.5
+
+@export_group("Sea Salt")
+## Glittering salt crystals: +salt_crit crit chance a stack (0.05: +5%).
+@export_range(0, 20, 1, "or_greater") var salt_stacks := 0
+@export_range(0.0, 1.0, 0.01, "or_greater") var salt_crit := 0.05
+
+@export_group("Coral Knuckles")
+## Coral on the nose: +knuckles_battery battery damage a stack (0.2: +20%).
+@export_range(0, 20, 1, "or_greater") var knuckles_stacks := 0
+@export_range(0.0, 5.0, 0.05, "or_greater") var knuckles_battery := 0.2
+
+@export_group("Diver's Goggles")
+## Goggles: +goggles_range pickup range a stack (0.25: +25%).
+@export_range(0, 20, 1, "or_greater") var goggles_stacks := 0
+@export_range(0.0, 5.0, 0.05, "or_greater") var goggles_range := 0.25
+
+@export_group("Lucky Sand Dollar")
+## A coin on the forehead: +dollar_luck luck a stack.
+@export_range(0, 20, 1, "or_greater") var dollar_stacks := 0
+@export_range(0.0, 5.0, 0.01, "or_greater") var dollar_luck := 0.1
+
+@export_group("Lamprey")
+## A lamprey trailing: a kill heals lamprey_heal hp (a stack), at most once
+## every lamprey_gap s.
+@export_range(0, 20, 1, "or_greater") var lamprey_stacks := 0
+@export_range(0.0, 100.0, 0.5, "or_greater") var lamprey_heal := 1.0
+@export_range(0.0, 5.0, 0.05, "or_greater") var lamprey_gap := 0.1
+
+@export_group("Clam Shield")
+## A clam: once it's gone clam_ready s untouched (less clam_ready_per_stack a
+## stack, down to clam_ready_min) it takes the next hit for you, then shuts for
+## that long. Unlike Bubble Wrap it recharges whether or not you're hurt.
+@export_range(0, 20, 1, "or_greater") var clam_stacks := 0
+@export_range(0.1, 120.0, 0.5, "or_greater") var clam_ready := 12.0
+@export_range(0.0, 20.0, 0.1, "or_greater") var clam_ready_per_stack := 2.0
+@export_range(0.1, 60.0, 0.1, "or_greater") var clam_ready_min := 3.0
+
+@export_group("Momentum Fin")
+## Streamers: your hits do momentum_damage more damage per momentum_speed m/s
+## you're swimming (0.1 per 10 m/s: +10%), a stack.
+@export_range(0, 20, 1, "or_greater") var momentum_stacks := 0
+@export_range(0.0, 5.0, 0.01, "or_greater") var momentum_damage := 0.1
+@export_range(1.0, 100.0, 0.5, "or_greater") var momentum_speed := 10.0
+
+@export_group("Treasure Map")
+## A rolled map: zombies drop chests treasure_chests (a stack) more often, and
+## your HUD pings chests treasure_ping more metres out (a stack).
+@export_range(0, 20, 1, "or_greater") var map_stacks := 0
+@export_range(0.0, 10.0, 0.05, "or_greater") var treasure_chests := 0.3
+@export_range(0.0, 500.0, 1.0, "or_greater") var treasure_ping := 10.0
+
 ## Powerup id -> its testing override's setting.
 const STACKS := {
+	"kelp_wrap": "kelp_stacks",
+	"sea_salt": "salt_stacks",
+	"coral_knuckles": "knuckles_stacks",
+	"divers_goggles": "goggles_stacks",
+	"lucky_sand_dollar": "dollar_stacks",
+	"lamprey": "lamprey_stacks",
+	"clam_shield": "clam_stacks",
+	"momentum_fin": "momentum_stacks",
+	"treasure_map": "map_stacks",
 	"greek_fire": "fire_stacks",
 	"chain_lightning": "lightning_stacks",
 	"torpedo": "torpedo_stacks",
@@ -334,7 +384,6 @@ const STACKS := {
 	"depth_charges": "charge_stacks",
 	"anglerfish_lure": "lure_stacks",
 	"tsunami_heart": "tsunami_stacks",
-	"drowned_fin": "fin_stacks",
 	"leviathans_coil": "coil_stacks",
 	"blood_moon_shard": "shard_stacks",
 	"glass_coral": "coral_stacks",

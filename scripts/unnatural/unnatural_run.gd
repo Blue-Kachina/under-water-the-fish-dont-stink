@@ -107,6 +107,8 @@ signal pearl_claimed(id: int, by: FishController)
 signal xp_claimed(xp: float)
 signal chest_claimed(index: int, by: FishController)
 ## `fish` backed out of a chest (cancel_offer): shut for them again. A guest says so to the host (chest_unclaimed).
+## `fish` held still beside `chest` long enough: it's unlocked, and waits for their Jump.
+signal chest_unlocked(chest: TreasureChest, fish: FishController)
 signal chest_reshut(chest: TreasureChest, fish: FishController)
 signal chest_unclaimed(index: int, by: FishController)
 ## `fish` cancelled the chest it was choosing from (the HUD closes the cards).
@@ -226,6 +228,8 @@ var _extra_picks := {}
 var _offers := {}
 var _offer_kind := {}
 var _opening := {}
+## The chest each player last put back (fish -> chest): no battering it open again until they swim clear.
+var _backed_out := {}
 var _stride_hooks := {}
 ## Downed local players' revive so far (0..1).
 var _revive := {}
@@ -313,6 +317,7 @@ func start() -> void:
 	_chest_rolls.clear()
 	_extra_picks.clear()
 	_opening.clear()
+	_backed_out.clear()
 	_revive.clear()
 	_bury_chests()
 	_clear_bosses()
@@ -451,7 +456,13 @@ func bite_of(fish: FishController) -> GhostBite:
 	return _attacks.get(fish) as GhostBite
 
 
-## `fish`'s traversal twist.
+## Whether `fish` has its stink off (the Moon Jelly's Go Quiet): it fires nothing, and zombies lose it.
+func is_quiet(fish: FishController) -> bool:
+	var twist: Traversal = _twists.get(fish)
+	return twist != null and twist.quiet
+
+
+## `fish's traversal twist and mobility skill.
 func twist_of(fish: FishController) -> Traversal:
 	return _twists.get(fish)
 
@@ -556,8 +567,10 @@ func _join(fish: FishController) -> void:
 	health.reset(settings.base_hp)
 	_health[fish] = health
 	_make_attack(fish)
-	if not fish.puppet and not _twists.has(fish):
+	if not fish.puppet and fish.controls == null and not _twists.has(fish):
 		_twists[fish] = Traversal.new(self, fish)
+		fish.set_meta("boost_before", fish.boost_enabled)
+		fish.boost_enabled = false  # the boost button is the fish's mobility skill here
 	stats_of(fish)
 	powerups_of(fish)
 	if not _stride_hooks.has(fish):
@@ -579,6 +592,9 @@ func _leave(fish: FishController) -> void:
 	_attacks.erase(fish)
 	if _twists.has(fish):
 		(_twists[fish] as Traversal).clear()
+		if is_instance_valid(fish) and fish.has_meta("boost_before"):
+			fish.boost_enabled = fish.get_meta("boost_before")
+			fish.remove_meta("boost_before")
 		_twists.erase(fish)
 	_health.erase(fish)
 	_offers.erase(fish)
@@ -587,6 +603,7 @@ func _leave(fish: FishController) -> void:
 	_chest_pending.erase(fish)
 	_chest_offer.erase(fish)
 	_opening.erase(fish)
+	_backed_out.erase(fish)
 	_revive.erase(fish)
 	_blocks.erase(fish)
 	_loadouts.erase(fish)
@@ -621,6 +638,7 @@ func _reset_player(fish: FishController) -> void:
 	_chest_pending.erase(fish)
 	_chest_offer.erase(fish)
 	_opening.erase(fish)
+	_backed_out.erase(fish)
 	var health: FishHealth = _health.get(fish)
 	if health:
 		health.reset(max_hp_of(fish))
@@ -650,6 +668,11 @@ static func _fresh_stats() -> Dictionary:
 ## `fish`'s attack: its own (or the panel's fish_attack), built anew if that changed.
 func _make_attack(fish: FishController) -> FishAttack:
 	var kind := FishAttack.kind_for(fish.character, settings.fish_attack as FishAttack.Kind)
+	var start := FishAttack.starting_weapon(fish.character) if kind == FishAttack.Kind.NONE else ""
+	if loadout_of(fish).starting != start:
+		loadout_of(fish).start_with(start)  # a powerup weapon takes the attack's slot
+		powerups_of(fish).clear()
+		powerups_of(fish).refresh()
 	var attack: FishAttack = _attacks.get(fish)
 	if is_instance_valid(attack) and attack.kind == kind:
 		return attack
@@ -730,7 +753,7 @@ func _physics_process(delta: float) -> void:
 		var attack := _make_attack(fish)
 		if _attack_levels.get(fish, -1) != loadout_of(fish).level(Weapons.ATTACK):
 			_apply_stats(fish)  # the attack's level override, live
-		attack.update(delta, is_up(fish) and not is_over)
+		attack.update(delta, is_up(fish) and not is_over and not is_quiet(fish))
 		var twist: Traversal = _twists.get(fish)
 		if twist:
 			twist.update(delta)
@@ -778,7 +801,7 @@ func _update_targets() -> void:
 		if is_instance_valid(fish):
 			at[i] = fish.global_position
 			moving[i] = fish.swim_velocity()
-			chaseable[i] = 1 if is_up(fish) and not is_over and not is_picking(fish) else 0
+			chaseable[i] = 1 if is_up(fish) and not is_over and not is_picking(fish) and not is_quiet(fish) else 0
 	var pull := PackedFloat32Array()
 	pull.resize(players.size())
 	pull.fill(1.0)
@@ -806,6 +829,11 @@ func hit(index: int, amount: float, by: FishController, source: String, push := 
 	if by:
 		var block := block_of(by)
 		amount *= 1.0 + block.value("damage")
+		var twist: Traversal = _twists.get(by)
+		if twist:
+			amount *= twist.damage_factor(source)
+		if _powerups.has(by):
+			amount *= (_powerups[by] as Powerups).damage_scale()
 		var stats := stats_of(by)
 		if block.value("crit_chance") > 0.0 and rng.randf() < block.value("crit_chance"):
 			amount *= 1.5 + block.value("crit_damage")
@@ -939,10 +967,12 @@ func hurt(fish: FishController, amount: float, from := -1, cause := "") -> bool:
 		health.shield(settings.iframes)
 		stats_of(fish)["blocked"] = stats_of(fish).get("blocked", 0) + 1
 		return false
-	if not health.take(amount, settings.iframes, settings.god_mode):
+	if not health.take(amount, settings.iframes + (twist.iframe_bonus() if twist else 0.0), settings.god_mode):
 		return false
 	if powerups:
 		powerups.on_hurt(amount, from)
+	if twist:
+		twist.on_hurt()
 	stats_of(fish).taken += amount
 	if run_log:
 		run_log.hurt_by(fish, cause if cause != "" else _cause_of(from))
@@ -1308,7 +1338,7 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 	if boss is DrownedShark:
 		# On every machine (each sees the boss beaten), so not sent as a drop.
 		var chest := add_chest(boss.global_position, 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
-				TreasureChest.Kind.BOSS, "drowned_fin")
+				TreasureChest.Kind.BOSS)  # a legendary pick (the dash is the Shark's own skill now)
 		chest.name = "SharkChest"
 		if authority:
 			levels.add(settings.shark_xp)
@@ -1319,6 +1349,10 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 	elif boss is BloodLeviathan:
 		# The run goes on: swim, batter and loot as long as you like. Entering the whirlpool wins.
 		_open_whirlpool(boss.global_position)
+		# And its loot: the Coil, in a chest beside the whirlpool (on every machine, like the shark's).
+		var loot := add_chest(boss.global_position + Vector3(9.0, 0.0, 0.0), 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
+				TreasureChest.Kind.BOSS, "leviathans_coil")
+		loot.name = "LeviathanChest"
 
 
 ## Opens the way out at `at` (on every machine: each sees the boss beaten).
@@ -1327,15 +1361,18 @@ func _open_whirlpool(at: Vector3) -> void:
 		return
 	cleared_at = elapsed
 	whirlpool = Whirlpool.new()
-	whirlpool.position = at
+	whirlpool.height = settings.arena_ceiling - settings.arena_floor
+	whirlpool.position = Vector3(at.x, settings.arena_floor, at.z)  # a column, seabed to surface
 	add_child(whirlpool)
 	whirlpool_opened.emit(at)
 
 
 ## Whether `fish` is close enough to the whirlpool to enter it.
 func near_whirlpool(fish: FishController) -> bool:
-	return is_instance_valid(whirlpool) and is_instance_valid(fish) and not is_over and is_up(fish) \
-			and fish.global_position.distance_to(whirlpool.global_position) <= settings.whirlpool_range
+	if not (is_instance_valid(whirlpool) and is_instance_valid(fish)) or is_over or not is_up(fish):
+		return false
+	var offset := fish.global_position - whirlpool.global_position  # the column runs the whole height
+	return Vector2(offset.x, offset.z).length() <= settings.whirlpool_range
 
 
 ## `fish` enters the whirlpool: the stage is complete, and the run is won.
@@ -1572,10 +1609,13 @@ func _offer_chest(fish: FishController) -> void:
 			line = "STRONG, WITH A CATCH  ·  CHOOSE CAREFULLY"
 		TreasureChest.Kind.BOSS:
 			var item: String = spec[1]
-			if Powerup.INFO.has(item):
+			if item == "":
+				for id in Powerup.pick_for_chest(rng, Rarity.Tier.LEGENDARY, settings.chest_choices):
+					cards.append(_powerup_card(fish, id))
+			elif Powerup.INFO.has(item):
 				cards.append(_powerup_card(fish, item))
 			heading = "BOSS TREASURE!"
-			line = "%s'S PRIZE" % Powerup.title(item).to_upper()
+			line = "%s'S PRIZE" % Powerup.title(item).to_upper() if item != "" else "THE SHARK'S PRIZE  ·  A LEGENDARY PICK"
 		_:
 			var rolled := Rarity.roll(rng, settings, block_of(fish).value("luck"))
 			for id in Powerup.pick_for_chest(rng, rolled, settings.chest_choices):
@@ -1710,7 +1750,7 @@ func _offer_swap(fish: FishController, incoming: String) -> void:
 	var loadout := loadout_of(fish)
 	var cards := []
 	for id in loadout.weapons:
-		if id != Weapons.ATTACK:
+		if id != Weapons.ATTACK and id != loadout.starting:
 			cards.append({"kind": "swap", "weapon": id, "incoming": incoming, "tier": Powerup.tier(incoming),
 					"level": loadout.earned_level(id)})
 	cards.append({"kind": "keep", "weapon": incoming, "tier": Rarity.Tier.COMMON})
@@ -1887,29 +1927,68 @@ func _open_chests(fish: FishController, delta: float) -> void:
 	var battering := fish.speed >= fish.nature_batter_speed * powerups_of(fish).batter_speed_share()
 	var still := fish.speed <= settings.chest_still_speed
 	var holding: TreasureChest = null
+	var backed_out: TreasureChest = _backed_out.get(fish)
 	for chest in shut_chests_for(fish):
 		var middle := chest.global_position + Vector3.UP * TreasureChest.SIZE.y * 0.5
 		var offset := middle - at
 		var gap := offset.length()
 		if gap > settings.chest_reach + GhostBite.bow_reach(fish):
+			if chest == backed_out:
+				_backed_out.erase(fish)  # swum clear of it: it's fair game again
 			continue
 		if not can_afford(fish, chest):
 			continue  # short of pearls: it stays shut (the HUD shows its price)
+		if chest == backed_out:
+			continue  # just put back: not by battering through it again
 		if battering and gap > 0.001 and offset.normalized().dot(nose) >= Battery.FRONT:
 			open_chest(chest, fish)
 			return
-		if still and gap <= settings.chest_reach:
+		if still and gap <= settings.chest_reach and not chest.is_unlocked_for(fish):
 			holding = chest
 	if holding:
 		_opening[fish] = holding
 		holding.set_progress(fish, minf(holding.progress_of(fish) + delta / maxf(settings.chest_open_time, 0.01), 1.0))
-		if holding.progress_of(fish) >= 1.0:
-			open_chest(holding, fish)
+		if holding.is_unlocked_for(fish):
+			_opening.erase(fish)  # free to swim: it waits for a Jump
+			chest_unlocked.emit(holding, fish)
 	else:
 		var was: TreasureChest = _opening.get(fish)
 		_opening.erase(fish)
-		if is_instance_valid(was):
+		if is_instance_valid(was) and not was.is_unlocked_for(fish):
 			was.set_progress(fish, 0.0)
+	var input: PlayerInput = fish.input_source if fish.input_source else PlayerInput.everyone()
+	if input.just_pressed("jump"):
+		open_unlocked(fish)
+
+
+## `fish` opens the nearest chest they've unlocked (by holding still beside it)
+## and are within reach of, if they can afford it: Jump/interact. Whether it did.
+func open_unlocked(fish: FishController) -> bool:
+	if _offers.has(fish):
+		return false
+	var best: TreasureChest = null
+	var best_gap := settings.chest_reach + GhostBite.bow_reach(fish)
+	for chest in shut_chests_for(fish):
+		var gap := (chest.global_position + Vector3.UP * TreasureChest.SIZE.y * 0.5).distance_to(fish.global_position)
+		if gap <= best_gap and chest.is_unlocked_for(fish) and can_afford(fish, chest):
+			best = chest
+			best_gap = gap
+	if best == null:
+		return false
+	open_chest(best, fish)
+	return true
+
+
+## The chest `fish` is within reach of that's unlocked for them and waiting for
+## Jump (for the HUD prompt), if any.
+func unlocked_chest_near(fish: FishController) -> TreasureChest:
+	if not is_instance_valid(fish) or _offers.has(fish) or is_over:
+		return null
+	for chest in shut_chests_for(fish):
+		var gap := (chest.global_position + Vector3.UP * TreasureChest.SIZE.y * 0.5).distance_to(fish.global_position)
+		if gap <= settings.chest_reach + GhostBite.bow_reach(fish) and chest.is_unlocked_for(fish) and can_afford(fish, chest):
+			return chest
+	return null
 
 
 ## Opens `chest` for `fish` (each player opens each chest for themselves): a
@@ -1922,6 +2001,7 @@ func open_chest(chest: TreasureChest, fish: FishController) -> void:
 	if price > 0:
 		stats_of(fish)["paid_chests"] = stats_of(fish).get("paid_chests", 0) + 1
 	_opening.erase(fish)
+	_backed_out.erase(fish)
 	stats_of(fish)["chests"] = stats_of(fish).get("chests", 0) + 1
 	chest_opened.emit(chest, fish)
 	if not authority:
@@ -1952,6 +2032,7 @@ func cancel_offer(fish: FishController) -> void:
 	var info: Dictionary = _chest_offer[fish]
 	var chest: TreasureChest = info.chest
 	chest.reshut_for(fish, layer_of(fish))
+	_backed_out[fish] = chest
 	add_pearls(fish, info.price)
 	var stats := stats_of(fish)
 	stats["chests"] = maxi(stats.get("chests", 0) - 1, 0)
@@ -2002,6 +2083,11 @@ func chest_price(chest: TreasureChest, fish: FishController = null) -> int:
 	return roundi(price)
 
 
+## How many more metres `fish` pings chests from (Treasure Map).
+func chest_ping_bonus_of(fish: FishController) -> float:
+	return (_powerups[fish] as Powerups).chest_ping_bonus() if _powerups.has(fish) else 0.0
+
+
 ## Whether `fish` has the pearls to open `chest`.
 func can_afford(fish: FishController, chest: TreasureChest) -> bool:
 	return purse_of(fish) >= chest_price(chest, fish)
@@ -2028,6 +2114,8 @@ func _clear_chest(chest: TreasureChest) -> void:
 func _rolls_chest(by: FishController, elite: bool) -> bool:
 	var luck := block_of(by).value("luck") if is_instance_valid(by) and _blocks.has(by) else 0.0
 	var chance := settings.chest_drop_chance * (settings.elite_chest_scale if elite else 1.0) * maxf(1.0 + luck * settings.chest_drop_luck, 0.0)
+	if is_instance_valid(by) and _powerups.has(by):
+		chance *= (_powerups[by] as Powerups).chest_drop_scale()
 	return chance > 0.0 and rng.randf() < chance
 
 

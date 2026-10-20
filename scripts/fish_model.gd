@@ -107,6 +107,8 @@ static func build(character: FishCharacter.Family) -> FishModel:
 			model._build_koi()
 		FishCharacter.Family.MERC:
 			model._build_boxfish()
+		_:
+			FishModelMore.build(model, character)
 	return model
 
 
