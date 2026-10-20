@@ -622,7 +622,9 @@ class StatsBoard extends Control:
 				for b in badges.size():
 					var centre := Vector2(PLATE_WIDTH + 14.0 + BADGE * 0.5 + (b % per_line) * (BADGE + BADGE_GAP),
 							y + ROW_HEIGHT + BADGE * 0.5 + (b / per_line) * (BADGE + BADGE_GAP))
-					HexBadge.draw_badge(self, centre, BADGE, badges[b][0], badges[b][1], true, UITheme.HUD_FILL)
+					var entry: Array = badges[b]
+					var shape: HexBadge.Shape = entry[2] if entry.size() > 2 else HexBadge.Shape.HEX
+					HexBadge.draw_badge(self, centre, BADGE, entry[0], entry[1], true, UITheme.HUD_FILL, shape)
 				BroadcastUI.text(self, Rect2(PLATE_WIDTH + 14.0, y, NAME_WIDTH - 14.0, ROW_HEIGHT), str(row.name).to_upper(), 16,
 						Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, 600)
 				var values: Array = row["values"]

@@ -1,6 +1,7 @@
 class_name HexBadge
 ## The Hex Badge icon set (UI Redesign Handoff, Icons A): each powerup's white
-## line glyph in a dark hexagon rimmed in its rarity's colour; the same glyphs
+## line glyph in a dark hexagon rimmed in its rarity's colour (a weapon's in a
+## diamond, a tome's in a square: Shape); the same glyphs
 ## go in the powerup cards' medallions, and the mode picker's tiles have their
 ## own. Glyphs are SVG path data on a 24-unit grid, stroke only, parsed once
 ## into polylines (parse()).
@@ -89,10 +90,21 @@ const GLYPHS := {
 	"mode_replays": "M3.5 12a8.5 8.5 0 1 0 2.5-6M3 3.5V8h4.5M10 8.5l5.5 3.5-5.5 3.5z",
 }
 
+## A badge's outline, by what it holds (Card Type Variations, E): a weapon's
+## a diamond, a tome's a square, an item's (a powerup) a hexagon. The same
+## shape on its level-up card, its HUD slot and the scoreboard.
+enum Shape { HEX, DIAMOND, SQUARE, CIRCLE }
+
 ## The hexagon's corners in a 100-unit box.
 const HEX := [Vector2(50, 4), Vector2(90, 27), Vector2(90, 73), Vector2(50, 96), Vector2(10, 73), Vector2(10, 27)]
-## A glyph's size against the badge's width.
+## The diamond's, likewise.
+const DIAMOND := [Vector2(50, 2), Vector2(98, 50), Vector2(50, 98), Vector2(2, 50)]
+## The square's side and corner radius in the same box.
+const SQUARE_SIDE := 78.0
+const SQUARE_RADIUS := 12.0
+## A glyph's size against the badge's width (a diamond's smaller: less room inside).
 const GLYPH_SHARE := 0.47
+const DIAMOND_GLYPH_SHARE := 0.42
 const CURVE_STEPS := 10
 
 ## Glyph id -> {"lines": Array[PackedVector2Array], "joints": PackedVector2Array}
@@ -104,27 +116,75 @@ static func has_glyph(id: String) -> bool:
 	return GLYPHS.has(id)
 
 
-## A badge `size` px wide centred on `centre`: the hexagon filled with `fill`,
+## A badge `size` px wide centred on `centre`: its `shape` filled with `fill`,
 ## its rim in `rim`, and glyph `id` in white. `hud`: the HUD's heavier strokes.
 static func draw_badge(canvas: CanvasItem, centre: Vector2, size: float, id: String, rim: Color, hud := false,
-		fill := UITheme.BADGE_FILL) -> void:
-	draw_hex(canvas, centre, size, fill, rim, (7.0 if hud else 6.0) / 100.0 * size)
-	draw_glyph(canvas, id, centre, size * GLYPH_SHARE, UITheme.INK, 2.0 if hud else 1.8)
+		fill := UITheme.BADGE_FILL, shape := Shape.HEX) -> void:
+	draw_shape(canvas, shape, centre, size, fill, rim, (7.0 if hud else 6.0) / 100.0 * size)
+	draw_glyph(canvas, id, centre, size * glyph_share(shape), UITheme.INK, 2.0 if hud else 1.8)
+
+
+## The shape for what powerup or weapon `id` is: a diamond for a weapon, a
+## hexagon for an item. (Tomes aren't powerups: Shape.SQUARE.)
+static func shape_of(id: String) -> Shape:
+	return Shape.DIAMOND if Powerup.is_weapon(id) else Shape.HEX
+
+
+static func glyph_share(shape: Shape) -> float:
+	return DIAMOND_GLYPH_SHARE if shape == Shape.DIAMOND else GLYPH_SHARE
 
 
 ## The hexagon alone, `size` px wide, its rim `rim_width` px.
 static func draw_hex(canvas: CanvasItem, centre: Vector2, size: float, fill: Color, rim: Color, rim_width: float) -> void:
-	var points := PackedVector2Array()
-	for corner: Vector2 in HEX:
-		points.append(centre + (corner - Vector2(50, 50)) * size / 100.0)
+	draw_shape(canvas, Shape.HEX, centre, size, fill, rim, rim_width)
+
+
+## `shape` alone, `size` px wide (its 100-unit box), its rim `rim_width` px.
+static func draw_shape(canvas: CanvasItem, shape: Shape, centre: Vector2, size: float, fill: Color, rim: Color, rim_width: float) -> void:
+	var points := outline(shape, centre, size)
 	canvas.draw_colored_polygon(points, fill)
 	if rim_width <= 0.0:
 		return
 	var ring := points.duplicate()
 	ring.append(points[0])
 	canvas.draw_polyline(ring, rim, rim_width, true)
-	for corner in points:
-		canvas.draw_circle(corner, rim_width * 0.5, rim, true, -1.0, true)
+	if shape == Shape.HEX or shape == Shape.DIAMOND:
+		for corner in points:
+			canvas.draw_circle(corner, rim_width * 0.5, rim, true, -1.0, true)
+
+
+## `shape`'s outline, `size` px wide (its 100-unit box) around `centre`.
+static func outline(shape: Shape, centre: Vector2, size: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	match shape:
+		Shape.HEX, Shape.DIAMOND:
+			for corner: Vector2 in (HEX if shape == Shape.HEX else DIAMOND):
+				points.append(centre + (corner - Vector2(50, 50)) * size / 100.0)
+		Shape.SQUARE:
+			var half := SQUARE_SIDE * 0.5 * size / 100.0
+			points = rounded_rect(Rect2(centre - Vector2(half, half), Vector2(half, half) * 2.0), SQUARE_RADIUS * size / 100.0)
+		Shape.CIRCLE:
+			for n in 32:
+				points.append(centre + Vector2.from_angle(TAU * n / 32.0) * size * 0.46)
+	return points
+
+
+## A rounded rectangle's outline (clockwise from its top-left corner's arc).
+static func rounded_rect(rect: Rect2, radius: float, steps := 6) -> PackedVector2Array:
+	var r := minf(radius, minf(rect.size.x, rect.size.y) * 0.5)
+	var corners := [
+		[rect.position + Vector2(r, r), PI],
+		[Vector2(rect.end.x - r, rect.position.y + r), PI * 1.5],
+		[rect.end - Vector2(r, r), 0.0],
+		[Vector2(rect.position.x + r, rect.end.y - r), PI * 0.5],
+	]
+	var points := PackedVector2Array()
+	for corner: Array in corners:
+		var at: Vector2 = corner[0]
+		var start: float = corner[1]
+		for step in steps + 1:
+			points.append(at + Vector2.from_angle(start + PI * 0.5 * step / steps) * r)
+	return points
 
 
 ## Glyph `id` drawn `px` wide centred on `centre`, its stroke `stroke` units

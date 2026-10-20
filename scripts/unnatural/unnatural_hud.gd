@@ -246,8 +246,16 @@ func _update_board() -> void:
 		var stats := run.stats_of(player)
 		var by: Dictionary = stats.by_source
 		var badges := []
+		var attack := run.attack_of(player)
+		var kind := attack.kind if attack else FishAttack.Kind.BITE
 		for entry: Array in run.powerups_of(player).list():
-			badges.append([entry[0], UITheme.rarity(Powerup.tier(entry[0]))])
+			var id: String = entry[0]
+			if Powerup.is_weapon(id):
+				# As on the HUD: a diamond, gold (a boss's keeps its colour).
+				var tint := UITheme.rarity(Rarity.Tier.BOSS) if id in Weapons.BOSS_ONLY else UITheme.GOLD
+				badges.append([Weapons.glyph(id, kind), tint, HexBadge.Shape.DIAMOND])
+			else:
+				badges.append([id, UITheme.rarity(Powerup.tier(id)), HexBadge.Shape.HEX])
 		rows.append({"name": player.display_name if player.display_name else "Player", "focus": player == fish, "values": [
 			stats.kills, roundi(stats.damage), roundi(_attack_damage(by)), roundi(by.get("battery", 0.0)), stats.battered,
 			stats.pearls, roundi(stats.top_speed * 3.6)], "badges": badges})
@@ -532,10 +540,10 @@ class Bars extends Control:
 				var id := loadout.weapons[n]
 				# Weapons have no rarity of their own (a boss's keeps its colour).
 				var tint := UITheme.rarity(Rarity.Tier.BOSS) if id in Weapons.BOSS_ONLY else UITheme.GOLD
-				HexBadge.draw_badge(self, centre, badge, Weapons.glyph(id, kind), tint, true, UITheme.HUD_FILL)
+				HexBadge.draw_badge(self, centre, badge, Weapons.glyph(id, kind), tint, true, UITheme.HUD_FILL, HexBadge.Shape.DIAMOND)
 				_level_chip(centre, badge, loadout.level(id), k)
 			else:
-				HexBadge.draw_hex(self, centre, badge, Color(UITheme.HUD_FILL, 0.35), SLOT_EMPTY, 2.0 * k)
+				HexBadge.draw_shape(self, HexBadge.Shape.DIAMOND, centre, badge, Color(UITheme.HUD_FILL, 0.35), SLOT_EMPTY, 2.0 * k)
 		# Tomes.
 		if run.settings.tome_slots > 0 or not loadout.tomes.is_empty():
 			row += 1
@@ -543,10 +551,10 @@ class Bars extends Control:
 				var centre := _slot_at(n, row, badge, gap)
 				if n < loadout.tomes.size():
 					var id := loadout.tomes[n]
-					HexBadge.draw_badge(self, centre, badge, Tomes.glyph(id), Tomes.color(id), true, UITheme.HUD_FILL)
+					HexBadge.draw_badge(self, centre, badge, Tomes.glyph(id), Tomes.color(id), true, UITheme.HUD_FILL, HexBadge.Shape.SQUARE)
 					_level_chip(centre, badge, loadout.tome_level(id), k)
 				else:
-					HexBadge.draw_hex(self, centre, badge, Color(UITheme.HUD_FILL, 0.35), SLOT_EMPTY, 2.0 * k)
+					HexBadge.draw_shape(self, HexBadge.Shape.SQUARE, centre, badge, Color(UITheme.HUD_FILL, 0.35), SLOT_EMPTY, 2.0 * k)
 		# Items.
 		row += 1
 		var n := 0

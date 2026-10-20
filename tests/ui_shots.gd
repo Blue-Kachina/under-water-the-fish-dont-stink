@@ -167,7 +167,8 @@ func _run() -> void:
 	var settings := UnnaturalSettings.shared()
 	cards.attack_kind = run.attack_of(fish).kind
 	cards.open([{"kind": "weapon", "weapon": "greek_fire", "tier": Rarity.Tier.EPIC, "level": 5, "gains": {"burn": 0.5, "life": 2.0}},
-			{"kind": "new_weapon", "weapon": "jellyfish_halo", "tier": Rarity.Tier.UNCOMMON, "level": 1, "gains": {}},
+			{"kind": "new_weapon", "weapon": "jellyfish_halo", "tier": Rarity.Tier.UNCOMMON, "level": 1,
+					"gains": Weapons.roll(run.rng, "jellyfish_halo", cards.attack_kind, Rarity.Tier.UNCOMMON, settings, run.powerup_settings)},
 			{"kind": "tome", "tome": "kill", "tier": Rarity.Tier.LEGENDARY, "level": 3, "gives": Tomes.gives("kill", Rarity.multiplier(settings, Rarity.Tier.LEGENDARY), settings)}],
 			"LEVEL 4", "+10 MAX HP  ·  +10% AREA (SIGNATURE)  ·  WEAPONS 2/2  ·  TOMES 1/2", null)
 	await _frames(6)
