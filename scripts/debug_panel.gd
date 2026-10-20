@@ -54,6 +54,7 @@ const USED_BY := {
 const GAME_OPTIONS := {
 	"game/player_name": ["Player name", "Player", "Your name on the scoreboard, over your fish, and to the people you play with online.", "the scoreboard and online co-op"],
 	"game/character": ["Fish", "Player", "The fish you swim as. Each has its own body shape and, in Unnatural, its own weapon, signature stat and twist (press Y on the home screen to read them).", "every mode"],
+	"game/skin": ["Skin", "Player", "Your fish's look: a species or colour morph of it, with the same body shape and moves. Each fish remembers its own (LT / RT on the home screen change it too).", "every mode"],
 	"game/goal_replays": ["Goal replays", "Matches", "A replay of each goal in a Fish Sticks 1v1, and of each battery in Hunt, from the net. Any button skips one.", "Fish Sticks and Hunt"],
 	"game/preset_save": ["Save tuning preset", "Tuning presets", "Saves every tuning section (Camera to Powerups) as a preset file. The last preset saved or loaded loads at startup.", "the tuning sections"],
 	"game/preset_load": ["Load tuning preset", "Tuning presets", "Loads a preset file over the defaults, so a preset only needs to list what it changes. The shipped presets are in the same folder.", "the tuning sections"],
@@ -106,7 +107,7 @@ const HIDDEN := ["fish/rl_roll_timing", "fish/rl_air_control", "fish/rl_dodge_ti
 ## (SELECT in Settings): the tuning presets, the stats panel and controller
 ## overlay, the sound tools, and every tuning section but the camera, plus the
 ## fish's controller options.
-const EVERYDAY := ["game/player_name", "game/character", "game/goal_replays", "display/fullscreen", "audio/profile", "audio/music_profile",
+const EVERYDAY := ["game/player_name", "game/character", "game/skin", "game/goal_replays", "display/fullscreen", "audio/profile", "audio/music_profile",
 		"audio/master_volume", "audio/sfx_volume", "audio/music_volume", "audio/voice_volume"]
 ## A held left/right repeats after this, this often (s).
 const REPEAT_DELAY := 0.38
@@ -130,6 +131,8 @@ const CAPTURE_ARM := 0.2
 ## the tuning (other local players' fish, an online session) can follow.
 signal tuning_changed
 signal character_selected(character: FishCharacter.Family)
+## The Skin row picked skin `skin` (FishCharacter.SKINS) of the shown character.
+signal skin_selected(skin: int)
 ## Settings closed (B from the sections, or set_open(false)).
 signal closed
 
@@ -163,6 +166,7 @@ var _detail_key := ""
 var _hints: ControllerHints
 var _s := 1.0
 var _character := FishCharacter.Family.OCTANE
+var _skin := 0
 var _character_enabled := true
 ## Sections someone else sets (an online session's host): shown, not editable.
 var _locked := {}
@@ -233,15 +237,38 @@ func show_status(text: String) -> void:
 ## Shows `character` as picked (selections are reported via character_selected).
 func set_character(character: FishCharacter.Family) -> void:
 	_character = character
+	if _meta.has("game/skin"):
+		_meta["game/skin"]["choices"] = _skin_choices(character)
 	if _rows.has("game/character"):
 		_refresh_row("game/character")
+	if _rows.has("game/skin"):
+		_refresh_row("game/skin")
+
+
+## Shows skin `skin` of the shown character as picked (reported via skin_selected).
+func set_skin(skin: int) -> void:
+	_skin = skin
+	if _rows.has("game/skin"):
+		_refresh_row("game/skin")
+	if _detail_key == "game/skin":
+		_sync_detail()
+
+
+## The Skin row's choices: `family`'s unlocked skins, [name, index].
+static func _skin_choices(family: FishCharacter.Family) -> Array:
+	var choices := []
+	for i in FishCharacter.skin_count(family):
+		if FishCharacter.is_skin_unlocked(family, i):
+			choices.append([FishCharacter.skin_name(family, i), i])
+	return choices
 
 
 ## The character can only be changed while playing, not during a replay.
 func set_character_enabled(enabled: bool) -> void:
 	_character_enabled = enabled
-	if _rows.has("game/character"):
-		_refresh_row("game/character")
+	for key: String in ["game/character", "game/skin"]:
+		if _rows.has(key):
+			_refresh_row(key)
 
 
 ## Whether the option `key` ("section/property") can be changed now (not
@@ -249,7 +276,7 @@ func set_character_enabled(enabled: bool) -> void:
 func is_editable(key: String) -> bool:
 	if _locked.has(key.get_slice("/", 0)):
 		return false
-	if key == "game/character":
+	if key in ["game/character", "game/skin"]:
 		return _character_enabled
 	if key in ["game/preset_load", "game/preset_default"]:
 		return _locked.is_empty()
@@ -616,6 +643,9 @@ func _build_game_options() -> void:
 				for family: FishCharacter.Family in FishCharacter.CARS:
 					choices.append([FishCharacter.display_name(family), family])
 				meta["choices"] = choices
+			"game/skin":
+				meta["kind"] = "enum"
+				meta["choices"] = _skin_choices(_character)  # the shown character's (set_character)
 			"controls/profile":
 				meta["kind"] = "enum"
 				var profiles := []
@@ -741,6 +771,8 @@ func _value(key: String) -> Variant:
 	match key:
 		"game/character":
 			return _character
+		"game/skin":
+			return _skin
 		"controls/profile":
 			return Controls.current_profile
 	if section in ["game", "display"]:
@@ -762,6 +794,8 @@ func _default(key: String) -> Variant:
 			return UISettings.DEFAULT_NAME
 		"game/character":
 			return FishCharacter.Family.OCTANE
+		"game/skin":
+			return 0
 		"game/goal_replays", "display/fullscreen":
 			return true
 		"display/show_stats", "display/show_input_overlay":
@@ -784,6 +818,10 @@ func _set_value(key: String, value: Variant) -> void:
 			_character = value
 			character_selected.emit(value)
 			show_status("Fish: %s (remembered on this PC)" % FishCharacter.display_name(value))
+		"game/skin":
+			_skin = value
+			skin_selected.emit(value)
+			show_status("Skin: %s (remembered on this PC)" % FishCharacter.skin_name(_character, value))
 		"controls/profile":
 			Controls.apply_profile(value)
 			show_status("Controller profile: %s (remembered on this PC)" % Controls.current_profile)
@@ -1139,7 +1177,7 @@ func _show_detail(key: String) -> void:
 	_detail_preview.texture = load(preview_path) if _detail_preview.visible else null
 	_detail_lock.visible = not is_editable(key)
 	_detail_lock.text = (_lock_note if _lock_note else "Locked") if _locked.has(section) else "Not now: close the replay first." \
-			if key == "game/character" else "The host sets the tuning while you're online."
+			if key in ["game/character", "game/skin"] else "The host sets the tuning while you're online."
 	for child in _detail_control.get_children():
 		_detail_control.remove_child(child)  # now: _sync_detail mustn't see the last option's
 		child.queue_free()

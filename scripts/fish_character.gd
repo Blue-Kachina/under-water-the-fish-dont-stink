@@ -89,9 +89,108 @@ const TYRE_HALF_WIDTH := 5.5
 const M_PER_UU := 0.01
 
 
+## Each family's skins (FishModel.build's `skin`): real species or colour
+## morphs sharing its shape, hitbox and moves. The first is the family's own
+## look; the rest are to unlock (meta progression, later).
+const SKINS := {
+	Family.OCTANE: [
+		{"key": "ocellaris", "name": "Ocellaris"},
+		{"key": "black_percula", "name": "Black Percula"},
+		{"key": "tomato", "name": "Tomato Clownfish"},
+		{"key": "maroon", "name": "Gold-stripe Maroon"},
+	],
+	Family.DOMINUS: [
+		{"key": "great_white", "name": "Great White"},
+		{"key": "mako", "name": "Shortfin Mako"},
+		{"key": "blacktip", "name": "Blacktip Reef"},
+		{"key": "tiger", "name": "Tiger Shark"},
+		{"key": "hammerhead", "name": "Hammerhead"},
+	],
+	Family.PLANK: [
+		{"key": "manta", "name": "Manta"},
+		{"key": "eagle_ray", "name": "Spotted Eagle Ray"},
+		{"key": "southern_stingray", "name": "Southern Stingray"},
+		{"key": "ribbontail", "name": "Blue-spotted Ribbontail"},
+	],
+	Family.BREAKOUT: [
+		{"key": "broadbill", "name": "Broadbill Swordfish"},
+		{"key": "blue_marlin", "name": "Blue Marlin"},
+		{"key": "sailfish", "name": "Sailfish"},
+		{"key": "striped_marlin", "name": "Striped Marlin"},
+	],
+	Family.HYBRID: [
+		{"key": "kohaku", "name": "Kohaku"},
+		{"key": "showa", "name": "Showa"},
+		{"key": "yamabuki", "name": "Yamabuki Ogon"},
+		{"key": "asagi", "name": "Asagi"},
+	],
+	Family.MERC: [
+		{"key": "yellow_boxfish", "name": "Yellow Boxfish"},
+		{"key": "longhorn", "name": "Longhorn Cowfish"},
+		{"key": "spotted_boxfish", "name": "Spotted Boxfish"},
+		{"key": "scrawled", "name": "Scrawled Cowfish"},
+	],
+	Family.LIONFISH: [
+		{"key": "red", "name": "Red Lionfish"},
+		{"key": "clearfin", "name": "Clearfin Lionfish"},
+		{"key": "fuzzy_dwarf", "name": "Fuzzy Dwarf"},
+		{"key": "spotfin", "name": "Spotfin Lionfish"},
+	],
+	Family.MOON_JELLY: [
+		{"key": "moon", "name": "Moon Jelly"},
+		{"key": "sea_nettle", "name": "Pacific Sea Nettle"},
+		{"key": "lions_mane", "name": "Lion's Mane"},
+		{"key": "purple_striped", "name": "Purple-striped Jelly"},
+	],
+	Family.MANTIS: [
+		{"key": "peacock", "name": "Peacock Mantis"},
+		{"key": "zebra", "name": "Zebra Mantis"},
+		{"key": "purple_spot", "name": "Purple-spot Mantis"},
+		{"key": "pink_eared", "name": "Pink-eared Mantis"},
+	],
+	Family.WHALE_SHARK: [
+		{"key": "indo_pacific", "name": "Whale Shark"},
+		{"key": "deep_charcoal", "name": "Deep Charcoal"},
+		{"key": "juvenile", "name": "Juvenile"},
+		{"key": "basking", "name": "Basking Shark"},
+	],
+}
+
+
 ## "Clownfish": how the picker lists it (the hitbox's car name stays out of the UI).
 static func display_name(family: Family) -> String:
 	return CARS[family].fish
+
+
+## How many skins `family` has (SKINS).
+static func skin_count(family: Family) -> int:
+	return (SKINS[family] as Array).size()
+
+
+## Skin `skin` of `family`'s name, as the picker shows it ("Great White").
+static func skin_name(family: Family, skin: int) -> String:
+	return SKINS[family][clampi(skin, 0, skin_count(family) - 1)].name
+
+
+## Skin `skin` of `family`'s key ("great_white"), for saves and replays.
+static func skin_key(family: Family, skin: int) -> String:
+	return SKINS[family][clampi(skin, 0, skin_count(family) - 1)].key
+
+
+## The skin of `family` with `key`; its first if unknown.
+static func skin_from_key(family: Family, key: String) -> int:
+	var skins: Array = SKINS[family]
+	for i in skins.size():
+		if skins[i].key == key:
+			return i
+	return 0
+
+
+## Whether the player may pick skin `skin` of `family`. Every skin for now;
+## the one place a meta-progression unlock check slots in later (the pickers
+## skip locked skins, the saved/remote/replay skins are taken as given).
+static func is_skin_unlocked(_family: Family, _skin: int) -> bool:
+	return true
 
 
 ## The family for a replay's hitbox_family key ("octane", ...); Octane if unknown.

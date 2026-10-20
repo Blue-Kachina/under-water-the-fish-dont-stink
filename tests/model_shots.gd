@@ -1,11 +1,15 @@
 extends Node3D
 ## Not a probe: screenshots of one fish model on its own (front three-quarter,
-## side, top, back and below) for checking its look by eye. Needs a window
-## (not --headless).
-##   Godot_console.exe --path . res://tests/model_shots.tscn -- --fish=plank --out=DIR
+## side, top, back and below) for checking its look by eye, then swimming,
+## wagging its tail (top views, to see the tail stay on the body) and mid
+## stride. Needs a window (not --headless). `--skin=N` picks a skin
+## (FishCharacter.SKINS); its shots are named <fish>_<skin key>_<view>.png.
+##   Godot_console.exe --path . res://tests/model_shots.tscn -- --fish=plank --skin=1 --out=DIR
 
 var out_dir := "user://model_shots"
 var fish_key := "plank"
+var skin := 0
+var _name := ""
 
 
 func _ready() -> void:
@@ -14,6 +18,8 @@ func _ready() -> void:
 			out_dir = arg.trim_prefix("--out=")
 		elif arg.begins_with("--fish="):
 			fish_key = arg.trim_prefix("--fish=")
+		elif arg.begins_with("--skin="):
+			skin = int(arg.trim_prefix("--skin="))
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	get_window().size = Vector2i(900, 700)
 	var environment := Environment.new()
@@ -29,7 +35,9 @@ func _ready() -> void:
 	sun.rotation = Vector3(-1.0, 0.6, 0.0)
 	sun.light_energy = 1.2
 	add_child(sun)
-	var model := FishModel.build(FishCharacter.from_key(fish_key))
+	var family := FishCharacter.from_key(fish_key)
+	var model := FishModel.build(family, skin)
+	_name = "%s_%s" % [fish_key, FishCharacter.skin_key(family, model.skin)]
 	add_child(model)
 	_run.call_deferred(model)
 
@@ -52,7 +60,7 @@ func _run(model: FishModel) -> void:
 		camera.look_at(Vector3.ZERO, Vector3.FORWARD if view == "top" else Vector3.UP)
 		for i in 3:
 			await RenderingServer.frame_post_draw
-		get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_%s.png" % [fish_key, view]))
+		get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_%s.png" % [_name, view]))
 	# Mid-swim: fins rolled and swept as the swim animation leaves them, a moment
 	# into swimming at full speed.
 	model.fin_left.rotation = Vector3(0.0, 0.5, -0.5)
@@ -65,7 +73,21 @@ func _run(model: FishModel) -> void:
 		camera.look_at(Vector3.ZERO, Vector3.UP)
 		for i in 3:
 			await RenderingServer.frame_post_draw
-		get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_swim_%s.png" % [fish_key, view]))
+		get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_swim_%s.png" % [_name, view]))
+	# Wagging: the tail swung hard each way and up, seen from above and the
+	# side, to check it stays on the body (FishModel._bend_body).
+	model.fin_left.rotation = Vector3.ZERO
+	model.fin_right.rotation = Vector3.ZERO
+	for wag: Array in [["wag_left", Vector3(0.0, -0.9, 0.0), "top"], ["wag_right", Vector3(0.0, 0.9, 0.0), "top"],
+			["wag_up", Vector3(-0.6, 0.0, 0.0), "side"], ["wag_three", Vector3(0.0, 0.7, 0.0), "back"]]:
+		model.tail.rotation = wag[1]
+		model.react(1.0 / 60.0, Vector3(0.0, 0.0, -10.0))
+		camera.position = Vector3(views[wag[2]]).normalized() * reach
+		camera.look_at(Vector3.ZERO, Vector3.FORWARD if wag[2] == "top" else Vector3.UP)
+		for i in 3:
+			await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_%s.png" % [_name, wag[0]]))
+	model.tail.rotation = Vector3.ZERO
 	# Mid-stride: an Extra Swishy stride pushing left (the tail swung left),
 	# nearly at its peak, turning left; then fading, a moment later.
 	model.fin_left.rotation = Vector3.ZERO
@@ -81,5 +103,5 @@ func _run(model: FishModel) -> void:
 		camera.look_at(Vector3.ZERO, Vector3.UP)
 		for i in 3:
 			await RenderingServer.frame_post_draw
-		get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_%s_back.png" % [fish_key, shot[0]]))
+		get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_%s_back.png" % [_name, shot[0]]))
 	get_tree().quit()

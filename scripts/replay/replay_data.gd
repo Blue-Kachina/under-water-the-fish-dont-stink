@@ -97,7 +97,8 @@ class Sample:
 
 var source := {}
 var match_info := {}
-## Per player: index, name, team, hitbox_family, hitbox_size (m; width,
+## Per player: index, name, team, hitbox_family, skin (its key; "" or missing:
+## the family's first), hitbox_size (m; width,
 ## height, length as the fish's hitbox_* exports) and hitbox_offset (m, the
 ## hitbox centre from the centre of mass in the fish's frame).
 var players: Array[Dictionary] = []
@@ -160,6 +161,7 @@ func load_document(doc: Dictionary, turn_for_aquarium := true) -> String:
 		players.append({
 			"index": int(raw_player.index), "name": str(raw_player.name), "team": int(raw_player.team),
 			"hitbox_family": str(raw_player.hitbox_family),
+			"skin": str(raw_player.get("skin", "")),  # none in RL's: the family's first
 			"hitbox_size": Vector3(hitbox.width, hitbox.height, hitbox.length) * RLSpace.M_PER_UU,
 			"hitbox_offset": RLSpace.car_offset(Vector3(offset[0], offset[1], offset[2])),
 		})

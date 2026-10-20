@@ -79,13 +79,20 @@ func setup(replay_player: Dictionary) -> void:
 	name = "Ghost%d" % player.index
 
 
+## The skin a replay player's fish wears: its recorded "skin" key, or its
+## family's first (RL replays and clips from before skins have none).
+static func skin_of(replay_player: Dictionary) -> int:
+	var family := FishCharacter.from_key(str(replay_player.get("hitbox_family", "octane")))
+	return FishCharacter.skin_from_key(family, str(replay_player.get("skin", "")))
+
+
 func _ready() -> void:
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF  # moved every rendered frame
 	var color: Color = AquariumArena.TEAM_COLORS[team]
 
 	# The fish the live game has for this car's hitbox, and its boost bubbles.
 	var family := FishCharacter.from_key(player.get("hitbox_family", "octane"))
-	_visual = FishModel.build(family)
+	_visual = FishModel.build(family, skin_of(player))
 	add_child(_visual)
 	_bubbles = BUBBLES_SCENE.instantiate()
 	_bubbles.position = Vector3(0.0, 0.0, hitbox_size.z * 0.75)  # behind the tail, as on the fish

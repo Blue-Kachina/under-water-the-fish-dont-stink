@@ -156,7 +156,7 @@ func _ready() -> void:
 		saved_character = FishCharacter.from_key(settings.get_value("playground", "character", "octane"))
 	if get_tree().current_scene != self and (saved_mode == ONE_V_ONE or saved_mode in NATURE_MODES):
 		saved_mode = FREE_PLAY  # inside a test probe: no bot or Nature tuning, whatever was last played
-	_fish.character = saved_character
+	_fish.set_look(saved_character, saved_skin(settings, saved_character))
 	_fish.display_name = UISettings.display_name()
 	UISettings.changed.connect(func(key: String) -> void:
 		if key == "player_name":
@@ -165,7 +165,9 @@ func _ready() -> void:
 			match_1v1.goal_replays = UISettings.goal_replays)
 	set_mode(saved_mode, false)
 	_panel.set_character(_fish.character)
+	_panel.set_skin(_fish.skin)
 	_panel.character_selected.connect(set_character)
+	_panel.skin_selected.connect(set_skin)
 	var arcade := ArcadeFx.new()
 	arcade.name = "ArcadeFx"
 	arcade.fish = _fish
@@ -211,6 +213,7 @@ func _ready() -> void:
 		_home.remember_focus()
 		_panel.set_open(true))
 	_home.character_changed.connect(set_character)
+	_home.skin_changed.connect(set_skin)
 	add_child(_home)
 	NetSession.coop.attach_main(self)
 	get_window().files_dropped.connect(func(files: PackedStringArray) -> void:
@@ -302,12 +305,15 @@ func set_environment(env_name: String) -> void:
 	_apply_mode()
 
 
-## Plays as `character` from now on (and remembers it): the fish respawns as it.
-## Not in Replays mode, where the live fish sits out.
+## Plays as `character` from now on (and remembers it), in the skin last picked
+## for it: the fish respawns as it. Not in Replays mode, where the live fish
+## sits out.
 func set_character(character: FishCharacter.Family) -> void:
 	if current_mode == REPLAYS:
 		return
-	_fish.character = character
+	var settings := ConfigFile.new()
+	settings.load(SETTINGS_PATH)
+	_fish.set_look(character, saved_skin(settings, character))
 	if match_1v1:
 		match_1v1.kickoff()  # back to a kickoff as the new character
 	elif nature_run:
@@ -319,10 +325,35 @@ func set_character(character: FishCharacter.Family) -> void:
 	else:
 		_fish.set_spawn(_environment.spawn_transform())
 	_panel.set_character(character)
-	var settings := ConfigFile.new()
-	settings.load(SETTINGS_PATH)
+	_panel.set_skin(_fish.skin)
 	settings.set_value("playground", "character", FishCharacter.CARS[character].key)
 	settings.save(SETTINGS_PATH)
+
+
+## Wears skin `skin` of the current character from now on (and remembers it
+## for that fish): looks only, so no respawn. Not in Replays mode.
+func set_skin(skin: int) -> void:
+	if current_mode == REPLAYS:
+		return
+	_fish.skin = skin
+	_panel.set_skin(_fish.skin)
+	var settings := ConfigFile.new()
+	settings.load(SETTINGS_PATH)
+	store_skin(settings, _fish.character, _fish.skin)
+	settings.save(SETTINGS_PATH)
+
+
+## The skin last picked for `family` in `settings` (playground/skin_<family
+## key>, by skin key); its first if none, unknown or locked.
+static func saved_skin(settings: ConfigFile, family: FishCharacter.Family) -> int:
+	var key: String = str(settings.get_value("playground", "skin_" + FishCharacter.CARS[family].key, ""))
+	var skin := FishCharacter.skin_from_key(family, key)
+	return skin if FishCharacter.is_skin_unlocked(family, skin) else 0
+
+
+## Remembers skin `skin` for `family` in `settings` (by its key; save after).
+static func store_skin(settings: ConfigFile, family: FishCharacter.Family, skin: int) -> void:
+	settings.set_value("playground", "skin_" + FishCharacter.CARS[family].key, FishCharacter.skin_key(family, skin))
 
 
 func _process(_delta: float) -> void:

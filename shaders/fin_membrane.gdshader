@@ -4,9 +4,10 @@ render_mode cull_disabled, depth_draw_always;
 // (0) out to its edge (1). It ripples out of its plane, more toward the edge and
 // harder the faster the fish swims, and goes see-through toward the edge with
 // its rays showing. A tail's fin also shows the stride cue (stride_cue.gdshaderinc),
-// root to edge.
+// root to edge. One on the body's bending part bends with it (fish_bend.gdshaderinc).
 
 #include "res://shaders/stride_cue.gdshaderinc"
+#include "res://shaders/fish_bend.gdshaderinc"
 
 uniform vec4 albedo : source_color = vec4(1.0);  // at the root
 uniform vec4 edge_color : source_color = vec4(1.0);
@@ -25,6 +26,7 @@ uniform float effort = 0.0;  // 0 idling to 1 flat out
 void vertex() {
 	float a = TAU * waves * UV.y + UV.x * 2.5 - phase * tempo;
 	VERTEX += NORMAL * flutter * (1.0 + 1.5 * effort) * UV.y * UV.y * sin(a);
+	fish_bend(VERTEX, NORMAL);  // a fin on the body's bending part
 }
 
 void fragment() {

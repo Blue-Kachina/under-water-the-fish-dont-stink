@@ -107,8 +107,7 @@ func _check_playing() -> void:
 	var s := replay.data.sample_car(0, replay.time, ReplayData.Sample.new())
 	var expected: Vector3 = s.position + Basis(s.rotation) * replay.data.players[0].hitbox_offset
 	check(car.global_position.is_equal_approx(expected), "ghost sits at its hitbox centre: %s" % car.global_position)
-	var body := car.get_node("Visual/Body") as MeshInstance3D
-	check((body.material_override as StandardMaterial3D).albedo_color == AquariumArena.TEAM_COLORS[0], "Blue ghost is blue")
+	check((car.get_node("Visual") as FishModel).body_color() == AquariumArena.TEAM_COLORS[0], "team 0's ghost wears its team colour")
 	var family := FishCharacter.from_key(replay.data.players[0].hitbox_family)
 	check(car.get_node("Visual").scale.is_equal_approx(replay.data.players[0].hitbox_size / FishCharacter.hitbox_size(family)), "ghost sized to its hitbox")
 	check(replay.cars[1].get_node("Visual").family == FishCharacter.from_key(replay.data.players[1].hitbox_family),

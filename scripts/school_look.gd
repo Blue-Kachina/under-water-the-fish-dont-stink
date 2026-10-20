@@ -57,6 +57,7 @@ static func _importers_for(family: FishCharacter.Family) -> Array:
 		for swing: float in POSES:
 			if model.tail:
 				model.tail.rotation.y = swing
+				model.apply_bend()
 			baked.append(_bake(model))
 		model.free()
 		_importers[family] = baked
@@ -122,7 +123,8 @@ static func pose_for(phase: float) -> int:
 
 
 ## Every visible mesh part of `model`, merged into one mesh in the model's own
-## space, with LODs.
+## space, with LODs. Parts that bend with its body are baked bent
+## (FishModel.bend_transform), since a MultiMesh can't bend them per fish.
 static func _bake(model: FishModel) -> ImporterMesh:
 	var importer := ImporterMesh.new()
 	var indexed := true
@@ -135,13 +137,21 @@ static func _bake(model: FishModel) -> ImporterMesh:
 		for surface in part.mesh.get_surface_count():
 			var arrays := part.mesh.surface_get_arrays(surface)
 			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var bent := model.is_bent(part)
+			var bends: Array[Basis] = []
 			for i in vertices.size():
 				vertices[i] = to_model * vertices[i]
+				if bent:
+					var bend := model.bend_transform(vertices[i])
+					vertices[i] = bend.origin
+					bends.append(bend.basis)
 			arrays[Mesh.ARRAY_VERTEX] = vertices
 			if arrays[Mesh.ARRAY_NORMAL] is PackedVector3Array:
 				var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 				for i in normals.size():
 					normals[i] = (normal_basis * normals[i]).normalized()
+					if bent:
+						normals[i] = bends[i] * normals[i]
 				arrays[Mesh.ARRAY_NORMAL] = normals
 			if arrays[Mesh.ARRAY_TANGENT] is PackedFloat32Array:
 				var tangents: PackedFloat32Array = arrays[Mesh.ARRAY_TANGENT]

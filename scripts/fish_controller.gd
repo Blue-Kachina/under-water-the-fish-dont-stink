@@ -466,7 +466,28 @@ const TIME_EPSILON := 0.0001
 var character := FishCharacter.Family.OCTANE:
 	set(value):
 		character = value
+		_skin = 0  # each family has its own skins; set skin after (or set_look)
+		if not _setting_look:
+			_apply_character()
+## Which of the character's skins (FishCharacter.SKINS) its model wears: looks
+## only, the hitbox and moves are the family's. Back to 0 when the character
+## changes, so set it after the character (set_look sets both, one rebuild).
+var skin: int:
+	get:
+		return _skin
+	set(value):
+		_skin = clampi(value, 0, FishCharacter.skin_count(character) - 1)
 		_apply_character()
+var _skin := 0
+var _setting_look := false
+
+
+## Become `family` wearing its skin `with_skin`, rebuilding the model once.
+func set_look(family: FishCharacter.Family, with_skin: int) -> void:
+	_setting_look = true
+	character = family
+	_setting_look = false
+	skin = with_skin
 ## A box, like Rocket League's car hitboxes: flat on the floor, flat on top to
 ## carry the ball. Set by the character (Octane: 120.5 x 86.7 x 38.7 uu, 1 uu =
 ## 1 cm). The fish's model is built to fill it.
@@ -749,7 +770,7 @@ func _apply_character() -> void:
 	if _visual:
 		remove_child(_visual)
 		_visual.queue_free()
-	_visual = FishModel.build(character)
+	_visual = FishModel.build(character, _skin)
 	add_child(_visual)
 	_tail = _visual.tail
 	_fin_left = _visual.fin_left

@@ -3,7 +3,7 @@ extends Node
 ## Split-screen co-op in Nature and Unnatural: up to MAX_PLAYERS players on one
 ## machine, a controller each (PlayerSlot). While a run is on, pressing Back/View
 ## (JOIN_BUTTON) on a controller nobody's using adds a player: their own fish
-## (a different character, which D-pad left/right changes), camera, HUD,
+## (a different character, which D-pad left/right changes, D-pad down its skin), camera, HUD,
 ## arcade looks and school wheel, in their own part of the window
 ## (SplitScreen). Holding Back/View for LEAVE_HOLD on a joined controller
 ## leaves. With one player left, the first player has the whole window back.
@@ -90,6 +90,8 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif owner and owner.index > 0 and button in [JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT] and not get_tree().paused:
 		_next_character(owner, 1 if button == JOY_BUTTON_DPAD_RIGHT else -1)
+	elif owner and owner.index > 0 and button == JOY_BUTTON_DPAD_DOWN and not get_tree().paused:
+		next_skin(owner, 1)
 
 
 ## `pad` can be a new player's: not the first player's only controller. (A
@@ -390,7 +392,20 @@ func _unused_character() -> FishCharacter.Family:
 func _next_character(slot: PlayerSlot, step: int) -> void:
 	var families: Array = FishCharacter.CARS.keys()
 	var at := families.find(slot.fish.character)
-	slot.fish.character = families[posmod(at + step, families.size())]
+	slot.fish.character = families[posmod(at + step, families.size())]  # its first skin
+
+
+## `slot`'s fish in its character's next (+1) or previous (-1) unlocked skin
+## (D-pad down for a joined player).
+func next_skin(slot: PlayerSlot, step: int) -> void:
+	var family := slot.fish.character
+	var count := FishCharacter.skin_count(family)
+	var skin := slot.fish.skin
+	for i in count:
+		skin = posmod(skin + step, count)
+		if FishCharacter.is_skin_unlocked(family, skin):
+			break
+	slot.fish.skin = skin
 
 
 ## A connected controller other than `pad`, or -1.
@@ -414,8 +429,9 @@ func _copy_tuning(slot: PlayerSlot) -> void:
 	var first := slots[0]
 	if is_instance_valid(slot.fish):
 		var character := slot.fish.character
+		var skin := slot.fish.skin
 		Match1v1.copy_tuning(first.fish, slot.fish)
-		slot.fish.character = character
+		slot.fish.set_look(character, skin)
 	if is_instance_valid(slot.camera):
 		_copy_camera(first.camera, slot.camera)
 

@@ -42,9 +42,15 @@ func _ready() -> void:
 	_length = hitbox.z * settings.shark_size
 	var half_width := hitbox.x * 0.5 * settings.shark_size
 	var half_height := hitbox.y * 0.5 * settings.shark_size
+	# Red eyes over the model's own, wherever its head puts them.
+	var model_eyes := _model.find_children("Eye", "Node3D", true, false)
 	for side: float in [-1.0, 1.0]:
 		var e := Boss.eye(0.09 * settings.shark_size)
 		e.position = Vector3(side * half_width * 0.55, half_height * 0.3, -_length * 0.38)
+		for node in model_eyes:
+			var at := _model.transform * (node as Node3D).position
+			if signf(at.x) == side:
+				e.position = at
 		add_child(e)
 	_glow.light_color = Color(1.0, 0.1, 0.05)
 	_glow.omni_range = _length * 1.5

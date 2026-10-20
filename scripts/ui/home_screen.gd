@@ -3,7 +3,8 @@ extends CanvasLayer
 ## The home screen the game launches to (UI Redesign Handoff, Home A · Reef
 ## Console): the title and menu down the left (Play, with the last mode played
 ## under it; Choose mode, Co-op, Replays, Settings, Quit), the player's fish
-## live in 3D on the right (‹ ›, left/right or LB/RB change it, its stat bias under it),
+## live in 3D on the right (‹ ›, left/right or LB/RB change it; its skin under
+## its name, the small ‹ › or LT/RT change that; its stat bias under it),
 ## the player's name top-right, and a calm reef behind. Play and Choose mode
 ## open the mode picker (ModePicker) over it; picking a mode starts it.
 ##
@@ -17,6 +18,9 @@ signal coop_requested
 signal settings_requested
 ## ‹ › or LB/RB: play as `character` from now on.
 signal character_changed(character: FishCharacter.Family)
+## The skin selector (its ‹ ›, or LT/RT, Home/End): wear skin `skin` of the
+## shown fish from now on.
+signal skin_changed(skin: int)
 
 ## main.gd: the mode last played (current_mode), each mode's tile (MODE_TILES)
 ## and its rules (_match_card_text).
@@ -31,6 +35,10 @@ var _play_note: Label
 var _showcase: FishShowcase
 var _fish_name: Label
 var _fish_bias: Label
+var _skin_name: Label
+var _skin_count: Label
+## LT / RT as held last frame (triggers are sticks to Godot: skins step on the pull).
+var _triggers_held := {}
 var _chip_name: Label
 var _chip_initial: Label
 var _hints: ControllerHints
@@ -114,7 +122,7 @@ func _ready() -> void:
 	_showcase.offset_left = 20.0 * s
 	_showcase.offset_right = -40.0 * s
 	_showcase.offset_top = 96.0 * s
-	_showcase.offset_bottom = -200.0 * s
+	_showcase.offset_bottom = -232.0 * s
 	_root.add_child(_showcase)
 	var caption := HBoxContainer.new()
 	caption.anchor_left = 0.5
@@ -123,7 +131,7 @@ func _ready() -> void:
 	caption.anchor_bottom = 1.0
 	caption.offset_left = 20.0 * s
 	caption.offset_right = -40.0 * s
-	caption.offset_top = -196.0 * s
+	caption.offset_top = -228.0 * s
 	caption.offset_bottom = -104.0 * s
 	caption.alignment = BoxContainer.ALIGNMENT_CENTER
 	caption.add_theme_constant_override("separation", roundi(22.0 * s))
@@ -137,6 +145,24 @@ func _ready() -> void:
 	_fish_name = UITheme.label("", "display", 34.0, UITheme.INK, s, 600)
 	_fish_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	names.add_child(_fish_name)
+	# The skin under the name: ‹ name › (LT / RT), and which of how many.
+	var skin_row := HBoxContainer.new()
+	skin_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	skin_row.add_theme_constant_override("separation", roundi(10.0 * s))
+	names.add_child(skin_row)
+	skin_row.add_child(_skin_arrow("‹", -1))
+	var skin_text := VBoxContainer.new()
+	skin_text.alignment = BoxContainer.ALIGNMENT_CENTER
+	skin_text.custom_minimum_size.x = 250.0 * s
+	skin_text.add_theme_constant_override("separation", 0)
+	skin_row.add_child(skin_text)
+	_skin_name = UITheme.label("", "body", 18.0, UITheme.AQUA, s, 600)
+	_skin_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	skin_text.add_child(_skin_name)
+	_skin_count = UITheme.label("", "caps", 11.0, UITheme.MUTED, s, 600)
+	_skin_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	skin_text.add_child(_skin_count)
+	skin_row.add_child(_skin_arrow("›", 1))
 	_fish_bias = UITheme.label("", "caps", 14.0, UITheme.CORAL, s, 700)
 	_fish_bias.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	names.add_child(_fish_bias)
@@ -259,6 +285,8 @@ func open(can_resume := false) -> void:
 	_picker.visible = false
 	_menu.modulate.a = 1.0
 	get_tree().paused = true
+	for action: String in ["ui_section_previous", "ui_section_next"]:
+		_triggers_held[action] = Input.is_action_pressed(action)  # RT is the throttle: held on the way in doesn't count
 	_refresh()
 	_play.grab_focus()
 
@@ -297,7 +325,7 @@ func _refresh() -> void:
 	var last := _last_mode()
 	var tile: Dictionary = main.MODE_TILES.get(last, {}) if main else {}
 	_play_note.text = "%s · last played" % tile.get("title", last) if last else "Pick a mode"
-	_hints.hints = [["A", "Select"], ["LB/RB", "Fish"], ["Y", "Fish details"]] +([["B", "Back to game"]] if _can_resume else [])
+	_hints.hints = [["A", "Select"], ["LB/RB", "Fish"], ["LT/RT", "Skin"], ["Y", "Fish details"]] +([["B", "Back to game"]] if _can_resume else [])
 	_show_fish(_character())
 	_refresh_chip()
 
@@ -314,9 +342,21 @@ func _character() -> FishCharacter.Family:
 	return FishCharacter.Family.OCTANE
 
 
+## The skin `character` is worn in: the player's fish's, if it's that fish.
+func _skin(character: FishCharacter.Family) -> int:
+	if main and main.has_node("Fish"):
+		var fish: FishController = main.get_node("Fish")
+		if fish.character == character:
+			return fish.skin
+	return 0
+
+
 func _show_fish(character: FishCharacter.Family) -> void:
-	_showcase.show_fish(character)
+	var skin := _skin(character)
+	_showcase.show_fish(character, skin)
 	_fish_name.text = FishCharacter.CARS[character].fish
+	_skin_name.text = FishCharacter.skin_name(character, skin)
+	_skin_count.text = ("Skin %d of %d" % [skin + 1, FishCharacter.skin_count(character)]).to_upper()
 	_fish_bias.text = ("%s +  ·  %s" % [StatBlock.title(StatBlock.signature(character)), Traversal.title(character)]).to_upper()
 	_refresh_details()
 
@@ -350,6 +390,19 @@ func _cycle_fish(direction: int) -> void:
 	var next: FishCharacter.Family = families[posmod(at + direction, families.size())]
 	character_changed.emit(next)
 	_show_fish(next)
+
+
+## The shown fish's next (+1) or previous (-1) unlocked skin, wrapping round.
+func _cycle_skin(direction: int) -> void:
+	var character := _character()
+	var count := FishCharacter.skin_count(character)
+	var skin := _skin(character)
+	for i in count:
+		skin = posmod(skin + direction, count)
+		if FishCharacter.is_skin_unlocked(character, skin):
+			break
+	skin_changed.emit(skin)
+	_show_fish(character)
 
 
 func _input(event: InputEvent) -> void:
@@ -437,9 +490,17 @@ func _process(_delta: float) -> void:
 	if NetSession.is_online():
 		close()  # joined or hosting from Co-op: into the game
 		return
-	if get_viewport().gui_get_focus_owner() == null and not _picker.visible and not _coop_open() \
-			and not (settings_panel and settings_panel.is_open()):
+	var menu_up: bool = not _picker.visible and not _coop_open() and not (settings_panel and settings_panel.is_open())
+	if get_viewport().gui_get_focus_owner() == null and menu_up:
 		_play.grab_focus()
+	# LT / RT (Home / End): the skin, on the pull (each has to come back up first).
+	for pair: Array in [["ui_section_previous", -1], ["ui_section_next", 1]]:
+		var action: String = pair[0]
+		var held := Input.is_action_pressed(action)
+		var pulled: bool = held and not _triggers_held.get(action, false)
+		_triggers_held[action] = held
+		if pulled and menu_up:
+			_cycle_skin(pair[1])
 
 
 func _coop_open() -> bool:
@@ -481,6 +542,22 @@ func _arrow(glyph: String, direction: int) -> Button:
 	return button
 
 
+## The skin selector's smaller ‹ / ›, like the fish's.
+func _skin_arrow(glyph: String, direction: int) -> Button:
+	var button := Button.new()
+	button.text = glyph
+	button.focus_mode = Control.FOCUS_NONE
+	button.tooltip_text = "Previous skin  (LT / Home)" if direction < 0 else "Next skin  (RT / End)"
+	button.custom_minimum_size = Vector2(34.0, 34.0) * _s
+	button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	button.add_theme_font_override("font", UITheme.display(600))
+	button.add_theme_font_size_override("font_size", roundi(20.0 * _s))
+	button.add_theme_stylebox_override("normal", UITheme.box(Color(UITheme.PANEL, 0.8), 17.0 * _s, Color(UITheme.MUTED, 0.4), maxf(1.0, _s)))
+	button.add_theme_stylebox_override("hover", UITheme.box(UITheme.PANEL.lightened(0.1), 17.0 * _s, UITheme.AQUA, maxf(1.0, 1.5 * _s)))
+	button.pressed.connect(_cycle_skin.bind(direction))
+	return button
+
+
 ## The player's fish, live in its own little world: turning slowly, swimming
 ## gently, lit like the menus.
 class FishShowcase extends SubViewportContainer:
@@ -489,6 +566,7 @@ class FishShowcase extends SubViewportContainer:
 	var _camera := Camera3D.new()
 	var _model: FishModel
 	var _shown := -1
+	var _shown_skin := -1
 	var _time := 0.0
 
 	func _init() -> void:
@@ -522,13 +600,14 @@ class FishShowcase extends SubViewportContainer:
 		_camera.fov = 32.0
 		_view.add_child(_camera)
 
-	func show_fish(character: FishCharacter.Family) -> void:
-		if character == _shown:
+	func show_fish(character: FishCharacter.Family, skin := 0) -> void:
+		if character == _shown and skin == _shown_skin:
 			return
 		_shown = character
+		_shown_skin = skin
 		if _model:
 			_model.queue_free()
-		_model = FishModel.build(character)
+		_model = FishModel.build(character, skin)
 		_pivot.add_child(_model)
 		var reach := _model._size.length() * 1.85
 		_camera.position = Vector3(-0.55, 0.32, -1.0).normalized() * reach

@@ -109,6 +109,7 @@ func clip(from: float, to: float) -> ReplayData:
 			"name": f.display_name if is_instance_valid(f) else "",
 			"team": maxi(f.team, 0) if is_instance_valid(f) else i,
 			"hitbox_family": FishCharacter.CARS[f.character].key if is_instance_valid(f) else "octane",
+			"skin": FishCharacter.skin_key(f.character, f.skin) if is_instance_valid(f) else "",
 			"hitbox_size": FishCharacter.hitbox_size(f.character) if is_instance_valid(f) else Vector3.ONE,
 			"hitbox_offset": Vector3.ZERO,  # the fish's origin is its hitbox centre already
 		})
