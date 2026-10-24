@@ -51,7 +51,7 @@ func counts_uses() -> bool:
 
 func count() -> int:
 	var twist := run.twist_of(fish)
-	return powers.jelly_count + facet_count("count") + (twist.halo_bonus() if twist else 0)
+	return powers.jelly_count + facet_count("count") + extra_projectiles + (twist.halo_bonus() if twist else 0)  # D8: it reads Quantity too
 
 
 func orbit_radius() -> float:

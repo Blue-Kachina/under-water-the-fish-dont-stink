@@ -31,7 +31,7 @@ const BOSSES: Array[String] = ["", "miniboss", "boss", "gulper", "whale", "lampr
 const BOSS_AHEAD := 45.0
 ## tank_preset's levels, and what fills the slots, in order.
 const PRESET_LEVELS := [0, 5, 10, 20]
-const PRESET_WEAPONS: Array[String] = ["attack_greek_fire", "attack_jellyfish_halo", "attack_depth_charges", "attack_remora_buddy",
+const PRESET_WEAPONS: Array[String] = ["attack_greek_fire", "attack_jellyfish_halo", "attack_purple_haze", "attack_remora_buddy",
 		"attack_leviathans_coil"]
 const PRESET_TOMES: Array[String] = ["teeth", "tides", "reef", "shell", "schools", "kill", "ages", "currents", "fins", "ram",
 		"fortune", "pearls"]

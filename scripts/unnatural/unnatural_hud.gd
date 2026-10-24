@@ -512,7 +512,7 @@ class StatsPanel extends Control:
 			if absf(value) < 0.0001:
 				continue
 			any = true
-			lines.append([StatBlock.describe(id, value) + ("   (SIGNATURE)" if id == signature else ""),
+			lines.append([StatBlock.describe(id, StatBlock.shown(id, value)) + ("   (SIGNATURE)" if id == signature else ""),
 					BroadcastUI.GOLD if id == signature else Color.WHITE, 14])
 		if not any:
 			lines.append(["none yet", Color(1, 1, 1, 0.5), 14])

@@ -256,6 +256,8 @@ Sea hares defend themselves with purple **ink** and a sticky white secretion cal
 
 **Size:** L (a new model with three species, a new weapon, twist, skill and gait).
 
+**Built 2026-10-24 (Phase 3).** `FishClass.ALCHEMIST` (added at the end, key `alchemist`, alias `sea_hare`, Merc hitbox), species California, Spotted and Ragged (`SeaHareModel`, `sea_hare_skin.gdshader`: a lofted slug body with a tail foot on the tail pivot, the parapodia on the fin pivots, rolled rhinophores, small eyes and flat oral tentacles, the head from the real animal; the Ragged is covered in branching hairs). **Purple Haze** (`purple_haze.gd`, `FishAttack.Kind.HAZE`, which takes Depth Charges' enum index; id `attack_purple_haze`, `haze_*` in Powerups) as planned, plus: it **holds a scatter while no zombie is within reach** (otherwise bombs fanned into empty water count as misses), and after the separate packs the extra bombs land along the best pack's path. `depth_charges.gd` and the `charge_*` settings are gone; `Weapons.current_id()` maps `attack_depth_charges` to it (Loadout and Powerups take old ids). Measured in `alchemist_probe` with the fish fleeing a chasing pack for 14 s: 100% of bombs did damage (target 90%); zombie-seconds hazed are reported. **Unpalatable** (`coat_*` in Twists): one sphere query a tick round the fish. **Flutter** (`flutter_*` in Mobility); without its own haze it uses a held one, else a spare. **Flap gait** (`Gait.StrokeAxis.FLAP`, `Gait.Visual.FLAP`, now in the GAITS panel): a stride's kick lifts instead of going sideways; the flaps beat down with each stride; the Alchemists' default is stroke time 1.35, power 0.85, coast drag 1.8, coast buoyancy -1. `gait_probe` skips classes that came with their own gait. **D8:** `StatBlock.signature_amount()` (Drifters +`signature_quantity` 0.33 Quantity a level), weapons read `floori(quantity)`, the HUD shows the floor (`StatBlock.shown()`), the Jelly Halo adds Quantity and offers it on cards. Not done: `weapon_bench`'s "bombs that did damage" column (the probe measures it instead) and a swim-away bot in `run_sim`.
+
 ---
 
 ## 6. Traversal variety: gaits (Phase 1 is the layer; later phases use it)
@@ -329,7 +331,7 @@ The fish are RocketSim cars, so **they already have wheels and can touch surface
 | **0** | Classes and Species rename (§1). **Built 2026-10-24** | ~~D1~~ (D2 can wait) | M |
 | **1** | Gait layer, lateral default, no visible change (§6). **Built 2026-10-24** | — | S–M |
 | **2** | Brawlers: Cavitation Punch, Recoil Dash, new twist (§4). Depth Charges stays in the card pool, ownerless, until Phase 3 replaces it. **Built 2026-10-24** | ~~D6~~ | M |
-| **3** | Alchemists: Sea Hare model + 3 species, Purple Haze (built from Depth Charges, which is then retired), Unpalatable, Flutter, flap gait (§5) (Regen signature; Drifters → Quantity, D8) | ~~D8~~ | L |
+| **3** | Alchemists: Sea Hare model + 3 species, Purple Haze (built from Depth Charges, which is then retired), Unpalatable, Flutter, flap gait (§5) (Regen signature; Drifters → Quantity, D8). **Built 2026-10-24** | ~~D8~~ | L |
 | **4** | Breachers: whale model + species, vertical gait; remove the Whale Shark (§2) | ~~D3, D4~~ | M |
 | **5** | Drifters: tilt-and-pulse gait for the jellies (§6) | — | S–M |
 | **6** | Zombie roster: every class appears as a zombie (§8) | ~~D10~~ | M–L |

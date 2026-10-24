@@ -13,7 +13,7 @@ class_name FishCharacter
 
 ## The order goes over the network (and into anything stored by index): add new
 ## classes at the end, never reorder.
-enum FishClass { SKIRMISHER, HUNTER, GLIDER, LANCER, CHARMER, BULWARK, SCORCHER, DRIFTER, BRAWLER, BREACHER }
+enum FishClass { SKIRMISHER, HUNTER, GLIDER, LANCER, CHARMER, BULWARK, SCORCHER, DRIFTER, BRAWLER, BREACHER, ALCHEMIST }
 
 ## Per class: `key` (saves and our clips), `name` (the role name the picker
 ## shows), `rl_hitbox` (the RL hitbox it uses, as RL replays key it), `aliases`
@@ -90,6 +90,13 @@ const CLASSES := {
 		"back": {"radius": 17.0, "rest": 27.924, "at": Vector3(-35.43, 20.28, 12.0942)},
 		"ride": 14.732,
 	},
+	FishClass.ALCHEMIST: {
+		"key": "alchemist", "name": "Alchemists", "rl_hitbox": "merc", "aliases": ["sea_hare"],
+		"hitbox": Vector3(123.22, 79.2103, 44.1591), "offset": Vector3(11.3757, 0.0, 21.505),
+		"front": {"radius": 15.0, "rest": 39.505, "at": Vector3(51.25, 25.9, 21.505)},
+		"back": {"radius": 15.0, "rest": 39.105, "at": Vector3(-33.75, 29.5, 21.505)},
+		"ride": 18.147,
+	},
 }
 ## How far a tyre reaches out past its suspension mount (uu): the belly is this
 ## much wider than the wheels' mounts on each side.
@@ -161,6 +168,11 @@ const SPECIES := {
 		{"key": "deep_charcoal", "name": "Deep Charcoal"},
 		{"key": "juvenile", "name": "Juvenile"},
 		{"key": "basking", "name": "Basking Shark"},
+	],
+	FishClass.ALCHEMIST: [
+		{"key": "california", "name": "California Sea Hare"},
+		{"key": "spotted", "name": "Spotted Sea Hare"},
+		{"key": "ragged", "name": "Ragged Sea Hare"},
 	],
 }
 

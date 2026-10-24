@@ -3,7 +3,7 @@ extends Resource
 ## Unnatural's powerups' tuning (planning_unnatural.md §7, §10): one group per
 ## powerup, its base numbers and how each stack adds to them, and a `stacks`
 ## override for testing (a player has at least that many). Weapons (Weapons:
-## Greek Fire, the Halo, Depth Charges, Remoras, the Coil, and the fish's own
+## Greek Fire, the Halo, Purple Haze, Remoras, the Coil, and the fish's own
 ## attack) level up instead of stacking: their `*_step` (and some
 ## `*_per_stack`) values are what one common step of each facet adds, and
 ## their `stacks` override is a level override. Shown in the tuning panel's
@@ -203,37 +203,46 @@ static func shared() -> PowerupSettings:
 @export_range(0.0, 10.0, 0.05, "or_greater") var eel_cooldown := 0.3
 @export_range(0.0, 1.0, 0.05) var eel_proc := 0.5
 
-@export_group("Depth Charges")
-## A weapon. A mine rack: every charge_interval s (divided by 1 + the rate
-## facet, and by attack speed weighted charge_speed_weight) it drops
-## charge_per_drop mines (+ the mines facet, + Quantity), each lobbed over
-## charge_lob_time s to a zombie within charge_lob m of the tail (times Size),
-## else fanned out behind. A mine arms after charge_arm s (divided by 1 + the
-## arming facet), then blows when a zombie comes within charge_trigger m
-## (times Size) or after charge_life s (times 1 + Duration): charge_damage
-## within charge_blast m (each times 1 + its facet), proc charge_proc. At most
-## charge_max mines out, the oldest go (a cap for performance). A facet step:
-## charge_damage_step damage, charge_blast_step blast size, charge_rate_step
-## drop rate, charge_count_step more mines per drop, charge_arm_step arming
-## speed. charge_stacks: a level override for testing.
-@export_range(0, 20, 1, "or_greater") var charge_stacks := 0
-@export_range(0.1, 60.0, 0.1, "or_greater") var charge_interval := 3.0
-@export_range(0.0, 5.0, 0.05, "or_greater") var charge_speed_weight := 2.0
-@export_range(1, 20, 1, "or_greater") var charge_per_drop := 1
-@export_range(0.0, 30.0, 0.25, "or_greater") var charge_lob := 6.0
-@export_range(0.05, 3.0, 0.05, "or_greater") var charge_lob_time := 0.35
-@export_range(0.0, 10.0, 0.05, "or_greater") var charge_arm := 0.5
-@export_range(0.2, 20.0, 0.1, "or_greater") var charge_trigger := 3.0
-@export_range(0.5, 120.0, 0.5, "or_greater") var charge_life := 10.0
-@export_range(0.0, 5000.0, 5.0, "or_greater") var charge_damage := 24.0
-@export_range(0.5, 40.0, 0.25, "or_greater") var charge_blast := 5.0
-@export_range(1, 200, 1, "or_greater") var charge_max := 30
-@export_range(0.0, 1.0, 0.05) var charge_proc := 0.5
-@export_range(0.0, 2.0, 0.01, "or_greater") var charge_damage_step := 0.2
-@export_range(0.0, 2.0, 0.01, "or_greater") var charge_blast_step := 0.15
-@export_range(0.0, 2.0, 0.01, "or_greater") var charge_rate_step := 0.2
-@export_range(0, 10, 1, "or_greater") var charge_count_step := 1
-@export_range(0.0, 2.0, 0.01, "or_greater") var charge_arm_step := 0.3
+@export_group("Purple Haze")
+## A weapon, the Alchemists' own (big_changes.md §5). Every haze_interval s
+## (divided by 1 + the rate facet, and by attack speed weighted
+## haze_speed_weight) it scatters haze_per_scatter bombs (+ the bombs facet, +
+## Quantity) over haze_scatter_time s, each lobbed over haze_lob_time s at the
+## densest pack within haze_reach m in any direction (times Size; led by the
+## pack's velocity), the rest round it, or fanned round the fish if nothing's
+## near (held while nothing is). Each bursts as it lands into a cloud haze_radius m round (times 1 +
+## the size facet, times Size) lasting haze_life s (+ the life facet, times
+## 1 + Duration): every haze_tick s it does haze_damage (times 1 + its facet)
+## to each zombie in it, proc haze_proc, and hazes them (they drift with
+## haze_slow of their speed taken). At most haze_max clouds (the oldest go).
+## Lv milestones: Opaline (haze_film_slow for haze_film_time s after leaving a
+## cloud); touching clouds merge; zombies that die hazed burst into a small
+## cloud; clouds creep at haze_creep m/s toward the nearest zombie. A facet
+## step: haze_damage_step damage, haze_size_step size, haze_life_step s of
+## life, haze_count_step bombs, haze_rate_step scatter rate. haze_stacks: a
+## level override for testing.
+@export_range(0, 20, 1, "or_greater") var haze_stacks := 0
+@export_range(0.1, 60.0, 0.1, "or_greater") var haze_interval := 3.5
+@export_range(0.0, 5.0, 0.05, "or_greater") var haze_speed_weight := 2.0
+@export_range(1, 20, 1, "or_greater") var haze_per_scatter := 3
+@export_range(0.0, 3.0, 0.05, "or_greater") var haze_scatter_time := 0.4
+@export_range(1.0, 60.0, 0.5, "or_greater") var haze_reach := 12.0
+@export_range(0.05, 3.0, 0.05, "or_greater") var haze_lob_time := 0.45
+@export_range(0.5, 30.0, 0.25, "or_greater") var haze_radius := 4.0
+@export_range(0.5, 60.0, 0.25, "or_greater") var haze_life := 5.0
+@export_range(0.05, 5.0, 0.05, "or_greater") var haze_tick := 0.5
+@export_range(0.0, 2000.0, 1.0, "or_greater") var haze_damage := 12.0
+@export_range(0.0, 1.0, 0.05) var haze_slow := 0.5
+@export_range(1, 200, 1, "or_greater") var haze_max := 12
+@export_range(0.0, 1.0, 0.05) var haze_proc := 0.15
+@export_range(0.0, 1.0, 0.05) var haze_film_slow := 0.3
+@export_range(0.0, 10.0, 0.1, "or_greater") var haze_film_time := 2.0
+@export_range(0.0, 20.0, 0.1, "or_greater") var haze_creep := 1.5
+@export_range(0.0, 2.0, 0.01, "or_greater") var haze_damage_step := 0.25
+@export_range(0.0, 2.0, 0.01, "or_greater") var haze_size_step := 0.12
+@export_range(0.0, 10.0, 0.1, "or_greater") var haze_life_step := 0.8
+@export_range(0, 10, 1, "or_greater") var haze_count_step := 1
+@export_range(0.0, 2.0, 0.01, "or_greater") var haze_rate_step := 0.15
 
 @export_group("Anglerfish Lure")
 ## A glowing lure: every lure_interval s (times 1 - lure_interval_per_stack a
@@ -577,7 +586,7 @@ const STACKS := {
 	"pufferfish_spines": "spine_stacks",
 	"attack_jellyfish_halo": "jelly_stacks",
 	"electric_eel": "eel_stacks",
-	"attack_depth_charges": "charge_stacks",
+	"attack_purple_haze": "haze_stacks",
 	"anglerfish_lure": "lure_stacks",
 	"tsunami_heart": "tsunami_stacks",
 	"attack_leviathans_coil": "coil_stacks",

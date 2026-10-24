@@ -42,9 +42,10 @@ const SIGNATURE := {
 	FishCharacter.FishClass.BULWARK: "armour",
 	FishCharacter.FishClass.GLIDER: "attack_speed",
 	FishCharacter.FishClass.SCORCHER: "duration",
-	FishCharacter.FishClass.DRIFTER: "size",
+	FishCharacter.FishClass.DRIFTER: "quantity",
 	FishCharacter.FishClass.BRAWLER: "knockback",
 	FishCharacter.FishClass.BREACHER: "pearl_chance",
+	FishCharacter.FishClass.ALCHEMIST: "regen",
 }
 
 var values := {}
@@ -108,6 +109,21 @@ static func pool(attack: FishAttack = null) -> Array[String]:
 
 static func signature(fish_class: FishCharacter.FishClass) -> String:
 	return SIGNATURE.get(fish_class, "damage")
+
+
+## What `fish_class`'s signature gives each level, `steps` steps of it. Quantity
+## (the Drifters') isn't a card's whole +1: settings.signature_quantity a
+## step (D8: Quantity is a real number; what spawns uses the floor).
+static func signature_amount(fish_class: FishCharacter.FishClass, steps: float, settings: UnnaturalSettings) -> float:
+	var id := signature(fish_class)
+	if id == "quantity":
+		return settings.signature_quantity * steps
+	return amount(id, steps)
+
+
+## A stat's total as it's shown: Quantity's floor (what spawns), the rest as is.
+static func shown(id: String, total: float) -> float:
+	return floorf(total + 0.0001) if id == "quantity" else total
 
 
 static func _number(x: float) -> String:

@@ -30,6 +30,7 @@ func _init(owner_run: UnnaturalRun, owner_fish: FishController) -> void:
 ## One more stack of item `id`. A weapon levels up in the Loadout instead (its
 ## facets spread evenly), slots or not: for tests and the panel.
 func add(id: String) -> void:
+	id = Weapons.current_id(id)
 	if Powerup.is_weapon(id):
 		var loadout := run.loadout_of(fish)
 		loadout.add_weapon(id, loadout.earned_level(id) + 1)

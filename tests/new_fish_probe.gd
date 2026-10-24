@@ -45,7 +45,8 @@ func _run() -> void:
 
 	print("starting weapons:")
 	var expected := {FishCharacter.FishClass.SCORCHER: FishAttack.Kind.FIRE, FishCharacter.FishClass.DRIFTER: FishAttack.Kind.HALO,
-			FishCharacter.FishClass.BRAWLER: FishAttack.Kind.PUNCH, FishCharacter.FishClass.BREACHER: FishAttack.Kind.REMORA}
+			FishCharacter.FishClass.BRAWLER: FishAttack.Kind.PUNCH, FishCharacter.FishClass.BREACHER: FishAttack.Kind.REMORA,
+			FishCharacter.FishClass.ALCHEMIST: FishAttack.Kind.HAZE}
 	for fish_class: FishCharacter.FishClass in expected:
 		await _be(fish_class)
 		var name: String = FishCharacter.display_name(fish_class)

@@ -53,7 +53,7 @@ func _run() -> void:
 	check(FishAttack.kind_for(FishCharacter.FishClass.BRAWLER) == FishAttack.Kind.PUNCH and Traversal.title(FishCharacter.FishClass.BRAWLER) == "Heavy Hitter"
 			and Traversal.skill_title(FishCharacter.FishClass.BRAWLER) == "Recoil Dash", "Cavitation Punch, Heavy Hitter, Recoil Dash")
 	check("attack_punch" in Weapons.card_pool(FishAttack.Kind.BITE) and "attack_punch" not in Weapons.card_pool(FishAttack.Kind.PUNCH)
-			and "attack_depth_charges" in Weapons.card_pool(FishAttack.Kind.PUNCH), "others can take it as a second weapon; Depth Charges stay in the pool, ownerless")
+			and "attack_purple_haze" in Weapons.card_pool(FishAttack.Kind.PUNCH), "others can take it as a second weapon; Purple Haze is in the pool")
 	check(Weapons.facets(Weapons.ATTACK, FishAttack.Kind.PUNCH).size() == 4 and Weapons.milestones(Weapons.ATTACK, FishAttack.Kind.PUNCH).size() == 4,
 			"four facets, four milestones")
 

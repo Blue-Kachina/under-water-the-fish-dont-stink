@@ -40,6 +40,7 @@ func has_tome(id: String) -> bool:
 ## A new weapon at `at_level` (its facets spread evenly over the upgrades below
 ## it), plus `gains` (facet id -> amount: a new weapon card's rolled rarity).
 func add_weapon(id: String, at_level := 1, gains := {}) -> void:
+	id = Weapons.current_id(id)
 	if not has_weapon(id):
 		weapons.append(id)
 	_levels[id] = maxi(at_level, 1)

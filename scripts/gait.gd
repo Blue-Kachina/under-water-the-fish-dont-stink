@@ -16,17 +16,19 @@ extends Resource
 ## shows an enum once it has more than one value (GaitSettings).
 
 ## Which way a stride's side kick and the body's bend go. LATERAL: away from the
-## stick's sweep, the tail bending across it (every fish today).
-enum StrokeAxis { LATERAL }
+## stick's sweep, the tail bending across it (every fish today). FLAP: up, as
+## a wingbeat lifts (the sea hare's parapodia), whichever way the stick swept.
+enum StrokeAxis { LATERAL, FLAP }
 ## What a stride pushes along. NOSE: where the fish faces.
 enum PushAxis { NOSE }
 ## What a stride does on a surface. NONE: nothing (strides only push in open water).
 enum SurfaceMode { NONE }
 ## What the model plays for a stride. TAIL_BEND: the tail sweeps across and back.
-enum Visual { TAIL_BEND }
+## FLAP: the side flaps (fin pivots) beat down with the push and lift back up.
+enum Visual { TAIL_BEND, FLAP }
 
 ## Which way a stride's side kick and the body's bend go. Lateral: away from
-## the stick's sweep, as fish swim.
+## the stick's sweep, as fish swim. Flap: up, as a wingbeat lifts.
 @export var stroke_axis := StrokeAxis.LATERAL
 ## What a stride pushes along. Nose: where the fish faces.
 @export var push_axis := PushAxis.NOSE
@@ -45,7 +47,8 @@ enum Visual { TAIL_BEND }
 @export_range(-20.0, 20.0, 0.1, "or_greater", "or_less") var coast_buoyancy := 0.0
 ## What a stride does on a surface. None: nothing; strides only push in open water.
 @export var surface_mode := SurfaceMode.NONE
-## The model's animation for each stride. Tail bend: the tail sweeps across and back.
+## The model's animation for each stride. Tail bend: the tail sweeps across and
+## back. Flap: the side flaps beat down with the push.
 @export var visual := Visual.TAIL_BEND
 
 

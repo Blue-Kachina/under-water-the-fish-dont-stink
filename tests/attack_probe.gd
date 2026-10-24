@@ -53,7 +53,7 @@ func _run() -> void:
 	var expected := {FishCharacter.FishClass.SKIRMISHER: AnemoneSting, FishCharacter.FishClass.HUNTER: GhostBite,
 			FishCharacter.FishClass.LANCER: BillThrust, FishCharacter.FishClass.CHARMER: BubbleVolley, FishCharacter.FishClass.BULWARK: SpineBurst,
 			FishCharacter.FishClass.SCORCHER: GreekFire, FishCharacter.FishClass.DRIFTER: JellyfishHalo, FishCharacter.FishClass.BRAWLER: CavitationPunch,
-			FishCharacter.FishClass.BREACHER: RemoraBuddy}
+			FishCharacter.FishClass.BREACHER: RemoraBuddy, FishCharacter.FishClass.ALCHEMIST: PurpleHaze}
 	for fish_class: FishCharacter.FishClass in expected:
 		var made := FishAttack.make(FishAttack.kind_for(fish_class))
 		check(made.get_script() == expected[fish_class], "%s: %s" % [FishCharacter.display_name(fish_class), FishAttack.title(made.kind)])

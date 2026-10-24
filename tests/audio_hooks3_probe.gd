@@ -232,18 +232,17 @@ func _powerups() -> void:
 	print("powerups:")
 	var powers := run.powerups_of(fish)
 	heard.clear()
-	for id in ["attack_depth_charges", "anglerfish_lure", "torpedo", "electric_eel", "tsunami_heart", "bubble_wrap",
+	for id in ["attack_purple_haze", "anglerfish_lure", "torpedo", "electric_eel", "tsunami_heart", "bubble_wrap",
 			"pufferfish_spines", "attack_greek_fire", "attack_jellyfish_halo", "attack_leviathans_coil"]:
 		powers.add(id)
 	await _seconds(0.2)
 	var worn_loops := heard.duplicate()
 	var held: Dictionary = powers.held
 	heard.clear()
-	var charges := powers.weapon("attack_depth_charges") as DepthCharges
-	charges.drop()
-	charges._work(charges.arm_time() + 0.1)
-	charges.explode(fish.global_position + Vector3(0, 5, 0))
-	check(heard.has("pw/depth_charge_drop") and heard.has("pw/depth_charge_arm") and heard.has("fx/explosion"), "depth charges: drop, arm, blast")
+	var haze := powers.weapon("attack_purple_haze") as PurpleHaze
+	haze.scatter(true)
+	haze.open_cloud(fish.global_position + Vector3(0, 5, 0), 2.0, 1.0)
+	check(heard.has("pw/haze_scatter") and heard.has("pw/haze_burst"), "purple haze: scatter, burst")
 	heard.clear()
 	var lure: AnglerfishLure = held["anglerfish_lure"]
 	lure.drop()

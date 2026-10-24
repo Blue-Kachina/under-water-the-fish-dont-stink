@@ -85,7 +85,7 @@ const TABS := {
 			["Jumps & Surfaces", ["Jump & Dodge", "Powerslide", "Surface"]],
 			["Body & Controller", ["Hitbox", "Controller"]]],
 	"gaits": [["Classes", ["Skirmishers", "Hunters", "Gliders", "Lancers", "Charmers", "Bulwarks", "Scorchers", "Drifters", "Brawlers",
-			"Breachers"]]],
+			"Breachers", "Alchemists"]]],
 	"nature": [["Schools", ["Schools", "Formation", "Spawning", "Performance"]],
 			["Battering", ["Battered fish", "School Reactions", "Multis & Sprees"]],
 			["Pearls & Targets", ["Pearls", "Targeting"]]],

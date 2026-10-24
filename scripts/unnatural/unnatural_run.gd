@@ -1939,7 +1939,7 @@ func _on_leveled_up(level: int) -> void:
 		if not is_instance_valid(fish):
 			continue
 		var signature := StatBlock.signature(fish.character)
-		block_of(fish).add(signature, StatBlock.amount(signature, settings.signature_steps))
+		block_of(fish).add(signature, StatBlock.signature_amount(fish.character, settings.signature_steps, settings))
 		_apply_stats(fish)
 	leveled_up.emit(level)
 	if settings.card_choices <= 0:
@@ -1980,7 +1980,7 @@ func _offer_level(fish: FishController) -> void:
 	_level_extra[fish] = powerups_of(fish).extra_level_picks()
 	var signature := StatBlock.signature(fish.character)
 	var gave := "MAX HP +%d  ·  %s (SIGNATURE)  ·  %s" % [roundi(settings.hp_per_level),
-			StatBlock.describe(signature, StatBlock.amount(signature, settings.signature_steps)).to_upper(), CardDeck.slot_line(self, fish)]
+			StatBlock.describe(signature, StatBlock.signature_amount(fish.character, settings.signature_steps, settings)).to_upper(), CardDeck.slot_line(self, fish)]
 	if cards_pause_game():
 		_hold_for_cards(true)
 	cards_offered.emit(fish, cards, "LEVEL %d" % (levels.level - left + 1), gave)

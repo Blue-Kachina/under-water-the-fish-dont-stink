@@ -57,6 +57,8 @@ func _run() -> void:
 	print("zero change (default gaits against the baseline):")
 	var baseline: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(BASELINE))
 	for fish_class: int in FishCharacter.FishClass.values():
+		if not baseline.has(str(fish_class)) or not GaitSettings.default_for(fish_class).is_default():
+			continue  # a class that came with its own gait (the Alchemists' flap): nothing to keep
 		var now := await _trajectory(fish_class)
 		var then: Array = baseline[str(fish_class)]
 		var worst := 0.0
@@ -69,8 +71,11 @@ func _run() -> void:
 	var settings := GaitSettings.shared()
 	var all_default := true
 	for fish_class: FishCharacter.FishClass in FishCharacter.FishClass.values():
-		all_default = all_default and settings.for_class(fish_class) != null and settings.for_class(fish_class).is_default()
-	check(all_default, "every class has a gait, all on today's defaults")
+		var own := not GaitSettings.default_for(fish_class).is_default()
+		all_default = all_default and settings.for_class(fish_class) != null and (own or settings.for_class(fish_class).is_default())
+	check(all_default, "every class has a gait, all on today's defaults but those given their own")
+	var flap := settings.for_class(FishCharacter.FishClass.ALCHEMIST)
+	check(flap.stroke_axis == Gait.StrokeAxis.FLAP and flap.visual == Gait.Visual.FLAP, "the Alchemists flap")
 	fish.set_look(FishCharacter.FishClass.DRIFTER, 0)
 	check(fish.gait == settings.for_class(FishCharacter.FishClass.DRIFTER), "a fish holds its class's gait")
 	settings.set("drifter_coast_drag", 3.0)

@@ -179,6 +179,8 @@ const ROWS := [
 	["pw/jelly_sting", 2, "3d voices=3 cd=0.05", "A halo jelly stings."],
 	["pw/eel_shock_ring", 1, "3d", "Electric Eel's shock ring."],
 	["pw/depth_charge_drop", 1, "3d", "A depth charge drops."],
+	["pw/haze_scatter", 1, "3d voices=2", "Purple Haze lobs its bombs."],
+	["pw/haze_burst", 1, "3d voices=4 cd=0.05", "A Purple Haze bomb bursts into a cloud."],
 	["pw/depth_charge_arm", 2, "3d", "A depth charge arms."],
 	["pw/lure_drop", 2, "3d", "The Anglerfish Lure drops."],
 	["pw/lure_loop", 2, "3d loop voices=2", "The lure glowing."],
@@ -277,6 +279,8 @@ const FALLBACKS := {
 	"unnatural/bubbles_hit": "unnatural/attack_own_hit",
 	"unnatural/spines_hit": "unnatural/attack_own_hit",
 	"unnatural/punch_hit": "unnatural/attack_own_hit",
+	"pw/haze_scatter": "pw/depth_charge_drop",
+	"pw/haze_burst": "fx/explosion",
 }
 
 static var _events := {}

@@ -19,7 +19,7 @@ const ATTACK := "attack"
 ## The weapons held as a second one (AttackWeapon powerups), in the order
 ## cards list them: every fish's weapon can be any fish's second (not its own
 ## again).
-const POWERUPS: Array[String] = ["attack_greek_fire", "attack_jellyfish_halo", "attack_depth_charges", "attack_remora_buddy",
+const POWERUPS: Array[String] = ["attack_greek_fire", "attack_jellyfish_halo", "attack_purple_haze", "attack_remora_buddy",
 		"attack_leviathans_coil", "attack_sting", "attack_bite", "attack_lash", "attack_thrust", "attack_bubbles", "attack_spines", "attack_punch"]
 ## Weapons only a boss gives (never offered on a level-up card).
 const BOSS_ONLY: Array[String] = ["attack_leviathans_coil"]
@@ -33,7 +33,7 @@ const ATTACK_WEAPONS := {
 	"attack_spines": FishAttack.Kind.SPINES,
 	"attack_greek_fire": FishAttack.Kind.FIRE,
 	"attack_jellyfish_halo": FishAttack.Kind.HALO,
-	"attack_depth_charges": FishAttack.Kind.CHARGES,
+	"attack_purple_haze": FishAttack.Kind.HAZE,
 	"attack_remora_buddy": FishAttack.Kind.REMORA,
 	"attack_leviathans_coil": FishAttack.Kind.COIL,
 	"attack_punch": FishAttack.Kind.PUNCH,
@@ -94,12 +94,12 @@ const ATTACK_FACETS := {
 		["spin", "Orbit speed", "pct", "halo_spin_step", ""],
 		["rate", "Sting rate", "pct", "jelly_rate_step", ""],
 	],
-	FishAttack.Kind.CHARGES: [
-		["damage", "Blast damage", "pct", "charge_damage_step", ""],
-		["blast", "Blast size", "pct", "charge_blast_step", ""],
-		["rate", "Drop rate", "pct", "charge_rate_step", ""],
-		["mines", "Mines per drop", "count", "charge_count_step", ""],
-		["arm", "Arming speed", "pct", "charge_arm_step", ""],
+	FishAttack.Kind.HAZE: [
+		["damage", "Cloud damage", "pct", "haze_damage_step", ""],
+		["size", "Cloud size", "pct", "haze_size_step", ""],
+		["life", "Cloud life", "add", "haze_life_step", " s"],
+		["bombs", "Bombs per scatter", "count", "haze_count_step", ""],
+		["rate", "Scatter rate", "pct", "haze_rate_step", ""],
 	],
 	FishAttack.Kind.REMORA: [
 		["count", "Remoras", "count", "remora_count_per_stack", ""],
@@ -126,8 +126,8 @@ const MILESTONES := {
 			"Patches flare up every few seconds, scorching wider", "The flames creep toward the nearest zombie"],
 	FishAttack.Kind.HALO: ["Each jelly trails a ghost that stings too", "The halo swings out wide every few seconds",
 			"A second, wider halo circles the other way", "Stings jump on to the nearest zombie"],
-	FishAttack.Kind.CHARGES: ["A triggered mine pulls zombies in, then blows", "Every fourth blast is a cluster bomb",
-			"Armed mines drift toward zombies close by", "Every blast goes off again a moment later"],
+	FishAttack.Kind.HAZE: ["Opaline: zombies stay slowed a while after leaving a cloud", "Clouds that touch merge into one bigger cloud",
+			"Zombies that die hazed burst into a small cloud", "Clouds creep toward the nearest zombie"],
 	FishAttack.Kind.REMORA: ["Remoras latch on and keep biting", "A kill splits a remora in two for a while",
 			"Bites tear into the zombies round the one bitten", "Remora kills heal you a little"],
 	FishAttack.Kind.COIL: ["Coils slow the zombies they touch", "The coil's head snaps at zombies near it",
@@ -155,6 +155,15 @@ static func is_weapon(id: String) -> bool:
 
 ## The weapons a level-up card may offer as new to a fish whose own attack is
 ## `own` (not boss ones, not its own attack again), each equally likely.
+## Weapon ids that were retired, and what they became (old saves, logs and presets).
+const RETIRED := {"attack_depth_charges": "attack_purple_haze"}
+
+
+## Weapon `id` as it is now (a retired one's replacement).
+static func current_id(id: String) -> String:
+	return RETIRED.get(id, id)
+
+
 static func card_pool(own: FishAttack.Kind) -> Array[String]:
 	var pool: Array[String] = []
 	for id in POWERUPS:

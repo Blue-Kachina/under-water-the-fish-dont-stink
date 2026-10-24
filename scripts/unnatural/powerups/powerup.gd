@@ -52,7 +52,7 @@ const INFO := {
 	"pufferfish_spines": ["Pufferfish Spines", Color(0.95, 0.85, 0.4), "PS", "Zombies that touch you take damage back\nSpines burst out when you're touched", Rarity.Tier.UNCOMMON],
 	"attack_jellyfish_halo": ["Jellyfish Halo", Color(0.85, 0.5, 1.0), "JH", "Jellies orbit you, stinging what they touch.", Rarity.Tier.UNCOMMON],
 	"electric_eel": ["Electric Eel", Color(0.4, 1.0, 0.9), "EE", "Batteries send out a shock ring", Rarity.Tier.UNCOMMON],
-	"attack_depth_charges": ["Depth Charges", Color(0.6, 0.66, 0.55), "DC", "Drops mines behind you that blow up the zombies that follow.", Rarity.Tier.RARE],
+	"attack_purple_haze": ["Purple Haze", Color(0.62, 0.3, 0.85), "PH", "Lobs ink bombs at the thickest pack near you; each bursts into a cloud that hurts and slows the zombies in it.", Rarity.Tier.RARE],
 	"anglerfish_lure": ["Anglerfish Lure", Color(0.6, 1.0, 0.5), "AL", "Drops a glowing decoy the zombies chase\nIt bursts after a while", Rarity.Tier.RARE],
 	"tsunami_heart": ["Tsunami Heart", Color(0.3, 0.6, 1.0), "TH", "Batteries send a wave rolling along your heading", Rarity.Tier.LEGENDARY],
 	"poseidons_trident": ["Poseidon's Trident", Color(0.4, 0.75, 1.0), "PT", "Every 3rd attack calls lightning down on the biggest zombie near", Rarity.Tier.LEGENDARY],
@@ -317,8 +317,8 @@ static func cap_line(powerup_id: String) -> String:
 			return "Up to %d%% HP" % roundi(p.tooth_execute_max * 100.0)
 		"attack_greek_fire":
 			return "At most %d patches out (+ upgrades)" % p.fire_max_patches
-		"attack_depth_charges":
-			return "At most %d mines out" % p.charge_max
+		"attack_purple_haze":
+			return "At most %d clouds out" % p.haze_max
 	return ""
 
 

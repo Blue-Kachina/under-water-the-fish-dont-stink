@@ -36,8 +36,18 @@ func for_class(fish_class: FishCharacter.FishClass) -> Gait:
 
 ## A class's gait before any tuning. Every class has today's lateral gait
 ## until its phase gives it its own (big_changes.md §7).
-static func default_for(_fish_class: FishCharacter.FishClass) -> Gait:
-	return Gait.new()
+static func default_for(fish_class: FishCharacter.FishClass) -> Gait:
+	var gait := Gait.new()
+	if fish_class == FishCharacter.FishClass.ALCHEMIST:
+		# The sea hare's flap: slow, heavy wingbeats that lift, and it hangs
+		# where it stops (a lot of drag between beats, sinking a little).
+		gait.stroke_axis = Gait.StrokeAxis.FLAP
+		gait.visual = Gait.Visual.FLAP
+		gait.stroke_time = 1.35
+		gait.stroke_power = 0.85
+		gait.coast_drag = 1.8
+		gait.coast_buoyancy = -1.0
+	return gait
 
 
 ## The Gait exports the panel shows: ranges and bools, and enums with more than

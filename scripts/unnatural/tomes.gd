@@ -22,7 +22,7 @@ const TOMES := {
 }
 ## What Tome of Ages' duration lasts longer: these weapons' (by their attack's
 ## kind) and items' effects.
-const DURATION_WEAPONS: Array[FishAttack.Kind] = [FishAttack.Kind.FIRE, FishAttack.Kind.CHARGES]
+const DURATION_WEAPONS: Array[FishAttack.Kind] = [FishAttack.Kind.FIRE, FishAttack.Kind.HAZE]
 const DURATION_ITEMS: Array[String] = ["anglerfish_lure"]
 
 

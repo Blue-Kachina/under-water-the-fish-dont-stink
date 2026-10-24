@@ -130,7 +130,7 @@ func _run() -> void:
 	settings.tank_preset = 2  # Full slots Lv 10
 	await _ticks(3)
 	var loadout := tank_run.loadout_of(fish)
-	check(powerups.attack_level == 10 and powerups.fire_stacks == 10 and powerups.jelly_stacks == 10 and powerups.charge_stacks == 0,
+	check(powerups.attack_level == 10 and powerups.fire_stacks == 10 and powerups.jelly_stacks == 10 and powerups.haze_stacks == 0,
 			"weapon slots full at Lv 10 (attack, Greek Fire, Halo)")
 	check(loadout.level(Weapons.ATTACK) == 10 and tank_run.powerups_of(fish).stacks("attack_greek_fire") > 0, "and the run has them")
 	var damage := StatBlock.amount("damage", 10.0)

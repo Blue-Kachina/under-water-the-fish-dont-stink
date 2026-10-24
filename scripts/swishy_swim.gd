@@ -217,7 +217,7 @@ func push_direction(basis: Basis) -> Vector3:
 	var along := -basis.z  # Gait.PushAxis.NOSE
 	# Gait.StrokeAxis.LATERAL: the tail sweeps one way, so the water pushes the
 	# body a little the other. Stick x is right, stick y is down (which pitches
-	# the nose up).
-	var kick := -(basis.x * _dir.x - basis.y * _dir.y).normalized()
+	# the nose up). FLAP: a wingbeat lifts, whichever way the stick swept.
+	var kick := basis.y if fish.gait.stroke_axis == Gait.StrokeAxis.FLAP else -(basis.x * _dir.x - basis.y * _dir.y).normalized()
 	var angle := deg_to_rad(fish.stride_side_angle)
 	return along * cos(angle) + kick * sin(angle)

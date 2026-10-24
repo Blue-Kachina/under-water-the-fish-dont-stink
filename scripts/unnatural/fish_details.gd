@@ -16,7 +16,7 @@ const BLURBS := {
 	FishAttack.Kind.SPINES: "A ring of spines fired out all round when zombies crowd in. Pierces two.",
 	FishAttack.Kind.FIRE: "Swimming leaves a trail of burning patches that scorch every zombie that crosses them. The faster you swim, the more you burn.",
 	FishAttack.Kind.HALO: "Jellyfish orbit you and sting whatever comes close. A slow, steady shield of damage.",
-	FishAttack.Kind.CHARGES: "Mines drop behind you, arm, then blow up when zombies wander near.",
+	FishAttack.Kind.HAZE: "Ink bombs lob at the thickest pack near you, wherever it is, and burst into purple clouds that hurt and slow everything inside for a few seconds. A near miss still pays: the pack drifts in.",
 	FishAttack.Kind.REMORA: "Remoras ride along and nip the nearest zombie in turn. Steady, safe damage.",
 	FishAttack.Kind.PUNCH: "A boxing glove punches the zombie in front, hard enough to knock it back, then the bubble it leaves collapses and hits again round it. Short range: get close.",
 }
@@ -30,7 +30,7 @@ static func sections(fish_class: FishCharacter.FishClass) -> Array:
 	var out := []
 	out.append(["Starting weapon  ·  %s" % FishAttack.title(attack_kind), BLURBS.get(attack_kind, "")])
 	out.append(["Grows by itself  ·  %s" % StatBlock.title(signature),
-			"Every level up gives %s, on top of the cards you pick." % StatBlock.describe(signature, StatBlock.amount(signature))])
+			"Every level up gives %s, on top of the cards you pick." % StatBlock.describe(signature, StatBlock.signature_amount(fish_class, s.signature_steps, s))])
 	out.append(["Passive  ·  %s" % Traversal.title(fish_class), twist_text(fish_class, s)])
 	out.append(["Mobility (RB)  ·  %s" % Traversal.skill_title(fish_class), skill_text(fish_class, s)])
 	out.append(["Base", "%d HP  ·  %.1f s of i-frames after a hit. Every class starts with the same base stats; the weapon, the signature stat and the twist set them apart." % [roundi(s.base_hp), s.iframes]])
@@ -61,6 +61,8 @@ static func twist_text(fish_class: FishCharacter.FishClass, s: UnnaturalSettings
 			return "Heavy Hitter: a zombie your punches knock back flies into the others, hurting up to %d of them for %d%% of the punch." % [s.heavy_max, roundi(s.heavy_share * 100.0)]
 		FishCharacter.FishClass.BREACHER:
 			return "Escort: holding still, it heals %.1f HP a second." % s.escort_regen
+		FishCharacter.FishClass.ALCHEMIST:
+			return "Unpalatable: a zombie that touches you is coated for %.0f s: slowed %d%%, and Purple Haze hurts it %d%% more." % [s.coat_time, roundi(s.coat_slow * 100.0), roundi(s.coat_bonus * 100.0)]
 	return ""
 
 
@@ -87,4 +89,6 @@ static func skill_text(fish_class: FishCharacter.FishClass, s: UnnaturalSettings
 			return "Recoil Dash: throws a full Cavitation Punch one way and the recoil throws you %.0f m/s the other, untouchable for %.1f s. You go the way you lean the stick (else backwards), so by default it punches what's ahead and shoots you back out of the crowd. Ready again after %.1f s." % [s.recoil_speed, s.recoil_iframes, s.recoil_cooldown]
 		FishCharacter.FishClass.BREACHER:
 			return "Gulp: sucks every zombie in a %.0f m cone ahead in, hurting each for %.0f. Ready again after %.1f s." % [s.gulp_range, s.gulp_damage, s.gulp_cooldown]
+		FishCharacter.FishClass.ALCHEMIST:
+			return "Flutter: %d big flaps carry you up and forward over the pack, and a Purple Haze cloud bursts where you took off. Ready again after %.1f s." % [s.flutter_flaps, s.flutter_cooldown]
 	return ""

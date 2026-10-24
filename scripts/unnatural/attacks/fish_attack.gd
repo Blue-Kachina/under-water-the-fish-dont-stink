@@ -9,7 +9,7 @@ extends Node3D
 ## - Fired ones (the sting, the bite...): a subclass gives cooldown() and
 ##   damage(), and fire() returns whether it went off (nothing in range: it
 ##   waits, ready).
-## - Steady ones (the fire trail, the halo, the mines, the remoras, the coil):
+## - Steady ones (the fire trail, the halo, the haze, the remoras, the coil):
 ##   they do their work in _work(delta), every tick they're active, on their
 ##   own timers. They read their own facets (facet()), so own_facets() is true.
 ## _animate() runs every frame, active or not. Every zombie it hurts goes
@@ -23,7 +23,8 @@ extends Node3D
 ## The attack went off (fire() returned true).
 signal fired
 
-enum Kind { OWN, STING, BITE, LASH, THRUST, BUBBLES, SPINES, FIRE, HALO, CHARGES, REMORA, COIL, PUNCH }
+## HAZE took Depth Charges' place (CHARGES, retired in big_changes.md Phase 3): same index.
+enum Kind { OWN, STING, BITE, LASH, THRUST, BUBBLES, SPINES, FIRE, HALO, HAZE, REMORA, COIL, PUNCH }
 ## Each fish's own.
 const FOR_CLASS := {
 	FishCharacter.FishClass.SKIRMISHER: Kind.STING,
@@ -36,6 +37,7 @@ const FOR_CLASS := {
 	FishCharacter.FishClass.DRIFTER: Kind.HALO,
 	FishCharacter.FishClass.BRAWLER: Kind.PUNCH,
 	FishCharacter.FishClass.BREACHER: Kind.REMORA,
+	FishCharacter.FishClass.ALCHEMIST: Kind.HAZE,
 }
 ## Kind -> [name, hit source]. Held as a second weapon, its id is "attack_" +
 ## its source (Weapons.ATTACK_WEAPONS).
@@ -48,7 +50,7 @@ const INFO := {
 	Kind.SPINES: ["Spine Burst", "spines"],
 	Kind.FIRE: ["Greek Fire Trail", "greek_fire"],
 	Kind.HALO: ["Jellyfish Halo", "jellyfish_halo"],
-	Kind.CHARGES: ["Depth Charges", "depth_charges"],
+	Kind.HAZE: ["Purple Haze", "purple_haze"],
 	Kind.REMORA: ["Remora Buddy", "remora_buddy"],
 	Kind.COIL: ["Leviathan's Coil", "leviathans_coil"],
 	Kind.PUNCH: ["Cavitation Punch", "punch"],
@@ -115,8 +117,8 @@ static func make(attack_kind: Kind) -> FishAttack:
 			attack = GreekFire.new()
 		Kind.HALO:
 			attack = JellyfishHalo.new()
-		Kind.CHARGES:
-			attack = DepthCharges.new()
+		Kind.HAZE:
+			attack = PurpleHaze.new()
 		Kind.REMORA:
 			attack = RemoraBuddy.new()
 		Kind.COIL:
@@ -201,7 +203,7 @@ static func kind_uses_stat(attack_kind: Kind, id: String) -> bool:
 	match attack_kind:
 		Kind.THRUST, Kind.BUBBLES, Kind.SPINES:
 			return id == "quantity" or id == "projectile_speed"
-		Kind.LASH, Kind.CHARGES, Kind.PUNCH:
+		Kind.LASH, Kind.HAZE, Kind.PUNCH, Kind.HALO:
 			return id == "quantity"
 	return false
 
@@ -219,14 +221,14 @@ func configure(block: StatBlock, held: Dictionary, at_level: int) -> void:
 		size_scale = bigger
 		damage_scale = 1.0
 		knock_scale = 1.0
-		extra_projectiles = roundi(block.value("quantity"))
+		extra_projectiles = floori(block.value("quantity") + 0.0001)  # D8: Quantity may be fractional; spawn the floor
 		projectile_speed = 1.0 + block.value("projectile_speed")
 	else:
 		attack_speed = rate * (1.0 + facet("rate"))
 		size_scale = bigger * (1.0 + facet("size"))
 		damage_scale = 1.0 + facet("damage")
 		knock_scale = 1.0 + facet("knock")
-		extra_projectiles = roundi(block.value("quantity") + facet("count"))
+		extra_projectiles = floori(block.value("quantity") + 0.0001) + facet_count("count")
 		projectile_speed = (1.0 + block.value("projectile_speed")) * (1.0 + facet("speed"))
 	milestones = settings.milestones_at(at_level) if settings else 0
 	if at_level != level:

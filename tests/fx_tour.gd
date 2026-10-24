@@ -116,18 +116,15 @@ func _run() -> void:
 	await _shot("fx_lash")
 	whip.queue_free()
 
-	# The lingering ones: mines, a lure, the jellies and the coil.
+	# The lingering ones: haze clouds, a lure, the jellies and the coil.
 	var held := run.powerups_of(fish)
-	for id: String in ["attack_depth_charges", "anglerfish_lure", "attack_jellyfish_halo", "attack_leviathans_coil"]:
+	for id: String in ["attack_purple_haze", "anglerfish_lure", "attack_jellyfish_halo", "attack_leviathans_coil"]:
 		held.add(id)
 	await _frames(5)
-	var charges := held.weapon("attack_depth_charges") as DepthCharges
-	for n in 3:
-		charges.drop()
-	for n in charges.mines.size():
-		charges.mines[n].global_position = at(-4.0 + n * 1.5, -1.5 + n * 0.4, 7.0 + n * 2.0)
-		charges.mines[n].age = 0.0 if n == 0 else 10.0
-		charges.mines[n].flight_left = 0.0  # landed where it's posed
+	var haze := held.weapon("attack_purple_haze") as PurpleHaze
+	for n in 2:
+		var cloud := haze.open_cloud(at(-4.0 + n * 3.0, -1.5 + n * 0.4, 9.0 + n * 2.0), 2.5, 30.0)
+		cloud.age = 1.0
 	var lure_powerup: AnglerfishLure = held.held["anglerfish_lure"]
 	lure_powerup.drop()
 	lure_powerup.lures[-1].global_position = at(4.0, 1.0, 10.0)
@@ -139,13 +136,13 @@ func _run() -> void:
 	coil._draw()
 	await _seconds(0.6)
 	await _shot("fx_lingering")
-	for id: String in ["attack_depth_charges", "anglerfish_lure", "attack_leviathans_coil"]:
+	for id: String in ["attack_purple_haze", "anglerfish_lure", "attack_leviathans_coil"]:
 		held.remove_stack(id)
 	await _frames(3)
 
 	# An explosion (a torpedo's) and a small pop, a moment in.
 	Explosion.spawn(run.ocean, at(-2.0, 0.5, 14.0), Powerup.color("torpedo"), 4.0, 0.0, 1.0)
-	Explosion.spawn(run.ocean, at(4.0, -1.0, 10.0), Powerup.color("attack_depth_charges"), 2.5, 0.0, 0.3)
+	Explosion.spawn(run.ocean, at(4.0, -1.0, 10.0), Powerup.color("attack_purple_haze"), 2.5, 0.0, 0.3)
 	await _seconds(0.15)
 	await _shot("fx_explosion")
 	print("fx_tour: saved to %s" % out_dir)

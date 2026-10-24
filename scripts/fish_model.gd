@@ -131,6 +131,8 @@ static func build(character: FishCharacter.FishClass, species := 0) -> FishModel
 			MantisModel.build(model)
 		FishCharacter.FishClass.BREACHER:
 			WhaleSharkModel.build(model)
+		FishCharacter.FishClass.ALCHEMIST:
+			SeaHareModel.build(model)
 	return model
 
 

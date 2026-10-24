@@ -57,7 +57,7 @@ func _run() -> void:
 		check(held.has(id) and (held[id] as Powerup).stacks == 20 and weapon and weapon.milestone(4), "%s on, with all four milestones" % id)
 	var fire := run.powerups_of(fish).weapon("attack_greek_fire") as GreekFire
 	var halo := run.powerups_of(fish).weapon("attack_jellyfish_halo") as JellyfishHalo
-	var charges := run.powerups_of(fish).weapon("attack_depth_charges") as DepthCharges
+	var haze := run.powerups_of(fish).weapon("attack_purple_haze") as PurpleHaze
 	var remora := run.powerups_of(fish).weapon("attack_remora_buddy") as RemoraBuddy
 	var coil := run.powerups_of(fish).weapon("attack_leviathans_coil") as LeviathansCoil
 
@@ -110,7 +110,7 @@ func _run() -> void:
 	check(fire and fire.flares > 0, "Greek Fire's patches flare (%d)" % (fire.flares if fire else 0))
 	check(halo and halo.jumps > 0, "the Halo's stings jump on (%d)" % (halo.jumps if halo else 0))
 	check(halo and is_instance_valid(halo._halo) and halo._halo.get_child_count() == halo.count() * 3, "and it has its outer ring")
-	check(charges and charges.aftershocks > 0, "Depth Charges' blasts go off again (%d)" % (charges.aftershocks if charges else 0))
+	check(haze and haze.merges > 0, "Purple Haze's touching clouds merge (%d)" % (haze.merges if haze else 0))
 	check(remora and remora.tears > 0, "the Remoras tear into the zombies round their bites (%d)" % (remora.tears if remora else 0))
 	check(coil and coil.lashes > 0, "the Coil's tail lashes (%d)" % (coil.lashes if coil else 0))
 	check(coil and coil.count() == (coil.powers.coil_segments + coil.facet_count("count")) * LeviathansCoil.LONG_SCALE, "and it's twice as long")

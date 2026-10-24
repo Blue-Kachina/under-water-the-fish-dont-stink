@@ -709,6 +709,8 @@ var swishy := SwishySwim.new(self)
 ## The gait shapes the body's motion and the model only; the follow camera
 ## follows the body, so a gait's bob or tilt (on the model) never moves it.
 var gait: Gait = GaitSettings.shared().for_class(FishCharacter.FishClass.SKIRMISHER)
+## Gait.Visual.FLAP: the flaps' beat now (rad, + up).
+var _flap := 0.0
 
 ## The character's model (built in _apply_character) and the parts the swim
 ## animation moves.
@@ -2130,6 +2132,14 @@ func _process(delta: float) -> void:
 
 	# Reverse swimming: frantic pectoral flutter.
 	var flutter := sin(Time.get_ticks_msec() * 0.05) * 0.7 * input_reverse
+	if gait.visual == Gait.Visual.FLAP:
+		# Gait.Visual.FLAP: the flaps beat down with each stride's push and lift
+		# back up between, with a slow idle wave.
+		var striding_now := swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY
+		var beat := swishy.power if striding_now else 0.0
+		var idle_wave := sin(_swim_phase * 0.35) * 0.12
+		_flap = lerpf(_flap, 0.9 * beat + idle_wave, 1.0 - exp(-12.0 * delta))  # + is down on the left pivot
+		flutter += _flap
 	_fin_left.rotation.z = flutter
 	_fin_right.rotation.z = -flutter
 	var striding := swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY

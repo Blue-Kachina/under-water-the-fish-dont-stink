@@ -250,7 +250,7 @@ static func shared() -> UnnaturalSettings:
 ## Each fish fires its own auto-attack (FishAttack.FOR_CLASS); pick one here
 ## to give every fish that one instead (testing). Live.
 @export_enum("Own fish's", "Anemone Sting", "Ghost Bite", "Shock Lash", "Bill Thrust", "Bubble Volley", "Spine Burst",
-		"Greek Fire Trail", "Jellyfish Halo", "Depth Charges", "Remora Buddy", "Leviathan's Coil", "Cavitation Punch") var fish_attack := 0
+		"Greek Fire Trail", "Jellyfish Halo", "Purple Haze", "Remora Buddy", "Leviathan's Coil", "Cavitation Punch") var fish_attack := 0
 
 @export_group("Ghost Bite")
 ## The Shark's auto-attack: huge spectral jaws that snap shut on the zone in front.
@@ -398,6 +398,12 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 3.0, 0.05, "or_greater") var graceful_iframes := 0.5
 ## Moon Jelly, Many Arms: its Halo has this many more jellies.
 @export_range(0, 10, 1, "or_greater") var arms_extra := 1
+## Sea Hare, Unpalatable: a zombie that touches it is coated for coat_time s:
+## slowed coat_slow (a share of its speed taken), and Purple Haze does
+## coat_bonus more to it (+share).
+@export_range(0.0, 20.0, 0.1, "or_greater") var coat_time := 2.0
+@export_range(0.0, 1.0, 0.05) var coat_slow := 0.3
+@export_range(0.0, 3.0, 0.05, "or_greater") var coat_bonus := 0.2
 @export_group("Mobility")
 ## Every fish's mobility skill is on the boost button (RB, Shift): it takes
 ## the place of boosting in Unnatural. Each has its own cooldown (s).
@@ -450,6 +456,15 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 100.0, 0.5, "or_greater") var gulp_pull := 25.0
 @export_range(0.0, 1000.0, 1.0, "or_greater") var gulp_damage := 25.0
 @export_range(0.1, 60.0, 0.1, "or_greater") var gulp_cooldown := 5.0
+## Sea Hare, Flutter: flutter_flaps flaps, flutter_gap s apart, each a push of
+## flutter_speed (m/s) forward and up (flutter_lift of it up), carrying it up
+## over the pack; a Purple Haze cloud bursts where it took off. Then
+## flutter_cooldown s.
+@export_range(1, 10, 1, "or_greater") var flutter_flaps := 3
+@export_range(0.0, 2.0, 0.05, "or_greater") var flutter_gap := 0.25
+@export_range(0.0, 100.0, 0.5, "or_greater") var flutter_speed := 9.0
+@export_range(0.0, 1.0, 0.05) var flutter_lift := 0.6
+@export_range(0.1, 60.0, 0.1, "or_greater") var flutter_cooldown := 4.0
 
 @export_group("Stage")
 ## The stage's timeline (StageTimeline, D5): when each event comes (s into the
@@ -673,6 +688,9 @@ static func shared() -> UnnaturalSettings:
 @export var cards_pause := true
 ## The signature stat's +1 each level, in steps.
 @export_range(0.0, 5.0, 0.25, "or_greater") var signature_steps := 1.0
+## The Drifters' signature, Quantity, adds this much each level (not a card's
+## whole +1); what spawns uses the floor of the total (D8).
+@export_range(0.0, 2.0, 0.01, "or_greater") var signature_quantity := 0.33
 
 @export_group("Weapons and Tomes")
 ## Slots (planning_unnatural.md, Playability pass, D17): a player holds this
@@ -862,7 +880,7 @@ static func shared() -> UnnaturalSettings:
 
 @export_group("Test Tank")
 ## A preset for power and frame benchmarks: every weapon slot full (the
-## attack, then Greek Fire, Jellyfish Halo, Depth Charges, Remora Buddy, the
+## attack, then Greek Fire, Jellyfish Halo, Purple Haze, Remora Buddy, the
 ## Coil) and every tome slot (Teeth, Tides, the Reef, the Shell...), all at
 ## that level. It sets the weapons' level overrides (POWERUPS) and the tank's
 ## stats below; Off clears what it set.

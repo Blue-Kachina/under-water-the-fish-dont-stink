@@ -15,6 +15,8 @@ extends RefCounted
 ## - Baby Whale Shark, Escort: heals while it holds still.
 ## - Mantis Shrimp, Heavy Hitter: zombies its punches knock back hurt the ones
 ##   they fly into (fling()).
+## - Sea Hare, Unpalatable: a zombie that touches it is coated: slowed a while,
+##   and Purple Haze hurts it more (is_coated()).
 ##
 ## And a mobility skill on the boost button (RB, Shift: boosting is off in
 ## Unnatural), on its own cooldown (mobility()):
@@ -30,6 +32,8 @@ extends RefCounted
 ## - Mantis Shrimp, Recoil Dash: punches one way, and the recoil throws it the
 ##   other (the way the stick leans, else backwards), untouchable a moment.
 ## - Baby Whale Shark, Gulp: sucks the zombies ahead of it in.
+## - Sea Hare, Flutter: three big flaps carry it up and forward over the pack,
+##   dropping a Purple Haze cloud where it took off.
 ## UnnaturalRun owns one per local player and calls update() every tick.
 
 ## Passive twist titles.
@@ -44,6 +48,7 @@ const NAMES := {
 	FishCharacter.FishClass.DRIFTER: "Many Arms",
 	FishCharacter.FishClass.BRAWLER: "Heavy Hitter",
 	FishCharacter.FishClass.BREACHER: "Escort",
+	FishCharacter.FishClass.ALCHEMIST: "Unpalatable",
 }
 ## Mobility skill titles.
 const SKILLS := {
@@ -57,6 +62,7 @@ const SKILLS := {
 	FishCharacter.FishClass.DRIFTER: "Go Quiet",
 	FishCharacter.FishClass.BRAWLER: "Recoil Dash",
 	FishCharacter.FishClass.BREACHER: "Gulp",
+	FishCharacter.FishClass.ALCHEMIST: "Flutter",
 }
 ## A leap splashes once its climb has slowed to this share of its push, or after LEAP_MAX s.
 const LEAP_TOP := 0.35
@@ -85,6 +91,9 @@ var gulps := 0
 var flares := 0
 var fin_dashes := 0
 var quiets := 0
+var flutters := 0
+var flaps := 0
+var coats := 0
 ## The Moon Jelly's stink is off: nothing fires, and zombies can't find it.
 var quiet := false
 
@@ -106,6 +115,14 @@ var _flings: Array[Dictionary] = []
 ## The Recoil Dash's punch when the fish has no Cavitation Punch of its own
 ## (the panel's fish_attack gave it another).
 var _spare_punch: CavitationPunch
+## Flutter's flaps still to come, and seconds to the next.
+var _flaps_left := 0
+var _flap_wait := 0.0
+## Flutter's cloud when the fish has no Purple Haze of its own (likewise).
+var _spare_haze: PurpleHaze
+## Unpalatable: coated zombies (index -> when the coat wears off, on _clock).
+var _coated := {}
+var _clock := 0.0
 
 
 func _init(owner: UnnaturalRun, of: FishController) -> void:
@@ -123,6 +140,9 @@ func clear() -> void:
 	if is_instance_valid(_spare_punch):
 		_spare_punch.queue_free()
 	_spare_punch = null
+	if is_instance_valid(_spare_haze):
+		_spare_haze.queue_free()
+	_spare_haze = null
 
 
 func reset() -> void:
@@ -137,6 +157,8 @@ func reset() -> void:
 	_quiet_left = 0.0
 	_recoil_left = 0.0
 	_flings.clear()
+	_flaps_left = 0
+	_coated.clear()
 	_stop_loop()
 
 
@@ -216,6 +238,14 @@ func update(delta: float) -> void:
 		_recoil_left -= delta  # no drag meanwhile (above): the throw carries
 	if not _flings.is_empty():
 		_fling_step(delta)
+	_clock += delta
+	_tick_spare(delta)
+	if is_on(FishCharacter.FishClass.ALCHEMIST):
+		_coat_touching()
+	if _flaps_left > 0:
+		_flap_wait -= delta
+		if _flap_wait <= 0.0:
+			_flap()
 	if _leap_age >= 0.0:
 		_leap_age += delta
 		var climb := fish.linear_velocity.y
@@ -280,6 +310,8 @@ func mobility() -> bool:
 			_recoil()
 		FishCharacter.FishClass.BREACHER:
 			_gulp(nose)
+		FishCharacter.FishClass.ALCHEMIST:
+			_flutter()
 		FishCharacter.FishClass.DRIFTER:
 			quiets += 1
 			quiet = true
@@ -297,7 +329,8 @@ func skill_title_now() -> String:
 
 
 func skill_active() -> bool:
-	return quiet or _dash_left > 0.0 or _brace_left > 0.0 or _surge_left > 0.0 or _leap_age >= 0.0 or _recoil_left > 0.0
+	return quiet or _dash_left > 0.0 or _brace_left > 0.0 or _surge_left > 0.0 or _leap_age >= 0.0 or _recoil_left > 0.0 \
+			or _flaps_left > 0
 
 
 func skill_wait() -> float:
@@ -498,6 +531,81 @@ func _gulp(nose: Vector3) -> void:
 			continue
 		var pull := (mouth - run.horde.enemy_position(i)).normalized() * settings.gulp_pull
 		run.hit(i, settings.gulp_damage, fish, "gulp", pull, 0.5)
+
+
+## Unpalatable: every zombie touching the sea hare is coated, slowed
+## coat_slow for coat_time s, and takes coat_bonus more from Purple Haze meanwhile.
+func _coat_touching() -> void:
+	if settings.coat_time <= 0.0:
+		return
+	for i in run.horde.query_sphere(fish.global_position, UnnaturalRun.PLAYER_RADIUS):
+		if not _coated.has(i) or _coated[i] < _clock:
+			coats += 1
+		_coated[i] = _clock + settings.coat_time
+		run.horde.slow(i, settings.coat_slow, settings.coat_time)
+	if _coated.size() > 256:  # forget the worn-off ones now and then
+		for i: int in _coated.keys():
+			if _coated[i] < _clock:
+				_coated.erase(i)
+
+
+## Whether zombie `index` wears Unpalatable's coat now (Purple Haze hurts it more).
+func is_coated(index: int) -> bool:
+	return is_on(FishCharacter.FishClass.ALCHEMIST) and _coated.get(index, -1.0) >= _clock and run.horde.is_alive(index)
+
+
+## The Sea Hare's Flutter: flutter_flaps big flaps up and forward, one every
+## flutter_gap s, and a Purple Haze cloud where it took off.
+func _flutter() -> void:
+	flutters += 1
+	_cool_for(settings.flutter_cooldown)
+	_flaps_left = maxi(settings.flutter_flaps, 1)
+	_flap()
+	var haze := haze_for_flutter()
+	if haze:
+		haze.open_cloud(fish.global_position, haze.radius(), haze.life())
+
+
+## One of Flutter's flaps: a push up and along the nose (flutter_lift of it up).
+func _flap() -> void:
+	flaps += 1
+	_flaps_left -= 1
+	_flap_wait = settings.flutter_gap
+	var nose := -fish.global_basis.z
+	var flat := Vector3(nose.x, 0.0, nose.z)
+	var ahead := flat.normalized() if flat.length_squared() > 0.0001 else Vector3.FORWARD
+	var heading := (ahead * (1.0 - settings.flutter_lift) + Vector3.UP * settings.flutter_lift).normalized()
+	fish.apply_push(heading * settings.flutter_speed)
+	PowerupFx.ring(run, fish.global_position, 1.3, PurpleHaze.COLOR, Vector3.UP, 0.25)
+
+
+## The Purple Haze Flutter drops its cloud with: the fish's own, else one it
+## holds, else a spare at its stats (the panel gave it another attack).
+func haze_for_flutter() -> PurpleHaze:
+	var own := run.attack_of(fish) as PurpleHaze
+	if own:
+		return own
+	var powerups := run.powerups_of(fish)
+	var held: PurpleHaze = powerups.weapon("attack_purple_haze") as PurpleHaze if powerups else null
+	if held:
+		return held
+	if not is_instance_valid(_spare_haze):
+		_spare_haze = FishAttack.make(FishAttack.Kind.HAZE) as PurpleHaze
+		_spare_haze.fish = fish
+		_spare_haze.horde = run.horde
+		_spare_haze.settings = settings
+		_spare_haze.run = run
+		_spare_haze.powers = run.powerup_settings
+		_spare_haze.on_hit = run.hit
+		run.add_child(_spare_haze)
+	_spare_haze.configure(run.block_of(fish), {}, 1)
+	return _spare_haze
+
+
+## Ticks the spare haze's clouds (it isn't the fish's attack, so nothing else does).
+func _tick_spare(delta: float) -> void:
+	if is_instance_valid(_spare_haze) and not _spare_haze.clouds.is_empty():
+		_spare_haze._tick_clouds(delta)
 
 
 ## More i-frames after a hit (s): the Koi's grace.
