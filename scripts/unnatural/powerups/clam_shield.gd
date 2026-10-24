@@ -12,7 +12,7 @@ var _charge := 0.0
 
 
 func ready_time() -> float:
-	return maxf(settings.clam_ready - settings.clam_ready_per_stack * (stacks - 1), settings.clam_ready_min)
+	return maxf(settings.clam_ready - settings.clam_ready_per_stack * extra(), settings.clam_ready_min)
 
 
 func is_ready() -> bool:

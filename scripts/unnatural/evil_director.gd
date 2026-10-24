@@ -51,6 +51,13 @@ var intensity := 0.0
 var relief_left := 0.0
 ## Breathers so far.
 var reliefs := 0
+## A quiet moment (P5: after a swarm event or the mini-boss): seconds left with no packs.
+var quiet_left := 0.0
+## The stage (P5): the target alive times stage_scale; the elite chance plus
+## elite_bonus, times elite_scale (the Shrine of the Deep).
+var stage_scale := 1.0
+var elite_bonus := 0.0
+var elite_scale := 1.0
 
 var _kill_times := PackedFloat32Array()
 var _read_left := 0.0
@@ -70,6 +77,7 @@ func reset() -> void:
 	intensity = 0.0
 	relief_left = 0.0
 	reliefs = 0
+	quiet_left = 0.0
 	hushed = false
 	escalation = 1.0
 	cleared = false
@@ -119,7 +127,7 @@ func baseline() -> float:
 ## How many zombies it wants out now.
 func target_alive() -> int:
 	var after := settings.cleared_alive_scale if cleared else 1.0
-	return mini(roundi(baseline() * pressure * escalation * after), horde.capacity)
+	return mini(roundi(baseline() * pressure * escalation * after * stage_scale), horde.capacity)
 
 
 ## How big a pack is now.
@@ -129,11 +137,16 @@ func swarm_size() -> int:
 
 ## The chance each new zombie is elite now.
 func elite_chance() -> float:
-	return clampf(settings.elite_chance + settings.elite_per_minute * minutes(), 0.0, 1.0)
+	return clampf((settings.elite_chance + settings.elite_per_minute * minutes() + elite_bonus) * elite_scale, 0.0, 1.0)
 
 
 func in_relief() -> bool:
 	return relief_left > 0.0
+
+
+## No packs for `seconds` (a quiet moment; a longer one already on isn't cut short).
+func quiet(seconds: float) -> void:
+	quiet_left = maxf(quiet_left, seconds)
 
 
 ## One tick: reads how the players are doing every READ_INTERVAL, then sends
@@ -142,12 +155,13 @@ func in_relief() -> bool:
 func update(delta: float, around: PackedVector3Array) -> void:
 	intensity = maxf(intensity - settings.intensity_fade * intensity * delta - 0.01 * delta, 0.0)
 	relief_left = maxf(relief_left - delta, 0.0)
+	quiet_left = maxf(quiet_left - delta, 0.0)
 	_read_left -= delta
 	if _read_left <= 0.0:
 		_read_left = READ_INTERVAL
 		_read()
 	next_pack -= delta
-	if not settings.spawning or around.is_empty() or next_pack > 0.0 or in_relief() or hushed:
+	if not settings.spawning or around.is_empty() or next_pack > 0.0 or in_relief() or hushed or quiet_left > 0.0:
 		return
 	var missing := target_alive() - horde.alive_count()
 	if missing <= 0:

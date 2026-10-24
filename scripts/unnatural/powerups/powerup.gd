@@ -178,6 +178,9 @@ static func blurb_lines(powerup_id: String) -> PackedStringArray:
 	for line in _lines(powerup_id):
 		if not line.begins_with("!"):
 			lines.append(line)
+	var cap := cap_line(powerup_id)
+	if cap != "" and not is_weapon(powerup_id):
+		lines.append(cap)
 	return lines
 
 
@@ -200,8 +203,9 @@ static func tier(powerup_id: String) -> int:
 
 ## Up to `count` different powerups for a chest of rarity `rolled`: its own
 ## first, then the tiers below it (nearest first), then above, each tier's in
-## a random order. Items only: weapons come from level-up cards.
-static func pick_for_chest(rng: RandomNumberGenerator, rolled: int, count: int) -> Array[String]:
+## a random order. Items only: weapons come from level-up cards. `left_out`:
+## ids not to offer (banished, P4, or already showing).
+static func pick_for_chest(rng: RandomNumberGenerator, rolled: int, count: int, left_out: Array = []) -> Array[String]:
 	var order: Array[int] = [rolled]
 	for t in range(rolled - 1, -1, -1):
 		order.append(t)
@@ -209,16 +213,16 @@ static func pick_for_chest(rng: RandomNumberGenerator, rolled: int, count: int) 
 		order.append(t)
 	var picked: Array[String] = []
 	for t in order:
-		for id in pick_from_tier(rng, t, count - picked.size()):
+		for id in pick_from_tier(rng, t, count - picked.size(), left_out):
 			picked.append(id)
 	return picked
 
 
 ## Up to `count` different powerups of tier `wanted`, in a random order.
-static func pick_from_tier(rng: RandomNumberGenerator, wanted: int, count: int) -> Array[String]:
+static func pick_from_tier(rng: RandomNumberGenerator, wanted: int, count: int, left_out: Array = []) -> Array[String]:
 	var pool: Array[String] = []
 	for id in ids():
-		if tier(id) == wanted and not is_weapon(id):
+		if tier(id) == wanted and not is_weapon(id) and id not in left_out:
 			pool.append(id)
 	var picked: Array[String] = []
 	while not pool.is_empty() and picked.size() < count:
@@ -250,6 +254,75 @@ func proc_power(chance: float) -> float:
 	if chance >= 1.0:
 		return chance
 	return 1.0 if roll(chance) else 0.0
+
+
+## Plain stat items, which flatten slower (stack_falloff_stats).
+const STAT_ITEMS: Array[String] = ["barnacle_plating", "hermit_shell", "fizzy_soda", "speedy_seahorse", "kelp_wrap", "sea_salt",
+		"coral_knuckles", "divers_goggles", "lucky_sand_dollar"]
+
+
+## How fast `powerup_id`'s stacks flatten out (P4's stacking curves; Limits.stack_value).
+static func falloff_for(powerup_id: String, from: UnnaturalSettings) -> float:
+	if from == null or not from.limits or tier(powerup_id) == Rarity.Tier.CURSED or is_weapon(powerup_id):
+		return 0.0
+	if powerup_id in STAT_ITEMS:
+		return from.stack_falloff_stats
+	if tier(powerup_id) == Rarity.Tier.LEGENDARY:
+		return from.stack_falloff_legendary
+	return from.stack_falloff
+
+
+## What its stacks are worth (P4): the first 1, later ones less and less
+## (Limits.stack_value, falloff_for()). Items read this, not `stacks`.
+func eff() -> float:
+	return Limits.stack_value(stacks, falloff_for(id, run.settings if run else UnnaturalSettings.shared()))
+
+
+## What its stacks past the first are worth (eff() - 1): the "+ per stack" part.
+func extra() -> float:
+	return maxf(eff() - 1.0, 0.0)
+
+
+## A proc chance as play uses it: bent short of 100% (Limits.chance) with the
+## limits on, else as it is.
+func soft_chance(raw: float) -> float:
+	var from := run.settings if run else UnnaturalSettings.shared()
+	return Limits.chance(raw, from.chance_softness) if from.limits else raw
+
+
+## Its effect cap, the visible rule ("At most 48 torpedoes out"; "": none).
+static func cap_line(powerup_id: String) -> String:
+	var p := PowerupSettings.shared()
+	match powerup_id:
+		"torpedo":
+			return "At most %d torpedoes in the water" % p.torpedo_max
+		"chain_lightning":
+			return "At most %d strikes a second" % roundi(p.lightning_max_rate)
+		"krakens_grasp":
+			return "At most %s slams a second" % _num(p.kraken_max_rate)
+		"whirlpool_charm":
+			return "At most %d whirlpools out" % p.charm_max
+		"ammonite_spiral":
+			return "At most %d splits a second" % roundi(p.ammonite_max_rate)
+		"anglerfish_lure":
+			return "At most %d lures out" % p.lure_max
+		"riptide":
+			return "At most %d currents out" % p.riptide_max
+		"electric_eel":
+			return "At most one ring every %s s" % _num(p.eel_cooldown)
+		"tsunami_heart":
+			return "At most one wave every %s s" % _num(p.tsunami_cooldown)
+		"megalodon_tooth":
+			return "Up to %d%% HP" % roundi(p.tooth_execute_max * 100.0)
+		"attack_greek_fire":
+			return "At most %d patches out (+ upgrades)" % p.fire_max_patches
+		"attack_depth_charges":
+			return "At most %d mines out (+ upgrades)" % p.charge_max
+	return ""
+
+
+static func _num(x: float) -> String:
+	return str(roundi(x)) if absf(x - roundf(x)) < 0.05 else "%.1f" % x
 
 
 ## A weapon's facet `facet_id` (its total from upgrades, Loadout.facet).

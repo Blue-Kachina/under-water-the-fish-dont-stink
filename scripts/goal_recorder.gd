@@ -79,7 +79,7 @@ func record(delta: float) -> void:
 		_ball = _ball.slice(keep_from)
 		for i in _fish.size():
 			_fish[i] = _fish[i].slice(keep_from)
-		_events = _events.filter(func(e: Dictionary) -> bool: return e.time >= time - KEEP)
+		_events.assign(_events.filter(func(e: Dictionary) -> bool: return e.time >= time - KEEP))
 
 
 ## The earliest time still kept.

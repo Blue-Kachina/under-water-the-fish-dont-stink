@@ -35,6 +35,18 @@ Every playable fish, weapon, tome, powerup and bonus in Unnatural (the survivors
 | Card type weights | Upgrade a held weapon 40, upgrade a held tome 30, new weapon 15 (needs a free slot), new tome 15 (needs a free slot) |
 | Weapon milestones | Lv 5, 10, 15, 20: each one unlocks a new behaviour (see the weapon tables) |
 | Nothing left to offer | A pearl purse of 10 × (1 + level/10), or a team heal of 30% max HP |
+| Weapon card fade (P4) | Upgrade-a-weapon weight ÷ (1 + 0.04 × (average weapon level − 1)): Lv 10 weapons come up at 74% |
+| Rerolls, skips, banishes (P4) | 0 each at the start (from meta later). RB rerolls a level's or chest's cards; LB skips a level; Y banishes the focused weapon, tome or item for the rest of the run |
+
+### Limits (P4, `limits.gd`; all off with `limits` false)
+
+| Rule | Value |
+|---|---|
+| Item stacking curve | The k-th stack (from 0) adds 1 / (1 + falloff × k) of the first. Procs and effects falloff 0.5 (100%, 67%, 50%, 40%...); plain stat items 0.25; legendaries 1.0; cursed items stay in a line |
+| Chances | Crit Chance and every item's proc chance bend short of 100%: raw / (1 + raw²)^½ (5% stays 5%, 50% → 45%, 100% → 71%) |
+| Cooldown floor | No auto-attack fires more than once every 0.12 s |
+| Size soft cap | Past +100%, Size grows at half its rate |
+| Effect caps | Shown on each item's card ("At most 48 torpedoes in the water") |
 
 ### Rarity (`rarity.gd`)
 
@@ -153,11 +165,11 @@ Shared facet steps (`PowerupSettings`): Damage +20%, Rate +12%, Size +12%, Knock
 
 | Weapon (second-weapon id) | Fish | Base numbers | Proc | Facets (common step) |
 |---|---|---|---|---|
-| **Greek Fire Trail** (`attack_greek_fire`) | Lionfish | Drops a burning patch every 1.6 m swum. Each patch is 1.6 m in radius, lasts 2.0 s (× Duration) and burns for 40 dmg/s. At most 60 patches out. | 0.1 | Burn damage +25%, Patch life +0.4 s, Patch size +10%, Denser trail +12%, Max patches +5 |
-| **Jellyfish Halo** (`attack_jellyfish_halo`) | Moon Jelly | 2 jellies orbit 3.2 m out at 0.5 turns/s. Each stings for 35 every 0.25 s on touch (1.2 m radius). | 0.2 | Jellies +1, Sting damage +25%, Orbit size +12%, Orbit speed +15%, Sting rate +15% |
+| **Greek Fire Trail** (`attack_greek_fire`) | Lionfish | Drops a burning patch every 1.6 m swum. Each patch is 1.6 m in radius, lasts 2.0 s (× Duration) and burns for 40 dmg/s. At most 60 patches out. | 0 | Burn damage +25%, Patch life +0.4 s, Patch size +10%, Denser trail +12%, Max patches +5 |
+| **Jellyfish Halo** (`attack_jellyfish_halo`) | Moon Jelly | 2 jellies orbit 3.2 m out at 0.5 turns/s. Each stings for 35 every 0.25 s on touch (1.2 m radius). | 0.1 | Jellies +1, Sting damage +25%, Orbit size +12%, Orbit speed +15%, Sting rate +15% |
 | **Depth Charges** (`attack_depth_charges`) | Mantis Shrimp | Drops a mine every 4 s. It arms after 0.5 s and blows when a zombie comes within 2 m (or after 10 s × Duration): 46 dmg in a 5 m blast. At most 12 mines out. | 0.5 | Blast damage +30%, Blast size +15%, Drop rate +15%, Mines out +3, Arming speed +30% |
 | **Remora Buddy** (`attack_remora_buddy`) | Baby Whale Shark | 1 remora nips the nearest zombie within 7 m every 1.5 s for 55. | 0.5 | Remoras +1, Bite damage +25%, Bite rate +15%, Reach +15% |
-| **Leviathan's Coil** (`attack_leviathans_coil`) | — (boss only, from the Blood Leviathan; `coil_arrive_level` 5) | 6 coils trail the fish 1.4 m apart. Each hurts what it touches (0.9 m radius) for 55 every 0.25 s. | 0.3 | Coils +3, Coil damage +25%, Coil size +15%, Hit rate +15% |
+| **Leviathan's Coil** (`attack_leviathans_coil`) | — (boss only, from the Blood Leviathan; `coil_arrive_level` 5) | 6 coils trail the fish 1.4 m apart. Each hurts what it touches (0.9 m radius) for 55 every 0.25 s. | 0.15 | Coils +3, Coil damage +25%, Coil size +15%, Hit rate +15% |
 
 **Milestones (Lv 5 / 10 / 15 / 20):**
 
@@ -169,7 +181,7 @@ Shared facet steps (`PowerupSettings`): Damage +20%, Rate +12%, Size +12%, Knock
 | Remora Buddy | Remoras latch on and keep biting | A kill splits a remora in two for a while | Bites tear into the zombies round the one bitten | Remora kills heal you a little |
 | Leviathan's Coil | Coils slow the zombies they touch | The coil's head snaps at zombies near it | The tail lashes out in a shock ring | The coil grows twice as long |
 
-**Proc coefficient:** chances to trigger on-hit powerups (Chain Lightning, Torpedo, Sticky Anemone...) are multiplied by the hit's proc. A hit started by a powerup can't start that same powerup again. Other procs: lightning jump 0.3, torpedo 0.5, burn 0.1.
+**Proc coefficient:** chances to trigger on-hit powerups (Chain Lightning, Torpedo, Sticky Anemone...) are multiplied by the hit's proc. A hit started by a powerup can't start that same powerup again. Other procs: lightning jump 0.3, torpedo 0.5, burn 0 (P4: weapons that hit very often start nothing).
 
 ---
 
@@ -198,7 +210,7 @@ Tome of Ages only matters for Greek Fire, Depth Charges and Anglerfish Lure (`DU
 
 ## 6. Powerups (items) (`powerup.gd`, `powerup_settings.gd`)
 
-Items come from **chests**, never from level-up cards. A chest rolls a rarity with the opener's Luck and offers 3 different items. It starts with that tier, then fills from the tiers below it (nearest first), then the tiers above. Taking an item you already hold adds a **stack**. Unless a row says otherwise, "+X/stack" means **each stack after the first** adds X (base + X × (stacks − 1)). The flat stat items add their full amount every stack.
+Items come from **chests**, never from level-up cards. A chest rolls a rarity with the opener's Luck and offers 3 different items. It starts with that tier, then fills from the tiers below it (nearest first), then the tiers above. Taking an item you already hold adds a **stack**. Unless a row says otherwise, "+X/stack" means **each stack after the first** adds X (base + X × (stacks − 1)) before P4's stacking curve: later stacks count for less (see Limits in §1). The flat stat items add their amount for each stack, on the gentler stat-item curve.
 
 ### Common
 
@@ -241,10 +253,10 @@ Items come from **chests**, never from level-up cards. A chest rolls a rarity wi
 | **Kraken's Grasp** (`krakens_grasp`) | Hits: 5% chance (× proc) that a tentacle slams the zombie: 120 dmg within 4.5 m, and the zombies hit are held still for 1.5 s. At most 2 slams/s | +2.5% chance, +60 dmg per stack |
 | **Ghost Swordfish** (`ghost_swordfish`) | Every 3 s a phantom swordfish dashes 18 m through the nearest line of zombies within 20 m: 60 dmg to each within 1.5 m of its path | +1 swordfish per stack |
 | **Ammonite Spiral** (`ammonite_spiral`) | Projectile hits (spears, bubbles, spines, torpedoes) split into 3 shards. Each shard goes to another zombie within 8 m for 35% of the hit. At most 20 splits/s | +1 shard per stack |
-| **Riptide** (`riptide`) | A stride timed at its peak (timing ≥ 0.75) leaves a 10 m current behind you (2.5 m each side) for 3 s. Zombies in it are dragged back at 8 m/s and take 25 dmg/s | +12 dmg/s per stack |
+| **Riptide** (`riptide`) | A stride timed at its peak (timing ≥ 0.75) leaves a 10 m current behind you (2.5 m each side) for 3 s. Zombies in it are dragged back at 8 m/s and take 25 dmg/s. At most 6 currents out (a new one replaces the oldest) | +12 dmg/s per stack |
 | **Reef Guardian** (`reef_guardian`) | Dropping under 25% HP makes you untouchable for 3 s. Recharges in 60 s | Recharge ×0.85 per extra stack |
 | **Bioluminescence** (`bioluminescence`) | Each level-up and each chest you open sends out a flash: 12 m radius (× Size), 10 dmg × team level | +2 m radius, +5 dmg per level per stack |
-| **Anglerfish Lure** (`anglerfish_lure`) | Every 10 s it drops a glowing decoy (pull 3: zombies prefer it over a player up to 3× nearer) for 5 s (× Duration). Then it bursts for 80 dmg in 6 m (proc 0.5) | Interval ×0.9 per extra stack, +50 dmg per stack |
+| **Anglerfish Lure** (`anglerfish_lure`) | Every 10 s it drops a glowing decoy (pull 3: zombies prefer it over a player up to 3× nearer) for 5 s (× Duration). Then it bursts for 80 dmg in 6 m (proc 0.5). At most 3 lures out | Interval ×0.9 per extra stack, +50 dmg per stack |
 
 ### Legendary
 
@@ -305,8 +317,8 @@ Drops are timed as well as rolled: after a drop of a kind, that kind waits its "
 
 | Rule | Value |
 |---|---|
-| At the start | 10 buried; then 1 more every 60 s, up to 16 unopened |
-| Kill drop | 0.2% × (1 + luck), elites ×2, × Treasure Map |
+| At the start | 10 buried; then 1 more every 60 s × (1 + 0.1 × minutes into the stage), up to 16 unopened. A won Shrine of the Tide raises a free one |
+| Kill drop | 0.2% × (1 + luck), elites ×2, × Treasure Map, elites with a modifier ×1.5 more; ÷ (1 + 0.06 × minutes into the stage) (P4) |
 | Cursed chance | 10% of buried chests (blood red, offers cursed items) |
 | Opening | Batter it, or hold still (< 3 m/s) within 8 m for 2 s. You can't be hurt or seen while you pick |
 | Choices | 3 items |
@@ -329,7 +341,34 @@ Drops are timed as well as rolled: after a drop of a kind, that kind waits its "
 | Boss | Reward |
 |---|---|
 | **Drowned Shark** (mini-boss, 5:00) | A chest, 80 XP, 25 pearls |
-| **Blood Leviathan** (boss, 10:00) | Leviathan's Coil (boss weapon); the whirlpool exit that completes the stage |
+| **Blood Leviathan** (boss, 10:00) | Leviathan's Coil (boss weapon); the whirlpool: the next stage, or on the run's last stage the win |
+| Shrine of the Deep (each, this stage) | One more boss chest (legendary pick) from every boss beaten |
+
+### Shrines (P5, `shrine.gd`): 4 per stage, one of each, Jump over one to use it
+
+| Shrine | What it does |
+|---|---|
+| **Tide** | Hold its 8 m ring for 10 s (draining back at half speed while you're out) while 40 zombies ring it every 3.5 s: a free chest |
+| **Chance** | Pay 6 pearls (growing as chests do, ×1.5 a try) for a 50% chance at an item (a chest's pick). 3 tries per player |
+| **Deep** | More elites for the rest of the stage (×2 chance), and every boss drops one more chest |
+| **Pearls** | Every pearl out flies to the nearest player, and 10 more spill out |
+
+### Elites: 2.2× the size of their kind, 5× hp, 2× contact damage. Elite modifiers (P5): 60% of elites have one, and drop chests ×1.5 more often
+
+| Modifier | Glow | What it does |
+|---|---|---|
+| **Burning** | Orange, flickering | Leaves a 1.6 m fire patch every 0.6 s (3 s, 6 dmg a touch; at most 40 out) |
+| **Electric** | Blue, crackling | Dying, it crackles 0.6 s (a ring shows where), then shocks everything within 5 m for 14 |
+| **Frozen** | Ice blue | Its touch takes 45% of your speed for 2 s |
+| **Bloated** | Sickly green | Dying, it bursts into 6 rotten sardines |
+
+### Stages and run length (P5)
+
+| Rule | Value |
+|---|---|
+| Run length | Picked before the run: Short (1 stage, events at 0.6× their times: the boss at 6:00), Standard (3 stages), Endless |
+| Each stage after the first | A new seabed; zombies ×1.8 hp and ×1.3 contact damage per stage (compounding), +3 difficulty levels, +40% zombies out, +2% elites; bosses ×1.8 hp. Weapons, tomes, items, level and purse carry on; everyone's healed and back at the start |
+| Quiet moments | 8 s with no packs after a swarm event ends, and after the mini-boss |
 
 ---
 

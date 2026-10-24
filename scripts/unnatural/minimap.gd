@@ -205,6 +205,11 @@ class Marks extends Control:
 			var spot := map.to_map(chest.global_position)
 			if map.on_map(spot, 5.0):
 				_draw_chest(spot, chest.tint())
+		for shrine in run.shrines:
+			if is_instance_valid(shrine) and not shrine.spent:
+				var spot := map.to_map(shrine.global_position)
+				if map.on_map(spot, 6.0):
+					_draw_shrine(spot, shrine.tint(), shrine.tide_active)
 		if is_instance_valid(run.horde):
 			for at in run.horde.survey_elites:
 				var spot := map.to_map(at)
@@ -236,6 +241,14 @@ class Marks extends Control:
 				draw_line(last, spot, Color(1.0, 0.45, 0.4, 0.7), 2.0, true)
 			last = spot
 			last_in = inside
+
+	## A shrine (P5): a diamond in its colour, pulsing while its Tide runs.
+	func _draw_shrine(spot: Vector2, tint: Color, running: bool) -> void:
+		var r := 6.0 + (1.5 * sin(Time.get_ticks_msec() / 120.0) if running else 0.0)
+		var diamond := PackedVector2Array([spot + Vector2(0.0, -r), spot + Vector2(r, 0.0), spot + Vector2(0.0, r), spot + Vector2(-r, 0.0)])
+		draw_colored_polygon(diamond, Color(BroadcastUI.INK, 0.9))
+		draw_colored_polygon(PackedVector2Array([spot + Vector2(0.0, -r + 2.0), spot + Vector2(r - 2.0, 0.0), spot + Vector2(0.0, r - 2.0),
+				spot + Vector2(-r + 2.0, 0.0)]), tint)
 
 	func _draw_chest(spot: Vector2, tint: Color) -> void:
 		var box := Rect2(spot - Vector2(5.0, 4.0), Vector2(10.0, 8.0))

@@ -11,11 +11,11 @@ var _cool := 0.0
 
 
 func radius() -> float:
-	return (settings.eel_radius + settings.eel_radius_per_stack * (stacks - 1)) * size_scale()
+	return (settings.eel_radius + settings.eel_radius_per_stack * extra()) * size_scale()
 
 
 func damage() -> float:
-	return settings.eel_damage + settings.eel_damage_per_stack * (stacks - 1)
+	return settings.eel_damage + settings.eel_damage_per_stack * extra()
 
 
 func on_tick(delta: float) -> void:

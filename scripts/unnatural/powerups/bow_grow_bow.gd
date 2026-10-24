@@ -8,7 +8,7 @@ extends Powerup
 ## wave batters below the battering speed too (Powerups.batter_speed_share()).
 
 func on_stacks_changed() -> void:
-	fish.bow_scale = 1.0 + settings.bow_growth * stacks
+	fish.bow_scale = 1.0 + settings.bow_growth * eff()
 
 
 func on_removed() -> void:

@@ -22,7 +22,7 @@ func on_hurt(_amount: float, _from: int) -> void:
 	clouds += 1
 	var at := fish.global_position
 	var reach := settings.ink_radius * size_scale()
-	var seconds := (settings.ink_time + settings.ink_time_per_stack * (stacks - 1)) * duration_scale()
+	var seconds := (settings.ink_time + settings.ink_time_per_stack * extra()) * duration_scale()
 	for i in run.horde.query_sphere(at, reach):
 		if run.horde.is_proxy(i):
 			continue

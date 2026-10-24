@@ -18,6 +18,11 @@ extends Control
 signal picked(index: int)
 ## B (or Backspace) on a chest's cards before the first pick: put the chest back.
 signal cancelled
+## The choice tools (P4): RB (Shift) rerolls, LB (Ctrl) skips, Y banishes the
+## focused card, each while its count below is above 0.
+signal rerolled
+signal skipped
+signal banished(index: int)
 
 ## At the 1280×720 design's scale (scaled to the view as they draw).
 const CARD_SIZE := Vector2(290.0, 410.0)
@@ -62,6 +67,11 @@ var input: PlayerInput
 var pauses := false
 ## Whether B puts a chest back (set before open(): a chest's first pick only).
 var cancelable := false
+## How many rerolls, skips and banishes the player can use on these cards now
+## (0: not offered; set before open()).
+var rerolls := 0
+var skips := 0
+var banishes := 0
 var selected := 0
 
 var _age := 0.0
@@ -101,9 +111,23 @@ func open(offer: Array, title: String, subtitle: String, player_input: PlayerInp
 	selected = 0
 	_age = 0.0
 	_stick_was = 0
-	_hints.hints = [["◀ ▶", "Choose"], ["A", "Take it"]] + ([["B", "Put it back"]] if cancelable else [])
+	_hints.hints = _hint_list()
 	visible = true
 	queue_redraw()
+
+
+## The controls along the bottom: choose, take, and the choice tools there are.
+func _hint_list() -> Array:
+	var list: Array = [["◀ ▶", "Choose"], ["A", "Take it"]]
+	if rerolls > 0:
+		list.append(["RB", "Reroll (%d)" % rerolls])
+	if skips > 0:
+		list.append(["LB", "Skip (%d)" % skips])
+	if banishes > 0:
+		list.append(["Y", "Banish (%d)" % banishes])
+	if cancelable:
+		list.append(["B", "Put it back"])
+	return list
 
 
 func close() -> void:
@@ -138,6 +162,16 @@ func _process(delta: float) -> void:
 				return
 		if reader.just_pressed("ui_accept") or reader.just_pressed("jump"):
 			_pick(selected)
+			return
+		if rerolls > 0 and reader.just_pressed("boost"):
+			rerolled.emit()
+			return
+		if skips > 0 and reader.just_pressed("powerslide"):
+			close()
+			skipped.emit()
+			return
+		if banishes > 0 and reader.just_pressed("ball_cam"):
+			banished.emit(selected)
 			return
 		# B puts a chest back (Esc is the pause menu's).
 		if cancelable and ((reader.just_pressed("ui_cancel") and not Input.is_key_pressed(KEY_ESCAPE)) or Input.is_action_just_pressed("ui_text_backspace")):

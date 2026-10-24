@@ -13,11 +13,11 @@ var _cool := 0.0
 
 
 func width() -> float:
-	return (settings.tsunami_width + settings.tsunami_width_per_stack * (stacks - 1)) * size_scale()
+	return (settings.tsunami_width + settings.tsunami_width_per_stack * extra()) * size_scale()
 
 
 func damage() -> float:
-	return settings.tsunami_damage + settings.tsunami_damage_per_stack * (stacks - 1)
+	return settings.tsunami_damage + settings.tsunami_damage_per_stack * extra()
 
 
 func on_tick(delta: float) -> void:

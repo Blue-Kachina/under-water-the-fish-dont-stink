@@ -5,7 +5,8 @@ extends RefCounted
 ## tide and the Blood Leviathan (the boss), each at its time in the Stage
 ## settings (0 skips it). Each is announced event_warning seconds ahead
 ## (warned), and the director holds its packs for event_hush seconds before it
-## (hushed()). UnnaturalRun hears started and makes it happen. Times are read
+## (hushed()). Times are the stage's (UnnaturalRun.stage_time(): each stage
+## starts its own), scaled for a Short run. UnnaturalRun hears started and makes it happen. Times are read
 ## again on reset(), so the panel's changes apply from the next run.
 
 signal warned(event: String)
@@ -38,7 +39,7 @@ func reset() -> void:
 	if not settings.stage_events:
 		return
 	for id: String in EVENTS:
-		var time: float = settings.get(EVENTS[id][0])
+		var time: float = settings.get(EVENTS[id][0]) * settings.event_time_scale()  # a Short run's come sooner (P5)
 		if time > 0.0:
 			pending.append({"id": id, "time": time, "warned": false})
 	pending.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.time < b.time)

@@ -91,8 +91,12 @@ const DYING_TIME := 0.25
 ## How quickly the hit flash fades (1/s).
 const FLASH_FADE := 7.0
 ## Elites: this much bigger, this many times the hp.
-const ELITE_SIZE := 1.6
 const ELITE_HP := 5.0
+## Elite modifiers (P5, RoR2 style): Burning leaves fire, Electric shocks as it
+## dies, Frozen's touch slows, Bloated bursts into sardines. UnnaturalRun does
+## what each does; the horde rolls them (roll_affix()) and tints them.
+enum Affix { NONE, BURNING, ELECTRIC, FROZEN, BLOATED }
+const AFFIX_NAMES := ["", "Burning", "Electric", "Frozen", "Bloated"]
 ## Floats per instance in a look's buffer: a 3x4 transform, then custom data.
 const STRIDE := 16
 ## Detail bands per look (near, mid, far: settings.lod_*).
@@ -131,6 +135,8 @@ var telegraphing := PackedInt32Array()
 ## The difficulty level new zombies spawn at (UnnaturalRun sets it from the
 ## clock): more hp, damage and speed, and bigger (UnnaturalSettings' Difficulty).
 var difficulty := 0.0
+## Every new zombie's hp times this (the stage: UnnaturalSettings.stage_hp_scale per stage after the first).
+var stage_hp := 1.0
 ## The Hourglass: every zombie (not a boss's body) stops dead for this long (s).
 ## They can still be hit, but don't swim, lunge or hurt.
 var frozen_left := 0.0
@@ -181,6 +187,8 @@ var _tail := PackedFloat32Array()
 var _phase := PackedFloat32Array()
 var _target := PackedInt32Array()
 var _elite := PackedByteArray()
+## Each elite's modifier (Affix, P5; NONE for a plain one or a non-elite).
+var _affix := PackedByteArray()
 var _immortal := PackedByteArray()
 var _proxy := PackedByteArray()
 var _proxy_count := 0
@@ -274,6 +282,7 @@ func setup(horde_settings: UnnaturalSettings, horde_kinds: Array[EnemyKind], max
 	_cooldown.resize(capacity)
 	_state.resize(capacity)
 	_elite.resize(capacity)
+	_affix.resize(capacity)
 	_immortal.resize(capacity)
 	_proxy.resize(capacity)
 	_net.resize(capacity)
@@ -291,7 +300,7 @@ func setup(horde_settings: UnnaturalSettings, horde_kinds: Array[EnemyKind], max
 	_kind_behaviour.resize(kinds.size())
 	_max_radius = 0.5
 	for k in kinds.size():
-		_max_radius = maxf(_max_radius, kinds[k].radius() * ELITE_SIZE)
+		_max_radius = maxf(_max_radius, kinds[k].radius() * elite_scale())
 	clear()
 	_build_looks()
 
@@ -360,7 +369,8 @@ func clear() -> void:
 ## A new zombie of kind `kind` at `at`, heading along `heading`. Returns its
 ## slot, or -1 with the horde full.
 ## `level`: its difficulty level (-1: the horde's `difficulty` now).
-func spawn(kind: int, at: Vector3, heading := Vector3.ZERO, elite := false, undying := false, net_id := 0, level := -1.0) -> int:
+func spawn(kind: int, at: Vector3, heading := Vector3.ZERO, elite := false, undying := false, net_id := 0, level := -1.0,
+		affix := -1) -> int:
 	var i := -1
 	if not _free.is_empty():
 		i = _free[_free.size() - 1]
@@ -386,13 +396,14 @@ func spawn(kind: int, at: Vector3, heading := Vector3.ZERO, elite := false, undy
 	_slow_until[i] = 0.0
 	_mark_until[i] = 0.0
 	var grow := minf(1.0 + settings.difficulty_size * level, maxf(settings.difficulty_size_max, 1.0))
-	var hp := info.hp * settings.enemy_hp_scale * (ELITE_HP if elite else 1.0) * settings.hp_growth(level)
+	var hp := info.hp * settings.enemy_hp_scale * (ELITE_HP if elite else 1.0) * settings.hp_growth(level) * stage_hp
 	_hp[i] = maxf(hp, 1.0)
 	_max_hp[i] = _hp[i]
-	_size[i] = info.size * (ELITE_SIZE if elite else 1.0) * grow
-	_radius[i] = info.radius() * (ELITE_SIZE if elite else 1.0) * grow
+	_size[i] = info.size * (elite_scale() if elite else 1.0) * grow
+	_radius[i] = info.radius() * (elite_scale() if elite else 1.0) * grow
 	_max_radius = maxf(_max_radius, _radius[i])
 	_elite[i] = 1 if elite else 0
+	_affix[i] = (roll_affix() if affix < 0 else affix) if elite else Affix.NONE
 	_immortal[i] = 1 if undying else 0
 	_proxy[i] = 0
 	if net_id <= 0:
@@ -581,6 +592,33 @@ func is_marked(index: int) -> bool:
 
 func is_elite(index: int) -> bool:
 	return _elite[index] == 1
+
+
+## How much bigger an elite is than the rest of its kind (UnnaturalSettings.elite_size).
+func elite_scale() -> float:
+	return maxf(settings.elite_size, 1.0) if settings else 1.6
+
+
+## Its elite modifier (Affix.NONE: none).
+func affix_of(index: int) -> int:
+	return _affix[index]
+
+
+## 0: not elite; 1: a plain elite; 2 on: an elite with modifier (code - 1). The
+## shader's elite channel, and what the net sends.
+func elite_code(index: int) -> int:
+	return 0 if _elite[index] == 0 else 1 + _affix[index]
+
+
+## A modifier for a new elite: elite_modifier_chance of one of those switched on (P5).
+func roll_affix() -> int:
+	if settings == null or rng.randf() >= settings.elite_modifier_chance:
+		return Affix.NONE
+	var on: Array[int] = []
+	for affix: int in [Affix.BURNING, Affix.ELECTRIC, Affix.FROZEN, Affix.BLOATED]:
+		if settings.get(AFFIX_NAMES[affix].to_lower()):
+			on.append(affix)
+	return Affix.NONE if on.is_empty() else on[rng.randi_range(0, on.size() - 1)]
 
 
 func is_immortal(index: int) -> bool:
@@ -1080,7 +1118,7 @@ func _draw_horde(delta: float) -> void:
 				x = _axis_x[i] * drawn_size
 				y = _axis_y[i] * drawn_size
 				z = _axis_z[i] * drawn_size
-				elite = float(_elite[i])
+				elite = float(elite_code(i))
 				warn = warning if _mode[i] == Lunge.TELEGRAPH else 0.0
 			drawn_instances += 1
 			var band := 0 if gap_squared < mid_squared * reach_squared else (1 if gap_squared < far_squared * reach_squared else 2)

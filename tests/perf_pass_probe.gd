@@ -35,6 +35,7 @@ func check(ok: bool, what: String) -> void:
 
 
 func _run() -> void:
+	UnnaturalSettings.shared().limits = false  # the items' own numbers, in a line (limits_probe has P4's curves)
 	settings.spawning = false
 	settings.stage_events = false
 	settings.chest_count = 0

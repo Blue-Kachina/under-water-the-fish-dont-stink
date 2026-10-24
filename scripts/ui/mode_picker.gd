@@ -20,6 +20,9 @@ const MORE := ["Test Tank"]  # (Free Swim is retired: refining_weaponry.md §2.8
 ## (main.gd mode ids).
 const FISH_STICKS := "Fish Sticks"
 const FISH_STICKS_MODES := ["1v1", "Free Play"]
+## Unnatural asks how long a run (P5: UnnaturalSettings.run_length), then plays it.
+const UNNATURAL := "Unnatural"
+const RUN_LENGTHS := ["Short", "Standard", "Endless"]
 const PANEL_SIZE := Vector2(1120.0, 616.0)
 
 var s := 1.0
@@ -38,6 +41,11 @@ var _rules_text: Label
 var _rules_mode := ""
 var _variants: PanelContainer
 var _variant_buttons: Array[Button] = []
+var _variants_title: Label
+var _variants_line: Label
+var _variants_row: HBoxContainer
+## Which tile's variants are up (FISH_STICKS or UNNATURAL).
+var _variants_mode := ""
 ## What had focus last (in the picker), for the MORE row's way back up.
 var _last_focus: Control
 var _nav := MenuNav.new()
@@ -169,28 +177,14 @@ func _ready() -> void:
 	var variants_column := VBoxContainer.new()
 	variants_column.add_theme_constant_override("separation", roundi(12.0 * s))
 	_variants.add_child(variants_column)
-	variants_column.add_child(UITheme.label("Fish Sticks", "caps", 12.0, UITheme.AQUA, s, 700))
-	var variants_line := UITheme.label("Fish-ball in the aquarium arena. How do you want to play?", "body", 17.0, UITheme.INK_SOFT, s)
-	variants_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	variants_column.add_child(variants_line)
-	var variants_row := HBoxContainer.new()
-	variants_row.add_theme_constant_override("separation", roundi(14.0 * s))
-	variants_column.add_child(variants_row)
-	for variant: String in FISH_STICKS_MODES:
-		var button := Button.new()
-		button.text = "1v1 against a bot" if variant == "1v1" else "Free Play"
-		button.custom_minimum_size = Vector2(230.0, 64.0) * s
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.add_theme_font_override("font", UITheme.display(600))
-		button.add_theme_font_size_override("font_size", roundi(20.0 * s))
-		button.add_theme_stylebox_override("normal", UITheme.box(UITheme.GROUND, 14.0 * s, Color(UITheme.MUTED, 0.4), maxf(1.0, s)))
-		button.add_theme_stylebox_override("hover", UITheme.box(UITheme.GROUND.lightened(0.08), 14.0 * s, UITheme.AQUA, maxf(1.0, 1.5 * s)))
-		button.add_theme_stylebox_override("focus", UITheme.box(Color(UITheme.AQUA, 0.14), 14.0 * s, UITheme.AQUA, 3.0 * s))
-		button.pressed.connect(func() -> void:
-			_hide_variants(false)
-			chosen.emit(variant))
-		variants_row.add_child(button)
-		_variant_buttons.append(button)
+	_variants_title = UITheme.label("Fish Sticks", "caps", 12.0, UITheme.AQUA, s, 700)
+	variants_column.add_child(_variants_title)
+	_variants_line = UITheme.label("", "body", 17.0, UITheme.INK_SOFT, s)
+	_variants_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	variants_column.add_child(_variants_line)
+	_variants_row = HBoxContainer.new()
+	_variants_row.add_theme_constant_override("separation", roundi(14.0 * s))
+	variants_column.add_child(_variants_row)
 	var variants_hints := ControllerHints.new()
 	variants_hints.s = s
 	variants_hints.hints = [["A", "Play"], ["B", "Back"]]
@@ -290,15 +284,61 @@ func _above(tile: Tile) -> Control:
 	return _grid[2] if middle < _grid[3].position.x else _grid[3]
 
 
-## Plays `mode`; Fish Sticks first asks which of its two.
+## Plays `mode`; Fish Sticks first asks which of its two, and Unnatural how
+## long a run (P5).
 func _choose(mode: String) -> void:
-	if mode == FISH_STICKS:
+	if mode == FISH_STICKS or mode == UNNATURAL:
 		_rules.visible = false
+		_build_variants(mode)
 		_variants.visible = true
 		_rules_dim.visible = true
-		_variant_buttons[0].grab_focus.call_deferred()
+		var first := _variant_buttons[clampi(UnnaturalSettings.shared().run_length, 0, 2)] if mode == UNNATURAL else _variant_buttons[0]
+		first.grab_focus.call_deferred()
 	else:
 		chosen.emit(mode)
+
+
+## The variants pop-up's buttons for `mode`: Fish Sticks' two modes, or
+## Unnatural's run lengths (setting run_length, then playing Unnatural).
+func _build_variants(mode: String) -> void:
+	_variants_mode = mode
+	for button in _variant_buttons:
+		button.queue_free()
+	_variant_buttons.clear()
+	var options := []  # [label, what pressing it does]
+	if mode == UNNATURAL:
+		_variants_title.text = "Unnatural"
+		_variants_line.text = "Survive the blood moon. How long a night?"
+		var labels := ["Short  ·  1 stage", "Standard  ·  %d stages" % UnnaturalSettings.shared().standard_stages, "Endless"]
+		for n in RUN_LENGTHS.size():
+			options.append([labels[n], func() -> void:
+				UnnaturalSettings.shared().run_length = n
+				chosen.emit(UNNATURAL)])
+	else:
+		_variants_title.text = "Fish Sticks"
+		_variants_line.text = "Fish-ball in the aquarium arena. How do you want to play?"
+		for variant: String in FISH_STICKS_MODES:
+			options.append(["1v1 against a bot" if variant == "1v1" else "Free Play", func() -> void: chosen.emit(variant)])
+	var width := (520.0 if options.size() <= 2 else 660.0) * s
+	_variants.custom_minimum_size = Vector2(width, 0.0)
+	_variants.size = Vector2(width, 0.0)
+	_variants.position = Vector2(PANEL_SIZE.x * s * 0.5 - width * 0.5, 170.0 * s)
+	for option: Array in options:
+		var button := Button.new()
+		button.text = option[0]
+		button.custom_minimum_size = Vector2(180.0 if options.size() > 2 else 230.0, 64.0) * s
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.add_theme_font_override("font", UITheme.display(600))
+		button.add_theme_font_size_override("font_size", roundi((18.0 if options.size() > 2 else 20.0) * s))
+		button.add_theme_stylebox_override("normal", UITheme.box(UITheme.GROUND, 14.0 * s, Color(UITheme.MUTED, 0.4), maxf(1.0, s)))
+		button.add_theme_stylebox_override("hover", UITheme.box(UITheme.GROUND.lightened(0.08), 14.0 * s, UITheme.AQUA, maxf(1.0, 1.5 * s)))
+		button.add_theme_stylebox_override("focus", UITheme.box(Color(UITheme.AQUA, 0.14), 14.0 * s, UITheme.AQUA, 3.0 * s))
+		var act: Callable = option[1]
+		button.pressed.connect(func() -> void:
+			_hide_variants(false)
+			act.call())
+		_variants_row.add_child(button)
+		_variant_buttons.append(button)
 
 
 func _hide_variants(refocus := true) -> void:
@@ -306,7 +346,7 @@ func _hide_variants(refocus := true) -> void:
 	_rules_dim.visible = false
 	if refocus:
 		for tile: Tile in [_featured] + _grid + _more:
-			if tile.mode == FISH_STICKS:
+			if tile.mode == _variants_mode:
 				tile.grab_focus()
 
 
@@ -349,10 +389,11 @@ func _input(event: InputEvent) -> void:
 		# Round the wall only, never out to the menu behind it (nor under the rules).
 		var toward := _nav.side(event)
 		if toward >= 0 and _variants.visible:
+			var at := _variant_buttons.find(get_viewport().gui_get_focus_owner() as Button)
 			if toward == SIDE_LEFT:
-				_variant_buttons[0].grab_focus()
+				_variant_buttons[maxi(at - 1, 0)].grab_focus()
 			elif toward == SIDE_RIGHT:
-				_variant_buttons[1].grab_focus()
+				_variant_buttons[mini(at + 1, _variant_buttons.size() - 1)].grab_focus()
 		elif toward >= 0 and not _rules.visible:
 			MenuNav.step(get_viewport().gui_get_focus_owner(), toward, _panel)
 		get_viewport().set_input_as_handled()

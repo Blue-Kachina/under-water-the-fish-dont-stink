@@ -142,27 +142,34 @@ func _draw() -> void:
 		_spine = MeshInstance3D.new()
 		_spine.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_coils.add_child(_spine)
-		_spine_material = FxKit.glow(Color(tint().lerp(Color.WHITE, 0.2), 0.8), FxKit.across(), true)
+		_spine_material = FxKit.glow(Color(tint().lerp(Color.WHITE, 0.2), 0.6), FxKit.across(), true)
 		_spine_material.vertex_color_use_as_albedo = true
+		FxKit.fade_near(_spine_material, powers.coil_fade_near, powers.coil_fade_far)
 		_drawn = PackedVector3Array()  # a new node: draw it all
 	if trail == _drawn:
 		return
 	_drawn = trail.duplicate()
 	var multi := _coils.multimesh
-	var shown := maxi(trail.size() - 1, 0)
+	# Not within coil_clear of the fish: the trail runs back toward the camera, so
+	# coils there would sit between it and the fish.
+	var first := 1
+	while first < trail.size() and trail[first].distance_to(fish.global_position) < powers.coil_clear:
+		first += 1
+	var shown := maxi(trail.size() - first, 0)
 	if multi.instance_count < shown:
 		multi.instance_count = maxi(shown, 8)
 	multi.visible_instance_count = shown
+	var drawn_size := minf(size(), powers.coil_draw_max)  # its reach grows; its look stops at coil_draw_max
 	for k in shown:
-		var at := trail[k + 1]
-		var ahead := trail[k] - at
+		var at := trail[k + first]
+		var ahead := trail[k + first - 1] - at
 		var basis := Basis.IDENTITY
 		if ahead.length_squared() > 0.0001:
 			basis = Basis.looking_at(ahead, Vector3.UP if absf(ahead.normalized().y) < 0.98 else Vector3.BACK)
-		var coil_size := size() * lerpf(0.9, 0.5, float(k) / maxf(count(), 1))
+		var coil_size := drawn_size * lerpf(0.9, 0.5, float(k + first - 1) / maxf(count(), 1))
 		multi.set_instance_transform(k, Transform3D(basis * Basis.from_scale(Vector3.ONE * coil_size), at))
-	if trail.size() >= 3:
-		_spine.mesh = FxKit.ribbons([trail.slice(1)], [size() * 0.5], true, true)
+	if trail.size() - first >= 2:
+		_spine.mesh = FxKit.ribbons([trail.slice(first)], [drawn_size * 0.4], true, true)
 		_spine.mesh.surface_set_material(0, _spine_material)
 	else:
 		_spine.mesh = null
@@ -179,15 +186,15 @@ func _vertebra_mesh() -> ArrayMesh:
 	var fin := PrismMesh.new()
 	fin.size = Vector3(1.1, 0.7, 0.12)
 	fin.left_to_right = 0.2
-	var glow := worn_material(1.4)
-	FxKit.fade_near(glow)
+	var glow := worn_material(0.7)
+	FxKit.fade_near(glow, powers.coil_fade_near, powers.coil_fade_far)
 	var dark := StandardMaterial3D.new()
 	dark.albedo_color = tint().darkened(0.65)
 	dark.roughness = 0.4
 	dark.emission_enabled = true
 	dark.emission = tint()
-	dark.emission_energy_multiplier = 0.25
-	FxKit.fade_near(dark)
+	dark.emission_energy_multiplier = 0.2
+	FxKit.fade_near(dark, powers.coil_fade_near, powers.coil_fade_far)
 	var mesh := ArrayMesh.new()
 	FxKit.merge_into(mesh, [[body, Transform3D(Basis.from_scale(Vector3(0.8, 0.65, 1.1)), Vector3.ZERO)]], glow)
 	FxKit.merge_into(mesh, [[fin, Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3(0, 0.75, 0.15))]], dark)

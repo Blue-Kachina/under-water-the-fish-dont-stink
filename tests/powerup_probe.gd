@@ -33,6 +33,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	UnnaturalSettings.shared().limits = false  # the items' own numbers, in a line (limits_probe has P4's curves)
 	settings.spawning = false
 	settings.chest_cost = false  # chests are free here (pearl_currency_probe has prices)
 	settings.fish_attack = FishAttack.Kind.BITE  # these checks are the bite's (attack_probe has the rest)

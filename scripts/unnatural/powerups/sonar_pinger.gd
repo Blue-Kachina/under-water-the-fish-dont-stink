@@ -16,7 +16,7 @@ func every() -> float:
 
 
 func bonus() -> float:
-	return settings.sonar_bonus + settings.sonar_bonus_per_stack * (stacks - 1)
+	return settings.sonar_bonus + settings.sonar_bonus_per_stack * extra()
 
 
 func on_tick(delta: float) -> void:

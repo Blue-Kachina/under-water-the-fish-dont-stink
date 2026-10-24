@@ -9,23 +9,23 @@ extends Powerup
 func stat_bonus() -> Dictionary:
 	match id:
 		"barnacle_plating":
-			return {"armour": settings.barnacle_armour * stacks}
+			return {"armour": settings.barnacle_armour * eff()}
 		"hermit_shell":
-			return {"max_hp": settings.hermit_hp * stacks}
+			return {"max_hp": settings.hermit_hp * eff()}
 		"fizzy_soda":
-			return {"attack_speed": settings.soda_attack_speed * stacks}
+			return {"attack_speed": settings.soda_attack_speed * eff()}
 		"speedy_seahorse":
-			return {"swim_speed": settings.seahorse_speed * stacks}
+			return {"swim_speed": settings.seahorse_speed * eff()}
 		"kelp_wrap":
-			return {"regen": settings.kelp_regen * stacks}
+			return {"regen": settings.kelp_regen * eff()}
 		"sea_salt":
-			return {"crit_chance": settings.salt_crit * stacks}
+			return {"crit_chance": settings.salt_crit * eff()}
 		"coral_knuckles":
-			return {"battery_damage": settings.knuckles_battery * stacks}
+			return {"battery_damage": settings.knuckles_battery * eff()}
 		"divers_goggles":
-			return {"pickup_range": settings.goggles_range * stacks}
+			return {"pickup_range": settings.goggles_range * eff()}
 		"lucky_sand_dollar":
-			return {"luck": settings.dollar_luck * stacks}
+			return {"luck": settings.dollar_luck * eff()}
 	return {}
 
 

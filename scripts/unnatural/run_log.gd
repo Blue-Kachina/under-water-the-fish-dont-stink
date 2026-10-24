@@ -35,6 +35,8 @@ var ending := {}
 ## Pearls dropped (their worth) and chests dropped by kills, all run.
 var pearls_dropped := 0
 var chests_dropped := 0
+## When each stage after the first began ({"stage", "t" (s)}), P5.
+var stages: Array[Dictionary] = []
 ## The path it was saved to ("" until saved).
 var saved_path := ""
 
@@ -63,6 +65,7 @@ func begin() -> void:
 	pearls_dropped = 0
 	chests_dropped = 0
 	saved_path = ""
+	stages.clear()
 	_started = Time.get_datetime_string_from_system()
 	_next_sample = 60.0
 	_last = {"damage": 0.0, "taken": 0.0, "kills": 0, "pearls_dropped": 0, "chests_dropped": 0}
@@ -97,6 +100,11 @@ func hurt_by(fish: FishController, cause: String) -> void:
 	_last_hurt[fish] = cause
 
 
+## The run reached stage `stage` (P5).
+func stage_reached(stage: int) -> void:
+	stages.append({"stage": stage, "t": snappedf(run.elapsed, 0.1)})
+
+
 ## The run's over (`outcome`: "down", "won" or "quit"): a last sample for the
 ## part minute, the totals, and the file (when run_logs is on).
 func finish(outcome: String) -> void:
@@ -117,11 +125,13 @@ func finish(outcome: String) -> void:
 			"fish": FishCharacter.Family.keys()[fish.character] if fish.character < FishCharacter.Family.size() else str(fish.character),
 			"kills": stats.kills, "battered": stats.battered, "damage": snappedf(stats.damage, 0.1),
 			"by_source": _rounded(stats.by_source), "taken": snappedf(stats.taken, 0.1), "pearls": stats.pearls,
-			"chests": stats.get("chests", 0), "bosses": stats.get("bosses", 0), "down": died,
+			"chests": stats.get("chests", 0), "bosses": stats.get("bosses", 0), "down": died, "shrines": stats.get("shrines", 0),
+			"rerolls": stats.get("rerolls", 0), "skips": stats.get("skips", 0), "banished": stats.get("banished", []),
 			"build": _build(fish),
 		})
 	ending = {"t": snappedf(run.elapsed, 0.1), "outcome": outcome, "cause": cause, "level": run.levels.level,
-			"kills": run.kills, "pearls_dropped": pearls_dropped, "chests_dropped": chests_dropped, "players": players}
+			"kills": run.kills, "pearls_dropped": pearls_dropped, "chests_dropped": chests_dropped, "players": players,
+			"stage": run.stage, "stages": stages, "run_length": ["short", "standard", "endless"][clampi(settings.run_length, 0, 2)]}
 	if settings.run_logs and may_save():
 		save()
 
@@ -168,6 +178,7 @@ func _sample(span: float) -> Dictionary:
 	var hp := _average_hp()
 	var sample := {
 		"t": snappedf(run.elapsed / 60.0, 0.01),
+		"stage": run.stage,
 		"level": run.levels.level,
 		"kills": run.kills - int(_last.kills),
 		"dps": snappedf(dps, 0.1),

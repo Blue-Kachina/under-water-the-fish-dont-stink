@@ -25,7 +25,7 @@ func on_tick(delta: float) -> void:
 	var order := Array(near)
 	order.sort_custom(func(a: int, b: int) -> bool:
 		return horde.enemy_position(a).distance_squared_to(from) < horde.enemy_position(b).distance_squared_to(from))
-	for n in mini(stacks, order.size()):
+	for n in mini(roundi(eff()), order.size()):
 		dash(from, horde.enemy_position(order[n]))
 
 

@@ -19,11 +19,11 @@ var _refilled := -1.0
 func chance() -> float:
 	match id:
 		"sticky_anemone":
-			return settings.anemone_chance + settings.anemone_chance_per_stack * (stacks - 1)
+			return soft_chance(settings.anemone_chance + settings.anemone_chance_per_stack * extra())
 		"cold_seep":
-			return settings.seep_chance + settings.seep_chance_per_stack * (stacks - 1)
+			return soft_chance(settings.seep_chance + settings.seep_chance_per_stack * extra())
 		"krakens_grasp":
-			return settings.kraken_chance + settings.kraken_chance_per_stack * (stacks - 1)
+			return soft_chance(settings.kraken_chance + settings.kraken_chance_per_stack * extra())
 	return 0.0
 
 
@@ -60,7 +60,7 @@ func on_hit(index: int, _damage: float, _source: String, proc: float, chain: Arr
 ## proc past certain, Powerup.proc_power()).
 func slam(at: Vector3, chain: Array, power := 1.0) -> void:
 	var reach := settings.kraken_radius * size_scale()
-	var damage := (settings.kraken_damage + settings.kraken_damage_per_stack * (stacks - 1)) * maxf(power, 1.0)
+	var damage := (settings.kraken_damage + settings.kraken_damage_per_stack * extra()) * maxf(power, 1.0)
 	var caught := run.horde.query_sphere(at, reach)
 	for i in caught:
 		run.horde.slow(i, 1.0, settings.kraken_hold * duration_scale())

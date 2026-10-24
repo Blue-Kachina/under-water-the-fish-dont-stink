@@ -23,15 +23,15 @@ var _fx_time := 0.0
 
 
 func chance() -> float:
-	return settings.torpedo_chance + settings.torpedo_chance_per_stack * (stacks - 1)
+	return soft_chance(settings.torpedo_chance + settings.torpedo_chance_per_stack * extra())
 
 
 func count() -> int:
-	return 1 + (stacks - 1) / maxi(settings.torpedo_stacks_per_extra, 1)
+	return 1 + int(extra()) / maxi(settings.torpedo_stacks_per_extra, 1)
 
 
 func blast() -> float:
-	return (settings.torpedo_blast + settings.torpedo_blast_per_stack * (stacks - 1)) * size_scale()
+	return (settings.torpedo_blast + settings.torpedo_blast_per_stack * extra()) * size_scale()
 
 
 func on_hit(_index: int, _damage: float, _source: String, proc: float, chain: Array) -> void:

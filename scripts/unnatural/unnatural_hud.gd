@@ -167,9 +167,20 @@ func _ready() -> void:
 				_cards.attack_kind = attack.kind if attack else FishAttack.Kind.BITE
 				_cards.max_levels = Vector2i(run.settings.weapon_max_level, run.settings.tome_max_level)
 				_cards.cancelable = run.can_cancel(fish)  # a chest, before the first pick
+				_cards.rerolls = run.choices_of(fish, "rerolls") if run.can_choose(fish, "rerolls") else 0
+				_cards.skips = run.choices_of(fish, "skips") if run.can_choose(fish, "skips") else 0
+				_cards.banishes = run.choices_of(fish, "banishes") if run.can_choose(fish, "banishes") else 0
 				_cards.open(cards, heading, line, fish.input_source))
 		_cards.picked.connect(func(index: int) -> void: run.pick(fish, index))
 		_cards.cancelled.connect(func() -> void: run.cancel_offer(fish))
+		_cards.rerolled.connect(func() -> void: run.reroll(fish))
+		_cards.skipped.connect(func() -> void: run.skip(fish))
+		_cards.banished.connect(func(index: int) -> void: run.banish(fish, index))
+		run.stage_began.connect(func(stage: int) -> void:
+			var stages := run.settings.stages_in_run()
+			_splash.play("STAGE %d" % stage, "DEEPER INTO THE NIGHT", ("THE LAST STAGE" if stages > 0 and stage >= stages else "THE DEAD COME HARDER"),
+					TreasureChest.GOLD, 2.8))
+		run.shrine_used.connect(_show_shrine)
 		run.offer_cancelled.connect(func(for_fish: FishController) -> void:
 			if for_fish == fish and not run.is_picking(fish):
 				_cards.close())
@@ -194,7 +205,8 @@ func _ready() -> void:
 		run.boss_enraged.connect(func(_boss: Boss) -> void:
 			_splash.play("THE LEVIATHAN ENRAGES", "NO TIME LIMIT", "AND THE DEAD KEEP COMING", HP_COLOR, 2.4))
 		run.whirlpool_opened.connect(func(_at: Vector3) -> void:
-			_splash.play("THE LEVIATHAN FALLS", "A WHIRLPOOL OPENS", "FISH ON  ·  ENTER IT WHEN YOU'RE READY", TreasureChest.GOLD, 3.0))
+			_splash.play("THE LEVIATHAN FALLS", "A WHIRLPOOL OPENS", ("FISH ON  ·  ENTER IT WHEN YOU'RE READY" if run.is_last_stage() else "ENTER IT FOR STAGE %d" % (run.stage + 1)),
+					TreasureChest.GOLD, 3.0))
 		run.stage_completed.connect(func() -> void:
 			_over_age = 0.0
 			_splash.play("STAGE COMPLETE", "THE NIGHT IS OVER", "%s  ·  %d KILLS" % [_time_text(run.elapsed), run.kills], TreasureChest.GOLD, OVER_SPLASH))
@@ -225,6 +237,42 @@ func _note(text: String, color: Color) -> void:
 	_cam_note.modulate.a = 1.6
 
 
+## What Jump does over `shrine` (held while you're over it).
+func _shrine_prompt(shrine: Shrine) -> String:
+	var name_text := Shrine.title(shrine.kind).to_upper()
+	match shrine.kind:
+		Shrine.Kind.TIDE:
+			return "JUMP  ·  %s  ·  HOLD ITS RING %d S FOR A CHEST" % [name_text, roundi(run.settings.shrine_tide_time)]
+		Shrine.Kind.CHANCE:
+			return "JUMP  ·  %s  ·  %d PEARLS FOR A %d%% CHANCE AT AN ITEM  ·  %d LEFT" % [name_text, run.shrine_price(shrine, fish),
+					roundi(run.settings.shrine_chance_odds * 100.0), run.settings.shrine_chance_uses - int(shrine.tries.get(fish, 0))]
+		Shrine.Kind.DEEP:
+			return "JUMP  ·  %s  ·  MORE ELITES, MORE BOSS CHESTS" % name_text
+	return "JUMP  ·  %s  ·  EVERY PEARL TO THE TEAM" % name_text
+
+
+## What came of a shrine (`result`: UnnaturalRun.shrine_used's).
+func _show_shrine(shrine: Shrine, by: FishController, result: String) -> void:
+	if by != fish and result in ["won", "lost", "short", "tide_won"]:
+		return  # theirs alone
+	var color := shrine.tint()
+	match result:
+		"won":
+			_note("THE SHRINE ANSWERS  ·  AN ITEM", color)
+		"lost":
+			_note("THE SHRINE IS SILENT", Color(0.7, 0.7, 0.75))
+		"short":
+			_note("NOT ENOUGH PEARLS  ·  %d NEEDED" % run.shrine_price(shrine, fish), TreasureChest.BLOOD)
+		"tide":
+			_splash.play("SHRINE OF THE TIDE", "HOLD THE RING", "STAY INSIDE FOR %d S" % roundi(run.settings.shrine_tide_time), color, 2.2)
+		"tide_won":
+			_note("THE TIDE IS HELD  ·  A CHEST RISES", color)
+		"deep":
+			_splash.play("SHRINE OF THE DEEP", "THE DEEP STIRS", "MORE ELITES  ·  BOSSES DROP MORE CHESTS", color, 2.4)
+		"pearls":
+			_note("SHRINE OF PEARLS  ·  EVERY PEARL TO THE TEAM", color)
+
+
 ## A drop taken: what it did (a heart heals the whole team).
 func _show_drop(kind: int, by: FishController) -> void:
 	var color: Color = Pickup.COLORS[kind]
@@ -247,19 +295,26 @@ func _process(delta: float) -> void:
 	_shock.color.a = move_toward(_shock.color.a, 0.0, delta * 1.2)
 	_cam_note.modulate.a = move_toward(_cam_note.modulate.a, 0.0, delta * 0.8)
 	if is_instance_valid(fish) and run.near_whirlpool(fish):
-		_note("JUMP  ·  ENTER THE WHIRLPOOL AND FINISH THE RUN", TreasureChest.GOLD)  # held while you're near
+		_note("JUMP  ·  ENTER THE WHIRLPOOL AND FINISH THE RUN" if run.is_last_stage() else "JUMP  ·  ENTER THE WHIRLPOOL  ·  ON TO STAGE %d" % (run.stage + 1),
+				TreasureChest.GOLD)  # held while you're near
 	elif is_instance_valid(fish) and run.unlocked_chest_near(fish):
 		_note("JUMP  ·  OPEN THE CHEST", TreasureChest.GOLD)  # held while it waits
-	_clock.text = _time_text(run.elapsed)
+	elif is_instance_valid(fish) and run.shrine_near(fish):
+		var shrine := run.shrine_near(fish)
+		_note(_shrine_prompt(shrine), shrine.tint())
+	_clock.text = _time_text(run.elapsed) if run.stage <= 1 else "STAGE %d  ·  %s" % [run.stage, _time_text(run.stage_time())]
 	_kills.text = "%d KILLS" % run.kills
 	_clock.visible = not _cards.is_open()  # the cards' heading is there
 	_kills.visible = _clock.visible
 	_update_skill()
 	var next := run.timeline.next_event() if run.timeline and not run.tank else {}
-	if run.swarm_left() > 0.0 and not run.is_over:
+	var tide := run.running_tide()
+	if tide and not run.is_over:
+		_kills.text += "    ·    HOLD THE TIDE  ·  %d%%" % roundi(run.tide_progress(tide) * 100.0)
+	elif run.swarm_left() > 0.0 and not run.is_over:
 		_kills.text += "    ·    %s  ·  SURVIVE %s" % [StageTimeline.headline(run.swarm.id).trim_prefix("THE "), _time_text(run.swarm_left())]
 	elif not next.is_empty() and not run.is_over:
-		_kills.text += "    ·    %s IN %s" % [StageTimeline.headline(next.id).trim_prefix("THE "), _time_text(maxf(next.time - run.elapsed, 0.0))]
+		_kills.text += "    ·    %s IN %s" % [StageTimeline.headline(next.id).trim_prefix("THE "), _time_text(maxf(next.time - run.stage_time(), 0.0))]
 	_director.visible = run.settings.show_director and _clock.visible
 	if _director.visible:
 		var director := run.director
@@ -312,6 +367,8 @@ func _update_board() -> void:
 	_stats.queue_redraw()
 	_board.title = ("STAGE COMPLETE" if run.stage_complete else "RUN OVER") if run.is_over else "RUN STATS"
 	var footer := "TIME  %s    ·    LEVEL  %d" % [_time_text(run.elapsed), run.levels.level]
+	if run.stage > 1 or run.settings.stages_in_run() != 1:
+		footer += "    ·    STAGE  %d%s" % [run.stage, "" if run.settings.stages_in_run() <= 0 else " / %d" % run.settings.stages_in_run()]
 	if run.is_over:
 		footer += "    ·    R: TRY AGAIN"
 	_board.footer = footer

@@ -11,7 +11,7 @@ var _resting := 0.0
 
 
 func cooldown() -> float:
-	return settings.guardian_cooldown * pow(1.0 - settings.guardian_cooldown_per_stack, stacks - 1)
+	return settings.guardian_cooldown * pow(1.0 - settings.guardian_cooldown_per_stack, extra())
 
 
 func is_ready() -> bool:

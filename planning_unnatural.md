@@ -31,7 +31,8 @@ is a **Fish Fry**. Teams are team colours / team 0, 1. "Demo" is only for Rocket
 **Phases 0 to 8 are built (2026-10-17), and so is the second play-test's round of changes (Round 2
 below). Phase 9 isn't started.** Pick **Unnatural** or **Test Tank** in the mode list.
 **The Playability pass's P3 (feel and readability) is built (2026-10-23): see "P3 as built".**
-Next is P4.
+**P4 (choice tools and limiters) and P5 (pacing) are built (2026-10-23): see "P4 and P5 as built".**
+Next is the user's play-test of P4 and P5, then P6 (meta-progression).
 
 ### Handoff (2026-10-18, balance pass 1): start here
 **State:** the defaults are rebalanced from 10 rounds of sims and the user's own logs (see
@@ -752,7 +753,7 @@ the XP bar.
 - **Depth assist** (`depth_assist`, from 0 = off to strong): the horde drifts toward the player's
   depth, and auto-aim favours zombies near it.
 
-### P4. Choice tools and limiters (§1.6)
+### P4. Choice tools and limiters (§1.6) (built 2026-10-23: "P4 and P5 as built")
 - **Item stacking curves:** the first stack is strong, and later ones add less (per item, e.g.
   100%, 60%, 40%...). Chances (crit, procs, blocks) go hyperbolic. Cooldowns get a floor
   (`min_cooldown`), and area gets a soft cap.
@@ -765,7 +766,7 @@ the XP bar.
   come from meta (P6); until then the panel can give them. A banished weapon, tome or item leaves
   the pool for the rest of the run.
 
-### P5. Pacing (§3)
+### P5. Pacing (§3) (built 2026-10-23: "P4 and P5 as built")
 - **Sunken shrines:** a few per stage. They're fixed spots on the seabed, not pickups.
   - *Tide:* hold its ring for 10 s while the horde comes, and win a chest.
   - *Chance:* pay pearls for a chance at an item.
@@ -1099,6 +1100,84 @@ slam's effects and slows inside the hit). Next: pool the effects (idea 6) and fi
 - Should the camera pull be stronger, or follow Size more?
 - The thud is still the existing `unnatural/hurt` sound. The new things have no sounds of their
   own yet (a crit, a lane, a threat).
+
+### P4 and P5 as built (2026-10-23)
+Both phases were built in one go, at the user's request. Every number is a panel setting:
+UNNATURAL gets two new tabs, **Limits** (the Limits and Choices groups) and **Pacing**
+(Shrines, Elite Modifiers), and the Stage & Bosses tab gets a **Run** group. INVENTORY.md has
+the player-facing tables.
+
+**P4: limiters and choice tools.** `limits` (on) switches all the limiters at once, for A/B.
+
+| P4 item | What it does | Where |
+|---|---|---|
+| Item stacking curves | The k-th stack (from 0) adds 1 / (1 + falloff × k) of the first. `stack_falloff` 0.5 for procs and effects (100%, 67%, 50%, 40%...), `stack_falloff_stats` 0.25 for the plain stat items, `stack_falloff_legendary` 1.0. Cursed items stay in a line (their downside does too); weapons level, they don't stack | `limits.gd` `stack_value()`; `Powerup.eff()` / `extra()` / `falloff_for()`; every item now reads `extra()` where it read `stacks - 1`, and `eff()` where it read `stacks` |
+| Hyperbolic chances | raw / (1 + raw^p)^(1/p), p `chance_softness` 2: 5% stays 5%, 50% is 45%, 100% is 71%. Crit Chance (as play reads it) and every item proc chance (lightning, torpedo, anemone, seep, kraken, charm). An area hit's proc still multiplies past 1 after this (proc_power) | `Limits.chance()`, `StatBlock.value()` (now `raw()` for the plain sum), `Powerup.soft_chance()` |
+| Cooldown floor | No auto-attack fires more than once every `min_cooldown` 0.12 s, whatever its attack speed | `FishAttack.update()` |
+| Area soft cap | Size past `size_soft_cap` (+100%) grows at `size_soft_rate` 0.5 | `Limits.stat()` |
+| Effect caps, visible | Each item card ends with its cap ("At most 48 torpedoes in the water"). New caps: `lure_max` 3, `riptide_max` 6 (a new current replaces the oldest) | `Powerup.cap_line()`, appended by `blurb_lines()` |
+| Weapon proc coefficients | `fire_proc` 0.1 → **0**, `jelly_proc` 0.2 → 0.1, `coil_proc` 0.3 → 0.15 | POWERUPS > General, Weapons |
+| Rarer chests later | Drop chance ÷ (1 + `chest_drop_fade` 0.06 × stage minutes); new buried chests every `chest_interval` × (1 + `chest_bury_fade` 0.1 × stage minutes) | `_rolls_chest()`, `_open_chests()` |
+| Weapon card fade | The upgrade-a-weapon weight ÷ (1 + `weapon_card_fade` 0.04 × (average weapon level − 1)) | `CardDeck.weapon_fade()` |
+| Rerolls, skips, banishes | Per player, `start_rerolls` / `start_skips` / `start_banishes` (all 0, D25). On the cards: **RB / Shift** rerolls (a level's dealt again; a treasure or cursed chest rolled again at a new rarity), **LB / Ctrl** skips a level, **Y** banishes the focused card's weapon, tome or item for the rest of the run (a fresh card takes its place). Boss chests, swaps and the Sunken Idol's extra picks allow none; a Moon Pearl extra pick allows no skip. A chest's rerolled or banished cards are remembered, so putting it back doesn't reroll it for free | `UnnaturalRun.reroll()` / `skip()` / `banish()` / `can_choose()`; `CardDeck.deal(..., shown)`; `Powerup.pick_for_chest(..., left_out)`; `LevelUpCards` hints and signals |
+
+**P5: pacing.**
+
+| P5 item | What it does | Where |
+|---|---|---|
+| Sunken shrines | `shrine_count` 4 a stage (one of each kind), on the seabed at least `shrine_spacing` 60 m apart: standing stones round a glowing altar and a column of light through the murk; a diamond on the minimap. Over one (within `shrine_reach` 9 m, any height) the HUD says what Jump does. **Tide:** hold its ring (`shrine_tide_radius` 8 m) for `shrine_tide_time` 10 s, draining back at half speed while you're out, as `shrine_tide_count` 40 zombies ring it every `shrine_tide_wave` 3.5 s: a free chest (`FREE_CHEST`). **Chance:** `shrine_chance_price` 6 pearls (growing with the stage's minutes as chests do, ×`shrine_chance_step` 1.5 a try) for a `shrine_chance_odds` 50% chance at an item (a treasure chest's pick); `shrine_chance_uses` 3 tries each. **Deep:** elites ×(1 + `shrine_deep_elites` 1) for the rest of the stage, and every boss beaten drops `shrine_deep_chests` 1 more boss chest. **Pearls:** every pearl out flies to the nearest player, and `shrine_pearls_bonus` 10 more spill out | `shrine.gd`; `UnnaturalRun` shrine section; HUD prompt and notes; `minimap.gd` |
+| Elite modifiers | An elite has `elite_modifier_chance` 60% of one, each switchable: **Burning** (orange, flickering) leaves a fire patch every 0.6 s (1.6 m, 3 s, 6 a touch, at most 40 out); **Electric** (blue, crackling) dies with a 0.6 s armed shell, then shocks 5 m for 14; **Frozen** (ice) — its touch takes 45% of your speed for 2 s; **Bloated** (green) bursts into 6 sardines. A modified elite drops chests ×`modifier_chest_scale` 1.5 more often | `Horde.Affix`, `roll_affix()`, `elite_code()` (the shader's elite channel, and what the net sends); `zombie_overlay.gdshader`; `BurstCloud` now has damage, colour, cause and an arming `delay` |
+| Stages and the next stage | A beaten Leviathan's whirlpool leads to the next stage unless it's the run's last. The next stage: a new seabed (seed by stage), a new timeline (times count from `stage_started`: `stage_time()`), new chests and shrines, the blood moon a little stronger, everyone healed and back at the start; loadouts, items, the level and purses carry on. Zombies ×`stage_hp_scale` 1.8 hp and ×`stage_damage_scale` 1.3 contact damage per stage (compounding), +`stage_difficulty` 3 levels, +`stage_alive` 40% out, +`stage_elite_chance` 2% elites; bosses ×1.8 hp. The HUD shows "STAGE n · time", a splash each stage, and the whirlpool's prompt says where it leads | `UnnaturalRun.next_stage()`, `is_last_stage()`, `stage_time()`, `difficulty()`; `Horde.stage_hp`; director `stage_scale` / `elite_bonus` |
+| Quiet moments | When a swarm event ends, and when the mini-boss falls, the director sends nothing for `quiet_moment` 8 s | `EvilDirector.quiet()` |
+| Run lengths | `run_length`: Short (1 stage, events at `short_time_scale` 0.6: the boss at 6:00), **Standard** (`standard_stages` 3), Endless. Choosing Unnatural in the mode picker now asks which (the Fish Sticks pop-up, generalised) | `UnnaturalSettings.stages_in_run()` / `event_time_scale()`; `StageTimeline.reset()`; `mode_picker.gd` |
+
+**Online:** the host places shrines and sends them (`_shrine`); a guest's player using a Tide,
+Deep or Pearls asks the host (`_claim_shrine`), who sets it off everywhere (`_shrine_on`). A
+Chance is the player's own machine's (their purse, their item). The world snapshot carries the
+stage, its start, the Deep count and the shrines. The whirlpool already went through the host
+(`_stage_done`); a guest's copy now goes on to the next stage the same way. Elite modifiers ride
+in the spawn message's elite field (0, 1, or modifier + 1). Burning patches and Electric shocks
+are made on every machine and hurt only its own players; Bloated's sardines are the host's.
+
+**Run log:** each sample has the stage; the ending has the stage, when each stage began, the run
+length, and per player their shrines, rerolls, skips and banished ids.
+
+**Probes:** new `limits_probe` (curves, chances, caps, the floor, chest fade, weapon card fade,
+choices) and `pacing_probe` (every shrine, every modifier, the quiet moment, two stages and the
+win, Short and Endless). The item probes (powerup, powerup_batch, items_batch, arsenal_batch,
+perf_pass) now run with `limits` off, as they test each item's own numbers. `stage_probe` sets a
+one-stage run.
+
+**Sims (run_sim, greedy, all fish, 6 runs to 7:00 per row, seeds 11 and 12):**
+
+| Setup | Reached 7:00 | Level / dps at 5:00 |
+|---|---|---|
+| Limits off, no elite modifiers (the pre-P4/P5 baseline) | 4 of 6 | 13–17 / 744–1,389 |
+| First draft (falloff 0.67, stats 0.35, chest fade 0.15, card fade 0.08) | 1 of 6 | 12–15 / 965–1,021 |
+| Limits off, with modifiers | 3 of 6 | 17–19 / 2,358–3,902 |
+| **Defaults now** (falloff 0.5, stats 0.25, chest fade 0.06, card fade 0.04) | **4 of 6** | 14–18 / 866–2,007 |
+
+The first draft starved the early game (fewer chests by minute 5, fewer weapon upgrades), so it
+was softened to the defaults above, which match the baseline early. Most early deaths in every
+setup are the Drowned Shark at 5:00 and elite swordfish. A 14-minute sim on the first draft had
+one bot reach stage 2 at Lv 31 after wiping the horde at minute 10, so late builds still
+outgrow the curve; that's the next balance question.
+
+**Bugs found by the sims and fixed:** Whirlpool Charm and Riptide assigned `filter()`'s untyped
+result to a typed array, an error on every use (34,000+ in one sim; it predates P4).
+`goal_recorder.gd` (Fish Sticks) had the same bug. The SurvivorBot read the whirlpool right
+after entering it, which the next stage now frees.
+
+**After the first look (2026-10-24):** elites are bigger: `elite_size` 2.2 (was a fixed 1.6), a setting under Enemies. Leviathan's Coil hid the player's fish: its trail runs from just behind the fish back toward the camera. A minor fix only, since the coil may change with a boss redesign: no coils drawn within `coil_clear` 3.5 m of the fish, they fade from `coil_fade_far` 13 m to `coil_fade_near` 6 m from the camera, none drawn bigger than `coil_draw_max` 0.9 m, and a dimmer glow. Four boss redesigns are on a design canvas for the user to pick from (https://claude.ai/artifact/RrKHErvEDG9Ya1WRPrLw2b): the King of Herrings (oarfish), the Gulper Mother, the Whale Fall (hagfish), the Lamprey Queen; each with its own replacement for the Coil.
+
+**Open for the user's play-test:**
+- The stacking falloffs (0.5 / 0.25 / 1.0) and `chance_softness` 2: too harsh, too soft?
+- Rerolls, skips and banishes start at 0 until meta (P6): give yourself some in the panel
+  (UNNATURAL > Limits > Choices) to try them. Y on the cards also swaps the camera in co-op.
+- Shrine numbers, and whether the Tide's waves are enough of a fight.
+- Elite modifier colours and numbers; whether 60% is too many.
+- Stage 2's jump (×1.8 hp, +3 difficulty, ×1.3 damage) and whether Standard should be 3 stages.
+- Short's 0.6 time scale.
 
 ## Existing pieces to reuse
 | Piece | Where | Use in Unnatural |

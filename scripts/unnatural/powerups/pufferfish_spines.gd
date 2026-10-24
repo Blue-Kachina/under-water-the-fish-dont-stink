@@ -10,11 +10,11 @@ var bursts := 0
 
 
 func reflect() -> float:
-	return settings.spine_reflect + settings.spine_reflect_per_stack * (stacks - 1)
+	return settings.spine_reflect + settings.spine_reflect_per_stack * extra()
 
 
 func burst() -> float:
-	return settings.spine_burst_damage + settings.spine_burst_damage_per_stack * (stacks - 1)
+	return settings.spine_burst_damage + settings.spine_burst_damage_per_stack * extra()
 
 
 func on_hurt(amount: float, from: int) -> void:

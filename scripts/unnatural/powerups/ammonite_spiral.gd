@@ -17,7 +17,7 @@ var _refilled := -1.0
 
 
 func splits() -> int:
-	return settings.ammonite_splits + stacks - 1
+	return settings.ammonite_splits + roundi(extra())
 
 
 func on_hit(index: int, damage: float, source: String, _proc: float, chain: Array) -> void:

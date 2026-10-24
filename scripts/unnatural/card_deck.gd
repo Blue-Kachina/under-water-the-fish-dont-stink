@@ -16,9 +16,11 @@ class_name CardDeck
 
 
 ## `count` cards for `fish` at the team's level now.
-static func deal(run: UnnaturalRun, fish: FishController, count: int) -> Array:
+static func deal(run: UnnaturalRun, fish: FishController, count: int, shown: Array = []) -> Array:
 	var settings := run.settings
 	var loadout := run.loadout_of(fish)
+	# Banished (P4) for the rest of the run, or already showing (a banish's replacement): not offered.
+	var left_out: Array = run.banished_of(fish) + shown
 	var attack := run.attack_of(fish)
 	if attack:
 		loadout.attack_kind = attack.kind
@@ -30,16 +32,18 @@ static func deal(run: UnnaturalRun, fish: FishController, count: int) -> Array:
 		"new_weapon": [] as Array[String],
 		"new_tome": [] as Array[String],
 	}
+	for kind: String in ["weapon", "tome"]:
+		pools[kind] = (pools[kind] as Array[String]).filter(func(id: String) -> bool: return id not in left_out)
 	if loadout.weapons.size() < settings.weapon_slots:
 		for id in Weapons.card_pool(attack.kind if attack else loadout.attack_kind):
-			if not loadout.has_weapon(id):
+			if not loadout.has_weapon(id) and id not in left_out:
 				pools.new_weapon.append(id)
 	if loadout.tomes.size() < settings.tome_slots:
 		for id in Tomes.ids():
-			if not loadout.has_tome(id) and tome_useful(run, fish, id):
+			if not loadout.has_tome(id) and id not in left_out and tome_useful(run, fish, id):
 				pools.new_tome.append(id)
 	var weights := {
-		"weapon": settings.card_weight_weapon,
+		"weapon": settings.card_weight_weapon / weapon_fade(run, fish),
 		"tome": settings.card_weight_tome,
 		"new_weapon": settings.card_weight_new_weapon,
 		"new_tome": settings.card_weight_new_tome,
@@ -127,3 +131,15 @@ static func slot_line(run: UnnaturalRun, fish: FishController) -> String:
 	var loadout := run.loadout_of(fish)
 	return "WEAPONS %d/%d  ·  TOMES %d/%d" % [loadout.weapons.size(), run.settings.weapon_slots, loadout.tomes.size(),
 			run.settings.tome_slots]
+
+
+## How much rarer weapon upgrade cards are for `fish` now (P4): 1 + weapon_card_fade x
+## (their weapons' average level - 1), so tomes and new weapons get a turn.
+static func weapon_fade(run: UnnaturalRun, fish: FishController) -> float:
+	var loadout := run.loadout_of(fish)
+	if not run.settings.limits or loadout.weapons.is_empty():
+		return 1.0
+	var total := 0
+	for id in loadout.weapons:
+		total += loadout.earned_level(id)
+	return 1.0 + run.settings.weapon_card_fade * maxf(float(total) / loadout.weapons.size() - 1.0, 0.0)

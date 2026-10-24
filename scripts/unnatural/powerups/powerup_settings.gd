@@ -23,10 +23,11 @@ static func shared() -> PowerupSettings:
 ## Every hit carries a proc coefficient (an attack or battery 1, a lightning
 ## jump chain_proc, a torpedo torpedo_proc, a burn fire_proc): proc chances
 ## are multiplied by it, and a hit a powerup started can't start that powerup
-## again, so chains stay fun without running away.
+## again, so chains stay fun without running away. Weapons that hit very often have
+## low ones (P4): Greek Fire's burn 0, the Halo 0.1, the Coil 0.15.
 @export_range(0.0, 1.0, 0.05) var chain_proc := 0.3
 @export_range(0.0, 1.0, 0.05) var torpedo_proc := 0.5
-@export_range(0.0, 1.0, 0.05) var fire_proc := 0.1
+@export_range(0.0, 1.0, 0.05) var fire_proc := 0.0
 
 @export_group("Fish attack (weapon)")
 ## The fish's own attack is a weapon too: each upgrade card raises some of its
@@ -184,7 +185,7 @@ static func shared() -> PowerupSettings:
 @export_range(0.1, 10.0, 0.05, "or_greater") var jelly_radius := 1.2
 @export_range(0.0, 1000.0, 1.0, "or_greater") var jelly_damage := 35.0
 @export_range(0.05, 5.0, 0.05, "or_greater") var jelly_tick := 0.25
-@export_range(0.0, 1.0, 0.05) var jelly_proc := 0.2
+@export_range(0.0, 1.0, 0.05) var jelly_proc := 0.1
 @export_range(0.0, 2.0, 0.01, "or_greater") var jelly_damage_step := 0.25
 @export_range(0.0, 2.0, 0.01, "or_greater") var halo_radius_step := 0.12
 @export_range(0.0, 2.0, 0.01, "or_greater") var halo_spin_step := 0.15
@@ -241,6 +242,8 @@ static func shared() -> PowerupSettings:
 @export_range(0.0, 5000.0, 5.0, "or_greater") var lure_damage_per_stack := 50.0
 @export_range(0.5, 40.0, 0.25, "or_greater") var lure_blast := 6.0
 @export_range(0.0, 1.0, 0.05) var lure_proc := 0.5
+## At most this many lures out at once (the next waits).
+@export_range(1, 50, 1, "or_greater") var lure_max := 3
 
 @export_group("Tsunami Heart")
 ## A glowing heart: a battery sends a wave along your heading, tsunami_width
@@ -274,10 +277,17 @@ static func shared() -> PowerupSettings:
 @export_range(0.1, 10.0, 0.05, "or_greater") var coil_radius := 0.9
 @export_range(0.0, 1000.0, 1.0, "or_greater") var coil_damage := 55.0
 @export_range(0.05, 5.0, 0.05, "or_greater") var coil_tick := 0.25
-@export_range(0.0, 1.0, 0.05) var coil_proc := 0.3
+@export_range(0.0, 1.0, 0.05) var coil_proc := 0.15
 @export_range(0.0, 2.0, 0.01, "or_greater") var coil_damage_step := 0.25
 @export_range(0.0, 2.0, 0.01, "or_greater") var coil_radius_step := 0.15
 @export_range(0.0, 2.0, 0.01, "or_greater") var coil_rate_step := 0.15
+## So it never hides your fish: no coils are drawn within coil_clear m of it (they
+## still hurt there), each fades out from coil_fade_far m to coil_fade_near m from
+## the camera, and none is drawn bigger than coil_draw_max m (its reach still grows).
+@export_range(0.0, 20.0, 0.25, "or_greater") var coil_clear := 3.5
+@export_range(0.0, 30.0, 0.5, "or_greater") var coil_fade_near := 6.0
+@export_range(0.0, 60.0, 0.5, "or_greater") var coil_fade_far := 13.0
+@export_range(0.1, 10.0, 0.05, "or_greater") var coil_draw_max := 0.9
 
 @export_group("Cursed")
 ## Blood Moon Shard: +shard_damage damage, +shard_taken damage taken, a stack.
@@ -464,6 +474,8 @@ static func shared() -> PowerupSettings:
 @export_range(0.0, 100.0, 0.5, "or_greater") var riptide_drag := 8.0
 @export_range(0.0, 2000.0, 1.0, "or_greater") var riptide_dps := 25.0
 @export_range(0.0, 2000.0, 1.0, "or_greater") var riptide_dps_per_stack := 12.0
+## At most this many currents out at once (a new one replaces the oldest).
+@export_range(1, 50, 1, "or_greater") var riptide_max := 6
 
 @export_group("Reef Guardian")
 ## A coral crown (rare): dropping under guardian_threshold of your max hp makes

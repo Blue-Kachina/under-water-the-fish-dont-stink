@@ -20,7 +20,7 @@ func on_kill(_at: Vector3, _source: String) -> void:
 	if health == null or health.down:
 		return
 	_gap_left = settings.lamprey_gap
-	var amount := settings.lamprey_heal * stacks
+	var amount := settings.lamprey_heal * eff()
 	healed += amount
 	health.heal(amount)
 

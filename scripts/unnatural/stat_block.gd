@@ -63,7 +63,13 @@ func reset() -> void:
 		values[id] = 0.0
 
 
+## A stat as play uses it: its total, with P4's limits on it (Limits.stat():
+## Crit Chance bent short of 100%, Size soft-capped). raw() is the plain total.
 func value(id: String) -> float:
+	return Limits.stat(id, raw(id), UnnaturalSettings.shared())
+
+
+func raw(id: String) -> float:
 	return values.get(id, 0.0) + bonus.get(id, 0.0)
 
 

@@ -107,12 +107,14 @@ func _choose_goal() -> Vector3:
 
 
 ## Once the final boss is down and it's lingered a while (LINGER s), swim to the
-## whirlpool and enter it, so a simulated run ends.
+## whirlpool and enter it: the next stage, or on the last one the run's end.
 func _whirlpool_goal(me: Vector3) -> Vector3:
 	if not is_instance_valid(run.whirlpool) or run.elapsed - run.cleared_at < LINGER:
 		return Vector3.INF
 	if run.near_whirlpool(fish):
 		run.enter_whirlpool(fish)
+		if not is_instance_valid(run.whirlpool):
+			return Vector3.INF  # on to the next stage (P5)
 	return Vector3(run.whirlpool.global_position.x, me.y, run.whirlpool.global_position.z)
 
 

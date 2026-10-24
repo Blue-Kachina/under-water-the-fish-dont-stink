@@ -8,7 +8,7 @@ extends Powerup
 func damage_factor() -> float:
 	if not is_instance_valid(fish) or stacks <= 0:
 		return 1.0
-	return 1.0 + settings.momentum_damage * stacks * fish.speed / maxf(settings.momentum_speed, 0.1)
+	return 1.0 + settings.momentum_damage * eff() * fish.speed / maxf(settings.momentum_speed, 0.1)
 
 
 ## Two bright streamers trailing from the back fins.

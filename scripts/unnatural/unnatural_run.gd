@@ -133,6 +133,18 @@ signal powerup_lost(fish: FishController, id: String)
 signal zombie_hit(index: int, amount: float, by: FishController, source: String, chain: Array)
 ## A local player took a pearl (the currency).
 signal pearl_collected(by: FishController)
+## The next stage began (P5: the whirlpool, in a run with more stages).
+signal stage_began(stage: int)
+## Shrines (P5): one placed (the host's, for the guests); a guest's player used
+## one only the host can set off (Tide, Deep, Pearls); one set off (on every
+## machine); and what came of a local player's use ("won", "lost", "short",
+## "tide", "deep", "pearls", "tide_won").
+signal shrine_placed(shrine: Shrine)
+signal shrine_claimed(index: int, by: FishController)
+signal shrine_activated(shrine: Shrine, by: FishController)
+signal shrine_used(shrine: Shrine, by: FishController, result: String)
+## A player's rerolls, skips or banishes changed (P4).
+signal choices_changed(fish: FishController)
 
 ## Players spawn side by side, this far apart (m).
 const SPAWN_SPACING := 3.0
@@ -281,6 +293,29 @@ var _crowd_left := 0.0
 var _last_drop := -INF
 var _last_drop_of := {}
 
+## Stages (P5): which one this is (from 1), and the run time it began at
+## (stage_time() counts from there: the timeline, the director, difficulty).
+var stage := 1
+var stage_started := 0.0
+## Shrines of the Deep set off this stage, and the stage's shrines.
+var deep := 0
+var shrines: Array[Shrine] = []
+## A beaten shrine's pearls' ids: this minus stage x 1000, shrine x 50, the pearl's number.
+const SHRINE_PEARL := 1900000000
+## A chest's `item` that makes it free (a Tide won).
+const FREE_CHEST := "free"
+## The seabed's seed is this plus the stage.
+const SEABED_SEED := 11
+## Per player (P4): rerolls, skips and banishes left ({"rerolls", "skips",
+## "banishes"}), and what they've banished (weapon, tome and item ids).
+var _choices := {}
+var _banished := {}
+## Local players chilled by a Frozen elite's touch: seconds left.
+var _chill := {}
+## Seconds to the next round of Burning elites' fire patches.
+var _burn_left := 0.0
+var _seabed_seed := SEABED_SEED
+
 
 func setup(run_ocean: Ocean, player_fish: FishController) -> void:
 	ocean = run_ocean
@@ -316,8 +351,8 @@ func _ready() -> void:
 	seabed.name = "Seabed"
 	seabed.position = centre + Vector3.UP * settings.arena_floor
 	add_child(seabed)
-	seabed.setup(settings.arena_radius, settings.seabed_rocks, settings.seabed_kelp, 11, settings.edge_rocks, settings.edge_kelp,
-			settings.arena_ceiling - settings.arena_floor + 5.0)
+	_seabed_seed = -1
+	_build_seabed()
 	blood_moon = BloodMoon.new()
 	blood_moon.name = "BloodMoon"
 	blood_moon.ocean = ocean
@@ -370,7 +405,15 @@ func start() -> void:
 	_opening.clear()
 	_backed_out.clear()
 	_revive.clear()
+	_chill.clear()
+	stage = 1
+	stage_started = 0.0
+	deep = 0
+	horde.stage_hp = 1.0
+	_burn_left = 0.0
+	_build_seabed()
 	_bury_chests()
+	_place_shrines()
 	_clear_bosses()
 	if is_instance_valid(whirlpool):
 		whirlpool.queue_free()
@@ -662,6 +705,9 @@ func _leave(fish: FishController) -> void:
 	_level_extra.erase(fish)
 	_blocks.erase(fish)
 	_loadouts.erase(fish)
+	_choices.erase(fish)
+	_banished.erase(fish)
+	_chill.erase(fish)
 	_purses.erase(fish)
 	_attack_levels.erase(fish)
 	_remote_pearl_chance.erase(fish)
@@ -683,6 +729,9 @@ func _leave(fish: FishController) -> void:
 func _reset_player(fish: FishController) -> void:
 	block_of(fish).reset()
 	loadout_of(fish).reset()
+	_choices[fish] = {"rerolls": settings.start_rerolls, "skips": settings.start_skips, "banishes": settings.start_banishes}
+	_banished[fish] = []
+	_chill.erase(fish)
 	_purses.erase(fish)
 	_attack_levels.erase(fish)
 	powerups_of(fish).clear()
@@ -712,7 +761,8 @@ func _reset_player(fish: FishController) -> void:
 ## `fish`'s swim speed: its Swim Speed stat, times its twist's (frenzy, armour).
 func _swim_scale(fish: FishController) -> float:
 	var twist: Traversal = _twists.get(fish)
-	return (1.0 + block_of(fish).value("swim_speed")) * (twist.speed_factor() if twist else 1.0)
+	var chill := (1.0 - clampf(settings.frozen_slow, 0.0, 0.95)) if _chill.get(fish, 0.0) > 0.0 else 1.0  # a Frozen elite's touch
+	return (1.0 + block_of(fish).value("swim_speed")) * (twist.speed_factor() if twist else 1.0) * chill
 
 
 static func _fresh_stats() -> Dictionary:
@@ -769,8 +819,10 @@ func _physics_process(delta: float) -> void:
 		if is_instance_valid(seabed):
 			seabed.set_murk(settings.murk_density)
 	if not tank and not is_over:
-		timeline.update(elapsed)  # a guest's only announces (the host's elapsed corrects ours)
+		timeline.update(stage_time())  # a guest's only announces (the host's elapsed corrects ours)
 		_update_swarm(delta)
+		_update_shrines(delta)
+		_update_affixes(delta)
 	if tank:
 		tank.update(delta)
 	elif authority and not is_over:
@@ -778,14 +830,21 @@ func _physics_process(delta: float) -> void:
 		for fish in players:
 			if is_up(fish):
 				around.append(fish.global_position)
-		director.elapsed = elapsed
+		director.elapsed = stage_time()
 		director.players = maxi(around.size(), 1)
-		director.hushed = timeline.hushed(elapsed)
+		director.hushed = timeline.hushed(stage_time())
 		director.escalation = (settings.enrage_scale if enraged else 1.0) * horde_scale()
 		director.cleared = cleared_at >= 0.0
+		director.stage_scale = 1.0 + settings.stage_alive * (stage - 1)
+		director.elite_bonus = settings.stage_elite_chance * (stage - 1)
+		director.elite_scale = 1.0 + settings.shrine_deep_elites * deep
 		director.update(delta, around)
 		horde.difficulty = difficulty()
 		_relocate_strays(delta)
+	for fish: FishController in _chill.keys():
+		_chill[fish] = _chill[fish] - delta
+		if _chill[fish] <= 0.0:
+			_chill.erase(fish)
 	_crowd_left -= delta
 	var count_crowd := _crowd_left <= 0.0
 	if count_crowd:
@@ -819,6 +878,7 @@ func _physics_process(delta: float) -> void:
 		powerups.on_tick(delta)
 		_open_chests(fish, delta)
 		_try_whirlpool(fish)
+		_try_shrine(fish)
 		_batter_zombies(fish)
 		if not tank or settings.tank_contact:
 			_touch_zombies(fish)
@@ -852,9 +912,21 @@ func horde_scale() -> float:
 	return scale
 
 
-## The difficulty level zombies spawn at now (difficulty_per_minute a minute).
+## The difficulty level zombies spawn at now: difficulty_per_minute a minute
+## into the stage, plus stage_difficulty for each stage before this one (P5).
 func difficulty() -> float:
-	return maxf(elapsed / 60.0 * settings.difficulty_per_minute, 0.0)
+	return maxf(stage_time() / 60.0 * settings.difficulty_per_minute, 0.0) + settings.stage_difficulty * (stage - 1)
+
+
+## Seconds into this stage (P5; the whole run's `elapsed` in its first).
+func stage_time() -> float:
+	return maxf(elapsed - stage_started, 0.0)
+
+
+## Whether this is the run's last stage (its whirlpool wins), by run_length.
+func is_last_stage() -> bool:
+	var stages := settings.stages_in_run()
+	return stages > 0 and stage >= stages
 
 
 ## The horde chases every player who's up.
@@ -1129,7 +1201,8 @@ func _touch_zombies(fish: FishController) -> void:
 		if rammed(fish, i):
 			continue  # we swam into it: our charge, not its bite
 		var kind := horde.enemy_kind(i)
-		var amount := kind.contact_damage * settings.enemy_damage_scale * (2.0 if horde.is_elite(i) else 1.0) * horde.damage_scale(i)
+		var amount := kind.contact_damage * settings.enemy_damage_scale * (2.0 if horde.is_elite(i) else 1.0) * horde.damage_scale(i) \
+				* stage_damage()
 		var boss := boss_at(i)
 		if boss:
 			amount = boss.contact()
@@ -1137,6 +1210,9 @@ func _touch_zombies(fish: FishController) -> void:
 			continue
 		if not hurt(fish, amount, i):
 			return
+		if horde.affix_of(i) == Horde.Affix.FROZEN and settings.frozen_time > 0.0:
+			_chill[fish] = settings.frozen_time  # its touch slows (P5)
+			fish.speed_scale = _swim_scale(fish)
 		var away := offset.normalized() if offset.length_squared() > 0.0001 else -nose
 		horde.damage(i, 0.0, "contact", null, away)  # knocked back off the fish
 		return
@@ -1168,8 +1244,14 @@ func rammed(fish: FishController, index: int) -> bool:
 func _touch_clouds(fish: FishController) -> void:
 	for cloud in _clouds:
 		if is_instance_valid(cloud) and cloud.contains(fish.global_position, PLAYER_RADIUS):
-			hurt(fish, settings.burst_damage * settings.enemy_damage_scale, -1, "a burst cloud")
+			var amount := settings.burst_damage if cloud.damage < 0.0 else cloud.damage
+			hurt(fish, amount * settings.enemy_damage_scale * stage_damage(), -1, cloud.cause)
 			return
+
+
+## Zombies' contact damage times this for the stage (P5: stage_damage_scale per stage after the first).
+func stage_damage() -> float:
+	return pow(settings.stage_damage_scale, stage - 1)
 
 
 ## `fish` takes `amount` (unless in i-frames), then i-frames. Returns whether
@@ -1385,6 +1467,7 @@ func _on_killed(index: int, kind_index: int, at: Vector3, source: String, by: Ob
 	var kind := horde.kinds[kind_index]
 	if kind.behaviour == EnemyKind.Behaviour.TANK and settings.burst_radius > 0.0 and settings.burst_time > 0.0:
 		_burst(at, settings.burst_radius * horde.enemy_size(index) / kind.size)
+	_affix_death(index, at)
 	if kill_pops and not horde.is_proxy(index):
 		kill_pops.pop(at, horde.enemy_size(index), kind.tint, horde.is_elite(index))
 	var fish := by as FishController
@@ -1408,7 +1491,7 @@ func _on_killed(index: int, kind_index: int, at: Vector3, source: String, by: Ob
 	if authority:
 		_roll_pearl(at, fish, elite, horde.net_id_of(index))
 		if source != LIGHTNING_SOURCE:  # a bolt's kills drop no chests or drops (no chain of bolts)
-			if _rolls_chest(fish, elite):
+			if _rolls_chest(fish, elite, horde.affix_of(index) != Horde.Affix.NONE):
 				drop_chest(at)
 			_roll_drop(at, fish, elite)
 	zombie_killed.emit(at, kind, fish, source)
@@ -1469,7 +1552,7 @@ func _start_event(event: String) -> void:
 			around.append(fish.global_position)
 	if around.is_empty():
 		return
-	var crowd := 1.0 + settings.coop_scale * maxi(around.size() - 1, 0)
+	var crowd := (1.0 + settings.coop_scale * maxi(around.size() - 1, 0)) * pow(settings.stage_hp_scale, stage - 1)  # bosses grow by stage too
 	match event:
 		"ring", "stampede", "tide":
 			_swarm_wave(event, 0, around)
@@ -1509,6 +1592,7 @@ func _update_swarm(delta: float) -> void:
 	swarm.left -= delta
 	if swarm.left <= 0.0:
 		swarm = {}
+		director.quiet(settings.quiet_moment)  # a quiet moment after it (P5)
 		return
 	swarm.next -= delta
 	if swarm.next > 0.0:
@@ -1613,6 +1697,8 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 		var chest := add_chest(boss.global_position, 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
 				TreasureChest.Kind.BOSS)  # a legendary pick (the dash is the Shark's own skill now)
 		chest.name = "SharkChest"
+		director.quiet(settings.quiet_moment)
+		_deep_chests(boss.global_position)
 		if authority:
 			levels.add(settings.shark_xp)
 		# Its pearls, the same on every machine (each sees the boss beaten).
@@ -1626,6 +1712,18 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 		var loot := add_chest(boss.global_position + Vector3(9.0, 0.0, 0.0), 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
 				TreasureChest.Kind.BOSS, "attack_leviathans_coil")
 		loot.name = "LeviathanChest"
+		_deep_chests(boss.global_position)
+
+
+## The Shrine of the Deep's reward (P5): shrine_deep_chests more boss chests
+## (legendary picks) round a beaten boss for each Deep set off this stage (on
+## every machine, like the boss's own).
+func _deep_chests(at: Vector3) -> void:
+	var count := deep * settings.shrine_deep_chests
+	for n in count:
+		var spot := at + Vector3(cos(TAU * n / maxf(count, 1)), 0.0, sin(TAU * n / maxf(count, 1))) * 6.0
+		var chest := add_chest(spot, 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3, TreasureChest.Kind.BOSS)
+		chest.name = "DeepChest"
 
 
 ## Opens the way out at `at` (on every machine: each sees the boss beaten).
@@ -1648,9 +1746,16 @@ func near_whirlpool(fish: FishController) -> bool:
 	return Vector2(offset.x, offset.z).length() <= settings.whirlpool_range
 
 
-## `fish` enters the whirlpool: the stage is complete, and the run is won.
+## `fish` enters the whirlpool: on the run's last stage (is_last_stage()) the
+## stage is complete and the run is won; otherwise everyone goes on to the next
+## stage (P5). Online, the host's call (whirlpool_entered tells the guests,
+## whose own copies then do the same).
 func enter_whirlpool(fish: FishController) -> void:
 	if is_over or not is_instance_valid(whirlpool):
+		return
+	if not is_last_stage():
+		whirlpool_entered.emit(fish)
+		next_stage()
 		return
 	stage_complete = true
 	is_over = true
@@ -1877,7 +1982,7 @@ func _offer_chest(fish: FishController) -> void:
 		-1:
 			pass
 		TreasureChest.Kind.CURSED:
-			for id in Powerup.pick_from_tier(rng, Rarity.Tier.CURSED, settings.chest_choices):
+			for id in Powerup.pick_from_tier(rng, Rarity.Tier.CURSED, settings.chest_choices, banished_of(fish)):
 				cards.append(_powerup_card(fish, id))
 			heading = "CURSED TREASURE"
 			line = "STRONG, WITH A CATCH  ·  CHOOSE CAREFULLY"
@@ -1892,7 +1997,7 @@ func _offer_chest(fish: FishController) -> void:
 			line = "%s'S PRIZE" % Powerup.title(item).to_upper() if item != "" else "THE SHARK'S PRIZE  ·  A LEGENDARY PICK"
 		_:
 			var rolled := Rarity.roll(rng, settings, block_of(fish).value("luck"))
-			for id in Powerup.pick_for_chest(rng, rolled, settings.chest_choices):
+			for id in Powerup.pick_for_chest(rng, rolled, settings.chest_choices, banished_of(fish)):
 				cards.append(_powerup_card(fish, id))
 			heading = "%s TREASURE!" % Rarity.NAMES[rolled]
 	if cards.is_empty():
@@ -2236,7 +2341,8 @@ func _open_chests(fish: FishController, delta: float) -> void:
 	if authority and fish == local_players()[0] and not test_tank and settings.chest_interval > 0.0:
 		_chest_left -= delta
 		if _chest_left <= 0.0:
-			_chest_left = settings.chest_interval
+			# Further apart as the stage goes on (P4).
+			_chest_left = settings.chest_interval * (1.0 + (settings.chest_bury_fade * stage_time() / 60.0 if settings.limits else 0.0))
 			if shut_chests().size() < settings.chest_max:
 				_bury_chest()
 	if _offers.has(fish):
@@ -2392,9 +2498,9 @@ func _chest_in_use(chest: TreasureChest) -> bool:
 ## times that; a boss's free, and every one free with chest_cost off or in the
 ## Test Tank.
 func chest_price(chest: TreasureChest, fish: FishController = null) -> int:
-	if not settings.chest_cost or tank or test_tank or chest.kind == TreasureChest.Kind.BOSS:
+	if not settings.chest_cost or tank or test_tank or chest.kind == TreasureChest.Kind.BOSS or chest.item == FREE_CHEST:
 		return 0
-	var price := settings.chest_price_base * (1.0 + settings.chest_price_growth * elapsed / 60.0)
+	var price := settings.chest_price_base * (1.0 + settings.chest_price_growth * stage_time() / 60.0)
 	if is_instance_valid(fish):
 		price *= 1.0 + settings.chest_price_step * float(stats_of(fish).get("paid_chests", 0))
 	if chest.kind == TreasureChest.Kind.CURSED:
@@ -2430,9 +2536,13 @@ func _clear_chest(chest: TreasureChest) -> void:
 
 ## Whether a kill by `by` drops a chest: chest_drop_chance (elite: x
 ## elite_chest_scale), raised by their luck.
-func _rolls_chest(by: FishController, elite: bool) -> bool:
+func _rolls_chest(by: FishController, elite: bool, modified := false) -> bool:
 	var luck := block_of(by).value("luck") if is_instance_valid(by) and _blocks.has(by) else 0.0
 	var chance := settings.chest_drop_chance * (settings.elite_chest_scale if elite else 1.0) * maxf(1.0 + luck * settings.chest_drop_luck, 0.0)
+	if modified:
+		chance *= settings.modifier_chest_scale  # an elite with a modifier (P5)
+	if settings.limits:
+		chance /= 1.0 + settings.chest_drop_fade * stage_time() / 60.0  # rarer as the stage goes on (P4)
 	if is_instance_valid(by) and _powerups.has(by):
 		chance *= (_powerups[by] as Powerups).chest_drop_scale()
 	return chance > 0.0 and rng.randf() < chance
@@ -2455,3 +2565,505 @@ func _announce_teleport(moved: Array) -> void:
 	for fish: FishController in moved:
 		if is_instance_valid(fish):
 			fish_teleported.emit(fish)
+
+
+# --- Stages (P5) ----------------------------------------------------------
+
+## On to the next stage (the whirlpool, in a run with more stages): a new
+## seabed and timeline, harder zombies (stage_hp_scale, stage_damage_scale,
+## stage_difficulty...), new chests and shrines, everyone back at the start and
+## healed. Weapons, tomes, items, the level and purses carry on.
+func next_stage() -> void:
+	stage += 1
+	stage_started = elapsed
+	deep = 0
+	horde.stage_hp = pow(settings.stage_hp_scale, stage - 1)
+	_hold_for_cards(false)
+	_clear_bosses()
+	if is_instance_valid(whirlpool):
+		whirlpool.queue_free()
+	whirlpool = null
+	cleared_at = -1.0
+	swarm = {}
+	enraged = false
+	stage_complete = false
+	horde.clear()
+	if kill_pops:
+		kill_pops.clear()
+	for cloud in _clouds:
+		if is_instance_valid(cloud):
+			cloud.queue_free()
+	_clouds.clear()
+	for pickup in pickups:
+		if is_instance_valid(pickup):
+			pickup.queue_free()
+	pickups.clear()
+	_chill.clear()
+	director.reset()
+	timeline.reset()
+	_build_seabed()
+	_bury_chests()
+	_place_shrines()
+	if is_instance_valid(blood_moon):
+		blood_moon.strength = settings.blood_moon * (1.0 + 0.15 * (stage - 1))
+	var spawn: Transform3D = ocean.spawn_transform()
+	var moved: Array = []
+	for fish in players:
+		var health: FishHealth = _health.get(fish)
+		if health:
+			if health.down:
+				revive(fish)
+			health.heal(health.max_hp)
+		if is_instance_valid(fish) and not fish.puppet:
+			fish.revive(spawn_for(fish, spawn))
+			moved.append(fish)
+	_announce_teleport(moved)
+	if run_log:
+		run_log.stage_reached(stage)
+	stage_began.emit(stage)
+
+
+## The stage's seabed: rocks and kelp laid out from SEABED_SEED and the stage,
+## so each stage's looks different (and every machine's the same).
+func _build_seabed() -> void:
+	var seed_now := SEABED_SEED + (stage - 1) * 7
+	if not is_instance_valid(seabed) or seed_now == _seabed_seed:
+		return
+	_seabed_seed = seed_now
+	seabed.setup(settings.arena_radius, settings.seabed_rocks, settings.seabed_kelp, seed_now, settings.edge_rocks, settings.edge_kelp,
+			settings.arena_ceiling - settings.arena_floor + 5.0)
+
+
+# --- Shrines (P5) ---------------------------------------------------------
+
+## The stage's shrines: shrine_count of them, the kinds in turn, on the seabed at
+## least shrine_spacing apart and away from the start (the host's; guests get
+## them sent, shrine_placed).
+func _place_shrines() -> void:
+	for shrine in shrines:
+		if is_instance_valid(shrine):
+			shrine.queue_free()
+	shrines.clear()
+	if test_tank or not authority:
+		return
+	var placed := PackedVector2Array()
+	for n in settings.shrine_count:
+		var spot := Vector2.ZERO
+		for attempt in 24:
+			spot = Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf_range(0.08, 1.0)) * settings.arena_radius * 0.8
+			var clear := spot.length() > 25.0
+			for other in placed:
+				if other.distance_to(spot) < settings.shrine_spacing:
+					clear = false
+					break
+			if clear:
+				break
+		placed.append(spot)
+		add_shrine(n % Shrine.Kind.size(), centre + Vector3(spot.x, settings.arena_floor, spot.y))
+
+
+## A shrine of `kind` at `at` (on every machine: the host's own, or one it sent).
+func add_shrine(kind: int, at: Vector3) -> Shrine:
+	var shrine := Shrine.new()
+	shrine.name = "Shrine"
+	shrine.kind = kind as Shrine.Kind
+	shrine.index = shrines.size()
+	shrine.ring_radius = settings.shrine_tide_radius
+	shrine.position = at
+	add_child(shrine)
+	shrines.append(shrine)
+	if authority:
+		shrine_placed.emit(shrine)
+	return shrine
+
+
+## The shrine `fish` is over and can use now (null: none).
+func shrine_near(fish: FishController) -> Shrine:
+	if not is_instance_valid(fish) or is_over or not is_up(fish) or _offers.has(fish):
+		return null
+	for shrine in shrines:
+		if is_instance_valid(shrine) and shrine.is_over(fish.global_position, settings.shrine_reach) and can_use_shrine(shrine, fish):
+			return shrine
+	return null
+
+
+## Whether `fish` may use `shrine`: not spent, not running, and (Chance) with tries left.
+func can_use_shrine(shrine: Shrine, fish: FishController) -> bool:
+	if shrine.spent or shrine.tide_active:
+		return false
+	if shrine.kind == Shrine.Kind.CHANCE:
+		return int(shrine.tries.get(fish, 0)) < settings.shrine_chance_uses
+	return true
+
+
+## What a Shrine of Chance costs `fish` now (pearls): shrine_chance_price,
+## growing with the stage's minutes as chests do, x shrine_chance_step a try.
+func shrine_price(shrine: Shrine, fish: FishController) -> int:
+	var price := settings.shrine_chance_price * (1.0 + settings.chest_price_growth * stage_time() / 60.0)
+	return roundi(price * pow(settings.shrine_chance_step, int(shrine.tries.get(fish, 0))))
+
+
+## Each local player over a shrine presses Jump to use it.
+func _try_shrine(fish: FishController) -> void:
+	if is_picking(fish) or near_whirlpool(fish) or unlocked_chest_near(fish):
+		return
+	var shrine := shrine_near(fish)
+	if shrine == null:
+		return
+	var input: PlayerInput = fish.input_source if fish.input_source else PlayerInput.everyone()
+	if input.just_pressed("jump"):
+		use_shrine(shrine, fish)
+
+
+## `fish` uses `shrine`. A Chance is theirs alone (their purse, their item),
+## done here; the rest change the stage for everyone, so the host sets them
+## off (a guest asks: shrine_claimed).
+func use_shrine(shrine: Shrine, fish: FishController) -> void:
+	if not can_use_shrine(shrine, fish):
+		return
+	if shrine.kind == Shrine.Kind.CHANCE:
+		var price := shrine_price(shrine, fish)
+		if purse_of(fish) < price:
+			shrine_used.emit(shrine, fish, "short")
+			return
+		add_pearls(fish, -price)
+		shrine.tries[fish] = int(shrine.tries.get(fish, 0)) + 1
+		stats_of(fish)["shrines"] = stats_of(fish).get("shrines", 0) + 1
+		if rng.randf() < settings.shrine_chance_odds:
+			if not _chest_pending.has(fish):
+				_chest_pending[fish] = []
+			(_chest_pending[fish] as Array).append([TreasureChest.Kind.TREASURE, "", null, 0])
+			shrine_used.emit(shrine, fish, "won")
+			if not _offers.has(fish):
+				_offer_next(fish)
+		else:
+			shrine_used.emit(shrine, fish, "lost")
+		return
+	if authority:
+		activate_shrine(shrine, fish)
+	else:
+		shrine_claimed.emit(shrine.index, fish)
+
+
+## `shrine` (a Tide, Deep or Pearls) set off by `fish`: on every machine (the
+## host's call; shrine_activated tells the guests).
+func activate_shrine(shrine: Shrine, fish: FishController) -> void:
+	if not is_instance_valid(shrine) or shrine.spent or shrine.tide_active:
+		return
+	if is_instance_valid(fish):
+		stats_of(fish)["shrines"] = stats_of(fish).get("shrines", 0) + 1
+	match shrine.kind:
+		Shrine.Kind.TIDE:
+			shrine.tide_active = true
+			shrine.tide_held = 0.0
+			shrine.tide_wave_left = 0.0  # the first wave now
+		Shrine.Kind.DEEP:
+			shrine.spent = true
+			deep += 1
+		Shrine.Kind.PEARLS:
+			shrine.spent = true
+			if authority:
+				for n in settings.shrine_pearls_bonus:
+					var spill := Vector3(sin(n * 2.4), 0.6 + 0.3 * sin(n * 1.3), cos(n * 2.4)) * 2.5
+					drop_pearl(shrine.global_position + Vector3.UP * 2.0 + spill, 1, SHRINE_PEARL - stage * 1000 - shrine.index * 50 - n)
+			_draw_pearls_to_team()
+	if authority:
+		shrine_activated.emit(shrine, fish)
+	shrine_used.emit(shrine, fish, ["tide", "", "deep", "pearls"][shrine.kind])
+
+
+## Every pearl out flies to the nearest player who's up (the Shrine of Pearls).
+func _draw_pearls_to_team() -> void:
+	for pearl in pearls_out:
+		if not is_instance_valid(pearl):
+			continue
+		var best: FishController = null
+		var gap := INF
+		for fish in players:
+			if is_up(fish):
+				var d := fish.global_position.distance_squared_to(pearl.global_position)
+				if d < gap:
+					gap = d
+					best = fish
+		if best:
+			pearl.drawn_by = best
+
+
+## Running Tides: held while anyone who's up is in the ring (draining back at
+## half speed while nobody is), a ring of zombies round it every
+## shrine_tide_wave s (the host's), and won at shrine_tide_time: a free chest.
+func _update_shrines(delta: float) -> void:
+	for shrine in shrines:
+		if not is_instance_valid(shrine) or not shrine.tide_active:
+			continue
+		var holder: FishController = null
+		for fish in players:
+			if is_up(fish) and shrine.is_over(fish.global_position, settings.shrine_tide_radius):
+				holder = fish
+				break
+		shrine.tide_held = clampf(shrine.tide_held + (delta if holder else -delta * 0.5), 0.0, settings.shrine_tide_time)
+		if authority and holder:
+			shrine.tide_wave_left -= delta
+			if shrine.tide_wave_left <= 0.0:
+				shrine.tide_wave_left = settings.shrine_tide_wave
+				var middle := Vector3(shrine.global_position.x, holder.global_position.y, shrine.global_position.z)
+				var crowd := 1.0 + settings.coop_scale * maxi(players.size() - 1, 0)
+				_ring(middle, roundi(settings.shrine_tide_count * crowd), settings.shrine_tide_radius * 2.5)
+		if shrine.tide_held >= settings.shrine_tide_time:
+			shrine.tide_active = false
+			shrine.spent = true
+			if authority:
+				var chest := add_chest(shrine.global_position + Vector3(0.0, 4.0, 4.0), rng.randf() * TAU,
+						centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3, TreasureChest.Kind.TREASURE, FREE_CHEST)
+				chest_buried.emit(chest)
+			for fish in local_players():
+				shrine_used.emit(shrine, fish, "tide_won")
+
+
+## A Shrine of the Tide's progress (0..1), for the HUD.
+func tide_progress(shrine: Shrine) -> float:
+	return shrine.tide_held / maxf(settings.shrine_tide_time, 0.01)
+
+
+## The running Tide (null: none).
+func running_tide() -> Shrine:
+	for shrine in shrines:
+		if is_instance_valid(shrine) and shrine.tide_active:
+			return shrine
+	return null
+
+
+# --- Elite modifiers (P5) -------------------------------------------------
+
+## Burning elites leave a patch of fire every burning_every s (on every machine:
+## the patches hurt only the players played there).
+func _update_affixes(delta: float) -> void:
+	if not settings.burning:
+		return
+	_burn_left -= delta
+	if _burn_left > 0.0:
+		return
+	_burn_left = settings.burning_every
+	var out := 0
+	for cloud in _clouds:
+		if is_instance_valid(cloud) and cloud.cause == BURN_CAUSE:
+			out += 1
+	for i in horde.alive:
+		if out >= settings.burning_max:
+			return
+		if horde.affix_of(i) == Horde.Affix.BURNING and not horde.is_proxy(i):
+			_hazard(horde.enemy_position(i), settings.burning_radius, settings.burning_time, settings.burning_damage,
+					Color(1.0, 0.45, 0.08, 0.35), BURN_CAUSE)
+			out += 1
+
+
+## What a burning elite's fire is called (the run log's cause).
+const BURN_CAUSE := "a burning elite's fire"
+
+
+## What an elite's modifier does as it dies: Electric shocks round it after
+## electric_delay; Bloated bursts into bloated_count sardines (the host's).
+func _affix_death(index: int, at: Vector3) -> void:
+	match horde.affix_of(index):
+		Horde.Affix.ELECTRIC:
+			if settings.electric:
+				var shock := _hazard(at, settings.electric_radius, 0.3, settings.electric_damage, Color(0.45, 0.8, 1.0, 0.4),
+						"an electric elite's shock")
+				shock.delay = settings.electric_delay
+		Horde.Affix.BLOATED:
+			if settings.bloated and authority:
+				horde.spawn_pack(0, settings.bloated_count, at, 1.5, Vector3.ZERO, 0.0)
+
+
+## A cloud that hurts the players in it (BurstCloud): a fire patch or a shock.
+func _hazard(at: Vector3, radius: float, lifetime: float, damage: float, color: Color, cause: String) -> BurstCloud:
+	var cloud := BurstCloud.new()
+	cloud.name = "Hazard"
+	cloud.radius = radius
+	cloud.lifetime = lifetime
+	cloud.damage = damage
+	cloud.color = color
+	cloud.cause = cause
+	cloud.position = at
+	add_child(cloud)
+	cloud.tree_exiting.connect(func() -> void: _clouds.erase(cloud))
+	_clouds.append(cloud)
+	return cloud
+
+
+# --- Choices (P4) ---------------------------------------------------------
+
+## `fish`'s rerolls, skips or banishes left (`what`: "rerolls", "skips", "banishes").
+func choices_of(fish: FishController, what: String) -> int:
+	return int((_choices.get(fish, {}) as Dictionary).get(what, 0))
+
+
+func add_choices(fish: FishController, what: String, amount: int) -> void:
+	if not _choices.has(fish):
+		_choices[fish] = {"rerolls": 0, "skips": 0, "banishes": 0}
+	_choices[fish][what] = maxi(choices_of(fish, what) + amount, 0)
+	choices_changed.emit(fish)
+
+
+## What `fish` has banished for the rest of the run (weapon, tome and item ids).
+func banished_of(fish: FishController) -> Array:
+	return _banished.get(fish, [])
+
+
+## Whether the cards `fish` has up allow `what` now: a level's all three (a
+## Moon Pearl's extra pick, no skip); a treasure or cursed chest's reroll and
+## banish (before its first pick); a boss chest's or a swap's, none.
+func can_choose(fish: FishController, what: String) -> bool:
+	if not _offers.has(fish) or choices_of(fish, what) <= 0:
+		return false
+	var cards: Array = _offers[fish]
+	match _offer_kind.get(fish, ""):
+		"level":
+			return what != "skips" or _level_extra.get(fish, 0) == powerups_of(fish).extra_level_picks()
+		"chest":
+			var info: Dictionary = _chest_offer.get(fish, {})
+			if what == "skips" or info.is_empty() or info.committed or cards.is_empty():
+				return false
+			var chest: TreasureChest = info.chest
+			return is_instance_valid(chest) and chest.kind != TreasureChest.Kind.BOSS \
+					and _extra_picks.get(fish, 0) == mini(powerups_of(fish).stacks("sunken_idol"), cards.size() - 1)
+	return false
+
+
+## New cards for `fish`'s offer (a reroll): a level's dealt again; a chest's
+## rolled again at a new rarity (the same kind of chest).
+func reroll(fish: FishController) -> void:
+	if not can_choose(fish, "rerolls"):
+		return
+	var cards: Array
+	if _offer_kind[fish] == "level":
+		cards = CardDeck.deal(self, fish, settings.card_choices)
+	else:
+		var chest: TreasureChest = (_chest_offer[fish] as Dictionary).chest
+		cards = _chest_cards(fish, chest.kind, [])
+		_remember_chest_cards(fish, cards)
+	if cards.is_empty():
+		return
+	add_choices(fish, "rerolls", -1)
+	_offers[fish] = cards
+	stats_of(fish)["rerolls"] = stats_of(fish).get("rerolls", 0) + 1
+	cards_offered.emit(fish, cards, "REROLLED", _choice_line(fish))
+
+
+## `fish` takes nothing from this level (a skip).
+func skip(fish: FishController) -> void:
+	if not can_choose(fish, "skips"):
+		return
+	add_choices(fish, "skips", -1)
+	stats_of(fish)["skips"] = stats_of(fish).get("skips", 0) + 1
+	_level_extra.erase(fish)
+	_pending[fish] = _pending.get(fish, 1) - 1
+	_offers.erase(fish)
+	_offer_kind.erase(fish)
+	card_picked.emit(fish, {"kind": "skip", "tier": Rarity.Tier.COMMON})
+	_offer_next(fish)
+
+
+## Card `index`'s weapon, tome or item is gone from `fish`'s pool for the rest
+## of the run (a banish), and a fresh card takes its place (or none, if
+## nothing's left but fallbacks and others remain).
+func banish(fish: FishController, index: int) -> void:
+	if not can_choose(fish, "banishes"):
+		return
+	var cards: Array = (_offers[fish] as Array).duplicate()
+	if index < 0 or index >= cards.size():
+		return
+	var card: Dictionary = cards[index]
+	var id := _card_id(card)
+	if id == "":
+		return
+	add_choices(fish, "banishes", -1)
+	if not _banished.has(fish):
+		_banished[fish] = []
+	(_banished[fish] as Array).append(id)
+	stats_of(fish)["banished"] = banished_of(fish).duplicate()
+	var shown: Array = []
+	for other: Dictionary in cards:
+		shown.append(_card_id(other))
+	var fresh: Array
+	if _offer_kind[fish] == "level":
+		fresh = CardDeck.deal(self, fish, 1, shown)
+	else:
+		var chest: TreasureChest = (_chest_offer[fish] as Dictionary).chest
+		fresh = _chest_cards(fish, chest.kind, shown, 1)
+	if fresh.is_empty() or (fresh[0].get("kind", "") == "fallback" and cards.size() > 1):
+		cards.remove_at(index)
+	else:
+		cards[index] = fresh[0]
+	if _offer_kind[fish] == "chest":
+		_remember_chest_cards(fish, cards)
+	if cards.is_empty():
+		# Nothing left to offer: a level's goes by; a chest's is put back.
+		if _offer_kind[fish] == "chest":
+			cancel_offer(fish)
+		else:
+			skip_free(fish)
+		return
+	_offers[fish] = cards
+	cards_offered.emit(fish, cards, "BANISHED: %s" % _card_title(fish, card).to_upper(), _choice_line(fish))
+
+
+## A level's offer goes by with nothing taken (and no skip spent).
+func skip_free(fish: FishController) -> void:
+	_level_extra.erase(fish)
+	_pending[fish] = _pending.get(fish, 1) - 1
+	_offers.erase(fish)
+	_offer_kind.erase(fish)
+	card_picked.emit(fish, {"kind": "skip", "tier": Rarity.Tier.COMMON})
+	_offer_next(fish)
+
+
+## A chest's cards as rerolled or banished, so putting it back and opening it
+## again offers these (no free rerolls).
+func _remember_chest_cards(fish: FishController, cards: Array) -> void:
+	var chest: TreasureChest = (_chest_offer.get(fish, {}) as Dictionary).get("chest")
+	if is_instance_valid(chest) and _chest_rolls.has(chest) and (_chest_rolls[chest] as Dictionary).has(fish):
+		((_chest_rolls[chest] as Dictionary)[fish] as Dictionary).cards = cards.duplicate(true)
+
+
+## What a card offers (a weapon, tome or item id; "" for a fallback or a swap).
+static func _card_id(card: Dictionary) -> String:
+	if card.has("powerup"):
+		return card.powerup
+	match card.get("kind", ""):
+		"weapon", "new_weapon":
+			return card.weapon
+		"tome", "new_tome":
+			return card.tome
+	return ""
+
+
+func _card_title(fish: FishController, card: Dictionary) -> String:
+	if card.has("powerup"):
+		return Powerup.title(card.powerup)
+	if card.has("tome"):
+		return Tomes.title(card.tome)
+	if card.has("weapon"):
+		return Weapons.title(card.weapon, loadout_of(fish).attack_kind)
+	return ""
+
+
+## The line under a rerolled or banished offer: what's left.
+func _choice_line(fish: FishController) -> String:
+	return "REROLLS %d  ·  SKIPS %d  ·  BANISHES %d" % [choices_of(fish, "rerolls"), choices_of(fish, "skips"), choices_of(fish, "banishes")]
+
+
+## A treasure or cursed chest's cards for `fish`, rolled fresh (`count`:
+## chest_choices), leaving out what they've banished and `shown`.
+func _chest_cards(fish: FishController, kind: int, shown: Array, count := -1) -> Array:
+	var want := settings.chest_choices if count < 0 else count
+	var left_out: Array = banished_of(fish) + shown
+	var cards := []
+	if kind == TreasureChest.Kind.CURSED:
+		for id in Powerup.pick_from_tier(rng, Rarity.Tier.CURSED, want, left_out):
+			cards.append(_powerup_card(fish, id))
+	else:
+		var rolled := Rarity.roll(rng, settings, block_of(fish).value("luck"))
+		for id in Powerup.pick_for_chest(rng, rolled, want, left_out):
+			cards.append(_powerup_card(fish, id))
+	return cards

@@ -26,11 +26,11 @@ var _refilled := -1.0
 
 
 func chance() -> float:
-	return settings.lightning_chance + settings.lightning_chance_per_stack * (stacks - 1)
+	return soft_chance(settings.lightning_chance + settings.lightning_chance_per_stack * extra())
 
 
 func jumps() -> int:
-	return settings.lightning_jumps + settings.lightning_jumps_per_stack * (stacks - 1)
+	return settings.lightning_jumps + roundi(settings.lightning_jumps_per_stack * extra())
 
 
 func on_hit(index: int, _damage: float, _source: String, proc: float, chain: Array) -> void:

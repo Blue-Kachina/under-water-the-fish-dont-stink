@@ -264,6 +264,8 @@ func update(delta: float, active := true) -> void:
 		return
 	if fire():
 		cooldown_left = cooldown()
+		if settings and settings.limits:
+			cooldown_left = maxf(cooldown_left, settings.min_cooldown * attack_speed)  # P4: the floor, in real seconds
 		uses += 1
 		fired.emit()
 

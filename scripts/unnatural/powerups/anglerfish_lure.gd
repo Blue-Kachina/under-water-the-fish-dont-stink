@@ -15,7 +15,7 @@ var _next := 0.0
 
 
 func interval() -> float:
-	return settings.lure_interval * pow(1.0 - settings.lure_interval_per_stack, stacks - 1) / rate_scale()
+	return settings.lure_interval * pow(1.0 - settings.lure_interval_per_stack, extra()) / rate_scale()
 
 
 ## How long a decoy lasts before it bursts (Tome of Ages stretches it).
@@ -28,7 +28,7 @@ func blast() -> float:
 
 
 func damage() -> float:
-	return settings.lure_damage + settings.lure_damage_per_stack * (stacks - 1)
+	return settings.lure_damage + settings.lure_damage_per_stack * extra()
 
 
 func on_stacks_changed() -> void:
@@ -40,7 +40,8 @@ func on_tick(delta: float) -> void:
 	_next -= delta
 	if _next <= 0.0:
 		_next = interval()
-		drop()
+		if lures.size() < settings.lure_max:
+			drop()
 	for k in range(lures.size() - 1, -1, -1):
 		var lure := lures[k]
 		if not is_instance_valid(lure):

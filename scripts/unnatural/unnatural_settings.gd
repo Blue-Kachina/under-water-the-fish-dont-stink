@@ -187,6 +187,9 @@ static func shared() -> UnnaturalSettings:
 ## elite_chance + elite_per_minute * minutes.
 @export_range(0.0, 1.0, 0.005) var elite_chance := 0.01
 @export_range(0.0, 0.2, 0.001, "or_greater") var elite_per_minute := 0.008
+## How much bigger an elite is than the rest of its kind (its body and its reach),
+## so it stands out in the crowd.
+@export_range(1.0, 5.0, 0.05, "or_greater") var elite_size := 2.2
 ## Swordfish stalk to lunge_range (m), telegraph for lunge_telegraph (s, a red
 ## glow), lunge at lunge_speed (m/s) for lunge_time (s), then rest lunge_rest (s).
 @export_range(0.0, 100.0, 0.5, "or_greater") var lunge_range := 14.0
@@ -444,6 +447,87 @@ static func shared() -> UnnaturalSettings:
 ## When the boss comes, the zombies further than this from every player (m)
 ## are cleared away (0: none are).
 @export_range(0.0, 300.0, 5.0, "or_greater") var boss_cleanup := 40.0
+## Quiet moments (P5): when a swarm event ends, the director sends no packs for
+## quiet_moment s, a breather to grab chests (0: none). Also after the mini-boss.
+@export_range(0.0, 60.0, 0.5, "or_greater") var quiet_moment := 8.0
+
+@export_group("Run")
+## How long a run is (P5), picked before it starts (the mode picker asks):
+## Short is one stage, its events at short_time_scale of their times (the boss
+## at 6:00); Standard is standard_stages stages; Endless never ends, each
+## whirlpool leading to the next stage. Entering the last stage's whirlpool wins.
+@export_enum("Short", "Standard", "Endless") var run_length := 1
+@export_range(1, 20, 1, "or_greater") var standard_stages := 3
+@export_range(0.1, 1.0, 0.05) var short_time_scale := 0.6
+## Each stage after the first: a new seabed, and zombies with stage_hp_scale x
+## the hp and stage_damage_scale x the contact damage of the stage before
+## (compounding), stage_difficulty more difficulty levels from its start,
+## stage_alive more of them out (a share per stage) and stage_elite_chance more
+## elites. Bosses' hp grow by stage_hp_scale too.
+@export_range(1.0, 10.0, 0.05, "or_greater") var stage_hp_scale := 1.8
+@export_range(1.0, 10.0, 0.05, "or_greater") var stage_damage_scale := 1.3
+@export_range(0.0, 20.0, 0.25, "or_greater") var stage_difficulty := 3.0
+@export_range(0.0, 5.0, 0.05, "or_greater") var stage_alive := 0.4
+@export_range(0.0, 0.5, 0.005, "or_greater") var stage_elite_chance := 0.02
+
+@export_group("Shrines")
+## Sunken shrines (P5): shrine_count fixed spots on each stage's seabed (one of
+## each kind in turn: Tide, Chance, Deep, Pearls), at least shrine_spacing m
+## apart. Swim within shrine_reach m and press Jump to use one.
+@export_range(0, 20, 1, "or_greater") var shrine_count := 4
+@export_range(0.0, 200.0, 5.0, "or_greater") var shrine_spacing := 60.0
+@export_range(1.0, 40.0, 0.5, "or_greater") var shrine_reach := 9.0
+## Tide: hold its ring (shrine_tide_radius m) for shrine_tide_time s in all
+## while the horde comes (a ring of shrine_tide_count zombies round it at the
+## start and every shrine_tide_wave s); out of the ring the time drains back at
+## half speed. Won: a free chest.
+@export_range(1.0, 120.0, 0.5, "or_greater") var shrine_tide_time := 10.0
+@export_range(1.0, 60.0, 0.5, "or_greater") var shrine_tide_radius := 8.0
+@export_range(0, 500, 5, "or_greater") var shrine_tide_count := 40
+@export_range(0.5, 30.0, 0.5, "or_greater") var shrine_tide_wave := 3.5
+## Chance: pay shrine_chance_price pearls (growing with the stage's minutes as
+## a chest's does, and x shrine_chance_step each time you've paid it) for a
+## shrine_chance_odds chance at an item (a chest's pick); up to shrine_chance_uses
+## tries per player.
+@export_range(0, 1000, 1, "or_greater") var shrine_chance_price := 6
+@export_range(1.0, 5.0, 0.05, "or_greater") var shrine_chance_step := 1.5
+@export_range(0.0, 1.0, 0.05) var shrine_chance_odds := 0.5
+@export_range(1, 20, 1, "or_greater") var shrine_chance_uses := 3
+## Deep: the stage gets harder for the rest of it (elites x (1 +
+## shrine_deep_elites)), but each boss beaten drops shrine_deep_chests more chests.
+@export_range(0.0, 10.0, 0.1, "or_greater") var shrine_deep_elites := 1.0
+@export_range(0, 5, 1, "or_greater") var shrine_deep_chests := 1
+## Pearls: every pearl out flies to the nearest player who's up, and
+## shrine_pearls_bonus more spill out of it.
+@export_range(0, 500, 1, "or_greater") var shrine_pearls_bonus := 10
+
+@export_group("Elite Modifiers")
+## Elites (P5, RoR2 style): an elite has elite_modifier_chance of a modifier,
+## each glowing its own colour, and drops chests modifier_chest_scale x as often
+## as a plain elite.
+@export_range(0.0, 1.0, 0.05) var elite_modifier_chance := 0.6
+@export_range(1.0, 10.0, 0.1, "or_greater") var modifier_chest_scale := 1.5
+## Burning: leaves a patch of fire every burning_every s (burning_radius m,
+## burning_time s, burning_damage a touch). At most burning_max patches out.
+@export var burning := true
+@export_range(0.1, 10.0, 0.05, "or_greater") var burning_every := 0.6
+@export_range(0.2, 10.0, 0.1, "or_greater") var burning_radius := 1.6
+@export_range(0.2, 20.0, 0.1, "or_greater") var burning_time := 3.0
+@export_range(0.0, 200.0, 1.0, "or_greater") var burning_damage := 6.0
+@export_range(1, 500, 1, "or_greater") var burning_max := 40
+## Electric: dying, it crackles for electric_delay s (a ring shows where), then
+## shocks everything within electric_radius m for electric_damage.
+@export var electric := true
+@export_range(0.0, 3.0, 0.05, "or_greater") var electric_delay := 0.6
+@export_range(0.5, 20.0, 0.25, "or_greater") var electric_radius := 5.0
+@export_range(0.0, 500.0, 1.0, "or_greater") var electric_damage := 14.0
+## Frozen: its touch takes frozen_slow of your speed for frozen_time s.
+@export var frozen := true
+@export_range(0.0, 1.0, 0.05) var frozen_slow := 0.45
+@export_range(0.0, 10.0, 0.1, "or_greater") var frozen_time := 2.0
+## Bloated: dying, it bursts into bloated_count rotten sardines.
+@export var bloated := true
+@export_range(0, 50, 1, "or_greater") var bloated_count := 6
 
 @export_group("Drowned Shark")
 ## The mini-boss: a huge zombie shark. Its hp (times 1 + coop_scale per extra
@@ -549,6 +633,42 @@ static func shared() -> UnnaturalSettings:
 ## (times 1 + level / 10), or a team heal of fallback_heal of max hp.
 @export_range(0, 1000, 1, "or_greater") var fallback_pearls := 10
 @export_range(0.0, 1.0, 0.05) var fallback_heal := 0.3
+## Weapon cards fade as your weapons level (P4), so tomes and new weapons get a
+## turn: the upgrade weight is card_weight_weapon / (1 + weapon_card_fade x (the
+## average level of your weapons - 1)). 0.04: Lv 10 weapons come up at 74%.
+@export_range(0.0, 2.0, 0.01, "or_greater") var weapon_card_fade := 0.04
+
+@export_group("Limits")
+## The Playability pass's limiters (P4). Off: every stack and stat adds up in a
+## line, as before (for comparing).
+@export var limits := true
+## Item stacking curves: the k-th stack of an item (from 0) adds 1 / (1 +
+## falloff x k) of the first. stack_falloff (procs and effects) 0.5: 100%, 67%,
+## 50%, 40%... stack_falloff_stats (plain stat items: Barnacle Plating, Sea
+## Salt...) flattens slower; stack_falloff_legendary faster. 0: no falloff.
+## Cursed items stay in a line (their downside does too).
+@export_range(0.0, 5.0, 0.01, "or_greater") var stack_falloff := 0.5
+@export_range(0.0, 5.0, 0.01, "or_greater") var stack_falloff_stats := 0.25
+@export_range(0.0, 5.0, 0.01, "or_greater") var stack_falloff_legendary := 1.0
+## Chances (Crit Chance, every item's proc chance) bend so they never reach
+## 100%: raw / (1 + raw ^ p) ^ (1 / p), p chance_softness. 2: 5% stays 5%, 50%
+## is 45%, 100% is 71%. Higher stays straight longer; 0: a plain sum capped at 100%.
+@export_range(0.0, 10.0, 0.1, "or_greater") var chance_softness := 2.0
+## No auto-attack fires more often than once every min_cooldown s, whatever its
+## attack speed (0: no floor).
+@export_range(0.0, 2.0, 0.01, "or_greater") var min_cooldown := 0.12
+## Size past size_soft_cap (+100% at 1) grows at size_soft_rate of its rate.
+@export_range(0.0, 10.0, 0.05, "or_greater") var size_soft_cap := 1.0
+@export_range(0.0, 1.0, 0.05) var size_soft_rate := 0.5
+
+@export_group("Choices")
+## Rerolls (new cards), skips (no card this level) and banishes (a weapon, tome
+## or item gone from your pool for the rest of the run) each player starts a run
+## with (D25: 0; they'll come from meta-progression, P6). Rerolls and banishes
+## work on level-ups and chests (not boss chests); skips on level-ups.
+@export_range(0, 50, 1, "or_greater") var start_rerolls := 0
+@export_range(0, 50, 1, "or_greater") var start_skips := 0
+@export_range(0, 50, 1, "or_greater") var start_banishes := 0
 
 @export_group("Chests")
 ## Chests buried round the arena at the start, one more uncovered every
@@ -587,6 +707,11 @@ static func shared() -> UnnaturalSettings:
 ## by this share of the base (0.25: the 10th costs 3.25x the first).
 @export_range(0.0, 2.0, 0.01, "or_greater") var chest_price_step := 0.25
 @export_range(0.0, 10.0, 0.05, "or_greater") var chest_cursed_price := 1.5
+## Chests get rarer as the stage goes on (P4): the drop chance is divided by 1 +
+## chest_drop_fade x minutes into the stage (0.06: 63% at 10 min), and a new chest
+## is uncovered every chest_interval x (1 + chest_bury_fade x minutes).
+@export_range(0.0, 2.0, 0.01, "or_greater") var chest_drop_fade := 0.06
+@export_range(0.0, 2.0, 0.01, "or_greater") var chest_bury_fade := 0.1
 
 @export_group("Drops")
 ## A kill's chance of dropping a heart (heals the whole team heart_heal of max
@@ -834,3 +959,18 @@ func milestones_at(level: int) -> int:
 ## A zombie's hp multiplier at difficulty `level`: 1 + difficulty_hp x level ^ difficulty_hp_curve.
 func hp_growth(level: float) -> float:
 	return 1.0 + difficulty_hp * pow(maxf(level, 0.0), difficulty_hp_curve)
+
+
+## How many stages a run has (0: endless).
+func stages_in_run() -> int:
+	match run_length:
+		0:
+			return 1
+		2:
+			return 0
+	return maxi(standard_stages, 1)
+
+
+## The stage events' times scale (a Short run's come sooner).
+func event_time_scale() -> float:
+	return short_time_scale if run_length == 0 else 1.0

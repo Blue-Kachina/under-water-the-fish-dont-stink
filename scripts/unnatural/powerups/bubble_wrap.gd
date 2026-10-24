@@ -11,7 +11,7 @@ var _untouched := 0.0
 
 
 func ready_time() -> float:
-	return maxf(settings.bubble_ready - settings.bubble_ready_per_stack * (stacks - 1), settings.bubble_ready_min)
+	return maxf(settings.bubble_ready - settings.bubble_ready_per_stack * extra(), settings.bubble_ready_min)
 
 
 func is_ready() -> bool:

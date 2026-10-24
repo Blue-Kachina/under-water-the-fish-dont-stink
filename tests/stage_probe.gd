@@ -42,6 +42,8 @@ func _run() -> void:
 	settings.twists = false
 	settings.base_hp = 100000.0
 	settings.stage_events = true
+	settings.run_length = 1
+	settings.standard_stages = 1  # one stage: the Leviathan's whirlpool wins (pacing_probe has the next stage)
 	settings.swarm_event_time = 0.0  # one wave each, as counted below (arsenal_batch_probe has the lasting swarms)
 	settings.event_warning = 0.5
 	settings.event_hush = 1.0

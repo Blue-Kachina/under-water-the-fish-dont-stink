@@ -13,11 +13,11 @@ var _out: Array[Vortex] = []
 
 
 func chance() -> float:
-	return settings.charm_chance + settings.charm_chance_per_stack * (stacks - 1)
+	return soft_chance(settings.charm_chance + settings.charm_chance_per_stack * extra())
 
 
 func on_kill(at: Vector3, _source: String) -> void:
-	_out = _out.filter(func(vortex: Vortex) -> bool: return is_instance_valid(vortex))
+	_out.assign(_out.filter(func(vortex: Vortex) -> bool: return is_instance_valid(vortex)))
 	if _out.size() >= settings.charm_max or not roll(chance()):
 		return
 	open_at(at)
@@ -28,7 +28,7 @@ func open_at(at: Vector3) -> Vortex:
 	vortex.owner_charm = self
 	vortex.radius = settings.charm_radius * size_scale()
 	vortex.life = settings.charm_time * duration_scale()
-	vortex.dps = settings.charm_dps + settings.charm_dps_per_stack * (stacks - 1)
+	vortex.dps = settings.charm_dps + settings.charm_dps_per_stack * extra()
 	vortex.pull = settings.charm_pull
 	vortex.tint = color(id)
 	run.add_child(vortex)

@@ -21,14 +21,16 @@ func on_stride(timing: float) -> void:
 
 ## A current from `from` back to `to`.
 func leave(from: Vector3, to: Vector3) -> Current:
-	_out = _out.filter(func(current: Current) -> bool: return is_instance_valid(current))
+	_out.assign(_out.filter(func(current: Current) -> bool: return is_instance_valid(current)))
+	while _out.size() >= maxi(settings.riptide_max, 1):
+		_out.pop_front().queue_free()  # the oldest gives way (the cap: riptide_max)
 	var current := Current.new()
 	current.owner_tide = self
 	current.from = from
 	current.to = to
 	current.width = settings.riptide_width * size_scale()
 	current.life = settings.riptide_time * duration_scale()
-	current.dps = settings.riptide_dps + settings.riptide_dps_per_stack * (stacks - 1)
+	current.dps = settings.riptide_dps + settings.riptide_dps_per_stack * extra()
 	current.drag = settings.riptide_drag
 	run.add_child(current)
 	_out.append(current)

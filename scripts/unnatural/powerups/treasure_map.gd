@@ -6,11 +6,11 @@ extends Powerup
 
 
 func chest_drop_factor() -> float:
-	return 1.0 + settings.treasure_chests * stacks
+	return 1.0 + settings.treasure_chests * eff()
 
 
 func chest_ping_bonus() -> float:
-	return settings.treasure_ping * stacks
+	return settings.treasure_ping * eff()
 
 
 ## A rolled map tucked on the back.

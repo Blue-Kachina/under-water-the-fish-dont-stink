@@ -63,7 +63,7 @@ func strike() -> void:
 		return
 	bolts += 1
 	var at := horde.enemy_position(best)
-	var damage := settings.trident_damage + settings.trident_damage_per_stack * (stacks - 1)
+	var damage := settings.trident_damage + settings.trident_damage_per_stack * extra()
 	var reach := settings.trident_radius * size_scale()
 	run.hit_area(horde.query_sphere(at, reach), damage, fish, id, at, 1.0, 1.0, [id])
 	var bolt := ChainLightning.Bolt.new()

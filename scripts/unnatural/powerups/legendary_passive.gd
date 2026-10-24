@@ -12,16 +12,16 @@ extends Powerup
 func execute_share() -> float:
 	if id != "megalodon_tooth" or stacks <= 0:
 		return 0.0
-	return minf(settings.tooth_execute + settings.tooth_execute_per_stack * (stacks - 1), settings.tooth_execute_max)
+	return minf(settings.tooth_execute + settings.tooth_execute_per_stack * extra(), settings.tooth_execute_max)
 
 
 func extra_level_picks() -> int:
-	return settings.pearl_picks * stacks if id == "moon_pearl" else 0
+	return roundi(settings.pearl_picks * eff()) if id == "moon_pearl" else 0
 
 
 func stat_bonus() -> Dictionary:
 	if id == "abyssal_engine":
-		return {"projectile_count": settings.engine_projectiles * stacks, "size": settings.engine_size * stacks}
+		return {"projectile_count": settings.engine_projectiles * eff(), "size": settings.engine_size * eff()}
 	return {}
 
 

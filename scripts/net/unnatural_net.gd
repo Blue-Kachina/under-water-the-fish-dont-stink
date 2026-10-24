@@ -88,6 +88,9 @@ func hook(game_run: UnnaturalRun) -> void:
 		run.whirlpool_entered.connect(func(fish: FishController) -> void: _send_all("_stage_done", [_pid(fish)], true))
 		run.pickup_dropped.connect(_on_pickup_dropped)
 		run.pickup_taken.connect(_on_pickup_taken)
+		run.shrine_placed.connect(func(shrine: Shrine) -> void: _send_all("_shrine", [shrine.global_position, shrine.kind], true))
+		run.shrine_activated.connect(func(shrine: Shrine, fish: FishController) -> void:
+			_send_all("_shrine_on", [shrine.index, _pid(fish)], true))
 	else:
 		run.hit_claimed.connect(_on_hit_claimed)
 		run.pearl_claimed.connect(_on_pearl_claimed)
@@ -97,6 +100,7 @@ func hook(game_run: UnnaturalRun) -> void:
 			_send_host("_unclaim_chest", [index, _pid(by)], true))
 		run.whirlpool_claimed.connect(_on_whirlpool_claimed)
 		run.pickup_claimed.connect(_on_pickup_claimed)
+		run.shrine_claimed.connect(func(index: int, by: FishController) -> void: _send_host("_claim_shrine", [index, _pid(by)], true))
 	run.player_down.connect(_on_down.bind(true))
 	run.player_revived.connect(_on_down.bind(false))
 
@@ -204,7 +208,7 @@ func _on_spawned(index: int) -> void:
 	if run.horde.is_proxy(index):
 		return  # a boss's: sent with the boss
 	_out_spawns.append([run.horde.net_id_of(index), run.horde.enemy_kind_index(index), run.horde.enemy_position(index),
-			run.horde.enemy_velocity(index), run.horde.is_elite(index), run.horde.enemy_level(index)])
+			run.horde.enemy_velocity(index), run.horde.elite_code(index), run.horde.enemy_level(index)])
 
 
 func _on_killed(index: int, _kind: int, _at: Vector3, source: String, by: Object) -> void:
@@ -299,7 +303,7 @@ func world() -> Dictionary:
 	for i in run.horde.alive:
 		if not run.horde.is_proxy(i):
 			zombies.append([run.horde.net_id_of(i), run.horde.enemy_kind_index(i), run.horde.enemy_position(i),
-					run.horde.enemy_velocity(i), run.horde.is_elite(i), run.horde.enemy_level(i)])
+					run.horde.enemy_velocity(i), run.horde.elite_code(i), run.horde.enemy_level(i)])
 	# Each: where, its turn, where it sinks to, who's opened it, and whether it's gone.
 	var chests := []
 	for chest in run.chests:
@@ -318,6 +322,11 @@ func world() -> Dictionary:
 	for pearl in run.pearls_out:
 		if is_instance_valid(pearl) and pearl.absorbing == null:
 			pearls.append([pearl.id, pearl.global_position, roundi(pearl.value)])
+	# Each: where, its kind, spent, a Tide running and how far held.
+	var shrines := []
+	for shrine in run.shrines:
+		if is_instance_valid(shrine):
+			shrines.append([shrine.global_position, shrine.kind, shrine.spent, shrine.tide_active, shrine.tide_held])
 	var bosses := []
 	for boss in run.bosses:
 		if is_instance_valid(boss) and not boss.dying:
@@ -327,13 +336,26 @@ func world() -> Dictionary:
 			bosses.append(["miniboss" if boss is DrownedShark else "boss", boss.boss_id, parts, boss.hp, boss.max_hp,
 					boss.global_position, boss.net_state()])
 	return {"mode": "unnatural", "zombies": zombies, "chests": chests, "drops": drops, "pearls": pearls, "frozen": run.horde.frozen_left,
-			"bosses": bosses, "elapsed": run.elapsed,
+			"bosses": bosses, "elapsed": run.elapsed, "stage": run.stage, "stage_started": run.stage_started, "deep": run.deep,
+			"shrines": shrines,
 			"level": run.levels.level, "xp": run.levels.xp, "kills": run.kills, "over": run.is_over, "won": run.stage_complete}
 
 
 ## A guest's run takes the host's world.
 func apply_world(state: Dictionary) -> void:
 	run.horde.clear()
+	if state.get("stage", 1) != run.stage:
+		run.stage = state.get("stage", 1)
+		run.horde.stage_hp = pow(run.settings.stage_hp_scale, run.stage - 1)
+		run._build_seabed()
+	run.stage_started = state.get("stage_started", 0.0)
+	run.deep = state.get("deep", 0)
+	run._place_shrines()  # (a guest's: clears them, for the host's below)
+	for entry: Array in state.get("shrines", []):
+		var shrine := run.add_shrine(entry[1], entry[0])
+		shrine.spent = entry[2]
+		shrine.tide_active = entry[3]
+		shrine.tide_held = entry[4]
 	_spawn_all(state.zombies)
 	for entry: Array in state.chests:
 		var chest := run.add_chest(entry[0], entry[1], entry[2], (entry[5] if entry.size() > 5 else 0) as TreasureChest.Kind, entry[6] if entry.size() > 6 else "")
@@ -365,7 +387,8 @@ func apply_world(state: Dictionary) -> void:
 func _spawn_all(entries: Array) -> void:
 	for entry: Array in entries:
 		if run.horde.index_of_net(entry[0]) < 0:
-			run.horde.spawn(entry[1], entry[2], entry[3], entry[4], false, entry[0], entry[5] if entry.size() > 5 else 0.0)
+			var code := int(entry[4])  # 0: not elite, 1: elite, 2 on: an elite modifier + 1 (Horde.elite_code)
+			run.horde.spawn(entry[1], entry[2], entry[3], code > 0, false, entry[0], entry[5] if entry.size() > 5 else 0.0, maxi(code - 1, 0))
 
 
 # --- Guest side ------------------------------------------------------------
@@ -575,3 +598,25 @@ func _down(pid: int, is_down: bool) -> void:
 	var fish := coop.fish_of(pid)
 	if fish and fish.puppet:
 		run.set_remote_down(fish, is_down)
+
+
+# --- Shrines (P5) ----------------------------------------------------------
+
+@rpc("authority", "call_remote", "reliable")
+func _shrine(at: Vector3, kind: int) -> void:
+	if _guest_run():
+		run.add_shrine(kind, at)
+
+
+## The host set shrine `index` off (a Tide, Deep or Pearls): it happens here too.
+@rpc("authority", "call_remote", "reliable")
+func _shrine_on(index: int, pid: int) -> void:
+	if _guest_run() and index >= 0 and index < run.shrines.size():
+		run.activate_shrine(run.shrines[index], coop.fish_of(pid))
+
+
+## A guest's player used shrine `index`: the host sets it off for everyone.
+@rpc("any_peer", "call_remote", "reliable")
+func _claim_shrine(index: int, pid: int) -> void:
+	if is_host() and index >= 0 and index < run.shrines.size():
+		run.activate_shrine(run.shrines[index], coop.fish_of(pid))  # (shrine_activated tells everyone)
