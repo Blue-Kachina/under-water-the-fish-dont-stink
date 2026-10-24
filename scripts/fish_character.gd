@@ -173,6 +173,7 @@ const SPECIES := {
 		{"key": "california", "name": "California Sea Hare"},
 		{"key": "spotted", "name": "Spotted Sea Hare"},
 		{"key": "ragged", "name": "Ragged Sea Hare"},
+		{"key": "tinctoria", "name": "Tinctoria"},
 	],
 }
 

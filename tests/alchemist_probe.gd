@@ -37,7 +37,7 @@ func _run() -> void:
 	var alchemist := FishCharacter.FishClass.ALCHEMIST
 	check(alchemist == 10 and FishCharacter.from_key("alchemist") == alchemist and FishCharacter.from_key("sea_hare") == alchemist,
 			"ALCHEMIST is added at the end (10); its key and alias resolve")
-	check(FishCharacter.species_count(alchemist) == 3 and FishCharacter.species_name(alchemist, 2) == "Ragged Sea Hare", "three Sea Hare species")
+	check(FishCharacter.species_count(alchemist) == 4 and FishCharacter.species_name(alchemist, 3) == "Tinctoria", "four Alchemist species")
 	check(FishCharacter.rl_hitbox(alchemist) == "merc", "on the Merc hitbox")
 	check(StatBlock.signature(alchemist) == "regen" and StatBlock.signature(FishCharacter.FishClass.DRIFTER) == "quantity",
 			"signatures: Regen (Alchemists), Quantity (Drifters)")
@@ -47,9 +47,9 @@ func _run() -> void:
 	check(Traversal.title(alchemist) == "Unpalatable" and Traversal.skill_title(alchemist) == "Flutter", "Unpalatable and Flutter")
 	check("attack_purple_haze" in Weapons.card_pool(FishAttack.Kind.BITE) and "attack_purple_haze" not in Weapons.card_pool(FishAttack.Kind.HAZE)
 			and "attack_depth_charges" not in Weapons.POWERUPS, "Purple Haze is a second weapon for others; Depth Charges are gone")
-	for species in 3:
+	for species in 4:
 		var model := FishModel.build(alchemist, species)
-		check(model.tail != null and model.fin_left != null and model.fin_left.get_child_count() > 0, "%s has a model with flaps on its fin pivots"
+		check(model.tail != null and model.fin_left != null and model._flaps.size() == 2 and model._flaps[0].get_child_count() > 0, "%s has a model with flaps hinged at its fin pivots"
 				% FishCharacter.species_name(alchemist, species))
 		model.free()
 

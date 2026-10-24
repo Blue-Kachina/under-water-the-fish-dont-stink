@@ -212,6 +212,7 @@ Signature stat stays **Knockback +15%**.
 | **California Sea Hare** (*Aplysia californica*), the standard one | Broad winglike parapodia. Reddish, brown, green and purple mottling |
 | **Spotted Sea Hare** (*Aplysia dactylomela*) | Cream, tan or olive body with prominent dark rings |
 | **Ragged Sea Hare** (*Bursatella leachii*) | Covered in small branching, hairlike projections (fin-strip "fuzz", like the Fuzzy Dwarf lionfish). Brownish, with bright blue spots |
+| **Tinctoria** (*Goniobranchus tinctorius*, a chromodorid nudibranch, not a sea hare) | After private_content/PygmySeaHare.png. A long flat oval, a red net over white with darker red patches, a white underside and wavy white mantle skirt; ridged red rhinophores on white stalks; a curled pink-white gill plume. (Added after Phase 3; first called the Pygmy Sea Hare until the reference turned out to be a nudibranch.) |
 
 ### Purple Haze (new steady `FishAttack`, the class's starting weapon)
 

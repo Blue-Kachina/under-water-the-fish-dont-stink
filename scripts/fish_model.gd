@@ -102,6 +102,14 @@ var _tail_rest := Vector3.ZERO
 var _bent: Array[GeometryInstance3D] = []
 var _riders: Array[Node3D] = []
 var _rider_rest: Array[Transform3D] = []
+## The sea hare's parapodia (SeaHareModel): thick flaps hinged on the flanks at
+## the fin pivots' places. They take only the pivots' roll, and close no further
+## than FLAP_CLOSE (rad), so they never fold into the body (_follow_flaps).
+const FLAP_CLOSE := 0.12
+var _flaps: Array[Node3D] = []
+## Materials whose body wave grows with each stride (sea_hare_skin.gdshader's
+## `stride`), set by _swim.
+var _body_waves: Array[ShaderMaterial] = []
 
 
 static func build(character: FishCharacter.FishClass, species := 0) -> FishModel:
@@ -272,6 +280,9 @@ func _swim(delta: float, velocity: Vector3) -> void:
 	for material in _waving:
 		material.set_shader_parameter("phase", _swim_phase)
 		material.set_shader_parameter("effort", effort)
+	for material in _body_waves:
+		material.set_shader_parameter("stride", stride_power)
+	_follow_flaps()
 	if _skin == null or delta <= 0.0:
 		return
 	# The ray: how far its body (not counting its own bank) turned this frame.
@@ -302,6 +313,21 @@ func _swim(delta: float, velocity: Vector3) -> void:
 	_skin.set_shader_parameter("sweep_right", -fin_right.rotation.y)
 	_tail_skin.set_shader_parameter("tail_ripple", lerpf(0.02, 0.05, effort))
 	_bend_whip(delta, moving, turned)
+
+
+## The sea hare's flaps (_flaps) roll with their fin pivot (+ opens them out
+## and down), closing no further than FLAP_CLOSE; the pivots' sweep is left out.
+## Their meshes' shaders get the roll as `hinge_roll`, to turn the body's wave
+## and bend into the hinge's space.
+func _follow_flaps() -> void:
+	for flap in _flaps:
+		var side := signf(flap.position.x)
+		var pivot := fin_left if side < 0.0 else fin_right
+		flap.rotation.z = clampf(-side * pivot.rotation.z, -FLAP_CLOSE, 1.2) * -side
+		for part in flap.get_children():
+			var material := (part as GeometryInstance3D).material_override as ShaderMaterial
+			if material:
+				material.set_shader_parameter("hinge_roll", flap.rotation.z)
 
 
 ## The frame the ray's body swims in: the model's own, less its bank.
