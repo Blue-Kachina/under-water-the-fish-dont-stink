@@ -704,6 +704,11 @@ var _pour_rate := 0.0
 var _pour_color := Color.TRANSPARENT
 ## Extra Swishy's strides (swim_style), read by the HUD's stride meter.
 var swishy := SwishySwim.new(self)
+## How its class's strides move it and look: the class's own Gait in
+## GaitSettings (the GAITS tuning), so a change there applies on the next tick.
+## The gait shapes the body's motion and the model only; the follow camera
+## follows the body, so a gait's bob or tilt (on the model) never moves it.
+var gait: Gait = GaitSettings.shared().for_class(FishCharacter.FishClass.SKIRMISHER)
 
 ## The character's model (built in _apply_character) and the parts the swim
 ## animation moves.
@@ -763,6 +768,7 @@ func _ready() -> void:
 ## Become `character`: its car's hitbox, belly, centre of mass (rotations pivot
 ## about it, as in RL) and wheels, and its fish model.
 func _apply_character() -> void:
+	gait = GaitSettings.shared().for_class(character)
 	if _collision == null:  # set before _ready; applied there
 		return
 	center_of_mass = FishCharacter.com_from_hitbox(character)
@@ -1194,7 +1200,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	# Before this tick's gravity and thrust, as RL damps the velocity the step starts with.
 	velocity = _apply_flip_z_damp(velocity, dt)
 	if on_surface:
-		velocity = _apply_ground(velocity, body_basis, dt)
+		velocity = _apply_ground(velocity, body_basis, dt)  # Gait.SurfaceMode.NONE: strides don't push here
 	else:
 		velocity = _apply_thrust(velocity, forward, dt)
 		if swim_style == SwimStyle.EXTRA_SWISHY:
@@ -1709,10 +1715,11 @@ func _apply_water(velocity: Vector3, forward: Vector3, dt: float) -> Vector3:
 		# Only the speed earned above cruise fades; cruise itself is held.
 		velocity *= (cruise + (current - cruise) * exp(-overspeed_drag * drag_scale * dt)) / current
 	else:
-		velocity *= exp(-linear_drag * drag_scale * dt)
+		# Between strides the class's gait sets how it coasts (Gait.coast_drag).
+		velocity *= exp(-linear_drag * (1.0 if stroking else gait.coast_drag) * drag_scale * dt)
 	var slip := velocity - forward * velocity.dot(forward)
 	velocity -= slip * (1.0 - exp(-_effective_lateral_drag(dt) * dt))
-	velocity.y += buoyancy * dt
+	velocity.y += (buoyancy + (0.0 if stroking else gait.coast_buoyancy)) * dt
 	return velocity
 
 
@@ -2103,9 +2110,9 @@ func _process(delta: float) -> void:
 	var slide := 1.0 if is_powersliding else 0.0
 	var tail_kick := -input_stick.x * 0.6 * slide
 	if swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY:
-		# Strides drive the tail: each sweeps it across, away from the push, to
-		# the far side at the peak (SwishySwim.tail_swing). The idle wiggle only
-		# shows between strides.
+		# Strides drive the tail (Gait.Visual.TAIL_BEND): each sweeps it across,
+		# away from the push, to the far side at the peak (SwishySwim.tail_swing).
+		# The idle wiggle only shows between strides.
 		var growth := stride_tail_growth * swishy.flow / maxf(stride_flow_max, 0.01)
 		_tail.scale = Vector3.ONE * (1.0 + growth) * (1.0 + 0.2 * swishy.power)
 		var swing := swishy.tail_swing * stride_tail_swing

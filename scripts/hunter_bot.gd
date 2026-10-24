@@ -304,7 +304,7 @@ func _time_stride() -> void:
 	if swim.strides != _stride_seen:
 		_stride_seen = swim.strides
 		var error := 0.0 if rng.randf() < difficulty.perfect_chance else rng.randfn(0.0, difficulty.timing_error)
-		_flip_at = clampf(fish.stride_peak_time + error, 0.08, fish.stride_peak_time + MAX_LATE)
+		_flip_at = clampf(fish.swishy.peak_time() + error, 0.08, fish.swishy.peak_time() + MAX_LATE)
 	if swim.phase >= _flip_at:
 		_flick()
 		_flip_at = INF  # once per stride

@@ -2,7 +2,7 @@ extends Node
 ## The later playable fish (Lionfish, Moon Jelly, Mantis Shrimp, Manta): each
 ## starts with a powerup weapon in the slot a fish's own attack takes (and
 ## can't swap it away), builds a model, shows its details, and has a twist:
-## Wake, Drift, Snap and Escort.
+## Wake, Drift, Recoil Dash and Escort.
 ##   Godot_console.exe --headless --path . res://tests/new_fish_probe.tscn
 
 var main: Node
@@ -45,7 +45,7 @@ func _run() -> void:
 
 	print("starting weapons:")
 	var expected := {FishCharacter.FishClass.SCORCHER: FishAttack.Kind.FIRE, FishCharacter.FishClass.DRIFTER: FishAttack.Kind.HALO,
-			FishCharacter.FishClass.BRAWLER: FishAttack.Kind.CHARGES, FishCharacter.FishClass.BREACHER: FishAttack.Kind.REMORA}
+			FishCharacter.FishClass.BRAWLER: FishAttack.Kind.PUNCH, FishCharacter.FishClass.BREACHER: FishAttack.Kind.REMORA}
 	for fish_class: FishCharacter.FishClass in expected:
 		await _be(fish_class)
 		var name: String = FishCharacter.display_name(fish_class)
@@ -100,14 +100,14 @@ func _run() -> void:
 
 	await _be(FishCharacter.FishClass.BRAWLER)
 	fish.freeze = false
-	var target := horde.spawn(1, Vector3(3, 0, 0))
+	var target := horde.spawn(1, Vector3(0, 0, -4))
 	await _ticks(4)
-	var snap := run.twist_of(fish)
-	check(snap.mobility() and snap.snaps == 1, "Mantis Shrimp, Snap goes off")
-	await _ticks(2)
-	check(run.stats_of(fish).by_source.get("snap", 0.0) > 0.0 and horde.enemy_hp(target) < horde.enemy_kind(target).hp * settings.enemy_hp_scale - 0.01,
-			"and shocks the zombie nearby")
-	check(not snap.mobility(), "then a cooldown")
+	var recoil := run.twist_of(fish)
+	check(recoil.mobility() and recoil.recoils == 1, "Mantis Shrimp, Recoil Dash goes off")
+	await _ticks(20)
+	check(run.stats_of(fish).by_source.get("punch", 0.0) > 0.0 and horde.enemy_hp(target) < horde.enemy_kind(target).hp * settings.enemy_hp_scale - 0.01,
+			"and punches the zombie ahead")
+	check(not recoil.mobility(), "then a cooldown")
 
 	await _be(FishCharacter.FishClass.BREACHER)
 	fish.freeze = false

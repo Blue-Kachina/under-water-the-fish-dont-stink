@@ -250,7 +250,7 @@ static func shared() -> UnnaturalSettings:
 ## Each fish fires its own auto-attack (FishAttack.FOR_CLASS); pick one here
 ## to give every fish that one instead (testing). Live.
 @export_enum("Own fish's", "Anemone Sting", "Ghost Bite", "Shock Lash", "Bill Thrust", "Bubble Volley", "Spine Burst",
-		"Greek Fire Trail", "Jellyfish Halo", "Depth Charges", "Remora Buddy", "Leviathan's Coil") var fish_attack := 0
+		"Greek Fire Trail", "Jellyfish Halo", "Depth Charges", "Remora Buddy", "Leviathan's Coil", "Cavitation Punch") var fish_attack := 0
 
 @export_group("Ghost Bite")
 ## The Shark's auto-attack: huge spectral jaws that snap shut on the zone in front.
@@ -328,6 +328,31 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.05, 5.0, 0.05, "or_greater") var spine_size := 0.5
 @export_range(1, 50, 1, "or_greater") var spine_pierce := 2
 
+@export_group("Cavitation Punch")
+## The Mantis Shrimp's: a boxing glove thrown at the nearest zombie within
+## punch_aim_cone degrees of the nose, flying punch_speed (m/s) for punch_range
+## m (never less than the bow wave's reach times punch_over_bow) with a
+## punch_size m hit radius, fading out over the last punch_fade of its flight.
+## It strikes the first zombie it touches for punch_damage, knocked back
+## punch_knock times as hard as usual. punch_collapse_delay s later the bubble
+## collapses there: punch_collapse_share of the strike to every zombie within
+## punch_collapse_radius m (proc punch_collapse_proc). More Quantity: more
+## gloves, punch_follow_gap s apart, from alternate claws.
+@export_range(0.0, 1000.0, 1.0, "or_greater") var punch_damage := 30.0
+@export_range(0.05, 10.0, 0.05, "or_greater") var punch_cooldown := 0.7
+@export_range(1.0, 200.0, 1.0, "or_greater") var punch_speed := 30.0
+@export_range(1.0, 60.0, 0.5, "or_greater") var punch_range := 7.0
+@export_range(1.0, 5.0, 0.05, "or_greater") var punch_over_bow := 1.2
+@export_range(0.05, 5.0, 0.05, "or_greater") var punch_size := 0.8
+@export_range(0.0, 1.0, 0.05) var punch_fade := 0.4
+@export_range(0.0, 10.0, 0.1, "or_greater") var punch_knock := 2.0
+@export_range(0.0, 180.0, 5.0) var punch_aim_cone := 60.0
+@export_range(0.0, 1.0, 0.01, "or_greater") var punch_collapse_delay := 0.08
+@export_range(0.0, 3.0, 0.05, "or_greater") var punch_collapse_share := 0.5
+@export_range(0.0, 20.0, 0.25, "or_greater") var punch_collapse_radius := 2.0
+@export_range(0.0, 1.0, 0.05) var punch_collapse_proc := 0.5
+@export_range(0.0, 1.0, 0.01, "or_greater") var punch_follow_gap := 0.1
+
 @export_group("Twists")
 ## Each fish's traversal twist (Traversal). Off: every fish swims the same.
 @export var twists := true
@@ -356,12 +381,14 @@ static func shared() -> UnnaturalSettings:
 ## Lionfish, Wake: Greek Fire burns up to this much harder (+share) the nearer
 ## it swims to battering speed.
 @export_range(0.0, 5.0, 0.05, "or_greater") var wake_damage := 0.6
-## Mantis Shrimp, Snap (mobility): lunges ahead snap_speed (m/s) and cracks a shockwave, snap_damage to every zombie
-## within snap_radius m, then snap_cooldown s before the next.
-@export_range(0.0, 1000.0, 1.0, "or_greater") var snap_damage := 70.0
-@export_range(0.0, 40.0, 0.5, "or_greater") var snap_radius := 6.0
-@export_range(0.0, 20.0, 0.25, "or_greater") var snap_cooldown := 2.0
-@export_range(0.0, 100.0, 0.5, "or_greater") var snap_speed := 18.0
+## Mantis Shrimp, Heavy Hitter: a zombie its punches knock back flies as a
+## missile for heavy_time s: each other zombie it hits (up to heavy_max) takes
+## heavy_share of the punch's damage, knocked on the way it flew. At most
+## heavy_flings missiles at once (the oldest goes), to keep big hordes cheap.
+@export_range(0.0, 3.0, 0.05, "or_greater") var heavy_share := 0.5
+@export_range(0.0, 2.0, 0.05, "or_greater") var heavy_time := 0.35
+@export_range(0, 20, 1, "or_greater") var heavy_max := 3
+@export_range(1, 200, 1, "or_greater") var heavy_flings := 24
 ## Baby Whale Shark, Escort: holding still (slower than chest_still_speed), it heals this
 ## many hp a second.
 @export_range(0.0, 100.0, 0.25, "or_greater") var escort_regen := 4.0
@@ -409,6 +436,14 @@ static func shared() -> UnnaturalSettings:
 ## fires, and zombies lose track of it. Ends if it's hurt; then quiet_cooldown s.
 @export_range(0.5, 60.0, 0.5, "or_greater") var quiet_time := 8.0
 @export_range(0.1, 60.0, 0.1, "or_greater") var quiet_cooldown := 6.0
+## Mantis Shrimp, Recoil Dash: throws a full Cavitation Punch one way and is
+## thrown the other at recoil_speed (m/s), with no drag for recoil_time s, untouchable for
+## recoil_iframes s. It goes the way the stick leans (else backwards), so the
+## punch goes the opposite way (else ahead).
+@export_range(0.0, 100.0, 0.5, "or_greater") var recoil_speed := 20.0
+@export_range(0.0, 2.0, 0.05, "or_greater") var recoil_time := 0.25
+@export_range(0.0, 2.0, 0.05, "or_greater") var recoil_iframes := 0.2
+@export_range(0.1, 60.0, 0.1, "or_greater") var recoil_cooldown := 2.0
 ## Baby Whale Shark, Gulp: sucks every zombie within gulp_range m ahead of it
 ## in (pulled at gulp_pull m/s), gulp_damage each.
 @export_range(1.0, 60.0, 0.5, "or_greater") var gulp_range := 14.0

@@ -40,7 +40,7 @@ const SCHOOL_RATE := 10.0
 ## Tuning changes are sent this long (s) after the last one, not every slider step.
 const TUNING_DELAY := 0.25
 ## The tuning that's the host's (the camera stays each player's own).
-const TUNING_SECTIONS := ["fish", "nature", "unnatural", "powerups"]
+const TUNING_SECTIONS := ["fish", "gaits", "nature", "unnatural", "powerups"]
 ## How often (s) guests time the round trip to the host, and send any change of
 ## their players (joining, leaving, a new fish).
 const PING_INTERVAL := 1.0

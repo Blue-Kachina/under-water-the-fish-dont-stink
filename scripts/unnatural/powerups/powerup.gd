@@ -66,6 +66,7 @@ const INFO := {
 	"attack_thrust": ["Bill Thrust", Color(0.95, 0.9, 0.6), "BT", "Spears of light fly ahead, piercing a line of zombies.", Rarity.Tier.COMMON],
 	"attack_bubbles": ["Bubble Volley", Color(0.6, 0.9, 1.0), "BV", "Homing bubbles pop on the nearest zombies.", Rarity.Tier.COMMON],
 	"attack_spines": ["Spine Burst", Color(0.95, 0.8, 0.45), "SB", "Spines burst out every way when zombies come close.", Rarity.Tier.COMMON],
+	"attack_punch": ["Cavitation Punch", Color(1.0, 0.45, 0.35), "CP", "A boxing glove punches the zombie ahead, and the bubble it leaves collapses on the ones round it.", Rarity.Tier.COMMON],
 	"blood_moon_shard": ["Blood Moon Shard", Color(0.9, 0.1, 0.15), "BM", "Damage +100%\n!Damage Taken +50%", Rarity.Tier.CURSED],
 	"glass_coral": ["Glass Coral", Color(1.0, 0.55, 0.65), "GC", "Damage +100%\n!Max HP -50%", Rarity.Tier.CURSED],
 	"sirens_song": ["Siren's Song", Color(0.75, 0.45, 0.95), "SS", "XP Gain +100%\n!Zombies +50%", Rarity.Tier.CURSED],

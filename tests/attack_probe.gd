@@ -52,7 +52,7 @@ func _run() -> void:
 	check(run.attack_of(fish) is ShockLash, "the String Ray lashes")
 	var expected := {FishCharacter.FishClass.SKIRMISHER: AnemoneSting, FishCharacter.FishClass.HUNTER: GhostBite,
 			FishCharacter.FishClass.LANCER: BillThrust, FishCharacter.FishClass.CHARMER: BubbleVolley, FishCharacter.FishClass.BULWARK: SpineBurst,
-			FishCharacter.FishClass.SCORCHER: GreekFire, FishCharacter.FishClass.DRIFTER: JellyfishHalo, FishCharacter.FishClass.BRAWLER: DepthCharges,
+			FishCharacter.FishClass.SCORCHER: GreekFire, FishCharacter.FishClass.DRIFTER: JellyfishHalo, FishCharacter.FishClass.BRAWLER: CavitationPunch,
 			FishCharacter.FishClass.BREACHER: RemoraBuddy}
 	for fish_class: FishCharacter.FishClass in expected:
 		var made := FishAttack.make(FishAttack.kind_for(fish_class))

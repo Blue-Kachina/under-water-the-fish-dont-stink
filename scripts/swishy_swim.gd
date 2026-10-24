@@ -21,8 +21,9 @@ extends RefCounted
 ## stride before it builds, so it pushes very little and drains flow.
 ##
 ## Tuning lives on the fish (its "Extra Swishy" exports), so the tuning panel
-## and presets cover it. The fish calls sample() as it samples input and
-## apply() while swimming off a surface.
+## and presets cover it, and its class's Gait (FishController.gait) shapes it:
+## the stride's timing and power, and which way it pushes and kicks. The fish
+## calls sample() as it samples input and apply() while swimming off a surface.
 
 ## Power from which a stride counts as near its peak (sweetness(), the cues).
 const SWEET_SPOT := 0.85
@@ -77,19 +78,29 @@ func reset() -> void:
 	_last_dir = Vector2.ZERO
 
 
+## Seconds from a stride's start to its peak: the fish's, times its gait's stroke time.
+func peak_time() -> float:
+	return fish.stride_peak_time * fish.gait.stroke_time
+
+
+## Seconds from a stride's peak until it has faded out (likewise).
+func fade_time() -> float:
+	return fish.stride_fade_time * fish.gait.stroke_time
+
+
 ## How strong a stride is `t` seconds after it began, 0..1.
 func envelope(t: float) -> float:
 	if t < 0.0:
 		return 0.0
-	var peak := maxf(fish.stride_peak_time, 0.01)
+	var peak := maxf(peak_time(), 0.01)
 	if t < peak:
 		return smoothstep(0.0, peak, t)
-	return clampf(1.0 - (t - peak) / maxf(fish.stride_fade_time, 0.01), 0.0, 1.0)
+	return clampf(1.0 - (t - peak) / maxf(fade_time(), 0.01), 0.0, 1.0)
 
 
 ## Seconds until the current stride peaks (negative once it has), for cues.
 func time_to_peak() -> float:
-	return fish.stride_peak_time - phase if phase >= 0.0 else INF
+	return peak_time() - phase if phase >= 0.0 else INF
 
 
 ## How close the current stride is to its peak, 0..1: 1 right at it, falling
@@ -104,8 +115,8 @@ func sweetness() -> float:
 func cue() -> Vector3:
 	if phase < 0.0:
 		return Vector3.ZERO
-	var fill := clampf(phase / maxf(fish.stride_peak_time, 0.01), 0.0, 1.0)
-	var glow := lerpf(0.75, 1.0, fill) if phase <= fish.stride_peak_time else power
+	var fill := clampf(phase / maxf(peak_time(), 0.01), 0.0, 1.0)
+	var glow := lerpf(0.75, 1.0, fill) if phase <= peak_time() else power
 	return Vector3(fill, glow, sweetness())
 
 
@@ -119,7 +130,7 @@ func sample(stick: Vector2, delta: float) -> void:
 		steer = stick  # not striding: plain, direct steering
 	if phase >= 0.0:
 		phase += delta
-		if phase > fish.stride_peak_time + fish.stride_fade_time:
+		if phase > peak_time() + fade_time():
 			# Faded out: the chain's over and the next push starts fresh.
 			phase = -1.0
 			strides = 0
@@ -165,7 +176,7 @@ func _start(dir: Vector2, reach: float) -> void:
 		flow = clampf(flow + fish.stride_flow_gain * (2.0 * timing - 1.0), 0.0, fish.stride_flow_max)
 		strength = lerpf(fish.stride_fresh, 1.0, timing) * (1.0 + flow)
 	last_timing = timing
-	last_early = not fresh and phase < fish.stride_peak_time
+	last_early = not fresh and phase < peak_time()
 	phase = 0.0
 	power = 0.0
 	_dir = dir
@@ -182,8 +193,8 @@ func _swing_tail(delta: float) -> void:
 		tail_swing = tail_swing.move_toward(Vector2.ZERO, 3.0 * delta)
 		return
 	var across := -_dir
-	if phase < fish.stride_peak_time:
-		tail_swing = _tail_from.lerp(across, smoothstep(0.0, fish.stride_peak_time, phase))
+	if phase < peak_time():
+		tail_swing = _tail_from.lerp(across, smoothstep(0.0, peak_time(), phase))
 	else:
 		tail_swing = across * power
 
@@ -196,9 +207,17 @@ func apply(velocity: Vector3, basis: Basis, dt: float) -> Vector3:
 	var room := clampf(1.0 - velocity.dot(forward) / maxf(fish.stride_max_speed, 0.1), 0.0, 1.0)
 	if room <= 0.0:
 		return velocity
-	# The tail sweeps one way, so the water pushes the body a little the other.
-	# Stick x is right, stick y is down (which pitches the nose up).
-	var sweep := basis.x * _dir.x - basis.y * _dir.y
+	var push := push_direction(basis)
+	return velocity + push * fish.stride_force * fish.gait.stroke_power * fish.stride_scale * power * strength * reach_scale() * room * dt
+
+
+## Which way the current stride pushes (unit, world): along the gait's push
+## axis, kicked off it by stride_side_angle along its stroke axis.
+func push_direction(basis: Basis) -> Vector3:
+	var along := -basis.z  # Gait.PushAxis.NOSE
+	# Gait.StrokeAxis.LATERAL: the tail sweeps one way, so the water pushes the
+	# body a little the other. Stick x is right, stick y is down (which pitches
+	# the nose up).
+	var kick := -(basis.x * _dir.x - basis.y * _dir.y).normalized()
 	var angle := deg_to_rad(fish.stride_side_angle)
-	var push := forward * cos(angle) - sweep.normalized() * sin(angle)
-	return velocity + push * fish.stride_force * fish.stride_scale * power * strength * reach_scale() * room * dt
+	return along * cos(angle) + kick * sin(angle)

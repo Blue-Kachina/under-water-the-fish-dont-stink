@@ -65,6 +65,7 @@ const GLYPHS := {
 	"attack_thrust": "M4 20 16 8M13 5l6-1-1 6zM6 14l4 4",
 	"attack_bubbles": "M4 15a4 4 0 1 0 8 0a4 4 0 1 0-8 0M13 8a3 3 0 1 0 6 0a3 3 0 1 0-6 0M15 17.5a2 2 0 1 0 4 0a2 2 0 1 0-4 0M6 13.5a1.5 1.5 0 0 1 1.5-1.5",
 	"attack_spines": "M8 8h8v8H8zM12 3v5M12 16v5M3 12h5M16 12h5M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3",
+	"attack_punch": "M10 7h6a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3h-6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zM8 10H5v4h3M11 13h4M2 7h3M2 17h3M19.5 3a1.5 1.5 0 1 0 0.01 0",
 	# The tomes (Tomes.glyph): a book, its emblem on the cover.
 	"tome_teeth": "M6 20V5a2 2 0 0 1 2-2h10v15H8a2 2 0 0 0-2 2a2 2 0 0 0 2 2h10M9.5 8l1.75 4 1.75-4 1.75 4 1.75-4",
 	"tome_tides": "M6 20V5a2 2 0 0 1 2-2h10v15H8a2 2 0 0 0-2 2a2 2 0 0 0 2 2h10M9.5 9c1-1 2-1 3 0s2 1 3 0M9.5 12.5c1-1 2-1 3 0s2 1 3 0",

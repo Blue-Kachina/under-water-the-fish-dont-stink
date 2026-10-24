@@ -11,7 +11,7 @@ extends CanvasLayer
 ##
 ## The sections: Game (player name, fish, goal replays, tuning presets),
 ## Display and Controls (UISettings; Controls, with every rebindable action's
-## keyboard & mouse and controller binding), then Camera, Fish, Ball, Nature,
+## keyboard & mouse and controller binding), then Camera, Fish, Gaits (GaitSettings), Ball, Nature,
 ## Unnatural and Powerups (the tuning). The big ones are split into tabs
 ## across the top (TABS).
 ##
@@ -40,11 +40,12 @@ const PREVIEW_DIR := "res://assets/ui/previews"
 ## The sections in order: [id, title]. Game, Display and Controls are
 ## UISettings and Controls; the rest are tuning targets.
 const SECTIONS := [["game", "Game"], ["display", "Display"], ["audio", "Audio"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"],
-		["ball", "Ball"], ["nature", "Nature"], ["unnatural", "Unnatural"], ["powerups", "Powerups"]]
+		["gaits", "Gaits"], ["ball", "Ball"], ["nature", "Nature"], ["unnatural", "Unnatural"], ["powerups", "Powerups"]]
 ## Who each tuning section is for ("Used by ...").
 const USED_BY := {
 	"camera": "the follow camera, in every mode",
 	"fish": "your fish, in every mode",
+	"gaits": "each class's strides, in every mode",
 	"ball": "the ball in Fish Sticks",
 	"nature": "Nature, Hunt and Unnatural",
 	"unnatural": "Unnatural and the Test Tank",
@@ -83,6 +84,8 @@ const TABS := {
 			["Strokes", ["Swim Strokes", "Extra Swishy", "Bow Wave", "Nature"]],
 			["Jumps & Surfaces", ["Jump & Dodge", "Powerslide", "Surface"]],
 			["Body & Controller", ["Hitbox", "Controller"]]],
+	"gaits": [["Classes", ["Skirmishers", "Hunters", "Gliders", "Lancers", "Charmers", "Bulwarks", "Scorchers", "Drifters", "Brawlers",
+			"Breachers"]]],
 	"nature": [["Schools", ["Schools", "Formation", "Spawning", "Performance"]],
 			["Battering", ["Battered fish", "School Reactions", "Multis & Sprees"]],
 			["Pearls & Targets", ["Pearls", "Targeting"]]],
@@ -91,7 +94,7 @@ const TABS := {
 			["Horde", ["Director", "Enemies", "Twists"]],
 			["Survivor", ["Player", "Batteries", "Levels", "Weapons and Tomes", "Pearls"]],
 			["Limits", ["Limits", "Choices"]],
-			["Attacks", ["Attacks", "Ghost Bite", "Anemone Sting", "Shock Lash", "Bill Thrust", "Bubble Volley", "Spine Burst"]],
+			["Attacks", ["Attacks", "Ghost Bite", "Anemone Sting", "Shock Lash", "Bill Thrust", "Bubble Volley", "Spine Burst", "Cavitation Punch"]],
 			["Stage & Bosses", ["Stage", "Run", "Drowned Shark", "Blood Leviathan", "Final Bosses"]],
 			["Pacing", ["Shrines", "Elite Modifiers"]],
 			["Loot", ["Chests", "Drops", "Rarity"]],
@@ -202,7 +205,7 @@ var _capture_age := 0.0
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 7  # over the pause menu and the home screen
-	_targets = {"fish": fish, "camera": follow_camera, "ball": ball_settings, "nature": NatureSettings.shared(),
+	_targets = {"fish": fish, "gaits": GaitSettings.shared(), "camera": follow_camera, "ball": ball_settings, "nature": NatureSettings.shared(),
 			"unnatural": UnnaturalSettings.shared(), "powerups": PowerupSettings.shared()}
 	for section: String in _targets:
 		_defaults[section] = _snapshot(_targets[section])
@@ -770,6 +773,8 @@ func _build_section(section: String, target: Object) -> void:
 			var group_name: String = shown_group if shown_group else "General"
 			heading = _heading(_list_for(key, group_name), group_name)
 		var meta := {"group": shown_group if shown_group else "General"}
+		if target.has_method("option_title"):  # options made per class (GaitSettings)
+			meta["title"] = target.option_title(prop)
 		if property.type == TYPE_BOOL:
 			meta["kind"] = "bool"
 		elif property.hint == PROPERTY_HINT_ENUM:

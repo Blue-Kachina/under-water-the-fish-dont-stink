@@ -10,7 +10,7 @@ extends Node
 
 const LEVELS := [1, 5, 10, 15, 20]
 const KINDS := [FishAttack.Kind.STING, FishAttack.Kind.BITE, FishAttack.Kind.LASH, FishAttack.Kind.THRUST,
-		FishAttack.Kind.BUBBLES, FishAttack.Kind.SPINES]
+		FishAttack.Kind.BUBBLES, FishAttack.Kind.SPINES, FishAttack.Kind.PUNCH]
 ## The circle the fish swims round the cluster (m) and how fast (m/s).
 const CIRCLE := 6.0
 const SWIM := 8.0

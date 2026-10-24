@@ -124,6 +124,8 @@ const ROWS := [
 	["unnatural/bubbles_hit", 1, "3d voices=3 cd=0.03", "Bubble Volley lands."],
 	["unnatural/spines_fire", 1, "3d voices=3", "Spine Burst fires."],
 	["unnatural/spines_hit", 1, "3d voices=3 cd=0.03", "Spine Burst lands."],
+	["unnatural/punch_fire", 1, "3d voices=3", "Cavitation Punch throws a glove."],
+	["unnatural/punch_hit", 1, "3d voices=3 cd=0.03", "Cavitation Punch lands (the glove, then the bubble collapsing)."],
 	# Unnatural: zombies.
 	["unnatural/zombie_spawn", 3, "3d voices=2 cd=0.2", "A zombie rises from the seabed (heavily rate-limited)."],
 	["unnatural/zombie_moan_loop", 2, "loop voices=1", "The horde's moan: one loop, louder the more are near."],
@@ -267,12 +269,14 @@ const FALLBACKS := {
 	"unnatural/thrust_fire": "unnatural/attack_own_fire",
 	"unnatural/bubbles_fire": "unnatural/attack_own_fire",
 	"unnatural/spines_fire": "unnatural/attack_own_fire",
+	"unnatural/punch_fire": "unnatural/attack_own_fire",
 	"unnatural/sting_hit": "unnatural/attack_own_hit",
 	"unnatural/bite_hit": "unnatural/attack_own_hit",
 	"unnatural/lash_hit": "unnatural/attack_own_hit",
 	"unnatural/thrust_hit": "unnatural/attack_own_hit",
 	"unnatural/bubbles_hit": "unnatural/attack_own_hit",
 	"unnatural/spines_hit": "unnatural/attack_own_hit",
+	"unnatural/punch_hit": "unnatural/attack_own_hit",
 }
 
 static var _events := {}

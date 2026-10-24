@@ -12,7 +12,7 @@ Started 2026-10-24. Covers seven requests:
 
 Everything follows the usual loop: plan → build → headless probes → debug build → you test by hand → adjust. Each phase ends with a build you can test. Numbers below are starting values. They go into `UnnaturalSettings` / `PowerupSettings` with wide ranges, not into consts. `INVENTORY.md` is updated in the same phase as each change.
 
-Open decisions are marked **D1, D2...** and listed together in §10 (D1 and D7 are answered). You can answer them in any order. Each phase notes which decisions it is waiting on.
+Decisions are marked **D1, D2...** and listed together in §10. **All twelve were answered on 2026-10-24.** Where an answer changed the plan (D6, D8, D11), §10 says how; the phase sections above still show the options as first written.
 
 ---
 
@@ -195,6 +195,8 @@ Signature stat stays **Knockback +15%**.
 
 **Size:** M.
 
+**Built 2026-10-24 (Phase 2).** `CavitationPunch` (`scripts/unnatural/attacks/cavitation_punch.gd`, `FishAttack.Kind.PUNCH`, added at the end of the enum; second-weapon id `attack_punch`, source `punch`) with the numbers above as `punch_*` settings (new **Cavitation Punch** group under Attacks). As planned, plus: the glove's range is never less than 1.2× the bow wave's reach (`punch_over_bow`, like the other melee attacks); with nothing in the 60° cone it punches straight on only if a zombie is within reach ahead, otherwise it waits; the knockback is `punch_knock` (2×) the usual. Zombies' speed cap clamps a knocked zombie to about 1.5× its swim speed, so knockback reads strongest on slow kinds. The Lv 10 stun skips zombies that are Heavy Hitter missiles (a stun zeroes their velocity). **Recoil Dash** (`recoil_*` in Mobility): the stick's lean is right/left and pitch up/down, relative to the fish; a single push to 20 m/s, then no water drag for `recoil_time` (as Surge does), rather than holding the speed. It throws the fish's own punch, else a held `attack_punch`, else a spare punch at the fish's stats (when the panel's `fish_attack` gave it another attack). **Heavy Hitter** (D6, `heavy_*` in Twists): `Traversal.fling()` keeps up to `heavy_flings` (24) missiles; each checks one sphere query a tick while it's moving faster than 1 m/s, and hits up to `heavy_max` (3) others for `heavy_share` (50%) of the punch, source `heavy_hitter`, proc 0.3. Missiles don't chain. Snap, Hammer and the `snap_*` settings are gone. Probes: new `brawler_probe`; `attack_probe`, `new_fish_probe`, `milestones_probe` and `weapon_bench` know the punch.
+
 ---
 
 ## 5. New class: Sea Hare (the Alchemists) (Phase 3)
@@ -316,6 +318,8 @@ The fish are RocketSim cars, so **they already have wheels and can touch surface
 
 **Size:** Phase 1 S–M (the layer, no new behaviour). Each new gait is S, plus whatever its model needs.
 
+**Built 2026-10-24 (Phase 1).** `Gait` (`scripts/gait.gd`) holds `stroke_axis`, `push_axis`, `stroke_time` (× the fish's stride peak and fade times; the plan's "cadence"), `stroke_power` (× stride force), `coast_drag` (× linear drag between strides), `coast_buoyancy` (m/s² between strides), `surface_mode` and `visual`. Each enum lists only what's built (today's `LATERAL` / `NOSE` / `NONE` / `TAIL_BEND`), and later phases add values at the end. `GaitSettings.shared()` keeps one Gait per class and is the new **GAITS** tuning section (after Fish): a heading per class, options named `<class key>_<export>` (e.g. `drifter_coast_drag`). It is saved in presets (`[gaits]`), sent by the co-op host, and described from gait.gd's comments (`gen_setting_docs`). An enum only shows in the panel once it has a second value. `FishController.gait` is its class's Gait. `SwishySwim.peak_time()` / `fade_time()` / `push_direction()` read it, and `_apply_water` uses the coast values. The camera follows the body, so bob or tilt on the model never moves it. `gait_probe` checks that every class swims **bit-for-bit** as before against `tests/fixtures/gait_baseline.json` (recorded on the pre-gait code; `-- --record` re-records it), and checks each number, the panel/preset/co-op wiring and the camera.
+
 ---
 
 ## 7. Phase plan
@@ -323,13 +327,13 @@ The fish are RocketSim cars, so **they already have wheels and can touch surface
 | Phase | Content | Needs | Size |
 |---|---|---|---|
 | **0** | Classes and Species rename (§1). **Built 2026-10-24** | ~~D1~~ (D2 can wait) | M |
-| **1** | Gait layer, lateral default, no visible change (§6) | — | S–M |
-| **2** | Brawlers: Cavitation Punch, Recoil Dash, new twist (§4). Depth Charges stays in the card pool, ownerless, until Phase 3 replaces it | D6 | M |
-| **3** | Alchemists: Sea Hare model + 3 species, Purple Haze (built from Depth Charges, which is then retired), Unpalatable, Flutter, flap gait (§5) | D8 | L |
-| **4** | Breachers: whale model + species, vertical gait; remove the Whale Shark (§2) | D3, D4 | M |
+| **1** | Gait layer, lateral default, no visible change (§6). **Built 2026-10-24** | — | S–M |
+| **2** | Brawlers: Cavitation Punch, Recoil Dash, new twist (§4). Depth Charges stays in the card pool, ownerless, until Phase 3 replaces it. **Built 2026-10-24** | ~~D6~~ | M |
+| **3** | Alchemists: Sea Hare model + 3 species, Purple Haze (built from Depth Charges, which is then retired), Unpalatable, Flutter, flap gait (§5) (Regen signature; Drifters → Quantity, D8) | ~~D8~~ | L |
+| **4** | Breachers: whale model + species, vertical gait; remove the Whale Shark (§2) | ~~D3, D4~~ | M |
 | **5** | Drifters: tilt-and-pulse gait for the jellies (§6) | — | S–M |
-| **6** | Zombie roster: every class appears as a zombie (§8) | D10 | M–L |
-| **7** | Sea Angel boss + Sea Butterfly zombies (§3) | D5, D12 | L |
+| **6** | Zombie roster: every class appears as a zombie (§8) | ~~D10~~ | M–L |
+| **7** | The Fallen Angel (Sea Angel) boss + Sea Butterfly zombies (§3) | ~~D5, D12~~ | L |
 
 Phases 2, 3 and 4 don't depend on each other once 0 and 1 are in, so they can be done in whatever order you want to test them. Phase 6 goes after 3 and 4 so it includes the Sea Hares and the whales. Phase 7 goes last because it's the biggest single piece and benefits from the new zombie kinds.
 
@@ -390,14 +394,14 @@ Adding a kind has a real cost: `Horde._add_set()` builds **9 MultiMeshes per kin
 | # | Question | Recommended |
 |---|---|---|
 | D1 | ~~Class names (§1 table)~~ **Answered 2026-10-24:** the proposed column (built in Phase 0) | — |
-| D2 | Are species looks only (as skins are today), or may they get small differences later? | Looks only for now |
-| D3 | Whales: any sweep strides (only the motion is vertical), or only up/down sweeps count fully? | Any sweep |
-| D4 | Whales keep Gulp, or get Whale Song? | Keep Gulp for now |
-| D5 | Boss name: "The Sea Angel" or "The Fallen Angel"? | Your pick |
-| D6 | Brawler twist: Keen Eyes or Heavy Hitter? | Keen Eyes |
+| D2 | ~~Are species looks only, or may they get small differences later?~~ **Answered 2026-10-24:** looks only for now | — |
+| D3 | ~~Whales: any sweep strides, or only up/down sweeps count fully?~~ **Answered 2026-10-24:** any sweep | — |
+| D4 | ~~Whales keep Gulp, or get Whale Song?~~ **Answered 2026-10-24:** keep Gulp for now | — |
+| D5 | ~~Boss name~~ **Answered 2026-10-24:** "The Fallen Angel" | — |
+| D6 | ~~Brawler twist: Keen Eyes or Heavy Hitter?~~ **Answered 2026-10-24:** Heavy Hitter (zombies knocked back by punches hurt the ones they hit; watch the cost of the extra collision checks in big hordes) | — |
 | D7 | ~~Depth Charges: stays or is retired?~~ **Answered 2026-10-24:** retired; Purple Haze is built from its code and must be easier to use (§5) | — |
-| D8 | Sea Hare signature stat: Duration or Size? | Duration |
-| D9 | Schedule a bottom-dweller class (octopus) after this roadmap? | Brainstorm for now, decide after Phase 5 |
-| D10 | Zombie roster: a rotation of ~6 kinds per stage, or all at once? | Rotation |
-| D11 | Gaits in Soccer mode too? | Yes, everywhere |
-| D12 | Sea Angel lashes: can a single well-timed stride dodge a lash (as the butterfly does in the clip), or does it take leaving the 12 m sphere? | A stride dodges |
+| D8 | ~~Sea Hare signature stat: Duration or Size?~~ **Answered 2026-10-24:** neither: **Regen** (no other class has it). Also: **Drifters' signature changes from Size to Quantity**, and Quantity becomes a real number: the Drifters' signature adds **+0.33 per level** (a starting value, tunable). Anything that spawns uses the **floor** of the total, and the display shows the floor. The weapons' `roundi(quantity)` becomes `floori`, and the Jelly Halo starts reading the Quantity stat (it only had its count facet). Cards still give +1. `INVENTORY.md` §3 changes when this is built | — |
+| D9 | ~~Schedule a bottom-dweller class (octopus) after this roadmap?~~ **Answered 2026-10-24:** brainstorm for now, decide after Phase 5 | — |
+| D10 | ~~Zombie roster: a rotation of ~6 kinds per stage, or all at once?~~ **Answered 2026-10-24:** rotation | — |
+| D11 | ~~Gaits in Soccer mode too?~~ **Answered 2026-10-24:** everywhere, with a setting to switch gaits off in Fish Sticks (on by default) | — |
+| D12 | ~~Sea Angel lashes: can a single well-timed stride dodge a lash?~~ **Answered 2026-10-24:** a timed stride dodges | — |

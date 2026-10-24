@@ -13,7 +13,8 @@ extends RefCounted
 ## - Lionfish, Wake: Greek Fire burns harder the faster it swims.
 ## - Moon Jelly, Many Arms: one more jelly in its Halo.
 ## - Baby Whale Shark, Escort: heals while it holds still.
-## - Mantis Shrimp, Hammer: its mobility's shockwave (below).
+## - Mantis Shrimp, Heavy Hitter: zombies its punches knock back hurt the ones
+##   they fly into (fling()).
 ##
 ## And a mobility skill on the boost button (RB, Shift: boosting is off in
 ## Unnatural), on its own cooldown (mobility()):
@@ -26,7 +27,8 @@ extends RefCounted
 ## - Lionfish, Flare Dash: a dash with its spines flared, hurting what it passes.
 ## - Moon Jelly, Go Quiet: switches its stink off: nothing fires, and zombies
 ##   lose track of it (until it's hurt or the time's up).
-## - Mantis Shrimp, Snap: lunges ahead and cracks a shockwave.
+## - Mantis Shrimp, Recoil Dash: punches one way, and the recoil throws it the
+##   other (the way the stick leans, else backwards), untouchable a moment.
 ## - Baby Whale Shark, Gulp: sucks the zombies ahead of it in.
 ## UnnaturalRun owns one per local player and calls update() every tick.
 
@@ -40,7 +42,7 @@ const NAMES := {
 	FishCharacter.FishClass.BULWARK: "Armoured",
 	FishCharacter.FishClass.SCORCHER: "Wake",
 	FishCharacter.FishClass.DRIFTER: "Many Arms",
-	FishCharacter.FishClass.BRAWLER: "Hammer",
+	FishCharacter.FishClass.BRAWLER: "Heavy Hitter",
 	FishCharacter.FishClass.BREACHER: "Escort",
 }
 ## Mobility skill titles.
@@ -53,7 +55,7 @@ const SKILLS := {
 	FishCharacter.FishClass.BULWARK: "Brace",
 	FishCharacter.FishClass.SCORCHER: "Flare Dash",
 	FishCharacter.FishClass.DRIFTER: "Go Quiet",
-	FishCharacter.FishClass.BRAWLER: "Snap",
+	FishCharacter.FishClass.BRAWLER: "Recoil Dash",
 	FishCharacter.FishClass.BREACHER: "Gulp",
 }
 ## A leap splashes once its climb has slowed to this share of its push, or after LEAP_MAX s.
@@ -68,11 +70,14 @@ var settings: UnnaturalSettings
 var frenzy := 0.0
 var frenzy_held := 0.0
 ## Skills used, for the probes: dashes (Swordfish), leaps and their splashes,
-## snaps, wriggles, surges, braces, gulps, flares, fin dashes and quiets.
+## recoils, wriggles, surges, braces, gulps, flares, fin dashes and quiets;
+## Heavy Hitter's flings and the zombies they hit.
 var dashes := 0
 var leaps := 0
 var splashes := 0
-var snaps := 0
+var recoils := 0
+var flings := 0
+var fling_hits := 0
 var wriggles := 0
 var surges := 0
 var braces := 0
@@ -94,6 +99,13 @@ var _dash_loop := 0
 var _surge_left := 0.0
 var _brace_left := 0.0
 var _quiet_left := 0.0
+var _recoil_left := 0.0
+var _recoil_heading := Vector3.BACK
+## Heavy Hitter's missiles: {index, left, damage, hits, hit (index -> true)}.
+var _flings: Array[Dictionary] = []
+## The Recoil Dash's punch when the fish has no Cavitation Punch of its own
+## (the panel's fish_attack gave it another).
+var _spare_punch: CavitationPunch
 
 
 func _init(owner: UnnaturalRun, of: FishController) -> void:
@@ -108,6 +120,9 @@ func clear() -> void:
 		fish.turn_scale = 1.0
 		fish.drag_scale = 1.0
 	reset()
+	if is_instance_valid(_spare_punch):
+		_spare_punch.queue_free()
+	_spare_punch = null
 
 
 func reset() -> void:
@@ -120,6 +135,8 @@ func reset() -> void:
 	_surge_left = 0.0
 	_brace_left = 0.0
 	_quiet_left = 0.0
+	_recoil_left = 0.0
+	_flings.clear()
 	_stop_loop()
 
 
@@ -176,7 +193,7 @@ func update(delta: float) -> void:
 	fish.turn_scale = settings.nimble_turn if is_on(FishCharacter.FishClass.SKIRMISHER) else 1.0
 	_surge_left = maxf(_surge_left - delta, 0.0)
 	_brace_left = maxf(_brace_left - delta, 0.0)
-	fish.drag_scale = 0.0 if _surge_left > 0.0 else (settings.glide_drag if is_on(FishCharacter.FishClass.GLIDER) else 1.0)
+	fish.drag_scale = 0.0 if _surge_left > 0.0 or _recoil_left > 0.0 else (settings.glide_drag if is_on(FishCharacter.FishClass.GLIDER) else 1.0)
 	if is_on(FishCharacter.FishClass.BREACHER) and settings.escort_regen > 0.0 and fish.speed <= settings.chest_still_speed:
 		var health := run.health_of(fish)
 		if health and not health.down:
@@ -195,6 +212,10 @@ func update(delta: float) -> void:
 		_dash_step()
 		if _dash_left <= 0.0:
 			_stop_loop()
+	if _recoil_left > 0.0:
+		_recoil_left -= delta  # no drag meanwhile (above): the throw carries
+	if not _flings.is_empty():
+		_fling_step(delta)
 	if _leap_age >= 0.0:
 		_leap_age += delta
 		var climb := fish.linear_velocity.y
@@ -256,9 +277,7 @@ func mobility() -> bool:
 			_cool_for(settings.leap_cooldown)
 			fish.apply_push(Vector3.UP * settings.leap_impulse)
 		FishCharacter.FishClass.BRAWLER:
-			if settings.snap_damage <= 0.0 and settings.snap_speed <= 0.0:
-				return false
-			_snap(nose)
+			_recoil()
 		FishCharacter.FishClass.BREACHER:
 			_gulp(nose)
 		FishCharacter.FishClass.DRIFTER:
@@ -278,7 +297,7 @@ func skill_title_now() -> String:
 
 
 func skill_active() -> bool:
-	return quiet or _dash_left > 0.0 or _brace_left > 0.0 or _surge_left > 0.0 or _leap_age >= 0.0
+	return quiet or _dash_left > 0.0 or _brace_left > 0.0 or _surge_left > 0.0 or _leap_age >= 0.0 or _recoil_left > 0.0
 
 
 func skill_wait() -> float:
@@ -365,16 +384,106 @@ func _splash() -> void:
 		run.hit(i, settings.leap_damage, fish, "splash", away.normalized() if away.length_squared() > 0.0001 else Vector3.UP)
 
 
-## The Mantis Shrimp: lunges along its nose, cracking a shockwave where it was.
-func _snap(nose: Vector3) -> void:
-	snaps += 1
-	_cool_for(settings.snap_cooldown)
-	var at := fish.global_position
-	fish.apply_push(nose * settings.snap_speed)
-	Explosion.spawn(run.ocean, at, Color(1.0, 0.6, 0.2), settings.snap_radius, 0.0, 0.25)
-	for i in run.horde.query_sphere(at, settings.snap_radius):
-		var away := run.horde.enemy_position(i) - at
-		run.hit(i, settings.snap_damage, fish, "snap", away.normalized() if away.length_squared() > 0.0001 else Vector3.UP)
+## The Mantis Shrimp's Recoil Dash: a full punch one way, thrown the other.
+func _recoil() -> void:
+	recoils += 1
+	_cool_for(settings.recoil_cooldown)
+	_recoil_heading = recoil_heading()
+	_recoil_left = settings.recoil_time
+	_shield(settings.recoil_iframes)
+	var punch := punch_for_recoil()
+	if punch:
+		punch.punch(-_recoil_heading)
+	var short := settings.recoil_speed - fish.linear_velocity.dot(_recoil_heading)
+	if short > 0.0:
+		fish.apply_push(_recoil_heading * short)
+	PowerupFx.ring(run, fish.global_position, 1.4, CavitationPunch.BUBBLE_COLOR, _recoil_heading, 0.25)
+
+
+## The way the Recoil Dash throws the fish (unit): the way the stick leans
+## (right / left, and up / down as it pitches), else backwards.
+func recoil_heading() -> Vector3:
+	var input := fish._player_input()
+	var lean := Vector2(input.strength("stick_right") - input.strength("stick_left"),
+			input.strength("stick_down") - input.strength("stick_up"))
+	if lean.length() < 0.25:
+		return fish.global_basis.z
+	return (fish.global_basis.x * lean.x + fish.global_basis.y * lean.y).normalized()
+
+
+## The punch the Recoil Dash throws: the fish's own Cavitation Punch, else a
+## second one it holds, else a spare at its stats (the panel gave it another attack).
+func punch_for_recoil() -> CavitationPunch:
+	var own := run.attack_of(fish) as CavitationPunch
+	if own:
+		return own
+	var powerups := run.powerups_of(fish)
+	var held: CavitationPunch = powerups.weapon("attack_punch") as CavitationPunch if powerups else null
+	if held:
+		return held
+	if not is_instance_valid(_spare_punch):
+		_spare_punch = FishAttack.make(FishAttack.Kind.PUNCH) as CavitationPunch
+		_spare_punch.fish = fish
+		_spare_punch.horde = run.horde
+		_spare_punch.settings = settings
+		_spare_punch.run = run
+		_spare_punch.powers = run.powerup_settings
+		_spare_punch.on_hit = run.hit
+		run.add_child(_spare_punch)
+	_spare_punch.configure(run.block_of(fish), {}, 1)
+	return _spare_punch
+
+
+## Heavy Hitter: zombie `index`, just punched for `amount`, flies as a missile
+## for heavy_time s, hurting the zombies it hits.
+func fling(index: int, amount: float) -> void:
+	if not is_on(FishCharacter.FishClass.BRAWLER) or settings.heavy_share <= 0.0 or settings.heavy_max <= 0:
+		return
+	if not run.horde.is_alive(index) or run.horde.is_proxy(index):
+		return
+	for f in _flings:
+		if f.index == index:
+			f.left = settings.heavy_time
+			f.damage = maxf(f.damage, amount)
+			return
+	if _flings.size() >= settings.heavy_flings:
+		_flings.pop_front()
+	flings += 1
+	_flings.append({"index": index, "left": settings.heavy_time, "damage": amount, "hits": 0, "hit": {index: true}})
+
+
+## Whether zombie `index` is one of Heavy Hitter's missiles now.
+func is_flung(index: int) -> bool:
+	for f in _flings:
+		if f.index == index:
+			return true
+	return false
+
+
+func _fling_step(delta: float) -> void:
+	var horde := run.horde
+	var n := 0
+	while n < _flings.size():
+		var f := _flings[n]
+		f.left -= delta
+		var index: int = f.index
+		if f.left <= 0.0 or not horde.is_alive(index) or f.hits >= settings.heavy_max:
+			_flings.remove_at(n)
+			continue
+		n += 1
+		var flying := horde.enemy_velocity(index)
+		if flying.length_squared() < 1.0:
+			continue
+		var at := horde.enemy_position(index)
+		for j in horde.query_sphere(at, horde.enemy_radius(index)):
+			if f.hit.has(j):
+				continue
+			f.hit[j] = true
+			f.hits += 1
+			fling_hits += 1
+			run.hit(j, f.damage * settings.heavy_share, fish, "heavy_hitter", flying.normalized(), 0.3)
+			if f.hits >= settings.heavy_max:
+				break
 
 
 ## The Baby Whale Shark: every zombie in the cone ahead is sucked in to its mouth.

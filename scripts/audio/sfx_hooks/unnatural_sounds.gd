@@ -41,6 +41,7 @@ const PICKUPS := ["heart", "magnet", "hourglass", "lightning"]
 const ATTACK_HITS := {
 	"sting": "unnatural/sting_hit", "bite": "unnatural/bite_hit", "lash": "unnatural/lash_hit",
 	"thrust": "unnatural/thrust_hit", "bubbles": "unnatural/bubbles_hit", "spines": "unnatural/spines_hit",
+	"punch": "unnatural/punch_hit",
 }
 ## A zombie behaviour (EnemyKind.Behaviour) -> the sound for its death.
 const DEATHS := [

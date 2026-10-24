@@ -18,6 +18,7 @@ const BLURBS := {
 	FishAttack.Kind.HALO: "Jellyfish orbit you and sting whatever comes close. A slow, steady shield of damage.",
 	FishAttack.Kind.CHARGES: "Mines drop behind you, arm, then blow up when zombies wander near.",
 	FishAttack.Kind.REMORA: "Remoras ride along and nip the nearest zombie in turn. Steady, safe damage.",
+	FishAttack.Kind.PUNCH: "A boxing glove punches the zombie in front, hard enough to knock it back, then the bubble it leaves collapses and hits again round it. Short range: get close.",
 }
 
 
@@ -57,7 +58,7 @@ static func twist_text(fish_class: FishCharacter.FishClass, s: UnnaturalSettings
 		FishCharacter.FishClass.DRIFTER:
 			return "Many Arms: %d more jelly%s in its Halo." % [s.arms_extra, "" if s.arms_extra == 1 else "s"]
 		FishCharacter.FishClass.BRAWLER:
-			return "Hammer: its Snap's shockwave hits for %.0f damage within %.0f m." % [s.snap_damage, s.snap_radius]
+			return "Heavy Hitter: a zombie your punches knock back flies into the others, hurting up to %d of them for %d%% of the punch." % [s.heavy_max, roundi(s.heavy_share * 100.0)]
 		FishCharacter.FishClass.BREACHER:
 			return "Escort: holding still, it heals %.1f HP a second." % s.escort_regen
 	return ""
@@ -83,7 +84,7 @@ static func skill_text(fish_class: FishCharacter.FishClass, s: UnnaturalSettings
 		FishCharacter.FishClass.DRIFTER:
 			return "Go Quiet: switches its stink off for up to %.0f s. Nothing fires, and zombies lose track of it. Hits end it; press again to end it early. Then %.1f s before the next." % [s.quiet_time, s.quiet_cooldown]
 		FishCharacter.FishClass.BRAWLER:
-			return "Snap: lunges ahead at %.0f m/s and cracks a shockwave. Ready again after %.1f s." % [s.snap_speed, s.snap_cooldown]
+			return "Recoil Dash: throws a full Cavitation Punch one way and the recoil throws you %.0f m/s the other, untouchable for %.1f s. You go the way you lean the stick (else backwards), so by default it punches what's ahead and shoots you back out of the crowd. Ready again after %.1f s." % [s.recoil_speed, s.recoil_iframes, s.recoil_cooldown]
 		FishCharacter.FishClass.BREACHER:
 			return "Gulp: sucks every zombie in a %.0f m cone ahead in, hurting each for %.0f. Ready again after %.1f s." % [s.gulp_range, s.gulp_damage, s.gulp_cooldown]
 	return ""

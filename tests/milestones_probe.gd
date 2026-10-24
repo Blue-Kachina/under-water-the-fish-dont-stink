@@ -62,7 +62,7 @@ func _run() -> void:
 	var coil := run.powerups_of(fish).weapon("attack_leviathans_coil") as LeviathansCoil
 
 	var kinds := [FishAttack.Kind.STING, FishAttack.Kind.BITE, FishAttack.Kind.LASH, FishAttack.Kind.THRUST,
-			FishAttack.Kind.BUBBLES, FishAttack.Kind.SPINES]
+			FishAttack.Kind.BUBBLES, FishAttack.Kind.SPINES, FishAttack.Kind.PUNCH]
 	var damage_by := {}
 	for kind: int in kinds:
 		settings.fish_attack = kind
@@ -94,6 +94,10 @@ func _run() -> void:
 		if kind == FishAttack.Kind.LASH:
 			var lash := attack as ShockLash
 			check(lash.arcs() == settings.lash_arcs + lash.extra_projectiles + ShockLash.MORE_ARCS, "the Lash arcs on to %d more" % ShockLash.MORE_ARCS)
+		if kind == FishAttack.Kind.PUNCH:
+			var punch := attack as CavitationPunch
+			check(punch.haymakers > 0 and punch.collapses > punch.gloves_thrown / 2,
+					"the Punch throws Haymakers (%d) and its gloves pierce, collapsing at each hit (%d gloves, %d collapses)" % [punch.haymakers, punch.gloves_thrown, punch.collapses])
 		for row: Dictionary in run.tank.sources():
 			damage_by[row.source] = maxf(damage_by.get(row.source, 0.0), float(row.damage))
 		var source := FishAttack.source_of(kind)

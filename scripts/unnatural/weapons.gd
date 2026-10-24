@@ -20,7 +20,7 @@ const ATTACK := "attack"
 ## cards list them: every fish's weapon can be any fish's second (not its own
 ## again).
 const POWERUPS: Array[String] = ["attack_greek_fire", "attack_jellyfish_halo", "attack_depth_charges", "attack_remora_buddy",
-		"attack_leviathans_coil", "attack_sting", "attack_bite", "attack_lash", "attack_thrust", "attack_bubbles", "attack_spines"]
+		"attack_leviathans_coil", "attack_sting", "attack_bite", "attack_lash", "attack_thrust", "attack_bubbles", "attack_spines", "attack_punch"]
 ## Weapons only a boss gives (never offered on a level-up card).
 const BOSS_ONLY: Array[String] = ["attack_leviathans_coil"]
 ## The weapons held as a second one: weapon id -> its attack's kind.
@@ -36,6 +36,7 @@ const ATTACK_WEAPONS := {
 	"attack_depth_charges": FishAttack.Kind.CHARGES,
 	"attack_remora_buddy": FishAttack.Kind.REMORA,
 	"attack_leviathans_coil": FishAttack.Kind.COIL,
+	"attack_punch": FishAttack.Kind.PUNCH,
 }
 
 ## Each weapon's facets, by its attack's kind (FishAttack.Kind):
@@ -112,6 +113,12 @@ const ATTACK_FACETS := {
 		["size", "Coil size", "pct", "coil_radius_step", ""],
 		["rate", "Hit rate", "pct", "coil_rate_step", ""],
 	],
+	FishAttack.Kind.PUNCH: [
+		["damage", "Damage", "pct", "attack_damage_step", ""],
+		["rate", "Punch rate", "pct", "attack_rate_step", ""],
+		["size", "Glove size", "pct", "attack_size_step", ""],
+		["knock", "Knockback", "pct", "attack_knock_step", ""],
+	],
 }
 ## What each Lv milestone does, by its attack's kind (shown on the card that reaches it).
 const MILESTONES := {
@@ -137,6 +144,8 @@ const MILESTONES := {
 			"Each volley blows twice as many bubbles", "Every volley ends with three big bubbles"],
 	FishAttack.Kind.SPINES: ["Spines fly further", "A second ring of spines follows each burst",
 			"Spines pierce two more zombies", "A third, full ring follows the second"],
+	FishAttack.Kind.PUNCH: ["The bubble collapses in a wider ring", "Collapses stun what they hit",
+			"Gloves punch through one zombie, collapsing at each", "Every third punch is a Haymaker"],
 }
 
 

@@ -88,7 +88,7 @@ Every stat starts at 0 and is a bonus. Percent stats are shares (0.1 = +10%); th
 | `damage` | Damage | +10% | % | yes | Teeth | Blood Moon Shard, Glass Coral (+100%) |
 | `attack_speed` | Attack Speed | +8% | % | yes | Tides | Fizzy Soda (+8%) |
 | `size` | Size | +10% | % | yes | Reef | Abyssal Engine (+15%) |
-| `quantity` | Quantity | +1 (rounded up) | flat | only if a weapon held uses it (Thrust, Bubbles, Spines, Lash, Depth Charges) | Schools | Abyssal Engine (+1) |
+| `quantity` | Quantity | +1 (rounded up) | flat | only if a weapon held uses it (Thrust, Bubbles, Spines, Lash, Punch, Depth Charges) | Schools | Abyssal Engine (+1) |
 | `projectile_speed` | Projectile Speed | +10% | % | only if the attack uses it (Thrust, Bubbles, Spines) | Currents | — |
 | `crit_chance` | Crit Chance | +5% | % | yes | Kill | Sea Salt (+5%) |
 | `crit_damage` | Crit Damage | +20% | % | yes | Kill | — |
@@ -102,7 +102,7 @@ Every stat starts at 0 and is a bonus. Percent stats are shares (0.1 = +10%); th
 | `pearl_chance` | Pearl Chance | +15% | % | yes | Pearls | — |
 | `luck` | Luck | +0.1 | flat | yes | Fortune | Lucky Sand Dollar (+0.1) |
 
-**What the global stats scale on weapons:** Attack Speed → fire/drop/tick rate (2× for Depth Charges' drop rate, `charge_speed_weight`). Quantity → spears, bubbles, spine rings, lash arcs, mines per drop. Size → every weapon's reach, radius, blast or hit size (all 10 weapons, plus the area powerups such as Electric Eel, Torpedo, Tsunami Heart). Duration → Greek Fire patch life, Depth Charge life, Anglerfish Lure, Ink Sac. Damage → every hit (applied in `UnnaturalRun.hit()`).
+**What the global stats scale on weapons:** Attack Speed → fire/drop/tick rate (2× for Depth Charges' drop rate, `charge_speed_weight`). Quantity → spears, bubbles, spine rings, lash arcs, punch follow-up gloves, mines per drop. Size → every weapon's reach, radius, blast or hit size (every weapon, plus the area powerups such as Electric Eel, Torpedo, Tsunami Heart). Duration → Greek Fire patch life, Depth Charge life, Anglerfish Lure, Ink Sac. Damage → every hit (applied in `UnnaturalRun.hit()`).
 
 ---
 
@@ -120,7 +120,7 @@ A **class** is a group of fish that play the same way; its **species** change on
 | **Bulwarks** (BULWARK, Merc) | Boxfish: Yellow Boxfish, Longhorn Cowfish, Spotted Boxfish, Scrawled Cowfish | Spine Burst | Armour +1 | **Armoured:** takes 70% of damage, swims at 88% speed | **Brace:** for 2.5 s takes 25% of damage, swims at 70% speed. Cooldown 8.0 s |
 | **Scorchers** (SCORCHER, Octane) | Lionfish: Red, Clearfin, Fuzzy Dwarf, Spotfin | Greek Fire Trail | Duration +10% | **Wake:** Greek Fire burns up to +60% harder the nearer it swims to battering speed | **Flare Dash:** dashes at 30 m/s for 0.35 s; 60 dmg to everything within 4 m on the way. Cooldown 3.5 s |
 | **Drifters** (DRIFTER, Hybrid) | Jellies: Moon Jelly, Pacific Sea Nettle, Lion's Mane, Purple-striped Jelly | Jellyfish Halo | Size +10% | **Many Arms:** +1 jelly in its Halo | **Go Quiet:** switches its stink off for up to 8 s: nothing fires and zombies lose track of it. Being hurt ends it, or press again to end it early. Cooldown 6.0 s |
-| **Brawlers** (BRAWLER, Dominus) | Mantis shrimp: Peacock, Zebra, Purple-spot, Pink-eared | Depth Charges | Knockback +15% | **Hammer:** the Snap's shockwave hits for 70 dmg within 6 m | **Snap:** lunges at 18 m/s and cracks a shockwave (see Hammer). Cooldown 2.0 s |
+| **Brawlers** (BRAWLER, Dominus) | Mantis shrimp: Peacock, Zebra, Purple-spot, Pink-eared | Cavitation Punch | Knockback +15% | **Heavy Hitter:** a zombie its punches knock back flies as a missile for 0.35 s; each other zombie it hits (up to 3) takes 50% of the punch, knocked on. At most 24 missiles at once | **Recoil Dash:** throws a full Cavitation Punch one way and is thrown the other at 20 m/s, no drag for 0.25 s, untouchable 0.2 s. It goes the way the stick leans, else backwards (so the punch goes ahead). Cooldown 2.0 s |
 | **Breachers** (BREACHER, Plank) | Baby whale sharks: Whale Shark, Deep Charcoal, Juvenile, Basking Shark | Remora Buddy | Pearl Chance +15% | **Escort:** heals 4 HP/s while holding still (under 3 m/s) | **Gulp:** pulls in every zombie in a 14 m cone ahead (25 m/s) and hits each for 25. Cooldown 5.0 s |
 
 - Every class starts with its own weapon (a `FishAttack`, `FishAttack.FOR_CLASS`) in slot 1, as the `attack` weapon.
@@ -150,6 +150,7 @@ Shared facet steps (`PowerupSettings`): Damage +20%, Rate +12%, Size +12%, Knock
 | **Bill Thrust** (`attack_thrust`) | Lancers | 34 | 1.0 s | 1.0 | A spear at 45 m/s that flies 40 m with a 0.7 m hit radius and pierces 6. Aims within 60° of the nose. Extra spears fan 8° apart. | Damage, Thrust rate, Spears (count), Spear speed |
 | **Bubble Volley** (`attack_bubbles`) | Charmers | 9 per pop | 1.2 s | 0.6 | 4 homing bubbles (+Quantity) at 18 m/s, turn rate 6/s, 2.5 s life, 30 m range. Each pops on its first touch with a 2 m splash. | Damage, Volley rate, Bubbles (count), Bubble speed |
 | **Spine Burst** (`attack_spines`) | Bulwarks | 32 | 1.4 s | 0.4 | 18 spines all round (+4 per Quantity) when a zombie is within 12 m. 30 m/s, pierce 2. | Damage, Burst rate, Spine rings (count), Spine range |
+| **Cavitation Punch** (`attack_punch`) | Brawlers | 30 + 15 | 0.7 s | 1.0 (collapse 0.5) | A boxing glove at 30 m/s that flies 7 m (always at least 1.2× the bow wave's reach) with a 0.8 m hit radius, fading out over the last 40%. Aims at the nearest zombie within 60° of the nose (else straight on, if one is within reach ahead). It strikes the first zombie it touches (knockback 2×), then 0.08 s later the bubble collapses there: 50% of the strike to every zombie within 2 m. Each Quantity throws one more glove from the other claw, 0.1 s apart. | Damage, Punch rate, Glove size, Knockback |
 
 **Milestones (Lv 5 / 10 / 15 / 20):**
 
@@ -161,6 +162,7 @@ Shared facet steps (`PowerupSettings`): Damage +20%, Rate +12%, Size +12%, Knock
 | Bill Thrust | Spears pierce one more zombie | Spears burst at the end of their flight | Two more spears fan out with each thrust | Spears pierce everything in their way |
 | Bubble Volley | Bubbles pop in a wider splash | Every volley ends with one big bubble | Each volley blows twice as many bubbles | Every volley ends with three big bubbles |
 | Spine Burst | Spines fly further | A second ring of spines follows each burst | Spines pierce two more zombies | A third, full ring follows the second |
+| Cavitation Punch | The bubble collapses in a ring 1.5× as wide | Collapses stun what they hit for 0.5 s (not Heavy Hitter's missiles) | Gloves pierce one zombie, collapsing at each hit | Every third punch is a Haymaker: 2× the glove, and its collapse hits for 100% |
 
 ### 4b. Steady weapons
 
@@ -168,7 +170,7 @@ Shared facet steps (`PowerupSettings`): Damage +20%, Rate +12%, Size +12%, Knock
 |---|---|---|---|---|
 | **Greek Fire Trail** (`attack_greek_fire`) | Scorchers | Drops a burning patch every 1.6 m swum. Each patch is 1.6 m in radius, lasts 2.0 s (× Duration) and burns for 40 dmg/s. At most 60 patches out. | 0 | Burn damage +25%, Patch life +0.4 s, Patch size +10%, Denser trail +12%, Max patches +5 |
 | **Jellyfish Halo** (`attack_jellyfish_halo`) | Drifters | 2 jellies orbit 3.2 m out at 0.5 turns/s. Each stings for 35 every 0.25 s on touch (1.2 m radius). | 0.1 | Jellies +1, Sting damage +25%, Orbit size +12%, Orbit speed +15%, Sting rate +15% |
-| **Depth Charges** (`attack_depth_charges`) | Brawlers | Every 3 s it drops 1 mine (+1 per Mines per drop, +1 per Quantity). Each is lobbed over 0.35 s at one of the zombies nearest the tail within 6 m (× Size), else fanned out behind. A mine arms after 0.5 s and blows when a zombie comes within 3 m (× Size), or after 10 s × Duration: 24 dmg in a 5 m blast. Attack Speed counts 2× toward its drop rate. At most 30 mines out (the oldest go). | 0.5 | Blast damage +20%, Blast size +15%, Drop rate +20%, Mines per drop +1, Arming speed +30% |
+| **Depth Charges** (`attack_depth_charges`) | — (no class since Phase 2; retired into Purple Haze in Phase 3) | Every 3 s it drops 1 mine (+1 per Mines per drop, +1 per Quantity). Each is lobbed over 0.35 s at one of the zombies nearest the tail within 6 m (× Size), else fanned out behind. A mine arms after 0.5 s and blows when a zombie comes within 3 m (× Size), or after 10 s × Duration: 24 dmg in a 5 m blast. Attack Speed counts 2× toward its drop rate. At most 30 mines out (the oldest go). | 0.5 | Blast damage +20%, Blast size +15%, Drop rate +20%, Mines per drop +1, Arming speed +30% |
 | **Remora Buddy** (`attack_remora_buddy`) | Breachers | 1 remora nips the nearest zombie within 7 m every 1.5 s for 55. | 0.5 | Remoras +1, Bite damage +25%, Bite rate +15%, Reach +15% |
 | **Leviathan's Coil** (`attack_leviathans_coil`) | — (boss only, from the Blood Leviathan; `coil_arrive_level` 5) | 6 coils trail the fish 1.4 m apart. Each hurts what it touches (0.9 m radius) for 55 every 0.25 s. | 0.15 | Coils +3, Coil damage +25%, Coil size +15%, Hit rate +15% |
 

@@ -139,7 +139,7 @@ func _run() -> void:
 
 	print("game section:")
 	var sections: Array = panel._section_buttons.keys()
-	check(sections == ["game", "display", "audio", "controls", "camera", "fish", "ball", "nature", "unnatural", "powerups"],
+	check(sections == ["game", "display", "audio", "controls", "camera", "fish", "gaits", "ball", "nature", "unnatural", "powerups"],
 			"the settings' sections: %s" % [sections])
 	for key: String in ["game/player_name", "game/character", "game/goal_replays", "game/preset_save", "display/fullscreen",
 			"display/show_stats", "display/show_input_overlay", "controls/profile"]:

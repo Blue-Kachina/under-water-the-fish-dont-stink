@@ -23,7 +23,7 @@ extends Node3D
 ## The attack went off (fire() returned true).
 signal fired
 
-enum Kind { OWN, STING, BITE, LASH, THRUST, BUBBLES, SPINES, FIRE, HALO, CHARGES, REMORA, COIL }
+enum Kind { OWN, STING, BITE, LASH, THRUST, BUBBLES, SPINES, FIRE, HALO, CHARGES, REMORA, COIL, PUNCH }
 ## Each fish's own.
 const FOR_CLASS := {
 	FishCharacter.FishClass.SKIRMISHER: Kind.STING,
@@ -34,7 +34,7 @@ const FOR_CLASS := {
 	FishCharacter.FishClass.BULWARK: Kind.SPINES,
 	FishCharacter.FishClass.SCORCHER: Kind.FIRE,
 	FishCharacter.FishClass.DRIFTER: Kind.HALO,
-	FishCharacter.FishClass.BRAWLER: Kind.CHARGES,
+	FishCharacter.FishClass.BRAWLER: Kind.PUNCH,
 	FishCharacter.FishClass.BREACHER: Kind.REMORA,
 }
 ## Kind -> [name, hit source]. Held as a second weapon, its id is "attack_" +
@@ -51,6 +51,7 @@ const INFO := {
 	Kind.CHARGES: ["Depth Charges", "depth_charges"],
 	Kind.REMORA: ["Remora Buddy", "remora_buddy"],
 	Kind.COIL: ["Leviathan's Coil", "leviathans_coil"],
+	Kind.PUNCH: ["Cavitation Punch", "punch"],
 }
 
 var fish: FishController
@@ -120,6 +121,8 @@ static func make(attack_kind: Kind) -> FishAttack:
 			attack = RemoraBuddy.new()
 		Kind.COIL:
 			attack = LeviathansCoil.new()
+		Kind.PUNCH:
+			attack = CavitationPunch.new()
 		_:
 			attack = GhostBite.new()
 			attack_kind = Kind.BITE
@@ -198,7 +201,7 @@ static func kind_uses_stat(attack_kind: Kind, id: String) -> bool:
 	match attack_kind:
 		Kind.THRUST, Kind.BUBBLES, Kind.SPINES:
 			return id == "quantity" or id == "projectile_speed"
-		Kind.LASH, Kind.CHARGES:
+		Kind.LASH, Kind.CHARGES, Kind.PUNCH:
 			return id == "quantity"
 	return false
 
