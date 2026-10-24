@@ -1,7 +1,7 @@
 class_name SpineBurst
 extends FishAttack
 ## The Boxfish's auto-attack (planning_unnatural.md §5): whenever a zombie is
-## within spine_range, spine_count spines (plus 4 per Projectiles stat) shoot
+## within spine_range, spine_count spines (plus 4 per Quantity) shoot
 ## out in every direction (most round its level), each piercing up to spine_pierce zombies.
 ##
 ## As a weapon (Weapons): at its first milestone the spines fly FAR_REACH
@@ -51,7 +51,7 @@ func proc() -> float:
 
 
 func uses_stat(id: String) -> bool:
-	return id == "projectile_count" or id == "projectile_speed"
+	return id == "quantity" or id == "projectile_speed"
 
 
 func count() -> int:

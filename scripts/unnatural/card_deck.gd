@@ -78,17 +78,17 @@ static func deal(run: UnnaturalRun, fish: FishController, count: int, shown: Arr
 	return cards
 
 
-## Whether tome `id` would do anything for `fish`: Schools only if their attack
-## fires projectiles; Ages only if they hold something that lasts.
+## Whether tome `id` would do anything for `fish`: Schools only if a weapon
+## they hold uses Quantity; Ages only if they hold something that lasts.
 static func tome_useful(run: UnnaturalRun, fish: FishController, id: String) -> bool:
 	match id:
 		"schools":
 			var attack := run.attack_of(fish)
-			if attack != null and attack.uses_stat("projectile_count"):
+			if attack != null and attack.uses_stat("quantity"):
 				return true
 			var held_by := run.loadout_of(fish)
 			for held: String in held_by.weapons:
-				if FishAttack.kind_uses_stat(Weapons.attack_kind_of(held, held_by.attack_kind), "projectile_count"):
+				if FishAttack.kind_uses_stat(Weapons.attack_kind_of(held, held_by.attack_kind), "quantity"):
 					return true
 			return false
 		"ages":

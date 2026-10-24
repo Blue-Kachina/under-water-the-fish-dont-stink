@@ -278,7 +278,7 @@ static func shared() -> UnnaturalSettings:
 
 @export_group("Shock Lash")
 ## The String Ray's: its tail whips the nearest zombie within lash_range (m),
-## and the shock arcs on to lash_arcs more (one more per Projectiles), each
+## and the shock arcs on to lash_arcs more (one more per Quantity), each
 ## within lash_arc_range (m) of the last, for lash_arc_share of the damage.
 @export_range(0.0, 1000.0, 1.0, "or_greater") var lash_damage := 47.0
 @export_range(0.05, 10.0, 0.05, "or_greater") var lash_cooldown := 0.8
@@ -290,7 +290,7 @@ static func shared() -> UnnaturalSettings:
 @export_group("Bill Thrust")
 ## The Swordfish's: a spear of light shot ahead (at the nearest zombie within
 ## thrust_aim_cone degrees of the nose, else straight on), piercing up to
-## thrust_pierce zombies. More Projectiles: more spears, thrust_spread degrees apart.
+## thrust_pierce zombies. More Quantity: more spears, thrust_spread degrees apart.
 @export_range(0.0, 1000.0, 1.0, "or_greater") var thrust_damage := 34.0
 @export_range(0.05, 10.0, 0.05, "or_greater") var thrust_cooldown := 1.0
 ## Its speed (m/s), how far it flies (m) and its hit radius (m).
@@ -302,7 +302,7 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 45.0, 0.5) var thrust_spread := 8.0
 
 @export_group("Bubble Volley")
-## The Butterfly Koi's: bubble_count homing bubbles (plus Projectiles) at the
+## The Butterfly Koi's: bubble_count homing bubbles (plus Quantity) at the
 ## nearest zombies within bubble_range (m); each pops on the first it touches,
 ## hurting everything within bubble_pop (m).
 @export_range(0.0, 1000.0, 1.0, "or_greater") var bubble_damage := 9.0
@@ -317,7 +317,7 @@ static func shared() -> UnnaturalSettings:
 @export_range(1.0, 200.0, 1.0, "or_greater") var bubble_range := 30.0
 
 @export_group("Spine Burst")
-## The Boxfish's: spine_count spines (plus 4 per Projectiles) out in every
+## The Boxfish's: spine_count spines (plus 4 per Quantity) out in every
 ## direction whenever a zombie is within spine_range (m), each piercing up to
 ## spine_pierce zombies.
 @export_range(0.0, 1000.0, 1.0, "or_greater") var spine_damage := 32.0
@@ -854,14 +854,14 @@ static func shared() -> UnnaturalSettings:
 ## The team's level there.
 @export_range(1, 100, 1, "or_greater") var tank_level := 1
 ## Each stat's bonus there (as StatBlock has them: 0.1 = +10%; hp, hp/s,
-## armour, projectiles and luck are flat).
+## armour, quantity and luck are flat).
 @export_range(0.0, 1000.0, 5, "or_greater") var tank_max_hp := 0.0
 @export_range(0.0, 50.0, 0.1, "or_greater") var tank_regen := 0.0
 @export_range(0.0, 50.0, 0.5, "or_greater") var tank_armour := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_damage := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_attack_speed := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_size := 0.0
-@export_range(0.0, 20.0, 1, "or_greater") var tank_projectile_count := 0.0
+@export_range(0.0, 20.0, 1, "or_greater") var tank_quantity := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_projectile_speed := 0.0
 @export_range(0.0, 1.0, 0.01, "or_greater") var tank_crit_chance := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_crit_damage := 0.0

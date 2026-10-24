@@ -58,7 +58,7 @@ const INFO := {
 	"poseidons_trident": ["Poseidon's Trident", Color(0.4, 0.75, 1.0), "PT", "Every 3rd attack calls lightning down on the biggest zombie near", Rarity.Tier.LEGENDARY],
 	"megalodon_tooth": ["Megalodon Tooth", Color(0.95, 0.92, 0.85), "MT", "Crits finish off zombies under 15% HP (not bosses)", Rarity.Tier.LEGENDARY],
 	"moon_pearl": ["Moon Pearl", Color(0.85, 0.88, 1.0), "MP", "Level-Up Picks +1", Rarity.Tier.LEGENDARY],
-	"abyssal_engine": ["Abyssal Engine", Color(0.5, 0.25, 0.75), "AE", "Projectiles +1\nSize +15%", Rarity.Tier.LEGENDARY],
+	"abyssal_engine": ["Abyssal Engine", Color(0.5, 0.25, 0.75), "AE", "Quantity +1\nSize +15%", Rarity.Tier.LEGENDARY],
 	"attack_leviathans_coil": ["Leviathan's Coil", Color(0.85, 0.15, 0.2), "LC", "A trail of coils behind you hurts whatever they touch.", Rarity.Tier.BOSS],
 	"attack_sting": ["Anemone Sting", Color(1.0, 0.55, 0.3), "ST", "A stinging pulse all round you hits everything inside.", Rarity.Tier.COMMON],
 	"attack_bite": ["Ghost Bite", Color(0.7, 0.85, 1.0), "GB", "Huge spectral jaws snap shut on the zombies ahead.", Rarity.Tier.COMMON],
@@ -317,7 +317,7 @@ static func cap_line(powerup_id: String) -> String:
 		"attack_greek_fire":
 			return "At most %d patches out (+ upgrades)" % p.fire_max_patches
 		"attack_depth_charges":
-			return "At most %d mines out (+ upgrades)" % p.charge_max
+			return "At most %d mines out" % p.charge_max
 	return ""
 
 

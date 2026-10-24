@@ -186,19 +186,20 @@ func counts_uses() -> bool:
 	return true
 
 
-## Whether the player's stat `id` does anything for it (projectile stats are
-## offered on cards only to fish whose attack uses them).
+## Whether the player's stat `id` does anything for it (Quantity and
+## Projectile Speed are offered on cards only to fish whose attack uses them).
 func uses_stat(id: String) -> bool:
 	return kind_uses_stat(kind, id)
 
 
-## Whether an attack of `attack_kind` uses the player's stat `id` (projectiles).
+## Whether an attack of `attack_kind` uses the player's stat `id` (Quantity,
+## Projectile Speed).
 static func kind_uses_stat(attack_kind: Kind, id: String) -> bool:
 	match attack_kind:
 		Kind.THRUST, Kind.BUBBLES, Kind.SPINES:
-			return id == "projectile_count" or id == "projectile_speed"
-		Kind.LASH:
-			return id == "projectile_count"
+			return id == "quantity" or id == "projectile_speed"
+		Kind.LASH, Kind.CHARGES:
+			return id == "quantity"
 	return false
 
 
@@ -215,14 +216,14 @@ func configure(block: StatBlock, held: Dictionary, at_level: int) -> void:
 		size_scale = bigger
 		damage_scale = 1.0
 		knock_scale = 1.0
-		extra_projectiles = roundi(block.value("projectile_count"))
+		extra_projectiles = roundi(block.value("quantity"))
 		projectile_speed = 1.0 + block.value("projectile_speed")
 	else:
 		attack_speed = rate * (1.0 + facet("rate"))
 		size_scale = bigger * (1.0 + facet("size"))
 		damage_scale = 1.0 + facet("damage")
 		knock_scale = 1.0 + facet("knock")
-		extra_projectiles = roundi(block.value("projectile_count") + facet("count"))
+		extra_projectiles = roundi(block.value("quantity") + facet("count"))
 		projectile_speed = (1.0 + block.value("projectile_speed")) * (1.0 + facet("speed"))
 	milestones = settings.milestones_at(at_level) if settings else 0
 	if at_level != level:

@@ -10,7 +10,7 @@ const TOMES := {
 	"teeth": ["Tome of Teeth", ["damage"], Color(1.0, 0.45, 0.4)],
 	"tides": ["Tome of Tides", ["attack_speed"], Color(0.45, 0.85, 1.0)],
 	"reef": ["Tome of the Reef", ["size"], Color(1.0, 0.55, 0.75)],
-	"schools": ["Tome of Schools", ["projectile_count"], Color(0.6, 0.75, 1.0)],
+	"schools": ["Tome of Schools", ["quantity"], Color(0.6, 0.75, 1.0)],
 	"currents": ["Tome of Currents", ["projectile_speed", "knockback"], Color(0.4, 0.7, 0.95)],
 	"kill": ["Tome of the Kill", ["crit_chance", "crit_damage"], Color(1.0, 0.3, 0.3)],
 	"fins": ["Tome of Fins", ["swim_speed", "stride_power"], Color(0.55, 1.0, 0.8)],

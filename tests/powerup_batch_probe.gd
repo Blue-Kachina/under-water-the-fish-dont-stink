@@ -196,6 +196,7 @@ func _run() -> void:
 	powers.eel_stacks = 0
 
 	print("depth charges:")
+	var charge_interval := powers.charge_interval
 	powers.charge_stacks = 1
 	powers.charge_interval = 0.5
 	horde.clear()
@@ -212,9 +213,41 @@ func _run() -> void:
 	var hp_v := horde.enemy_hp(victim)
 	await _ticks(4)
 	check(charges.blown >= 1 and horde.enemy_hp(victim) < hp_v, "a zombie near an armed one sets it off, and it's hurt")
+	# A drop lobs a mine at a zombie near the tail, and it can't go off mid-air.
+	charges.on_removed()  # no mines left from above to set it off
+	horde.clear()
+	await _ticks(2)
+	var tail := fish.global_position + fish.global_basis.z * (fish.hitbox_length * 0.6)
+	var target_at := tail + fish.global_basis.z * 4.0
+	var target := horde.spawn(2, target_at)
+	var hp_target := horde.enemy_hp(target)
+	await _ticks(2)  # in the horde's lookups
+	target_at = horde.enemy_position(target)
+	var blown_before := charges.blown
+	charges.drop()
+	var lobbed: DepthCharges.Mine = charges.mines[-1]
+	await _ticks(2)
+	check(is_instance_valid(lobbed) and lobbed.flight_left > 0.0 and charges.blown == blown_before, "a lobbed mine is in the air, not blown")
+	var landed_at := lobbed.to if is_instance_valid(lobbed) else Vector3.INF
+	check(landed_at.distance_to(target_at) < 1.0, "it's lobbed at the zombie behind the fish (%.1f m off)" % landed_at.distance_to(target_at))
+	await _seconds(powers.charge_lob_time + powers.charge_arm + 0.2)
+	check(charges.blown > blown_before and horde.enemy_hp(target) < hp_target, "it lands, arms and blows on the zombie")
+	# More mines per drop: the mines facet and Quantity.
+	horde.clear()
+	await _ticks(2)
+	check(FishAttack.kind_uses_stat(FishAttack.Kind.CHARGES, "quantity"), "Depth Charges use Quantity (Tome of Schools)")
+	check(Weapons.facets("attack_depth_charges", FishAttack.Kind.BITE).any(func(entry: Array) -> bool: return entry[1] == "Mines per drop"),
+			"its facet is Mines per drop")
+	charges.extra_projectiles = 2
+	var dropped_before := charges.dropped
+	charges.drop()
+	check(charges.dropped - dropped_before == 3 and charges.per_drop() == 3, "+2 Quantity: three mines a drop (%d)" % (charges.dropped - dropped_before))
+	var spread := charges.mines[-1].to.distance_to(charges.mines[-3].to)
+	check(spread > 0.5, "with no zombies near, they fan out behind (%.1f m apart)" % spread)
+	charges.extra_projectiles = 0
 	var dropped_mines := charges.mines.duplicate()
 	powers.charge_stacks = 0
-	powers.charge_interval = 4.0
+	powers.charge_interval = charge_interval
 	await _ticks(2)
 	check(dropped_mines.all(func(mine: Variant) -> bool: return not is_instance_valid(mine)), "without it, the mines go")
 

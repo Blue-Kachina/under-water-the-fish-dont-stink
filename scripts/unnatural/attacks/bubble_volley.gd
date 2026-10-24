@@ -1,7 +1,7 @@
 class_name BubbleVolley
 extends FishAttack
 ## The Butterfly Koi's auto-attack (planning_unnatural.md §5): a volley of
-## bubble_count homing bubbles (plus the Projectiles stat), each after one of
+## bubble_count homing bubbles (plus the Quantity stat), each after one of
 ## the nearest zombies within bubble_range. A bubble pops on the first zombie
 ## it touches, hurting every one within bubble_pop.
 ##
@@ -54,7 +54,7 @@ func proc() -> float:
 
 
 func uses_stat(id: String) -> bool:
-	return id == "projectile_count" or id == "projectile_speed"
+	return id == "quantity" or id == "projectile_speed"
 
 
 func _physics_process(_delta: float) -> void:

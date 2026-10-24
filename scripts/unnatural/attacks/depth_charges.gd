@@ -1,11 +1,12 @@
 class_name DepthCharges
 extends FishAttack
 ## Depth Charges (planning_unnatural.md §7b, D14), a steady weapon (FishAttack),
-## the Mantis Shrimp's own: a mine rack under
-## the fish. A mine drops behind it every interval() s; it arms after arm_time()
-## s, then blows when a zombie comes within charge_trigger m (or when life() s
-## are up): damage() to every zombie within blast() m (proc coefficient
-## charge_proc). At most max_mines() out (the oldest goes). Milestones: at the
+## the Mantis Shrimp's own: a mine rack under the fish. Every interval() s it
+## drops per_drop() mines, each lobbed to a zombie near its tail (lob_reach()),
+## else fanned out behind it; a mine arms after arm_time() s, then blows when
+## a zombie comes within trigger() m (or when life() s are up): damage() to
+## every zombie within blast() m (proc coefficient charge_proc). At most
+## charge_max out (the oldest goes). Milestones: at the
 ## first, a triggered mine pulls the zombies round it in for PULL_TIME s
 ## before it blows; at the second, every CLUSTER_EVERY-th blast throws
 ## CLUSTER_COUNT smaller ones round it; at the third, an armed mine drifts
@@ -27,6 +28,11 @@ const DRIFT_REACH := 10.0
 const DRIFT_SPEED := 3.0
 const AFTERSHOCK_AFTER := 0.4
 const AFTERSHOCK_SHARE := 0.6
+## Untargeted mines: fanned FAN_DEGREES apart behind the tail, lobbed
+## FAN_SHARE of lob_reach() out; a lob arcs LOB_RISE of its length up.
+const FAN_DEGREES := 25.0
+const FAN_SHARE := 0.35
+const LOB_RISE := 0.3
 
 ## Mines dropped and blown so far, for the probes.
 var dropped := 0
@@ -48,8 +54,24 @@ func counts_uses() -> bool:
 	return false
 
 
+## Attack speed counts charge_speed_weight times over here (a mine every
+## few seconds barely feels a few percent).
 func interval() -> float:
-	return powers.charge_interval / (1.0 + facet("rate")) / attack_speed
+	var hurry := maxf(1.0 + (attack_speed - 1.0) * powers.charge_speed_weight, 0.1)
+	return powers.charge_interval / (1.0 + facet("rate")) / hurry
+
+
+## Mines in each drop: the base, the mines facet and Quantity.
+func per_drop() -> int:
+	return maxi(powers.charge_per_drop + facet_count("mines") + extra_projectiles, 1)
+
+
+func lob_reach() -> float:
+	return powers.charge_lob * size_scale
+
+
+func trigger() -> float:
+	return powers.charge_trigger * size_scale
 
 
 func damage() -> float:
@@ -69,7 +91,7 @@ func life() -> float:
 
 
 func max_mines() -> int:
-	return powers.charge_max + facet_count("mines")
+	return maxi(powers.charge_max, 1)
 
 
 func _work(delta: float) -> void:
@@ -91,6 +113,10 @@ func _work(delta: float) -> void:
 			continue
 		mine.age += delta
 		mine.arm_time = arm_time()
+		if mine.flight_left > 0.0:
+			_fly(mine, delta)
+			if mine.flight_left > 0.0:
+				continue  # still in the air: it can't go off yet
 		if mine.fuse >= 0.0:
 			mine.fuse -= delta
 			_pull(mine.global_position, delta)
@@ -105,7 +131,7 @@ func _work(delta: float) -> void:
 			Sfx.play_at("pw/depth_charge_arm", mine.global_position)
 		if armed and milestone(3):
 			_drift(mine, delta)
-		if mine.age >= life() or (armed and not run.horde.query_sphere(mine.global_position, powers.charge_trigger).is_empty()):
+		if mine.age >= life() or (armed and not run.horde.query_sphere(mine.global_position, trigger()).is_empty()):
 			if milestone(1) and mine.age < life():
 				mine.fuse = PULL_TIME  # the first milestone: it draws them in, then blows
 				continue
@@ -132,8 +158,44 @@ func _pull(at: Vector3, delta: float) -> void:
 			run.horde.shove(i, toward.normalized() * PULL_ACCEL * delta)
 
 
-## A mine behind the fish, now.
+## A mine's lob: along the line from where it left to where it lands, arcing up.
+func _fly(mine: Mine, delta: float) -> void:
+	mine.flight_left = maxf(mine.flight_left - delta, 0.0)
+	var t := 1.0 - mine.flight_left / maxf(mine.flight_time, 0.001)
+	var rise := mine.from.distance_to(mine.to) * LOB_RISE * sin(t * PI)
+	mine.global_position = mine.from.lerp(mine.to, t) + Vector3.UP * rise
+
+
+## A drop, now: per_drop() mines from under the tail, each lobbed at one of
+## the zombies nearest it (within lob_reach()), the rest fanned out behind.
 func drop() -> void:
+	var tail := fish.global_position + fish.global_basis.z * (fish.hitbox_length * 0.6)
+	var count := per_drop()
+	var spots := _targets(tail, count)
+	var back := fish.global_basis.z
+	var fanned := count - spots.size()
+	for n in fanned:
+		var turn := deg_to_rad(FAN_DEGREES) * (n - (fanned - 1) * 0.5)
+		spots.append(tail + back.rotated(fish.global_basis.y, turn) * lob_reach() * FAN_SHARE)
+	for spot: Vector3 in spots:
+		_lay(tail, spot)
+	Sfx.play_at("pw/depth_charge_drop", tail)
+
+
+## Where the `count` zombies nearest `from` (within lob_reach()) are, nearest first.
+func _targets(from: Vector3, count: int) -> Array[Vector3]:
+	var near: Array = []  # [distance², position]
+	for i in run.horde.query_sphere(from, lob_reach()):
+		var at := run.horde.enemy_position(i)
+		near.append([from.distance_squared_to(at), at])
+	near.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+	var spots: Array[Vector3] = []
+	for k in mini(count, near.size()):
+		spots.append(near[k][1])
+	return spots
+
+
+func _lay(from: Vector3, to: Vector3) -> void:
 	while mines.size() >= max_mines():
 		var oldest: Variant = mines.pop_front()  # untyped: a spent one is a freed instance
 		if is_instance_valid(oldest):
@@ -141,11 +203,14 @@ func drop() -> void:
 	var mine := Mine.new()
 	mine.tint = tint()
 	mine.arm_time = arm_time()
+	mine.from = from
+	mine.to = to
+	mine.flight_time = powers.charge_lob_time
+	mine.flight_left = powers.charge_lob_time if from.distance_squared_to(to) > 0.01 else 0.0
 	run.add_child(mine)
-	mine.global_position = fish.global_position + fish.global_basis.z * (fish.hitbox_length * 0.6)
+	mine.global_position = from
 	mines.append(mine)
 	dropped += 1
-	Sfx.play_at("pw/depth_charge_drop", mine.global_position)
 
 
 func explode(at: Vector3) -> void:
@@ -207,6 +272,11 @@ class Mine extends Node3D:
 	## When it arms (s), and its fuse once triggered (the pull; -1: not lit).
 	var arm_time := 0.5
 	var fuse := -1.0
+	## Its lob (DepthCharges._fly): from where, to where, and how long (s).
+	var from := Vector3.ZERO
+	var to := Vector3.ZERO
+	var flight_time := 0.0
+	var flight_left := 0.0
 	var _light := MeshInstance3D.new()
 	var _halo := MeshInstance3D.new()
 

@@ -2,12 +2,12 @@ class_name StatBlock
 extends RefCounted
 ## A player's stats in Unnatural (planning_unnatural.md §6): what level-up
 ## cards (and later powerups) add to. Every stat starts at 0 and is a bonus:
-## flat ones (hp, hp/s, armour, projectiles, luck) add, the rest are shares
+## flat ones (hp, hp/s, armour, quantity, luck) add, the rest are shares
 ## (0.1 = +10%). Each has a step, what one common card gives; rarer cards give
 ## more (Rarity's multipliers). Each fish has a signature stat it gets +1 step
 ## of every level (SIGNATURE).
 ##
-## In the card pool: the stats something uses. Projectile count and speed are
+## In the card pool: the stats something uses. Quantity and Projectile Speed are
 ## offered only to fish whose attack uses them (FishAttack.uses_stat);
 ## duration waits for something that uses it.
 
@@ -19,7 +19,7 @@ const STATS := {
 	"damage": ["Damage", 0.1, true, true],
 	"attack_speed": ["Attack Speed", 0.08, true, true],
 	"size": ["Size", 0.1, true, true],
-	"projectile_count": ["Projectiles", 1.0, false, false],
+	"quantity": ["Quantity", 1.0, false, false],
 	"projectile_speed": ["Projectile Speed", 0.1, true, false],
 	"crit_chance": ["Crit Chance", 0.05, true, true],
 	"crit_damage": ["Crit Damage", 0.2, true, true],
@@ -82,7 +82,7 @@ func add(id: String, amount: float) -> void:
 static func amount(id: String, multiplier := 1.0) -> float:
 	var step: float = STATS[id][1]
 	var given := step * multiplier
-	return ceilf(given) if id == "projectile_count" else given
+	return ceilf(given) if id == "quantity" else given
 
 
 static func title(id: String) -> String:

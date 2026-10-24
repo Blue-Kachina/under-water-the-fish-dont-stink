@@ -3,7 +3,7 @@ extends FishAttack
 ## The Swordfish's auto-attack (planning_unnatural.md §5): a spear of light
 ## shot off its bill, at the nearest zombie within thrust_aim_cone of the nose
 ## (or straight on if one is anywhere within range ahead), piercing up to
-## thrust_pierce zombies. Each Projectiles stat adds a spear, fanned
+## thrust_pierce zombies. Each Quantity adds a spear, fanned
 ## thrust_spread degrees apart; Projectile Speed (the Swordfish's signature)
 ## makes them faster and fly further in the same time.
 ##
@@ -51,7 +51,7 @@ func damage() -> float:
 
 
 func uses_stat(id: String) -> bool:
-	return id == "projectile_count" or id == "projectile_speed"
+	return id == "quantity" or id == "projectile_speed"
 
 
 func speed() -> float:

@@ -332,7 +332,7 @@ func _legendaries() -> void:
 	powers.engine_stacks = 2
 	await _ticks(2)
 	var block := run.block_of(fish)
-	check(is_equal_approx(block.bonus.get("projectile_count", 0.0), 2.0) and is_equal_approx(block.bonus.get("size", 0.0), powers.engine_size * 2.0),
+	check(is_equal_approx(block.bonus.get("quantity", 0.0), 2.0) and is_equal_approx(block.bonus.get("size", 0.0), powers.engine_size * 2.0),
 			"Abyssal Engine x2: +2 projectiles, +%.0f%% size" % (powers.engine_size * 200.0))
 	powers.engine_stacks = 0
 

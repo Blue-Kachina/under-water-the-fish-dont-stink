@@ -2,7 +2,7 @@ class_name ShockLash
 extends FishAttack
 ## The String Ray's auto-attack (planning_unnatural.md §5): its tail whips the
 ## nearest zombie within lash_range, any way round, and the shock arcs on to
-## lash_arcs more (one more per Projectiles stat), each the nearest not yet
+## lash_arcs more (one more per Quantity), each the nearest not yet
 ## struck within lash_arc_range of the last, for lash_arc_share of the damage
 ## (and a lower proc coefficient).
 ##
@@ -34,7 +34,7 @@ func damage() -> float:
 
 
 func uses_stat(id: String) -> bool:
-	return id == "projectile_count"
+	return id == "quantity"
 
 
 ## How far the tail reaches (m): lash_range, never less than the bow wave's

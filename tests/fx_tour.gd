@@ -127,6 +127,7 @@ func _run() -> void:
 	for n in charges.mines.size():
 		charges.mines[n].global_position = at(-4.0 + n * 1.5, -1.5 + n * 0.4, 7.0 + n * 2.0)
 		charges.mines[n].age = 0.0 if n == 0 else 10.0
+		charges.mines[n].flight_left = 0.0  # landed where it's posed
 	var lure_powerup: AnglerfishLure = held.held["anglerfish_lure"]
 	lure_powerup.drop()
 	lure_powerup.lures[-1].global_position = at(4.0, 1.0, 10.0)

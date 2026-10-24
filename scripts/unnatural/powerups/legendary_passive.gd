@@ -21,7 +21,7 @@ func extra_level_picks() -> int:
 
 func stat_bonus() -> Dictionary:
 	if id == "abyssal_engine":
-		return {"projectile_count": settings.engine_projectiles * eff(), "size": settings.engine_size * eff()}
+		return {"quantity": settings.engine_projectiles * eff(), "size": settings.engine_size * eff()}
 	return {}
 
 

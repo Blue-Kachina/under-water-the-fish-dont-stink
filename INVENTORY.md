@@ -2,7 +2,7 @@
 
 Every playable fish, weapon, tome, powerup and bonus in Unnatural (the survivors mode), with their stats.
 
-- **Last synced with code:** 2026-10-23
+- **Last synced with code:** 2026-10-24
 - **Values are defaults.** Almost every number here is a tuning-panel setting (`UnnaturalSettings`, `PowerupSettings`), so a preset can change it. If this file and the code disagree, the code is right; fix this file.
 - **Sources of truth:**
 
@@ -88,7 +88,7 @@ Every stat starts at 0 and is a bonus. Percent stats are shares (0.1 = +10%); th
 | `damage` | Damage | +10% | % | yes | Teeth | Blood Moon Shard, Glass Coral (+100%) |
 | `attack_speed` | Attack Speed | +8% | % | yes | Tides | Fizzy Soda (+8%) |
 | `size` | Size | +10% | % | yes | Reef | Abyssal Engine (+15%) |
-| `projectile_count` | Projectiles | +1 (rounded up) | flat | only if the attack uses it (Thrust, Bubbles, Spines, Lash) | Schools | Abyssal Engine (+1) |
+| `quantity` | Quantity | +1 (rounded up) | flat | only if a weapon held uses it (Thrust, Bubbles, Spines, Lash, Depth Charges) | Schools | Abyssal Engine (+1) |
 | `projectile_speed` | Projectile Speed | +10% | % | only if the attack uses it (Thrust, Bubbles, Spines) | Currents | — |
 | `crit_chance` | Crit Chance | +5% | % | yes | Kill | Sea Salt (+5%) |
 | `crit_damage` | Crit Damage | +20% | % | yes | Kill | — |
@@ -102,7 +102,7 @@ Every stat starts at 0 and is a bonus. Percent stats are shares (0.1 = +10%); th
 | `pearl_chance` | Pearl Chance | +15% | % | yes | Pearls | — |
 | `luck` | Luck | +0.1 | flat | yes | Fortune | Lucky Sand Dollar (+0.1) |
 
-**What the global stats scale on weapons:** Attack Speed → fire/drop/tick rate. Size → every weapon's reach, radius, blast or hit size (all 10 weapons, plus the area powerups such as Electric Eel, Torpedo, Tsunami Heart). Duration → Greek Fire patch life, Depth Charge life, Anglerfish Lure, Ink Sac. Damage → every hit (applied in `UnnaturalRun.hit()`).
+**What the global stats scale on weapons:** Attack Speed → fire/drop/tick rate (2× for Depth Charges' drop rate, `charge_speed_weight`). Quantity → spears, bubbles, spine rings, lash arcs, mines per drop. Size → every weapon's reach, radius, blast or hit size (all 10 weapons, plus the area powerups such as Electric Eel, Torpedo, Tsunami Heart). Duration → Greek Fire patch life, Depth Charge life, Anglerfish Lure, Ink Sac. Damage → every hit (applied in `UnnaturalRun.hit()`).
 
 ---
 
@@ -145,10 +145,10 @@ Shared facet steps (`PowerupSettings`): Damage +20%, Rate +12%, Size +12%, Knock
 |---|---|---|---|---|---|---|
 | **Anemone Sting** (`attack_sting`) | Clownfish | 9 | 0.9 s | 0.6 | A pulse 6.5 m round the fish (always at least 1.4× the bow wave's reach). Hits everything inside. Only fires when a zombie is close. | Damage, Attack rate, Pulse size, Knockback |
 | **Ghost Bite** (`attack_bite`) | Shark | 26 | 0.9 s | 1.0 | Jaws 8 m long, 4.5 m half-width (always at least 1.6× the bow wave). Aims at the nearest zombie within 110° of the nose. | Damage, Bite rate, Jaw size, Knockback |
-| **Shock Lash** (`attack_lash`) | String Ray | 47 | 0.8 s | 1.0 | Whips the nearest zombie within 14 m. It arcs on to 1 more (+1 per Projectile) within 8 m of the last, each arc doing 70%. | Damage, Lash rate, Lash reach, Arcs (count) |
+| **Shock Lash** (`attack_lash`) | String Ray | 47 | 0.8 s | 1.0 | Whips the nearest zombie within 14 m. It arcs on to 1 more (+1 per Quantity) within 8 m of the last, each arc doing 70%. | Damage, Lash rate, Lash reach, Arcs (count) |
 | **Bill Thrust** (`attack_thrust`) | Swordfish | 34 | 1.0 s | 1.0 | A spear at 45 m/s that flies 40 m with a 0.7 m hit radius and pierces 6. Aims within 60° of the nose. Extra spears fan 8° apart. | Damage, Thrust rate, Spears (count), Spear speed |
-| **Bubble Volley** (`attack_bubbles`) | Butterfly Koi | 9 per pop | 1.2 s | 0.6 | 4 homing bubbles (+Projectiles) at 18 m/s, turn rate 6/s, 2.5 s life, 30 m range. Each pops on its first touch with a 2 m splash. | Damage, Volley rate, Bubbles (count), Bubble speed |
-| **Spine Burst** (`attack_spines`) | Boxfish | 32 | 1.4 s | 0.4 | 18 spines all round (+4 per Projectile) when a zombie is within 12 m. 30 m/s, pierce 2. | Damage, Burst rate, Spine rings (count), Spine range |
+| **Bubble Volley** (`attack_bubbles`) | Butterfly Koi | 9 per pop | 1.2 s | 0.6 | 4 homing bubbles (+Quantity) at 18 m/s, turn rate 6/s, 2.5 s life, 30 m range. Each pops on its first touch with a 2 m splash. | Damage, Volley rate, Bubbles (count), Bubble speed |
+| **Spine Burst** (`attack_spines`) | Boxfish | 32 | 1.4 s | 0.4 | 18 spines all round (+4 per Quantity) when a zombie is within 12 m. 30 m/s, pierce 2. | Damage, Burst rate, Spine rings (count), Spine range |
 
 **Milestones (Lv 5 / 10 / 15 / 20):**
 
@@ -167,7 +167,7 @@ Shared facet steps (`PowerupSettings`): Damage +20%, Rate +12%, Size +12%, Knock
 |---|---|---|---|---|
 | **Greek Fire Trail** (`attack_greek_fire`) | Lionfish | Drops a burning patch every 1.6 m swum. Each patch is 1.6 m in radius, lasts 2.0 s (× Duration) and burns for 40 dmg/s. At most 60 patches out. | 0 | Burn damage +25%, Patch life +0.4 s, Patch size +10%, Denser trail +12%, Max patches +5 |
 | **Jellyfish Halo** (`attack_jellyfish_halo`) | Moon Jelly | 2 jellies orbit 3.2 m out at 0.5 turns/s. Each stings for 35 every 0.25 s on touch (1.2 m radius). | 0.1 | Jellies +1, Sting damage +25%, Orbit size +12%, Orbit speed +15%, Sting rate +15% |
-| **Depth Charges** (`attack_depth_charges`) | Mantis Shrimp | Drops a mine every 4 s. It arms after 0.5 s and blows when a zombie comes within 2 m (or after 10 s × Duration): 46 dmg in a 5 m blast. At most 12 mines out. | 0.5 | Blast damage +30%, Blast size +15%, Drop rate +15%, Mines out +3, Arming speed +30% |
+| **Depth Charges** (`attack_depth_charges`) | Mantis Shrimp | Every 3 s it drops 1 mine (+1 per Mines per drop, +1 per Quantity). Each is lobbed over 0.35 s at one of the zombies nearest the tail within 6 m (× Size), else fanned out behind. A mine arms after 0.5 s and blows when a zombie comes within 3 m (× Size), or after 10 s × Duration: 24 dmg in a 5 m blast. Attack Speed counts 2× toward its drop rate. At most 30 mines out (the oldest go). | 0.5 | Blast damage +20%, Blast size +15%, Drop rate +20%, Mines per drop +1, Arming speed +30% |
 | **Remora Buddy** (`attack_remora_buddy`) | Baby Whale Shark | 1 remora nips the nearest zombie within 7 m every 1.5 s for 55. | 0.5 | Remoras +1, Bite damage +25%, Bite rate +15%, Reach +15% |
 | **Leviathan's Coil** (`attack_leviathans_coil`) | — (boss only, from the Blood Leviathan; `coil_arrive_level` 5) | 6 coils trail the fish 1.4 m apart. Each hurts what it touches (0.9 m radius) for 55 every 0.25 s. | 0.15 | Coils +3, Coil damage +25%, Coil size +15%, Hit rate +15% |
 
@@ -194,7 +194,7 @@ A tome is a global stat that levels up (max Lv 99). One card adds one step of ea
 | **Tome of Teeth** (`teeth`) | Damage | Damage +10% | Damage +50% |
 | **Tome of Tides** (`tides`) | Attack Speed | Attack Speed +8% | +40% |
 | **Tome of the Reef** (`reef`) | Size | Size +10% | +50% |
-| **Tome of Schools** (`schools`) | Projectiles | Projectiles +1 | +5 |
+| **Tome of Schools** (`schools`) | Quantity | Quantity +1 | +5 |
 | **Tome of Currents** (`currents`) | Projectile Speed, Knockback | +7%, +10.5% | +35%, +52.5% |
 | **Tome of the Kill** (`kill`) | Crit Chance, Crit Damage | +3.5%, +14% | +17.5%, +70% |
 | **Tome of Fins** (`fins`) | Swim Speed, Stride Power | +3.5%, +4.2% | +17.5%, +21% |
@@ -266,7 +266,7 @@ Items come from **chests**, never from level-up cards. A chest rolls a rarity wi
 | **Poseidon's Trident** (`poseidons_trident`) | Every 3rd attack of a fired weapon (every 3 s for a fish with only steady ones) calls lightning down on the biggest zombie within 30 m: 250 dmg within 4 m | +150 dmg per stack |
 | **Megalodon Tooth** (`megalodon_tooth`) | Crits finish off zombies under 15% HP (not bosses) | +5%/stack, max 50% |
 | **Moon Pearl** (`moon_pearl`) | Take +1 card from each level-up offer | +1 per stack |
-| **Abyssal Engine** (`abyssal_engine`) | Projectiles +1, Size +15% | +1 and +15% per stack |
+| **Abyssal Engine** (`abyssal_engine`) | Quantity +1, Size +15% | +1 and +15% per stack |
 
 ### Cursed (blood-red chests only)
 

@@ -2,7 +2,7 @@ extends Node
 ## Every fish unique (planning_unnatural.md phase 6) in the real game: each
 ## fish gets its own auto-attack (and the panel's fish_attack overrides it,
 ## live); the Anemone Sting hits all round and out-reaches the bow wave; the
-## Shock Lash whips any way round and arcs on (one more per Projectiles); the
+## Shock Lash whips any way round and arcs on (one more per Quantity); the
 ## Bill Thrust's spear pierces a line ahead; the Bubble Volley's bubbles home
 ## in and pop; the Spine Burst hits all round; projectile cards are offered only
 ## to fish that shoot. Then the twists: Nimble turns sharper, Glide keeps its
@@ -82,11 +82,11 @@ func _run() -> void:
 	var third := horde.spawn(1, Vector3(10, 0, 14))
 	await _ticks(20)
 	check(_hurt(first) and _hurt(second) and not _hurt(third), "it whips the nearest (behind), arcs to one more, not two")
-	run.block_of(fish).add("projectile_count", 1.0)
+	run.block_of(fish).add("quantity", 1.0)
 	run._apply_stats(fish)
 	_heal_all()
 	await _ticks(roundi(settings.lash_cooldown * Engine.physics_ticks_per_second) + 10)
-	check(_hurt(third) and lash.arcs() == 2, "+1 Projectiles: one more arc (%d made)" % lash.arcs_made)
+	check(_hurt(third) and lash.arcs() == 2, "+1 Quantity: one more arc (%d made)" % lash.arcs_made)
 
 	print("bill thrust:")
 	var thrust: BillThrust = await _use(FishAttack.Kind.THRUST)
@@ -99,7 +99,7 @@ func _run() -> void:
 	run._apply_stats(fish)
 	check(thrust.speed() > slow * 1.4, "Projectile Speed makes it faster (%.0f -> %.0f m/s)" % [slow, thrust.speed()])
 	var melee := AnemoneSting.new()
-	check(StatBlock.pool(thrust).has("projectile_speed") and not StatBlock.pool(melee).has("projectile_count"),
+	check(StatBlock.pool(thrust).has("projectile_speed") and not StatBlock.pool(melee).has("quantity"),
 			"projectile cards only for fish that shoot")
 	melee.free()
 
@@ -121,9 +121,9 @@ func _run() -> void:
 		hurt_count += 1 if _hurt(i) else 0
 	check(hurt_count >= 5, "spines out all round (%d of 8 hit)" % hurt_count)
 	var before := burst.count()
-	run.block_of(fish).add("projectile_count", 1.0)
+	run.block_of(fish).add("quantity", 1.0)
 	run._apply_stats(fish)
-	check(burst.count() == before + 4, "+1 Projectiles: 4 more spines")
+	check(burst.count() == before + 4, "+1 Quantity: 4 more spines")
 	settings.fish_attack = FishAttack.Kind.OWN
 	horde.clear()
 

@@ -97,7 +97,7 @@ const ATTACK_FACETS := {
 		["damage", "Blast damage", "pct", "charge_damage_step", ""],
 		["blast", "Blast size", "pct", "charge_blast_step", ""],
 		["rate", "Drop rate", "pct", "charge_rate_step", ""],
-		["mines", "Mines out", "count", "charge_max_step", ""],
+		["mines", "Mines per drop", "count", "charge_count_step", ""],
 		["arm", "Arming speed", "pct", "charge_arm_step", ""],
 	],
 	FishAttack.Kind.REMORA: [
