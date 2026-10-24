@@ -12,7 +12,9 @@ extends RefCounted
 ## hits and would-be kills (sources()). The tuning panel's Test Tank group
 ## sets the dummies' hp, the team's level and every stat directly, and
 ## tank_horde keeps that many chasing zombies out (mortal, no contact damage
-## unless tank_contact): the perf bench in the game. R resets it all.
+## unless tank_contact): the perf bench in the game. tank_boss brings in a
+## boss (the Drowned Shark or any final boss) to practise on, back again
+## tank_boss_respawn s after it's beaten. R resets it all.
 
 ## DPS is over this many seconds.
 const DPS_WINDOW := 5.0
@@ -24,6 +26,9 @@ const CLUSTER_COUNT := 40
 const LINES := [10.0, 20.0, 40.0]
 const LINE_SIDE := 16.0
 const LINE_COUNT := 5
+## tank_boss's bosses, in its order ("": None), and how far ahead of the spawn they come in (m).
+const BOSSES: Array[String] = ["", "miniboss", "boss", "gulper", "whale", "lamprey"]
+const BOSS_AHEAD := 45.0
 ## tank_preset's levels, and what fills the slots, in order.
 const PRESET_LEVELS := [0, 5, 10, 20]
 const PRESET_WEAPONS: Array[String] = ["attack_greek_fire", "attack_jellyfish_halo", "attack_depth_charges", "attack_remora_buddy",
@@ -43,6 +48,11 @@ var _recent: Array = []
 var _rng := RandomNumberGenerator.new()
 ## The tank_preset last applied (0 at the start: Off leaves the panel's values be).
 var _preset := 0
+## The tank_boss out (or due back), and the boss itself (null: none out now).
+var _boss_pick := 0
+var boss: Boss
+## Seconds until a beaten boss comes back (-1: not due).
+var _boss_back := -1.0
 
 
 ## Every weapon and tome slot full at `level` (0: all cleared): the weapons'
@@ -98,6 +108,9 @@ func start() -> void:
 		for n in LINE_COUNT:
 			var at := spawn.origin + ahead * distance + side * (LINE_SIDE + (n - LINE_COUNT / 2.0) * 2.5)
 			run.horde.spawn(dummy_kind, at, -ahead, false, true)
+	boss = null  # the run's start cleared it
+	_boss_pick = run.settings.tank_boss
+	_spawn_boss()
 
 
 ## Every tick: the dummy kind, level and stats from the panel, the chasers topped up.
@@ -128,7 +141,7 @@ func update(delta: float) -> void:
 		var around: Vector3 = run.players[0].global_position
 		var count := mini(missing, 200)
 		run.horde.spawn_pack(_rng.randi_range(0, dummy_kind - 1), count, run.spawn_point(around), 2.0 + sqrt(float(count)))
-	elif missing < 0:
+	elif missing < 0 and not is_instance_valid(boss):  # a boss's brood and summons stay while it's out
 		for i in run.horde.alive:
 			if missing >= 0:
 				break
@@ -138,10 +151,68 @@ func update(delta: float) -> void:
 	var since := elapsed - DPS_WINDOW
 	while not _recent.is_empty() and float(_recent[0][0]) < since:
 		_recent.pop_front()
+	_update_boss(delta)
 
 
 func dummy_count() -> int:
 	return CLUSTER_COUNT + LINES.size() * LINE_COUNT
+
+
+## A new tank_boss pick swaps the boss out; a beaten one comes back when due.
+func _update_boss(delta: float) -> void:
+	if run.settings.tank_boss != _boss_pick:
+		_boss_pick = run.settings.tank_boss
+		_send_boss_away()
+		_spawn_boss()
+		return
+	if _boss_back >= 0.0:
+		_boss_back -= delta
+		if _boss_back <= 0.0:
+			_spawn_boss()
+
+
+## tank_boss's boss, ahead of the spawn (none for None, or with one out).
+func _spawn_boss() -> void:
+	_boss_back = -1.0
+	var kind := BOSSES[clampi(_boss_pick, 0, BOSSES.size() - 1)]
+	if kind == "" or is_instance_valid(boss):
+		return
+	var settings := run.settings
+	var made: Boss = DrownedShark.new() if kind == "miniboss" else UnnaturalRun.make_final_boss(kind)
+	var boss_hp := settings.tank_boss_hp
+	if boss_hp <= 0.0:
+		boss_hp = settings.shark_hp if kind == "miniboss" else settings.leviathan_hp
+	var spawn: Transform3D = run.ocean.spawn_transform()
+	var at := spawn.origin - spawn.basis.z * BOSS_AHEAD
+	var flat := Vector2(at.x - run.centre.x, at.z - run.centre.z)
+	var reach := settings.arena_radius - 10.0
+	if flat.length() > reach:
+		flat = flat.normalized() * maxf(reach, 0.0)
+		at = Vector3(run.centre.x + flat.x, at.y, run.centre.z + flat.y)
+	at.y = clampf(at.y, run.centre.y + settings.arena_floor + 4.0, run.centre.y + settings.arena_ceiling - 4.0)
+	boss = made
+	run._add_boss(made, at, boss_hp)
+
+
+## The boss out now gone at once (a new pick).
+func _send_boss_away() -> void:
+	_boss_back = -1.0
+	if not is_instance_valid(boss):
+		boss = null
+		return
+	run.bosses.erase(boss)
+	boss.queue_free()  # its proxies go as it leaves the tree
+	boss = null
+
+
+## A boss beaten in the tank: it's logged (a would-be kill for whatever finished
+## it is already in the DPS readout), and comes back after tank_boss_respawn s.
+func boss_beaten(beaten: Boss) -> void:
+	if beaten != boss:
+		return
+	boss = null
+	if run.settings.tank_boss_respawn > 0.0:
+		_boss_back = run.settings.tank_boss_respawn
 
 
 ## A hit by `source` for `amount`.

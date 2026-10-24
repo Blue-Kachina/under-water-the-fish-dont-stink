@@ -122,6 +122,42 @@ func _run() -> void:
 	check(horde.enemy_position(far_one).distance_to(fish.global_position) < gap_before - 2.0, "they drift towards the player")
 	settings.tank_slow_walkers = false
 
+	print("bosses:")
+	check(run.bosses.is_empty(), "none by default")
+	var titles := ["", "Drowned Shark", "King of Herrings", "Gulper Mother", "Whale Fall", "Lamprey Queen"]
+	for pick in range(1, titles.size()):
+		settings.tank_boss = pick
+		await _ticks(30)
+		var out: Boss = run.bosses[0] if run.bosses.size() == 1 else null
+		var right := out != null and (out is DrownedShark if pick == 1 else (out is BloodLeviathan and TestTank.BOSSES[pick] != ""))
+		check(right and out == tank.boss and not out.parts.is_empty(), "%s comes in (%d parts)" % [titles[pick], out.parts.size() if out else 0])
+	var gone: Boss = tank.boss
+	settings.tank_boss = 0
+	await _ticks(3)
+	check(run.bosses.is_empty() and not is_instance_valid(gone), "None sends it away")
+	settings.tank_boss = 2
+	settings.tank_boss_hp = 500.0
+	settings.tank_boss_respawn = 0.5
+	await _ticks(5)
+	var king: Boss = tank.boss
+	check(king != null and is_equal_approx(king.max_hp, 500.0), "tank_boss_hp sets its hp")
+	await _ticks(120 * 2)
+	var hp := run.health_of(fish)
+	check(is_equal_approx(hp.hp, hp.max_hp), "it doesn't hurt without tank_contact (%.0f hp)" % hp.hp)
+	king.take(1000.0, fish, "test")
+	await _ticks(3)
+	check(run.bosses.is_empty() and run.whirlpool == null and run.chests.all(func(c: TreasureChest) -> bool: return c.kind != TreasureChest.Kind.BOSS),
+			"beaten: no whirlpool or boss chest")
+	await _ticks(120)
+	check(run.bosses.size() == 1 and tank.boss != king and tank.boss is BloodLeviathan, "it comes back after tank_boss_respawn")
+	main.reset_play()
+	await _ticks(5)
+	check(run.bosses.size() == 1 and is_instance_valid(tank.boss), "R brings it in again")
+	settings.tank_boss = 0
+	settings.tank_boss_hp = 0.0
+	settings.tank_boss_respawn = 3.0
+	await _ticks(3)
+
 	print("leaving:")
 	main.set_mode(main.UNNATURAL)
 	await _ticks(3)

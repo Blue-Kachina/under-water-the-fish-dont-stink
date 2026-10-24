@@ -1263,8 +1263,8 @@ func stage_damage() -> float:
 ## instead (Bubble Wrap): then it's i-frames, and no hurt. `cause`: what it
 ## was, for the run log (a zombie's touch names its kind).
 func hurt(fish: FishController, amount: float, from := -1, cause := "") -> bool:
-	if amount <= 0.0:
-		return false
+	if amount <= 0.0 or (tank and not settings.tank_contact):
+		return false  # the Test Tank's unhurt practice (its bosses' bolts and holds too)
 	var twist: Traversal = _twists.get(fish)
 	if twist:
 		amount *= twist.taken_factor()
@@ -1719,6 +1719,9 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 		stats_of(by).kills += 1
 		stats_of(by)["bosses"] = stats_of(by).get("bosses", 0) + 1
 	boss_defeated.emit(boss, by)
+	if tank:
+		tank.boss_beaten(boss)  # no loot or whirlpool there: it comes back instead
+		return
 	if boss is DrownedShark:
 		# On every machine (each sees the boss beaten), so not sent as a drop.
 		var chest := add_chest(boss.global_position, 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,

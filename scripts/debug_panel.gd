@@ -158,6 +158,11 @@ var _status: Label
 var _title: Label
 var _subtitle: Label
 var _detail: VBoxContainer
+var _detail_scroll: ScrollContainer
+## The mouse's way back a column (B on a controller): over the options to the
+## sections, over the detail pane to its option. Shown when there's a column to go back to.
+var _rows_back: Button
+var _detail_back: Button
 var _detail_preview: TextureRect
 var _detail_group: Label
 var _detail_title: Label
@@ -176,6 +181,8 @@ var _locked := {}
 var _lock_note := ""
 var _repeat_dir := 0
 var _repeat_time := 0.0
+## What had focus last frame (the slider's repeat starts afresh on it).
+var _repeat_focus: Control
 ## Held up/down: which way (-1 up, 1 down), and for how long.
 var _scroll_dir := 0
 var _scroll_held := 0.0
@@ -208,7 +215,8 @@ func _ready() -> void:
 			if _rows.has("%s/%s" % [section, key]):
 				_refresh_row("%s/%s" % [section, key])
 		if _detail_key.ends_with("/" + key):
-			_show_detail(_detail_key))
+			_sync_detail())  # not rebuilt: its control may have focus (a dropdown closing, typing)
+	get_viewport().gui_focus_changed.connect(_on_focus_changed)
 
 
 func is_open() -> bool:
@@ -364,8 +372,15 @@ func _build_ui() -> void:
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_theme_constant_override("separation", roundi(4.0 * s))
 	columns.add_child(right)
+	var title_line := HBoxContainer.new()
+	title_line.add_theme_constant_override("separation", roundi(6.0 * s))
+	right.add_child(title_line)
+	_rows_back = _back_arrow("", s)
+	_rows_back.tooltip_text = "Back to the sections"
+	_rows_back.pressed.connect(_to_sections)
+	title_line.add_child(_rows_back)
 	_title = UITheme.label("Game", "display", 34.0, UITheme.INK, s, 600)
-	right.add_child(_title)
+	title_line.add_child(_title)
 	_subtitle = UITheme.label("", "caps", 13.0, UITheme.AQUA, s)
 	right.add_child(_subtitle)
 	_build_tab_bar(right)
@@ -415,13 +430,35 @@ func _build_ui() -> void:
 	for side in ["left", "right", "top", "bottom"]:
 		detail_margin.add_theme_constant_override("margin_" + side, roundi(24.0 * s))
 	detail_box.add_child(detail_margin)
-	var detail_scroll := ScrollContainer.new()
-	detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	detail_margin.add_child(detail_scroll)
+	# Too much to fit (the fish list, a long Sound Board entry) scrolls: a bar
+	# that shows on the pane's fill, a gutter so it doesn't sit over the
+	# content, and focus moving through the choices keeps them in view.
+	_detail_scroll = ScrollContainer.new()
+	_detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_detail_scroll.follow_focus = true
+	var bar := _detail_scroll.get_v_scroll_bar()
+	var track := UITheme.box(Color(UITheme.GROUND, 0.6), 4.0 * s)
+	track.set_content_margin_all(0.0)
+	track.set_content_margin(SIDE_LEFT, 4.0 * s)  # the theme's bars are 0 wide (an empty track): this one isn't
+	track.set_content_margin(SIDE_RIGHT, 4.0 * s)
+	bar.add_theme_stylebox_override("scroll", track)
+	var grab := UITheme.box(Color(UITheme.AQUA, 0.45), 4.0 * s)
+	grab.set_content_margin_all(3.0 * s)
+	bar.add_theme_stylebox_override("grabber", grab)
+	detail_margin.add_child(_detail_scroll)
+	var detail_gutter := MarginContainer.new()
+	detail_gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail_gutter.add_theme_constant_override("margin_right", roundi(16.0 * s))
+	_detail_scroll.add_child(detail_gutter)
 	_detail = VBoxContainer.new()
 	_detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_detail.add_theme_constant_override("separation", roundi(10.0 * s))
-	detail_scroll.add_child(_detail)
+	detail_gutter.add_child(_detail)
+	_detail_back = _back_arrow("Back", s)
+	_detail_back.tooltip_text = "Back to the options"
+	_detail_back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_detail_back.pressed.connect(_back)
+	_detail.add_child(_detail_back)
 	_detail_preview = TextureRect.new()
 	_detail_preview.custom_minimum_size.y = 240.0 * s
 	_detail_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -592,8 +629,7 @@ func _show_tab(section: String, index: int) -> void:
 	for i in tabs.size():
 		tabs[i].list.visible = i == _tab_at[section]
 	_tab_bar.visible = tabs.size() > 1
-	_hints.hints = ([["LB/RB", "Tab"]] if tabs.size() > 1 else []) + [["LT/RT", "Section"], ["◀ ▶", "Change"], ["Y", "Default"],
-			["SELECT", "Debug tweaks"], ["B", "Back"]]
+	_refresh_hints()
 	for child in _tab_strip.get_children():
 		_tab_strip.remove_child(child)
 		child.queue_free()
@@ -1153,8 +1189,140 @@ func _step_section_to(section: String) -> void:
 		(_section_buttons[section] as Button).grab_focus()
 
 
+## Three columns, each a step in: the sections, a section's options, the
+## detail pane. A (or right) goes a column in; B goes a column back, and so
+## does left from an option (left / right only change a value in the detail
+## pane, where it's plain what they're changing).
+func _to_sections() -> void:
+	(_section_buttons[_section] as Button).grab_focus()
+
+
+func _in_detail(focus: Control) -> bool:
+	return focus != null and _detail.is_ancestor_of(focus)
+
+
+## Into the detail pane for the shown option, focus on its control: the
+## current On / Off, the slider, the name to type, or the dropdown (opened
+## straight away when `open_list`). False when the option has nothing there to
+## change (an action or a binding: A on its row does it).
+func _enter_detail(open_list := true) -> bool:
+	var kind: String = _meta.get(_detail_key, {}).get("kind", "")
+	var fallback: Control
+	for control: Control in _detail_control.find_children("*", "Control", true, false):
+		match kind:
+			"enum":
+				if control is OptionButton:
+					control.grab_focus()
+					if open_list and not (control as OptionButton).disabled:
+						(control as OptionButton).show_popup()
+					return true
+			"bool":
+				if control is ChoiceButton:
+					if (control as ChoiceButton).current:
+						control.grab_focus()
+						return true
+					if fallback == null:
+						fallback = control
+			"range":
+				if control is DetailSlider:
+					control.grab_focus()
+					return true
+			"text":
+				if control is LineEdit:
+					control.grab_focus()
+					(control as LineEdit).select_all()
+					return true
+	if fallback:
+		fallback.grab_focus()
+		return true
+	return false
+
+
+## The detail pane's controls keep focus in the pane: up / down go nowhere,
+## left / right only between controls side by side (On and Off).
+func _confine_detail_focus() -> void:
+	for control: Control in _detail_control.find_children("*", "Control", true, false):
+		if control.focus_mode != Control.FOCUS_ALL:
+			continue
+		var mates: Array = [control]
+		if control.get_parent() is HBoxContainer:
+			mates = control.get_parent().get_children().filter(func(other: Node) -> bool:
+				return other is Control and (other as Control).focus_mode == Control.FOCUS_ALL)
+		var at := mates.find(control)
+		control.focus_neighbor_top = control.get_path_to(control)
+		control.focus_neighbor_bottom = control.get_path_to(control)
+		control.focus_neighbor_left = control.get_path_to(mates[maxi(at - 1, 0)])
+		control.focus_neighbor_right = control.get_path_to(mates[mini(at + 1, mates.size() - 1)])
+		control.focus_previous = control.focus_neighbor_left
+		control.focus_next = control.focus_neighbor_right
+
+
+## The hints and the back arrows follow the column focus is in.
+func _on_focus_changed(_focus: Control) -> void:
+	if is_open():
+		_refresh_hints()
+
+
+func _refresh_hints() -> void:
+	var focus := get_viewport().gui_get_focus_owner()
+	var tabs: Array = [["LB/RB", "Tab"]] if _visible_tabs(_section).size() > 1 else []
+	var in_detail := _in_detail(focus)
+	if in_detail:
+		var kind: String = _meta.get(_detail_key, {}).get("kind", "")
+		match kind:
+			"range":
+				_hints.hints = [["◀ ▶", "Adjust"], ["Y", "Default"], ["B", "Back"]]
+			"bool":
+				_hints.hints = [["◀ ▶", "Choose"], ["A", "Set"], ["Y", "Default"], ["B", "Back"]]
+			"enum":
+				_hints.hints = [["A", "Choose"], ["Y", "Default"], ["B", "Back"]]
+			_:
+				_hints.hints = [["B", "Back"]]
+	elif focus is Row:
+		var verb: String = {"binding": "Rebind", "action": "Select"}.get(_meta.get((focus as Row).key, {}).get("kind", ""), "Change")
+		_hints.hints = tabs + [["LT/RT", "Section"], ["A", verb], ["Y", "Default"], ["SELECT", "Debug tweaks"], ["B", "Back"]]
+	else:
+		_hints.hints = tabs + [["LT/RT", "Section"], ["A", "Open"], ["SELECT", "Debug tweaks"], ["B", "Close"]]
+	_show_back(_rows_back, focus is Row or in_detail)
+	_show_back(_detail_back, in_detail)
+
+
+## A back arrow shown or not, keeping its room either way (nothing jumps).
+func _show_back(arrow: Button, shown: bool) -> void:
+	arrow.modulate.a = 1.0 if shown else 0.0
+	arrow.disabled = not shown
+	arrow.mouse_filter = Control.MOUSE_FILTER_STOP if shown else Control.MOUSE_FILTER_IGNORE
+
+
+## A ‹ button (and `text`) for the mouse, in aqua; controllers use B.
+func _back_arrow(text: String, s: float) -> Button:
+	var arrow := Button.new()
+	arrow.text = "‹  " + text if text else "‹"
+	arrow.focus_mode = Control.FOCUS_NONE
+	arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	arrow.add_theme_font_override("font", UITheme.body(700))
+	arrow.add_theme_font_size_override("font_size", roundi((16.0 if text else 30.0) * s))
+	var clear := UITheme.box(Color(0, 0, 0, 0), 10.0 * s)
+	var hover := UITheme.box(Color(UITheme.AQUA, 0.14), 10.0 * s)
+	for box: StyleBoxFlat in [clear, hover]:
+		box.set_content_margin(SIDE_LEFT, 10.0 * s)
+		box.set_content_margin(SIDE_RIGHT, 12.0 * s)
+		box.set_content_margin(SIDE_TOP, 2.0 * s)
+		box.set_content_margin(SIDE_BOTTOM, 2.0 * s)
+	for state in ["normal", "disabled", "focus"]:
+		arrow.add_theme_stylebox_override(state, clear)
+	arrow.add_theme_stylebox_override("hover", hover)
+	arrow.add_theme_stylebox_override("pressed", hover)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_disabled_color"]:
+		arrow.add_theme_color_override(state, UITheme.AQUA)
+	return arrow
+
+
 ## The detail pane for option `key`: what it is, its control, its default.
 func _show_detail(key: String) -> void:
+	if key != _detail_key:
+		_detail_scroll.scroll_vertical = 0  # a new option starts at its top
+	var refocus := _in_detail(get_viewport().gui_get_focus_owner())  # rebuilt under focus: onto the new control
 	_detail_key = key
 	var meta: Dictionary = _meta.get(key, {})
 	var section := key.get_slice("/", 0)
@@ -1193,6 +1361,9 @@ func _show_detail(key: String) -> void:
 	if used:
 		default_text += ("  ·  " if default_text else "") + "Used by %s" % used
 	_detail_default.text = default_text
+	if refocus:
+		_enter_detail(false)
+	_refresh_hints()
 
 
 ## The Sound Board's words for event `id`: what it's for, how it plays, and the
@@ -1246,16 +1417,31 @@ func _build_detail_control(key: String, meta: Dictionary) -> void:
 				pair.add_child(button)
 			_detail_control.add_child(pair)
 		"enum":
-			for choice: Array in meta.choices:
-				var button := ChoiceButton.new()
-				button.setup(str(choice[0]), s)
-				button.disabled = not editable
-				button.pressed.connect(func() -> void: _set_value(key, choice[1]))
-				button.set_meta("value", choice[1])
-				_detail_control.add_child(button)
+			# One of a list: a dropdown (A on the row opens it).
+			var dropdown := OptionButton.new()
+			dropdown.custom_minimum_size.y = 48.0 * s
+			dropdown.fit_to_longest_item = false
+			dropdown.disabled = not editable
+			var choices: Array = meta.choices
+			for i in choices.size():
+				dropdown.add_item(str(choices[i][0]), i)
+			dropdown.item_selected.connect(func(index: int) -> void:
+				_set_value(key, choices[index][1]))
+			var list := dropdown.get_popup()
+			list.max_size = Vector2i(0, roundi(get_viewport().get_visible_rect().size.y * 0.6))
+			list.add_theme_constant_override("v_separation", roundi(12.0 * s))
+			list.add_theme_constant_override("item_start_padding", roundi(14.0 * s))
+			list.add_theme_constant_override("item_end_padding", roundi(14.0 * s))
+			list.about_to_popup.connect(func() -> void:  # as wide as the dropdown (once it's sized itself)
+				(func() -> void:
+					list.size.x = maxi(list.size.x, roundi(dropdown.get_global_rect().size.x * dropdown.get_global_transform_with_canvas().get_scale().x))
+				).call_deferred())
+			_detail_control.add_child(dropdown)
 		"range":
 			var line := HBoxContainer.new()
-			var slider := HSlider.new()
+			var slider := DetailSlider.new()
+			slider.key = key
+			slider.panel = self
 			slider.min_value = meta.min
 			slider.max_value = meta.max
 			slider.step = meta.step
@@ -1265,7 +1451,6 @@ func _build_detail_control(key: String, meta: Dictionary) -> void:
 			slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			slider.custom_minimum_size.y = 28.0 * s
 			slider.editable = editable
-			slider.focus_mode = Control.FOCUS_CLICK
 			slider.set_value_no_signal(_value(key))
 			slider.value_changed.connect(func(value: float) -> void: _set_value(key, value))
 			line.add_child(slider)
@@ -1328,6 +1513,7 @@ func _build_detail_control(key: String, meta: Dictionary) -> void:
 			deep.set_content_margin(SIDE_BOTTOM, 8.0 * s)
 			button.add_theme_stylebox_override("normal", deep)
 			button.add_theme_stylebox_override("disabled", deep)
+	_confine_detail_focus()
 	_sync_detail()
 
 
@@ -1337,6 +1523,11 @@ func _sync_detail() -> void:
 	for child in _detail_control.get_children():
 		if child is ChoiceButton:
 			(child as ChoiceButton).current = child.get_meta("value") == value
+		elif child is OptionButton:
+			var choices: Array = _meta[_detail_key].choices
+			for i in choices.size():
+				if choices[i][1] == value:
+					(child as OptionButton).select(i)
 		elif child is HBoxContainer:
 			for inner in child.get_children():
 				if inner is ChoiceButton:
@@ -1408,18 +1599,35 @@ func _process(delta: float) -> void:
 			if _trigger_pulled(pair[0]):
 				_step_section(pair[1])
 	_scroll_held_list(delta, get_viewport().gui_get_focus_owner())
-	# Held left/right on a row repeats (controllers don't echo).
+	# Left/right on the detail pane's slider: a step as it goes down, then held,
+	# it repeats (controllers don't echo). What was held coming onto the slider
+	# (right from its row) doesn't count until it's let go.
 	var direction := 0
-	if focus is Row:
+	if focus is DetailSlider:
 		direction = int(Input.is_action_pressed("ui_right")) - int(Input.is_action_pressed("ui_left"))
-	if direction == 0 or direction != _repeat_dir:
+	if focus != _repeat_focus:
+		_repeat_focus = focus
+		_repeat_dir = direction
+		_repeat_time = -REPEAT_DELAY if direction == 0 else -INF
+		return
+	if direction != _repeat_dir:
 		_repeat_dir = direction
 		_repeat_time = -REPEAT_DELAY
+		if direction != 0:
+			_step((focus as DetailSlider).key, direction)
+		return
+	if direction == 0 and focus is DetailSlider:
+		# Down and up again within a frame (a quick tap): still a step.
+		var tapped := int(Input.is_action_just_pressed("ui_right")) - int(Input.is_action_just_pressed("ui_left"))
+		if tapped != 0:
+			_step((focus as DetailSlider).key, tapped)
+		return
+	if direction == 0:
 		return
 	_repeat_time += delta
 	while _repeat_time >= REPEAT_EVERY:
 		_repeat_time -= REPEAT_EVERY
-		_step((focus as Row).key, direction)
+		_step((focus as DetailSlider).key, direction)
 
 
 ## Held up/down on an option or a section: after SCROLL_DELAY focus keeps
@@ -1779,13 +1987,16 @@ class SectionButton extends Button:
 		current = false
 
 	func _gui_input(event: InputEvent) -> void:
-		if event.is_action_pressed("ui_right"):
+		if event is InputEventJoypadMotion and (event.is_action("ui_left") or event.is_action("ui_right")):
+			accept_event()  # the stick stays in the column (a sideways wobble mustn't cross): the d-pad or A
+		elif event.is_action_pressed("ui_right"):
 			pressed.emit()
 			accept_event()
 
 
 ## One option in the middle column: its name on the left, its value on the
-## right in condensed caps. Left/right change it, A toggles, picks or edits.
+## right in condensed caps. A (or right) goes into the detail pane to change
+## it (a binding waits for its key, an action runs); left goes back to the sections.
 class Row extends Button:
 	var key := ""
 	var panel: Node
@@ -1839,24 +2050,38 @@ class Row extends Button:
 		match kind:
 			"binding":
 				panel._start_capture(key)
-			"bool":
-				panel._set_value(key, not panel._value(key))
-			"enum":
-				panel._step(key, 1)
 			"action":
 				panel._act(key)
-			"text":
-				for child in panel._detail_control.get_children():
-					if child is LineEdit:
-						(child as LineEdit).grab_focus()
-						(child as LineEdit).select_all()
+			_:
+				if not has_focus():
+					grab_focus()  # clicked: this row's detail first
+				panel._enter_detail()
 
-	## Held, they repeat (the panel's _process), so key echoes are just swallowed.
+	## A stick push matches both ui_left and ui_right (the axis, not its sign),
+	## so the direction is from is_action_pressed; and the stick never crosses
+	## columns (the d-pad does).
 	func _gui_input(event: InputEvent) -> void:
 		if event.is_action("ui_left") or event.is_action("ui_right"):
-			if event.is_pressed() and not event.is_echo():
-				panel._step(key, 1 if event.is_action("ui_right") else -1)
+			if not event is InputEventJoypadMotion:
+				if event.is_action_pressed("ui_left"):
+					panel._to_sections()
+				elif event.is_action_pressed("ui_right") and panel._meta[key].kind not in ["binding", "action"]:
+					panel._enter_detail()
 			accept_event()
+
+
+## The detail pane's slider: left / right (keys, d-pad, stick) step it from the
+## panel's _process, which reads the held direction (so a stick pushed left is
+## never a step right) and repeats it; the mouse drags it; up / down stay put.
+class DetailSlider extends HSlider:
+	var key := ""
+	var panel: Node
+
+	func _gui_input(event: InputEvent) -> void:
+		for action: String in ["ui_left", "ui_right", "ui_up", "ui_down"]:
+			if event.is_action(action):
+				accept_event()
+				return
 
 
 ## A tab in the bar over a big section's options: the current one in aqua,

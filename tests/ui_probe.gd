@@ -258,6 +258,8 @@ func _check_settings() -> void:
 	await _button(JOY_BUTTON_RIGHT_SHOULDER)
 	check(panel._section == "fish" and panel._tab_at["fish"] == 1, "RB with the sections column focused: still Fish's tabs")
 	await _button(JOY_BUTTON_LEFT_SHOULDER)
+	await _stick(JOY_AXIS_LEFT_X, 0.9)
+	check(get_viewport().gui_get_focus_owner() == panel._section_buttons["fish"], "stick right on a section: stays in the sections")
 	await _button(JOY_BUTTON_DPAD_RIGHT)
 	focus = get_viewport().gui_get_focus_owner()
 	check(focus is Button and panel._section_lists["fish"].is_ancestor_of(focus), "right: into its options")
@@ -268,9 +270,45 @@ func _check_settings() -> void:
 	await _frames(2)
 	check(panel._detail_title.text == "Max Speed" and not panel._detail_text.text.is_empty(), "the detail pane: its title and doc comment")
 	var start: float = fish.max_speed
+	await _button(JOY_BUTTON_DPAD_LEFT)
+	check(get_viewport().gui_get_focus_owner() == panel._section_buttons["fish"] and is_equal_approx(fish.max_speed, start),
+			"left on an option: back to the sections, nothing changed")
+	await _button(JOY_BUTTON_A)
+	row.grab_focus()
+	await _frames(2)
+	await _button(JOY_BUTTON_A)
+	check(get_viewport().gui_get_focus_owner() is HSlider and is_equal_approx(fish.max_speed, start),
+			"A on an option: into the detail pane, on its slider, nothing changed")
 	await _button(JOY_BUTTON_DPAD_RIGHT)
 	var stepped: float = fish.max_speed
 	check(stepped > start, "right: up a step (%.2f -> %.2f)" % [start, stepped])
+	await _button(JOY_BUTTON_DPAD_DOWN)
+	await _button(JOY_BUTTON_DPAD_UP)
+	check(get_viewport().gui_get_focus_owner() is HSlider, "up / down: still on the slider")
+	# A stick pushed left ramps through several events: one step down, never up on the way.
+	var before: float = fish.max_speed
+	var went_up := false
+	for v: float in [-0.3, -0.6, -0.8, -0.95, -0.95, 0.0]:
+		var push := InputEventJoypadMotion.new()
+		push.device = 0
+		push.axis = JOY_AXIS_LEFT_X
+		push.axis_value = v
+		Input.parse_input_event(push)
+		Input.flush_buffered_events()
+		await _frames(1)
+		went_up = went_up or fish.max_speed > before
+	await _frames(2)
+	check(not went_up and fish.max_speed < before and before - fish.max_speed <= stepped - start + 0.001,
+			"stick left: one step down, never up first (%.2f -> %.2f)" % [before, fish.max_speed])
+	var low: float = fish.max_speed
+	await _stick(JOY_AXIS_LEFT_X, 0.9)
+	check(fish.max_speed > low and fish.max_speed - low <= stepped - start + 0.001, "stick right: one step back up (%.2f)" % fish.max_speed)
+	panel._rows[key].grab_focus()
+	await _frames(2)
+	await _stick(JOY_AXIS_LEFT_X, -0.9)
+	await _stick(JOY_AXIS_LEFT_X, 0.9)
+	check(get_viewport().gui_get_focus_owner() == panel._rows[key], "stick left / right on an option: stays on it")
+	await _button(JOY_BUTTON_A)
 	_hold(JOY_BUTTON_DPAD_RIGHT, true)
 	await _seconds(0.8)
 	_hold(JOY_BUTTON_DPAD_RIGHT, false)
@@ -279,6 +317,8 @@ func _check_settings() -> void:
 	await _button(JOY_BUTTON_Y)
 	check(is_equal_approx(fish.max_speed, panel._defaults["fish"]["max_speed"]), "Y: back to the default (%.2f)" % fish.max_speed)
 	check(row._value.text == panel._format_value(fish.max_speed), "the row shows it")
+	await _button(JOY_BUTTON_B)
+	check(get_viewport().gui_get_focus_owner() == row, "B: back to the option")
 
 	fish.bow_wave = false
 	panel._refresh_visibility()
@@ -303,11 +343,28 @@ func _check_settings() -> void:
 	await _frames(2)
 	var character_row: Button = panel._rows["game/character"]
 	character_row.grab_focus()
+	await _frames(2)
 	var was: FishCharacter.Family = fish.character
-	await _button(JOY_BUTTON_DPAD_RIGHT)
-	check(fish.character != was, "Game's Fish row: right changes the fish")
+	await _button(JOY_BUTTON_A)
+	await _frames(2)
+	var dropdown := get_viewport().gui_get_focus_owner() as OptionButton
+	check(dropdown != null and dropdown.get_popup().visible and fish.character == was, "A on Game's Fish row: its dropdown, open")
+	if dropdown:
+		await _button(JOY_BUTTON_B)
+		await _frames(2)
+		check(not dropdown.get_popup().visible and get_viewport().gui_get_focus_owner() == dropdown and fish.character == was,
+				"B with it open: just closes it")
+		await _button(JOY_BUTTON_A)
+		await _frames(2)
+		await _button(JOY_BUTTON_DPAD_DOWN)
+		await _button(JOY_BUTTON_A)
+		await _frames(2)
+		check(fish.character != was and not dropdown.get_popup().visible, "A, down, A: another fish (%s)" % fish.character)
+		check(panel._in_detail(get_viewport().gui_get_focus_owner()), "still in the detail pane")
 	await _button(JOY_BUTTON_Y)
 	check(fish.character == FishCharacter.Family.OCTANE, "Y: back to the first fish")
+	await _button(JOY_BUTTON_B)
+	check(get_viewport().gui_get_focus_owner() == character_row, "B: back to the Fish row")
 	main.set_character(was)
 
 	await _check_rebinding(panel)

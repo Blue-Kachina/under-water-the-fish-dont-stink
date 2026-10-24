@@ -202,7 +202,8 @@ func _ready() -> void:
 			_splash.play(StageTimeline.headline(event), "WARNING", StageTimeline.line(event), HP_COLOR, 2.4))
 		run.boss_defeated.connect(func(boss: Boss, by: FishController) -> void:
 			if boss is DrownedShark:
-				_splash.play("DROWNED SHARK BEATEN", "MINI-BOSS DOWN", "%s  ·  IT DROPPED A BOSS CHEST" % (by.display_name.to_upper() if is_instance_valid(by) and by.display_name else "SURVIVORS"),
+				_splash.play("DROWNED SHARK BEATEN", "MINI-BOSS DOWN", "%s  ·  %s" % [by.display_name.to_upper() if is_instance_valid(by) and by.display_name else "SURVIVORS",
+						"IT COMES BACK SOON" if run.tank else "IT DROPPED A BOSS CHEST"],
 						TreasureChest.STEEL, 2.4))
 		run.boss_arrived.connect(func(boss: Boss) -> void:
 			var final := boss as BloodLeviathan

@@ -839,8 +839,18 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 20.0, 0.25, "or_greater") var tank_walk_speed := 1.5
 ## Keeps this many chasing zombies out too (the perf bench: try 2000).
 @export_range(0, 10000, 50, "or_greater") var tank_horde := 0
-## Zombies hurt in the Test Tank (off: practise unhurt).
+## Zombies hurt in the Test Tank (off: practise unhurt). Bosses too: their
+## touch, bolts and holds.
 @export var tank_contact := false
+## A boss in the Test Tank: it comes in ahead of the spawn the moment you pick
+## it (a new pick swaps it, None sends it away), and on R. Its hits show in the
+## DPS readout. Beaten, it comes back after tank_boss_respawn s (0: not until
+## R); no whirlpool or chests there.
+@export_enum("None", "Drowned Shark", "King of Herrings", "Gulper Mother", "Whale Fall", "Lamprey Queen") var tank_boss := 0
+## Its hp (0: its own, shark_hp or leviathan_hp).
+@export_range(0.0, 1000000.0, 100.0, "or_greater") var tank_boss_hp := 0.0
+## Seconds after it's beaten before it comes back (0: not until R).
+@export_range(0.0, 60.0, 0.5, "or_greater") var tank_boss_respawn := 3.0
 ## The team's level there.
 @export_range(1, 100, 1, "or_greater") var tank_level := 1
 ## Each stat's bonus there (as StatBlock has them: 0.1 = +10%; hp, hp/s,

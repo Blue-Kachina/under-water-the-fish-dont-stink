@@ -270,7 +270,7 @@ func _on_focus_changed(focus: Control) -> void:
 	if not visible:
 		return
 	var wall := [_featured] + _grid
-	if focus in _more and _last_focus in wall:
+	if focus is Tile and focus in _more and _last_focus in wall:
 		focus.focus_neighbor_top = focus.get_path_to(_last_focus)
 	_last_focus = focus
 
@@ -321,8 +321,8 @@ func _build_variants(mode: String) -> void:
 			options.append(["1v1 against a bot" if variant == "1v1" else "Free Play", func() -> void: chosen.emit(variant)])
 	var width := (520.0 if options.size() <= 2 else 660.0) * s
 	_variants.custom_minimum_size = Vector2(width, 0.0)
-	_variants.size = Vector2(width, 0.0)
 	_variants.position = Vector2(PANEL_SIZE.x * s * 0.5 - width * 0.5, 170.0 * s)
+	_wrap_at(_variants_line, width - 56.0 * s)
 	for option: Array in options:
 		var button := Button.new()
 		button.text = option[0]
@@ -339,6 +339,21 @@ func _build_variants(mode: String) -> void:
 			act.call())
 		_variants_row.add_child(button)
 		_variant_buttons.append(button)
+	_shrink_to_fit.call_deferred(_variants)
+
+
+## Wrapping `label` at `width` from the start: a wrapped label measures its
+## height at the width it has, which is none before its card's first layout
+## (a word a line, a card far too tall).
+func _wrap_at(label: Label, width: float) -> void:
+	label.custom_minimum_size.x = width
+	label.size.x = width
+
+
+## `card` back down to what its content needs (a Control only grows on its own),
+## once the content in it now has been laid out.
+func _shrink_to_fit(card: Control) -> void:
+	card.size = Vector2(card.custom_minimum_size.x, 0.0)
 
 
 func _hide_variants(refocus := true) -> void:
@@ -370,8 +385,10 @@ func _show_rules(mode: String) -> void:
 	for prefix: String in [mode + ": ", _rules_title.text + ": "]:
 		text = text.trim_prefix(prefix)  # "Hunt: 1v1 in open water..." under the title Hunt
 	_rules_text.text = text[0].to_upper() + text.substr(1) if text else ""
+	_wrap_at(_rules_text, 660.0 * s - 56.0 * s)
 	_rules.visible = true
 	_rules_dim.visible = true
+	_shrink_to_fit.call_deferred(_rules)
 
 
 func _hide_rules() -> void:

@@ -527,6 +527,10 @@ every stride sweep swung the view, and it sat 2.7 m behind. Unnatural now steadi
   readout per source (damage, DPS over 5 s and overall, hits, would-be kills), R resets.
 - UNNATURAL > Test Tank: dummy hp, slow walkers, `tank_horde` (chasers kept out; the in-game perf
   bench), contact damage on/off, the level, and every stat.
+- Bosses (added 2026-10-24): `tank_boss` brings in the Drowned Shark or any final boss ahead of the
+  spawn (a new pick swaps it, None sends it away, R brings it back). `tank_boss_hp` sets its hp
+  (0: its own), and `tank_boss_respawn` brings it back after it's beaten. The tank has no whirlpool
+  or loot, and `tank_contact` covers the bosses' touch, bolts and holds. Probe: `test_tank_probe`.
 
 ### Phase 5: chests and powerups
 - `TreasureChest`: 10 buried at the start, one more each minute (up to 16), glow, bubbles, HUD pings
