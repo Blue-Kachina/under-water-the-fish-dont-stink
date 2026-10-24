@@ -43,10 +43,13 @@ const ATTACK_HITS := {
 	"thrust": "unnatural/thrust_hit", "bubbles": "unnatural/bubbles_hit", "spines": "unnatural/spines_hit",
 	"punch": "unnatural/punch_hit",
 }
-## A zombie behaviour (EnemyKind.Behaviour) -> the sound for its death.
+## A zombie behaviour (EnemyKind.Behaviour) -> the sound for its death. The
+## Phase 6 behaviours borrow the nearest one's for now: a schooling koi the
+## swarm's, a drifting jelly the glide's, a punching mantis the lunge's.
 const DEATHS := [
 	"unnatural/zombie_die_chase", "unnatural/zombie_die_swarm", "unnatural/zombie_die_tank",
 	"unnatural/zombie_die_lunge", "unnatural/zombie_die_glide",
+	"unnatural/zombie_die_swarm", "unnatural/zombie_die_glide", "unnatural/zombie_die_lunge",
 ]
 
 var run: UnnaturalRun

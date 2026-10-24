@@ -4,11 +4,13 @@ extends Node3D
 ## wagging its tail (top views, to see the tail stay on the body) and mid
 ## stride. Needs a window (not --headless). `--species=N` picks a species
 ## (FishCharacter.SPECIES); its shots are named <fish>_<species key>_<view>.png.
+## `--look=sardine` shoots a zombie's own model (ZombieLooks) instead.
 ##   Godot_console.exe --path . res://tests/model_shots.tscn -- --fish=glider --species=1 --out=DIR
 
 var out_dir := "user://model_shots"
 var fish_key := "glider"
 var species := 0
+var look := ""
 var _name := ""
 
 
@@ -20,6 +22,8 @@ func _ready() -> void:
 			fish_key = arg.trim_prefix("--fish=")
 		elif arg.begins_with("--species="):
 			species = int(arg.trim_prefix("--species="))
+		elif arg.begins_with("--look="):
+			look = arg.trim_prefix("--look=")
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	get_window().size = Vector2i(900, 700)
 	var environment := Environment.new()
@@ -36,8 +40,13 @@ func _ready() -> void:
 	sun.light_energy = 1.2
 	add_child(sun)
 	var fish_class := FishCharacter.from_key(fish_key)
-	var model := FishModel.build(fish_class, species)
-	_name = "%s_%s" % [fish_key, FishCharacter.species_key(fish_class, model.species)]
+	var model: FishModel
+	if look != "":
+		model = ZombieLooks.build(look, fish_class)
+		_name = look
+	else:
+		model = FishModel.build(fish_class, species)
+		_name = "%s_%s" % [fish_key, FishCharacter.species_key(fish_class, model.species)]
 	add_child(model)
 	_run.call_deferred(model)
 
@@ -87,6 +96,17 @@ func _run(model: FishModel) -> void:
 		for i in 3:
 			await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_%s.png" % [_name, wag[0]]))
+	if model.fluke:
+		# A whale's flukes beat up and down (Gait.Visual.FLUKE): down hard, seen
+		# from the side and from behind.
+		for wag: Array in [["fluke_down", "side"], ["fluke_down_back", "back"]]:
+			model.tail.rotation = Vector3(0.7, 0.0, 0.0)
+			model.react(1.0 / 60.0, Vector3(0.0, 0.0, -10.0))
+			camera.position = Vector3(views[wag[1]]).normalized() * reach
+			camera.look_at(Vector3.ZERO, Vector3.UP)
+			for i in 3:
+				await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png(out_dir.path_join("%s_%s.png" % [_name, wag[0]]))
 	model.tail.rotation = Vector3.ZERO
 	# Mid-stride: an Extra Swishy stride pushing left (the tail swung left),
 	# nearly at its peak, turning left; then fading, a moment later.

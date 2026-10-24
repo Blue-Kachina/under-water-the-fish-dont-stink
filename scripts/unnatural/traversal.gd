@@ -12,7 +12,7 @@ extends RefCounted
 ## - Boxfish, Armoured: takes less damage, swims slower.
 ## - Lionfish, Wake: Greek Fire burns harder the faster it swims.
 ## - Moon Jelly, Many Arms: one more jelly in its Halo.
-## - Baby Whale Shark, Escort: heals while it holds still.
+## - Breachers (baby whales), Escort: heals while it holds still.
 ## - Mantis Shrimp, Heavy Hitter: zombies its punches knock back hurt the ones
 ##   they fly into (fling()).
 ## - Sea Hare, Unpalatable: a zombie that touches it is coated: slowed a while,
@@ -31,7 +31,7 @@ extends RefCounted
 ##   lose track of it (until it's hurt or the time's up).
 ## - Mantis Shrimp, Recoil Dash: punches one way, and the recoil throws it the
 ##   other (the way the stick leans, else backwards), untouchable a moment.
-## - Baby Whale Shark, Gulp: sucks the zombies ahead of it in.
+## - Breachers (baby whales), Gulp: sucks the zombies ahead of it in.
 ## - Sea Hare, Flutter: three big flaps carry it up and forward over the pack,
 ##   dropping a Purple Haze cloud where it took off.
 ## UnnaturalRun owns one per local player and calls update() every tick.
@@ -519,7 +519,7 @@ func _fling_step(delta: float) -> void:
 				break
 
 
-## The Baby Whale Shark: every zombie in the cone ahead is sucked in to its mouth.
+## The Breachers (baby whales): every zombie in the cone ahead is sucked in to its mouth.
 func _gulp(nose: Vector3) -> void:
 	gulps += 1
 	_cool_for(settings.gulp_cooldown)

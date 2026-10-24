@@ -1,7 +1,7 @@
 class_name RemoraBuddy
 extends FishAttack
 ## Remora Buddy (planning_unnatural.md §7b, D14), a steady weapon (FishAttack),
-## the Baby Whale Shark's own: remoras ride
+## the Breachers' (baby whales) own: remoras ride
 ## along under the fish (count(): remora_count, + the count facet). Each nips
 ## the nearest zombie within reach() every interval() s for damage() (proc
 ## coefficient remora_proc); they take turns, so the nips come evenly.

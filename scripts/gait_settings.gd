@@ -12,6 +12,16 @@ extends Resource
 
 static var _shared: GaitSettings
 static var _field_names: Array[String] = []
+## Whether a Fish Sticks mode (Free Play, 1v1) is being played now: main.gd
+## sets it as the mode changes. With in_fish_sticks off, every class swims with
+## the plain lateral gait while it's set.
+static var fish_sticks_now := false
+static var _plain: Gait
+
+## Whether the classes' gaits apply in Fish Sticks too. Off: every class swims
+## there with the plain lateral fish gait, as before gaits (the other modes
+## keep theirs).
+@export var in_fish_sticks := true
 
 ## FishCharacter.FishClass -> its Gait.
 var gaits := {}
@@ -34,6 +44,16 @@ func for_class(fish_class: FishCharacter.FishClass) -> Gait:
 	return gaits[fish_class]
 
 
+## The gait `fish_class` swims with now: its own, or the plain lateral one in
+## Fish Sticks with in_fish_sticks off.
+func active_for(fish_class: FishCharacter.FishClass) -> Gait:
+	if fish_sticks_now and not in_fish_sticks:
+		if _plain == null:
+			_plain = Gait.new()
+		return _plain
+	return gaits[fish_class]
+
+
 ## A class's gait before any tuning. Every class has today's lateral gait
 ## until its phase gives it its own (big_changes.md §7).
 static func default_for(fish_class: FishCharacter.FishClass) -> Gait:
@@ -47,6 +67,23 @@ static func default_for(fish_class: FishCharacter.FishClass) -> Gait:
 		gait.stroke_power = 0.85
 		gait.coast_drag = 1.8
 		gait.coast_buoyancy = -1.0
+	elif fish_class == FishCharacter.FishClass.DRIFTER:
+		# The jellies' tilt and pulse: the bell hangs upright and sinks slowly
+		# at rest, leans bell-first as it swims, and each stride is a short,
+		# hard squeeze along it followed by a draggy coast (big_changes.md §6).
+		gait.stroke_axis = Gait.StrokeAxis.RADIAL
+		gait.push_axis = Gait.PushAxis.BELL
+		gait.visual = Gait.Visual.BELL_PULSE
+		gait.stroke_time = 0.8
+		gait.stroke_power = 0.8
+		gait.coast_drag = 1.8
+		gait.coast_buoyancy = -2.0
+	elif fish_class == FishCharacter.FishClass.BREACHER:
+		# The whales' flukes: up-and-down strokes at a fish's timing and push, so
+		# they keep the Gliders' pace on the same hitbox (any sweep counts, D3).
+		# A slower stroke_time cost ~15% of the distance in gait_probe.
+		gait.stroke_axis = Gait.StrokeAxis.VERTICAL
+		gait.visual = Gait.Visual.FLUKE
 	return gait
 
 

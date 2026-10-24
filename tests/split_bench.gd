@@ -12,6 +12,8 @@ extends Node
 ## director keeps the horde at --count.
 ## --seconds=S how long to measure (default 4); --profile: each script's process times after.
 ## --no-sfx-hooks: without the sound hooks (SfxHooks), for comparing frame times.
+## --kinds=sardine,koi,...: the zombie kinds (EnemyKind ids) to spawn, the first
+## two thirds, the rest spread over the others (default: the original five).
 
 const PADS := [11, 12, 13]
 
@@ -23,6 +25,7 @@ var seconds := 4.0
 var pearls := 0
 var powers := 0
 var profile := false
+var kind_ids: Array[String] = ["sardine", "clownfish", "boxfish", "swordfish", "ray"]
 
 
 func _ready() -> void:
@@ -43,6 +46,8 @@ func _ready() -> void:
 			profile = true
 		elif arg == "--no-sfx-hooks":  # the same run with none of the sound nodes (planning_audio.md phase 3)
 			Sfx.hooks.queue_free()
+		elif arg.begins_with("--kinds="):
+			kind_ids.assign(arg.trim_prefix("--kinds=").split(","))
 		elif arg.begins_with("--seconds="):
 			seconds = arg.trim_prefix("--seconds=").to_float()
 	get_window().size = Vector2i(1920, 1080)
@@ -88,10 +93,16 @@ func _run(main: Node) -> void:
 		settings.spawning = true
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2
+	var picks: Array[int] = []
+	for id in kind_ids:
+		for k in horde.kinds.size():
+			if horde.kinds[k].id == id:
+				picks.append(k)
+	print("split_bench: kinds %s" % ", ".join(kind_ids))
 	for n in count:
 		var direction := Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.3, 0.3), rng.randf_range(-1, 1)).normalized()
-		var kind := 0 if n % 3 != 0 else 1 + n % 4
-		horde.spawn(kind % horde.kinds.size(), centre + direction * rng.randf_range(8.0, maxf(spread, 8.0)) + Vector3.UP * 6.0, -direction)
+		var kind := picks[0] if n % 3 != 0 or picks.size() < 2 else picks[1 + n % (picks.size() - 1)]
+		horde.spawn(kind, centre + direction * rng.randf_range(8.0, maxf(spread, 8.0)) + Vector3.UP * 6.0, -direction)
 	for n in pearls:
 		var direction := Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.3, 0.3), rng.randf_range(-1, 1)).normalized()
 		run.drop_pearl(centre + direction * rng.randf_range(10.0, spread) + Vector3.UP * 6.0, 1)

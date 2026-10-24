@@ -27,7 +27,7 @@ const LINES := [10.0, 20.0, 40.0]
 const LINE_SIDE := 16.0
 const LINE_COUNT := 5
 ## tank_boss's bosses, in its order ("": None), and how far ahead of the spawn they come in (m).
-const BOSSES: Array[String] = ["", "miniboss", "boss", "gulper", "whale", "lamprey"]
+const BOSSES: Array[String] = ["", "miniboss", "boss", "gulper", "whale", "lamprey", "angel"]
 const BOSS_AHEAD := 45.0
 ## tank_preset's levels, and what fills the slots, in order.
 const PRESET_LEVELS := [0, 5, 10, 20]

@@ -164,10 +164,11 @@ const SPECIES := {
 		{"key": "pink_eared", "name": "Pink-eared Mantis"},
 	],
 	FishClass.BREACHER: [
-		{"key": "indo_pacific", "name": "Whale Shark"},
-		{"key": "deep_charcoal", "name": "Deep Charcoal"},
-		{"key": "juvenile", "name": "Juvenile"},
-		{"key": "basking", "name": "Basking Shark"},
+		{"key": "humpback", "name": "Humpback Calf"},
+		{"key": "orca", "name": "Orca Calf"},
+		{"key": "beluga", "name": "Beluga Calf"},
+		{"key": "sperm", "name": "Sperm Whale Calf"},
+		{"key": "blue", "name": "Blue Whale Calf"},
 	],
 	FishClass.ALCHEMIST: [
 		{"key": "california", "name": "California Sea Hare"},

@@ -64,11 +64,15 @@ signal would_kill(index: int, kind: int, source: String, by: Object)
 ## A zombie came (any way: packs, events, a boss's call), or was taken away quietly.
 signal spawned(index: int)
 signal removed(index: int)
-## A lunger entered a stage (Lunge.TELEGRAPH: it winds up; Lunge.LUNGE: it strikes).
+## A lunger entered a stage (Lunge.TELEGRAPH: it winds up; Lunge.LUNGE: it
+## strikes). A puncher (EnemyKind.Behaviour.PUNCH) too: its LUNGE is the punch
+## landing, along lunge_aim(), which UnnaturalRun resolves.
 signal lunge_stage(index: int, stage: int)
 
 enum State { FREE, ALIVE, DYING }
-## A lunging zombie's stages.
+## A lunging zombie's stages. Others use them too: a schooling koi closes in
+## (STALK), circles (REST) and darts in (LUNGE); a puncher stalks, winds up
+## (TELEGRAPH), punches (LUNGE, one tick) and rests.
 enum Lunge { STALK, TELEGRAPH, LUNGE, REST }
 
 const OVERLAY_SHADER := preload("res://shaders/zombie_overlay.gdshader")
@@ -214,6 +218,8 @@ var _cooldown := PackedFloat32Array()
 var _mode := PackedByteArray()
 var _mode_left := PackedFloat32Array()
 var _lunge := PackedVector3Array()
+## How long its current wind-up is (s), for telegraph_progress().
+var _wind := PackedFloat32Array()
 var _free := PackedInt32Array()
 ## Slots below this have been used (FREE, ALIVE or DYING); above, never.
 var _high := 0
@@ -222,6 +228,7 @@ var _max_radius := 1.0
 var _kind_speed := PackedFloat32Array()
 var _kind_accel := PackedFloat32Array()
 var _kind_behaviour := PackedInt32Array()
+var _kind_bob := PackedFloat32Array()
 var _since_step := 0.0
 var _steps := 0
 var _time := 0.0
@@ -294,10 +301,12 @@ func setup(horde_settings: UnnaturalSettings, horde_kinds: Array[EnemyKind], max
 	_mode.resize(capacity)
 	_mode_left.resize(capacity)
 	_lunge.resize(capacity)
+	_wind.resize(capacity)
 	grid = HordeGrid.new(2.0, 4096, capacity)
 	_kind_speed.resize(kinds.size())
 	_kind_accel.resize(kinds.size())
 	_kind_behaviour.resize(kinds.size())
+	_kind_bob.resize(kinds.size())
 	_max_radius = 0.5
 	for k in kinds.size():
 		_max_radius = maxf(_max_radius, kinds[k].radius() * elite_scale())
@@ -420,6 +429,7 @@ func spawn(kind: int, at: Vector3, heading := Vector3.ZERO, elite := false, undy
 	_target[i] = -1
 	_mode[i] = Lunge.STALK
 	_mode_left[i] = 0.0
+	_wind[i] = 0.0
 	_alive_count += 1
 	spawned.emit(i)
 	return i
@@ -640,11 +650,11 @@ func lunge_aim(index: int) -> Vector3:
 	return _lunge[index]
 
 
-## How far a lunger is through winding up (0 to 1; 0 when it isn't).
+## How far a lunger (or puncher) is through winding up (0 to 1; 0 when it isn't).
 func telegraph_progress(index: int) -> float:
-	if _mode[index] != Lunge.TELEGRAPH or settings.lunge_telegraph <= 0.0:
+	if _mode[index] != Lunge.TELEGRAPH or _wind[index] <= 0.0:
 		return 0.0
-	return clampf(1.0 - _mode_left[index] / settings.lunge_telegraph, 0.0, 1.0)
+	return clampf(1.0 - _mode_left[index] / _wind[index], 0.0, 1.0)
 
 
 ## How far off zombie `index` counts for auto-aim from `from`: its distance,
@@ -783,6 +793,7 @@ func step_once(delta: float) -> void:
 		_kind_speed[k] = kinds[k].speed * settings.enemy_speed_scale
 		_kind_accel[k] = kinds[k].accel * maxf(settings.enemy_speed_scale, 0.2)
 		_kind_behaviour[k] = kinds[k].behaviour
+		_kind_bob[k] = kinds[k].bob
 	if frozen_left > 0.0:
 		frozen_left = maxf(frozen_left - delta, 0.0)
 		for i in alive:
@@ -878,14 +889,28 @@ func _steer(delta: float) -> void:
 						wanted = lead.normalized() * speed
 						accel *= 0.6
 					EnemyKind.Behaviour.LUNGE:
-						wanted = _lunge_step(i, ahead, gap, speed, dt)
+						var info := kinds[kind]
+						wanted = _lunge_step(i, ahead, gap, speed, dt, settings.lunge_telegraph * info.telegraph_scale,
+								settings.lunge_speed * info.lunge_scale)
 						if _mode[i] == Lunge.LUNGE:
 							accel = 200.0
+					EnemyKind.Behaviour.SCHOOL:
+						wanted = _school_step(i, ahead, gap, speed, dt)
+					EnemyKind.Behaviour.DRIFT:
+						# A surge a pulse, then a coast: quick, sharp, then slack.
+						var beat := fposmod(_time / maxf(settings.drift_pulse, 0.1) + _phase[i] / TAU, 1.0)
+						var surge := pow(maxf(sin(beat * TAU), 0.0), 3.0)
+						wanted = ahead * speed * lerpf(0.2, settings.drift_surge, surge)
+						accel *= 1.0 + 2.0 * surge
+					EnemyKind.Behaviour.PUNCH:
+						wanted = _punch_step(i, ahead, gap, speed, dt)
 					_:
 						wanted = ahead * speed
 				if assist > 0.0 and _mode[i] != Lunge.LUNGE:
 					# Depth assist: toward its target's depth sooner than the chase alone.
 					wanted.y += clampf(toward.y / DEPTH_SOFT, -1.0, 1.0) * speed * assist
+				if _kind_bob[kind] > 0.0:
+					wanted.y += sin(_time * 1.7 + _phase[i]) * _kind_bob[kind]  # a whale's rise and fall
 			else:
 				wanted = -_axis_z[i] * speed * 0.35  # nobody to chase: mill about
 				_mode[i] = Lunge.STALK
@@ -922,7 +947,11 @@ func _steer(delta: float) -> void:
 					velocity.y += minf(floor_y - at.y, 5.0) * 6.0 * dt
 				elif at.y > ceiling_y:
 					velocity.y -= minf(at.y - ceiling_y, 5.0) * 6.0 * dt
-			var top := speed * 1.5 + 2.0 if _mode[i] != Lunge.LUNGE else settings.lunge_speed * 1.1
+			var top := speed * 1.5 + 2.0
+			if _mode[i] == Lunge.LUNGE:
+				top = maxf(top, settings.lunge_speed * kinds[kind].lunge_scale * 1.1)
+			elif _kind_behaviour[kind] == EnemyKind.Behaviour.DRIFT:
+				top = speed * settings.drift_surge * 1.1 + 2.0
 			if velocity.length_squared() > top * top:
 				velocity = velocity.normalized() * top
 			_velocity[i] = velocity
@@ -932,15 +961,16 @@ func _steer(delta: float) -> void:
 		_position[i] = at + velocity * delta
 
 
-## A lunging zombie's stages, toward its target (`ahead`, unit, `gap` m off):
-## the velocity it wants now.
-func _lunge_step(i: int, ahead: Vector3, gap: float, speed: float, dt: float) -> Vector3:
+## A lunging zombie's stages, toward its target (`ahead`, unit, `gap` m off),
+## winding up for `wind` s and lunging at `lunge` m/s: the velocity it wants now.
+func _lunge_step(i: int, ahead: Vector3, gap: float, speed: float, dt: float, wind: float, lunge: float) -> Vector3:
 	_mode_left[i] -= dt
 	match _mode[i]:
 		Lunge.STALK:
-			if gap < settings.lunge_range and settings.lunge_speed > 0.0:
+			if gap < settings.lunge_range and lunge > 0.0:
 				_mode[i] = Lunge.TELEGRAPH
-				_mode_left[i] = settings.lunge_telegraph
+				_mode_left[i] = wind
+				_wind[i] = wind
 				lunge_stage.emit(i, Lunge.TELEGRAPH)
 			return ahead * speed * 0.8
 		Lunge.TELEGRAPH:
@@ -948,18 +978,77 @@ func _lunge_step(i: int, ahead: Vector3, gap: float, speed: float, dt: float) ->
 			if _mode_left[i] <= 0.0:
 				_mode[i] = Lunge.LUNGE
 				_mode_left[i] = settings.lunge_time
-				_velocity[i] = ahead * settings.lunge_speed
+				_velocity[i] = ahead * lunge
 				lunge_stage.emit(i, Lunge.LUNGE)
 			return ahead * 0.5
 		Lunge.LUNGE:
 			if _mode_left[i] <= 0.0:
 				_mode[i] = Lunge.REST
 				_mode_left[i] = settings.lunge_rest
-			return _lunge[i] * settings.lunge_speed
+			return _lunge[i] * lunge
 		_:
 			if _mode_left[i] <= 0.0:
 				_mode[i] = Lunge.STALK
 			return ahead * speed * 0.3
+
+
+## A schooling zombie (the Drowned Koi): it closes to school_ring m round its
+## target (STALK), circles it for school_circle s (REST), then darts in for
+## school_dart s (LUNGE), and closes and circles again. The whole school
+## circles the same way, so they come as a ring.
+func _school_step(i: int, ahead: Vector3, gap: float, speed: float, dt: float) -> Vector3:
+	var ring := settings.school_ring
+	_mode_left[i] -= dt
+	match _mode[i]:
+		Lunge.REST:
+			if _mode_left[i] <= 0.0:
+				_mode[i] = Lunge.LUNGE
+				_mode_left[i] = settings.school_dart
+			elif gap > ring * 2.0:
+				_mode[i] = Lunge.STALK  # it got away: close in again
+			var around := Vector3.UP.cross(ahead).normalized()
+			var inward := clampf((gap - ring) / maxf(ring * 0.5, 0.5), -1.0, 1.0)
+			return (around + ahead * inward * 1.2).normalized() * speed * 1.1
+		Lunge.LUNGE:
+			if _mode_left[i] <= 0.0:
+				_mode[i] = Lunge.STALK
+			return ahead * speed * 1.6
+		_:
+			if gap < ring * 1.25:
+				_mode[i] = Lunge.REST
+				_mode_left[i] = settings.school_circle * (0.8 + 0.4 * fposmod(_phase[i], 1.0))
+			return ahead * speed
+
+
+## A punching zombie (the Rotten Mantis): it stalks to zombie_punch_range m,
+## stops and winds up for zombie_punch_telegraph s (aiming as it does), punches
+## (lunge_stage LUNGE, for one tick: UnnaturalRun hurts whoever's in reach),
+## then rests zombie_punch_rest s, backing off a little.
+func _punch_step(i: int, ahead: Vector3, gap: float, speed: float, dt: float) -> Vector3:
+	_mode_left[i] -= dt
+	match _mode[i]:
+		Lunge.STALK:
+			if gap < settings.zombie_punch_range:
+				_mode[i] = Lunge.TELEGRAPH
+				_mode_left[i] = settings.zombie_punch_telegraph
+				_wind[i] = settings.zombie_punch_telegraph
+				lunge_stage.emit(i, Lunge.TELEGRAPH)
+				return Vector3.ZERO
+			return ahead * speed
+		Lunge.TELEGRAPH:
+			_lunge[i] = ahead  # still aiming
+			if _mode_left[i] <= 0.0:
+				_mode[i] = Lunge.LUNGE
+				lunge_stage.emit(i, Lunge.LUNGE)
+			return ahead * clampf(gap - settings.zombie_punch_range * 0.6, -1.0, 1.0)  # holds its distance
+		Lunge.LUNGE:
+			_mode[i] = Lunge.REST
+			_mode_left[i] = settings.zombie_punch_rest
+			return ahead * speed * 0.5  # follows through
+		_:
+			if _mode_left[i] <= 0.0:
+				_mode[i] = Lunge.STALK
+			return -ahead * speed * 0.3
 
 
 ## The nearest chaseable target to `at` (-1: none).
@@ -1238,7 +1327,7 @@ func _fit_detail() -> void:
 		var at := look % _per_set
 		var kind := at / (3 * BANDS)
 		var pose := (at / BANDS) % 3
-		_looks[look].multimesh.mesh = SchoolLook.detail_meshes(kinds[kind].fish_class, errors[at % BANDS])[pose]
+		_looks[look].multimesh.mesh = SchoolLook.detail_meshes(kinds[kind].look_key(), errors[at % BANDS])[pose]
 
 
 ## The rot overlays, and the first set of looks.
@@ -1273,7 +1362,7 @@ func _add_set() -> void:
 	for k in kinds.size():
 		var meshes: Array[Array] = []
 		for band in BANDS:
-			meshes.append(SchoolLook.detail_meshes(kinds[k].fish_class, _lod_errors[band]))
+			meshes.append(SchoolLook.detail_meshes(kinds[k].look_key(), _lod_errors[band]))
 		for pose in 3:
 			for band in BANDS:
 				var multimesh := MultiMesh.new()

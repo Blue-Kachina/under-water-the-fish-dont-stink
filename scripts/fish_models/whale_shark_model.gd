@@ -1,7 +1,9 @@
 class_name WhaleSharkModel
 extends RefCounted
-## The Breachers' baby whale shark (FishModel.build hands it here): species m.species of
-## FishCharacter.SPECIES[FishCharacter.FishClass.BREACHER].
+## Unused since the Breachers became baby whales (WhaleModel, big_changes.md
+## Phase 4); kept for later (a zombie or a Nature fish, decision D14). It was
+## the Breachers' baby whale shark, in four looks (LOOKS): whale shark, deep
+## charcoal, juvenile and basking shark.
 ##
 ## One smooth lofted body (_body_mesh): superelliptic slices, wide and low at
 ## the front for a whale shark's flat head (a basking shark's conical snout),

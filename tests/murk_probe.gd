@@ -158,20 +158,27 @@ func _run() -> void:
 	horde.remove(close)
 	var full := 0
 	var far_tris := 0
+	var per_kind: Array[String] = []
 	for kind in horde.kinds:
-		var whole: Mesh = SchoolLook.meshes(kind.fish_class)[0]
-		var cut: Mesh = SchoolLook.detail_meshes(kind.fish_class, settings.lod_far_error)[0]
+		var whole: Mesh = SchoolLook.meshes(kind.look_key())[0]
+		var cut: Mesh = SchoolLook.detail_meshes(kind.look_key(), settings.lod_far_error)[0]
+		var kind_full := 0
+		var kind_far := 0
 		for s in whole.get_surface_count():
-			full += (whole.surface_get_arrays(s)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+			kind_full += (whole.surface_get_arrays(s)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
 		for s in cut.get_surface_count():
-			far_tris += (cut.surface_get_arrays(s)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
-		if cut.get_surface_count() >= whole.get_surface_count():
-			far_tris = full  # parts not merged: fail below
-	check(far_tris * 10 < full, "far looks are a tenth of the triangles or fewer, in fewer surfaces (%d of %d)" % [far_tris, full])
+			kind_far += (cut.surface_get_arrays(s)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+		full += kind_full
+		far_tris += kind_far
+		per_kind.append("%s %d/%d (%d/%d surfaces)" % [kind.id, kind_far, kind_full, cut.get_surface_count(), whole.get_surface_count()])
+		if cut.get_surface_count() > whole.get_surface_count() or (cut.get_surface_count() == whole.get_surface_count() and kind.look_key() is int 				and kind.fish_class != FishCharacter.FishClass.DRIFTER):
+			far_tris = full  # parts not merged: fail below (a jelly's parts each have their own shader: nothing to merge)
+	print("    far/full per kind: ", ", ".join(per_kind))
+	check(far_tris * 10 < full, "far looks are a tenth of the triangles or fewer, their parts merged where they can be (%d of %d)" % [far_tris, full])
 	settings.lod_mid_error = 0.05
 	horde._draw_horde(0.0)
 	var mid_mesh: Mesh = horde._looks[1].multimesh.mesh
-	check(mid_mesh == SchoolLook.detail_meshes(horde.kinds[0].fish_class, 0.05)[0], "changing an error re-cuts the looks")
+	check(mid_mesh == SchoolLook.detail_meshes(horde.kinds[0].look_key(), 0.05)[0], "changing an error re-cuts the looks")
 	settings.lod_mid_error = 0.02
 	horde._draw_horde(0.0)
 	settings.murk_cull = 1.0

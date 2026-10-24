@@ -6,8 +6,12 @@ extends Node
 ## a player who strides free; the Lamprey's gills take gill_bonus damage, its
 ## brood drops off as zombies, and it grabs too; the Whale Fall's hagfish hold
 ## their own hp (dying one by one, their proxies gone), the carcass is armoured
-## while any live, and in fury they tear loose; and beaten, any of them opens
-## the whirlpool and drops the boss chest.
+## while any live, and in fury they tear loose; the Fallen Angel hangs upright,
+## its head and gut take angel_weak damage, it opens its crown (the wind-up,
+## its lane showing) then lashes: a lash grabs a player who didn't stride, is
+## dodged by one who did, eats the zombies it catches, and it sheds Sea
+## Butterflies; and beaten, any of them opens the whirlpool and drops the boss
+## chest.
 ##   Godot_console.exe --headless --path . res://tests/final_boss_probe.tscn
 
 var main: Node
@@ -60,13 +64,13 @@ func _run() -> void:
 	var seen := {}
 	for n in 60:
 		seen[run.pick_final_boss()] = true
-	check(seen.size() == 3 and not seen.has("boss"), "chance 1: each alternate, never the King (%s)" % [seen.keys()])
+	check(seen.size() == 4 and not seen.has("boss"), "chance 1: each alternate, never the King (%s)" % [seen.keys()])
 	settings.final_boss = 3
 	check(run.pick_final_boss() == "whale", "final_boss forces one")
 	settings.final_boss = 0
 	settings.alternate_boss_chance = 0.4
 
-	for kind: String in ["boss", "gulper", "whale", "lamprey"]:
+	for kind: String in ["boss", "gulper", "whale", "lamprey", "angel"]:
 		await _each(kind)
 	_finish()
 
@@ -102,6 +106,8 @@ func _each(kind: String) -> void:
 			await _lamprey(boss as LampreyBoss)
 		"whale":
 			await _whale(boss as WhaleFallBoss)
+		"angel":
+			await _angel(boss as FallenAngelBoss)
 	boss.hp = boss.max_hp * 0.6
 	boss.take(1.0, fish, "probe")
 	check(boss.phase == BloodLeviathan.Phase.SPIT, "at 60% it spits")
@@ -202,6 +208,86 @@ func _whale(boss: WhaleFallBoss) -> void:
 	check(fresh.hagfish.all(func(x: WhaleFallBoss.Hagfish) -> bool: return x.loose), "in fury the hagfish tear loose")
 	fresh.queue_free()
 	run.bosses.erase(fresh)
+
+
+func _angel(boss: FallenAngelBoss) -> void:
+	var head := boss.rig.points[0]
+	var tail := boss.rig.points[SpineRig.SPINE_N - 1]
+	check(head.y - tail.y > boss.height() * 0.6, "it hangs upright, head up (%.0f m over its tail)" % (head.y - tail.y))
+	boss.hp = boss.max_hp
+	var before := boss.hp
+	run.hit(boss.parts[4], 1000.0, fish, "probe")
+	var tail_hit := before - boss.hp
+	before = boss.hp
+	run.hit(boss.parts[0], 1000.0, fish, "probe")
+	var head_hit := before - boss.hp
+	check(head_hit > tail_hit * (settings.angel_weak - 0.05), "its glowing head takes %.1fx a tail hit" % (head_hit / maxf(tail_hit, 0.01)))
+	# The crown, then the flurry: a player in front of it, not striding, is caught.
+	fish.freeze = false
+	fish.global_position = boss.global_position + boss.facing * settings.angel_lash_reach * 0.5
+	fish.freeze = true
+	await _ticks(2)
+	boss._start_crown()
+	var lane := false
+	var opened := 0.0
+	for n in int(settings.angel_crown * 120) + 4:
+		await get_tree().physics_frame
+		lane = lane or not boss.telegraph().is_empty()
+		opened = maxf(opened, boss.crown_open)
+		if boss.state != FallenAngelBoss.State.CROWN:
+			break
+	check(lane and opened > 0.9, "its crown bursts open over angel_crown s, its lane showing (%.2f open)" % opened)
+	check(boss.state == FallenAngelBoss.State.FLURRY, "then it tumbles in")
+	await _until(func() -> bool: return boss.held != null or boss.state == FallenAngelBoss.State.HOVER, int(settings.angel_flurry * 120) + 20)
+	check(boss.held == fish and boss.lashes >= 1, "a lash catches a player who didn't stride (%d lashes)" % boss.lashes)
+	for n in settings.final_hold_strides:
+		fish.strode.emit(1.0, 1.0)
+	await _ticks(3)
+	check(boss.held == null, "strides break free of its crown")
+	# A timed stride dodges a lash.
+	await _ticks(int(2.6 * 120))
+	fish.freeze = false
+	fish.global_position = boss.global_position + boss.facing * settings.angel_lash_reach * 0.5
+	fish.freeze = true
+	boss._regrab_left = 0.0
+	var dodged := boss.dodged
+	boss._start_crown()
+	for n in int((settings.angel_crown + settings.angel_flurry) * 120) + 10:
+		fish.strode.emit(1.0, 1.0)  # striding all the while: each lash is dodged
+		await get_tree().physics_frame
+		if boss.state == FallenAngelBoss.State.HOVER:
+			break
+	check(boss.dodged > dodged and boss.held == null, "a stride just before a lash dodges it (%d dodged)" % (boss.dodged - dodged))
+	# Zombies in a lash's way are eaten, and heal it.
+	fish.global_position = run.centre + Vector3(0.0, 0.0, 80.0)
+	await _ticks(2)
+	boss.hp = boss.max_hp * 0.5
+	var eaten := boss.eaten
+	for n in 8:
+		horde.spawn(1, boss.global_position + boss.facing * 4.0 + Vector3(n * 0.4 - 1.6, 0.0, 0.0))
+	await _ticks(14)
+	boss._lash(boss.facing * 4.0)
+	check(boss.eaten > eaten and boss.hp > boss.max_hp * 0.5, "its lashes eat the zombies they catch, healing it (%d)" % (boss.eaten - eaten))
+	boss.state = FallenAngelBoss.State.HOVER
+	# Sea Butterflies.
+	var shed := boss.butterflies_shed
+	boss._shed()
+	await _ticks(14)
+	var flutter := 0
+	for i in horde.alive:
+		if horde.enemy_kind(i).id == "butterfly":
+			flutter += 1
+	check(boss.butterflies_shed - shed == settings.angel_butterflies and flutter >= settings.angel_butterflies,
+			"it sheds %d Sea Butterflies" % (boss.butterflies_shed - shed))
+	horde.clear()
+	await _ticks(2)
+
+
+func _until(done: Callable, most: int) -> void:
+	for n in most:
+		if done.call():
+			return
+		await get_tree().physics_frame
 
 
 func _finish() -> void:

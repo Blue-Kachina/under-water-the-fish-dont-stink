@@ -50,6 +50,13 @@ var steer := Vector2.ZERO
 ## arriving at the peak, and it relaxes back to the middle as the stride fades.
 var tail_swing := Vector2.ZERO
 var _tail_from := Vector2.ZERO
+## Gait.StrokeAxis.VERTICAL: which way the current stroke kicks the body (+1
+## up, -1 down). An up or down sweep picks it; a sideways one alternates.
+var beat := 1.0
+## Gait.Visual.FLUKE: where the flukes are, -1 (up) to 1 (down): a stroke beats
+## them to the side opposite its kick by the peak, and they relax back as it fades.
+var fluke_swing := 0.0
+var _fluke_from := 0.0
 
 var _dir := Vector2.ZERO  # the current stride's sweep direction (unit stick vector)
 var _reach := 0.0  # how far the stick has reached along the current stride's direction
@@ -72,6 +79,9 @@ func reset() -> void:
 	steer = Vector2.ZERO
 	tail_swing = Vector2.ZERO
 	_tail_from = Vector2.ZERO
+	beat = 1.0
+	fluke_swing = 0.0
+	_fluke_from = 0.0
 	_dir = Vector2.ZERO
 	_reach = 0.0
 	_crossed = true
@@ -183,6 +193,12 @@ func _start(dir: Vector2, reach: float) -> void:
 	_reach = reach
 	_crossed = false
 	_tail_from = tail_swing
+	_fluke_from = fluke_swing
+	# Stick y is down (which pitches the nose up, so it kicks the body up).
+	if absf(dir.y) > 0.5:
+		beat = signf(dir.y)
+	elif not fresh:
+		beat = -beat
 	fish.strode.emit(timing, flow)
 
 
@@ -191,12 +207,16 @@ func _start(dir: Vector2, reach: float) -> void:
 func _swing_tail(delta: float) -> void:
 	if phase < 0.0:
 		tail_swing = tail_swing.move_toward(Vector2.ZERO, 3.0 * delta)
+		fluke_swing = move_toward(fluke_swing, 0.0, 3.0 * delta)
 		return
 	var across := -_dir
 	if phase < peak_time():
-		tail_swing = _tail_from.lerp(across, smoothstep(0.0, peak_time(), phase))
+		var t := smoothstep(0.0, peak_time(), phase)
+		tail_swing = _tail_from.lerp(across, t)
+		fluke_swing = lerpf(_fluke_from, beat, t)
 	else:
 		tail_swing = across * power
+		fluke_swing = beat * power
 
 
 ## The stride's push this tick, added to `velocity` (off a surface).
@@ -215,9 +235,21 @@ func apply(velocity: Vector3, basis: Basis, dt: float) -> Vector3:
 ## axis, kicked off it by stride_side_angle along its stroke axis.
 func push_direction(basis: Basis) -> Vector3:
 	var along := -basis.z  # Gait.PushAxis.NOSE
+	if fish.gait.push_axis == Gait.PushAxis.BELL:
+		along = basis * fish.bell_axis()
 	# Gait.StrokeAxis.LATERAL: the tail sweeps one way, so the water pushes the
 	# body a little the other. Stick x is right, stick y is down (which pitches
 	# the nose up). FLAP: a wingbeat lifts, whichever way the stick swept.
-	var kick := basis.y if fish.gait.stroke_axis == Gait.StrokeAxis.FLAP else -(basis.x * _dir.x - basis.y * _dir.y).normalized()
+	# VERTICAL: the flukes kick it up or down (beat).
+	var kick: Vector3
+	match fish.gait.stroke_axis:
+		Gait.StrokeAxis.FLAP:
+			kick = basis.y
+		Gait.StrokeAxis.VERTICAL:
+			kick = basis.y * beat
+		Gait.StrokeAxis.RADIAL:
+			return along
+		_:
+			kick = -(basis.x * _dir.x - basis.y * _dir.y).normalized()
 	var angle := deg_to_rad(fish.stride_side_angle)
 	return along * cos(angle) + kick * sin(angle)

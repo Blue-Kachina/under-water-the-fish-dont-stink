@@ -314,6 +314,13 @@ var _banished := {}
 var _chill := {}
 ## Seconds to the next round of Burning elites' fire patches.
 var _burn_left := 0.0
+## Cinder Lionfish (EnemyKind.trail): seconds until they next drop fire.
+var _cinder_left := 0.0
+## The last stage's rotation of zombie kinds (EnemyKind.rotation()), and its
+## own random numbers (seeded off the run's, so picking it leaves the run's
+## sequence as it was: drops, pearls and packs roll the same with or without it).
+var _last_rotation := PackedByteArray()
+var _kind_rng: RandomNumberGenerator
 var _seabed_seed := SEABED_SEED
 
 
@@ -337,6 +344,7 @@ func _ready() -> void:
 	horde.setup(settings, kinds, settings.max_enemies, rng.randi() & 0x7fffffff)
 	horde.immortal = not authority  # a guest's die when the host says (Horde.kill)
 	horde.killed.connect(_on_killed)
+	horde.lunge_stage.connect(_on_lunge_stage)
 	if test_tank:
 		tank = TestTank.new(self)
 		horde.would_kill.connect(func(_index: int, _kind: int, source: String, _by: Object) -> void: tank.log_kill(source))
@@ -424,6 +432,8 @@ func start() -> void:
 	if kill_pops:
 		kill_pops.clear()
 	director.reset()
+	_last_rotation = PackedByteArray()
+	_rotate_kinds()
 	timeline.reset()
 	stage_complete = false
 	enraged = false
@@ -1213,6 +1223,9 @@ func _touch_zombies(fish: FishController) -> void:
 		if horde.affix_of(i) == Horde.Affix.FROZEN and settings.frozen_time > 0.0:
 			_chill[fish] = settings.frozen_time  # its touch slows (P5)
 			fish.speed_scale = _swim_scale(fish)
+		elif kind.contact_slow and settings.jelly_sting_time > 0.0:
+			_chill[fish] = maxf(_chill.get(fish, 0.0), settings.jelly_sting_time)  # a grave jelly's sting
+			fish.speed_scale = _swim_scale(fish)
 		var away := offset.normalized() if offset.length_squared() > 0.0001 else -nose
 		horde.damage(i, 0.0, "contact", null, away)  # knocked back off the fish
 		return
@@ -1665,16 +1678,16 @@ func _add_boss(boss: Boss, at: Vector3, boss_hp: float, id := 0) -> void:
 ## Which final boss comes this stage ("boss": the King of Herrings, or an
 ## alternate by alternate_boss_chance; final_boss picks one for testing).
 func pick_final_boss() -> String:
-	var picked := ["", "boss", "gulper", "whale", "lamprey"]
+	var picked := ["", "boss", "gulper", "whale", "lamprey", "angel"]
 	if settings.final_boss > 0 and settings.final_boss < picked.size():
 		return picked[settings.final_boss]
 	if rng.randf() < settings.alternate_boss_chance:
-		return ["gulper", "whale", "lamprey"][rng.randi_range(0, 2)]
+		return ["gulper", "whale", "lamprey", "angel"][rng.randi_range(0, 3)]
 	return "boss"
 
 
 ## A final boss of `kind` ("boss" or "king": the King of Herrings; "gulper",
-## "whale", "lamprey": its alternates), not yet added.
+## "whale", "lamprey", "angel": its alternates), not yet added.
 static func make_final_boss(kind: String) -> BloodLeviathan:
 	match kind:
 		"gulper":
@@ -1683,6 +1696,8 @@ static func make_final_boss(kind: String) -> BloodLeviathan:
 			return WhaleFallBoss.new()
 		"lamprey":
 			return LampreyBoss.new()
+		"angel":
+			return FallenAngelBoss.new()
 	return BloodLeviathan.new()
 
 
@@ -2630,6 +2645,7 @@ func next_stage() -> void:
 	pickups.clear()
 	_chill.clear()
 	director.reset()
+	_rotate_kinds()
 	timeline.reset()
 	_build_seabed()
 	_bury_chests()
@@ -2866,8 +2882,10 @@ func running_tide() -> Shrine:
 # --- Elite modifiers (P5) -------------------------------------------------
 
 ## Burning elites leave a patch of fire every burning_every s (on every machine:
-## the patches hurt only the players played there).
+## the patches hurt only the players played there), and Cinder Lionfish a
+## smaller one every cinder_every s.
 func _update_affixes(delta: float) -> void:
+	_update_cinders(delta)
 	if not settings.burning:
 		return
 	_burn_left -= delta
@@ -2889,6 +2907,60 @@ func _update_affixes(delta: float) -> void:
 
 ## What a burning elite's fire is called (the run log's cause).
 const BURN_CAUSE := "a burning elite's fire"
+const CINDER_CAUSE := "a cinder lionfish's fire"
+const SOUR_CAUSE := "a sour sea hare's cloud"
+const PUNCH_CAUSE := "a rotten mantis's punch"
+
+
+## Cinder Lionfish (EnemyKind.trail) leave short-lived fire behind them, like
+## a Burning elite's but weaker; on every machine, like those.
+func _update_cinders(delta: float) -> void:
+	_cinder_left -= delta
+	if _cinder_left > 0.0:
+		return
+	_cinder_left = settings.cinder_every
+	if settings.cinder_damage <= 0.0 or settings.cinder_max <= 0:
+		return
+	var out := 0
+	for cloud in _clouds:
+		if is_instance_valid(cloud) and cloud.cause == CINDER_CAUSE:
+			out += 1
+	for i in horde.alive:
+		if out >= settings.cinder_max:
+			return
+		if horde.enemy_kind(i).trail and not horde.is_proxy(i):
+			_hazard(horde.enemy_position(i), settings.cinder_radius * horde.enemy_size(i), settings.cinder_time,
+					settings.cinder_damage, Color(1.0, 0.55, 0.15, 0.28), CINDER_CAUSE)
+			out += 1
+
+
+## A puncher's punch lands (EnemyKind.Behaviour.PUNCH, Horde.lunge_stage):
+## every player here within zombie_punch_reach m and zombie_punch_cone degrees
+## of its aim takes its contact damage and is knocked back.
+func _on_lunge_stage(index: int, stage_now: int) -> void:
+	if stage_now != Horde.Lunge.LUNGE or horde.is_frozen() or not horde.is_alive(index):
+		return
+	var kind := horde.enemy_kind(index)
+	if kind.behaviour != EnemyKind.Behaviour.PUNCH:
+		return
+	var at := horde.enemy_position(index)
+	var aim := horde.lunge_aim(index)
+	var reach := settings.zombie_punch_reach + horde.enemy_radius(index)
+	var cone := cos(deg_to_rad(settings.zombie_punch_cone))
+	for fish in local_players():
+		var health: FishHealth = _health.get(fish)
+		if health == null or health.down:
+			continue
+		var offset := fish.global_position - at
+		var gap := offset.length()
+		if gap > reach or (gap > 0.5 and offset.dot(aim) < gap * cone):
+			continue
+		var amount := kind.contact_damage * settings.enemy_damage_scale * (2.0 if horde.is_elite(index) else 1.0) \
+				* horde.damage_scale(index) * stage_damage()
+		if health.iframes_left > 0.0 or not hurt(fish, amount, index, PUNCH_CAUSE):
+			continue
+		var away := offset / gap if gap > 0.01 else aim
+		fish.linear_velocity += away * settings.zombie_punch_knock
 
 
 ## What an elite's modifier does as it dies: Electric shocks round it after
@@ -2903,6 +2975,27 @@ func _affix_death(index: int, at: Vector3) -> void:
 		Horde.Affix.BLOATED:
 			if settings.bloated and authority:
 				horde.spawn_pack(0, settings.bloated_count, at, 1.5, Vector3.ZERO, 0.0)
+	var kind := horde.enemy_kind(index)
+	if kind.death_spawn > 0 and authority and not tank:
+		horde.spawn_pack(0, kind.death_spawn, at, 1.5, Vector3.ZERO, 0.0)  # a whale calf's sardines
+	if kind.death_cloud and settings.zombie_haze_radius > 0.0 and settings.zombie_haze_time > 0.0:
+		_hazard(at, settings.zombie_haze_radius, settings.zombie_haze_time, 0.0, Color(0.6, 0.3, 0.75, 0.3), SOUR_CAUSE, true)
+
+
+## Picks the zombie kinds this stage plays (D10), the host's (guests are told
+## each spawn's kind).
+func _rotate_kinds() -> void:
+	if not authority:
+		return
+	var roster: Array[EnemyKind] = horde.kinds
+	if tank and tank.dummy_kind >= 0:
+		director.rotation = PackedByteArray()  # the Test Tank picks its own
+		return
+	if _kind_rng == null:
+		_kind_rng = RandomNumberGenerator.new()
+		_kind_rng.seed = rng.seed ^ 0x6b696e64
+	director.rotation = EnemyKind.rotation(roster, settings.stage_kinds, _kind_rng, _last_rotation)
+	_last_rotation = director.rotation
 
 
 ## A cloud that hurts the players in it (BurstCloud): a fire patch or a shock.

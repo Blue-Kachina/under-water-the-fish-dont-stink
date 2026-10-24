@@ -76,7 +76,13 @@ func _process(_delta: float) -> void:
 					break
 			if not close:
 				continue
-			_lay(n, at, horde.lunge_aim(i), length, horde.enemy_radius(i) * 2.0, horde.telegraph_progress(i), 0.0)
+			var kind := horde.enemy_kind(i)
+			var reach := length
+			if kind.behaviour == EnemyKind.Behaviour.PUNCH:
+				reach = settings.zombie_punch_reach + horde.enemy_radius(i)
+			elif kind.lunge_scale != 1.0:
+				reach = minf(settings.lunge_speed * kind.lunge_scale * settings.lunge_time, MAX_LENGTH)
+			_lay(n, at, horde.lunge_aim(i), reach, horde.enemy_radius(i) * 2.0, horde.telegraph_progress(i), 0.0)
 			n += 1
 	shown = n
 	_show(n)

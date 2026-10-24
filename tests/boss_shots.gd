@@ -3,9 +3,11 @@ extends Node
 ## eye. Each boss is spawned in a real Unnatural run, its body laid along a set
 ## S-curve (no AI), and shot from the side (whole body), its head three-quarter
 ## and front, above, and through the murk as you'd meet it. Needs a window.
-##   Godot_console.exe --path . res://tests/boss_shots.tscn -- --boss=king|gulper|whale|lamprey|all --out=DIR
+## The Fallen Angel hangs upright instead: shot from its side and front (its
+## crown open), close on its crown, from above, and through the murk.
+##   Godot_console.exe --path . res://tests/boss_shots.tscn -- --boss=king|gulper|whale|lamprey|angel|all --out=DIR
 
-const KINDS := ["king", "gulper", "whale", "lamprey"]
+const KINDS := ["king", "gulper", "whale", "lamprey", "angel"]
 
 var out_dir := "user://boss_shots"
 var wanted := "all"
@@ -70,6 +72,9 @@ func _shoot(kind: String) -> void:
 	boss.set_physics_process(false)
 	await _frames(2)
 	var length := boss.body_length()
+	if boss is FallenAngelBoss:
+		await _shoot_angel(boss as FallenAngelBoss, head, kind, murk)
+		return
 	# An S-curve back from the head, heading -x.
 	var trail := PackedVector3Array()
 	var steps := 160
@@ -92,6 +97,46 @@ func _shoot(kind: String) -> void:
 	settings.murk_density = murk
 	await _frames(2)
 	await _view(head + Vector3(-g * 6.0, g * 1.5, g * 5.0), head + Vector3(g * 2.0, 0.0, 0.0), "%s_murk" % kind)
+	boss.queue_free()
+	run.bosses.erase(boss)
+	await _frames(3)
+
+
+## The Fallen Angel, upright, facing -x with its crown open.
+func _shoot_angel(boss: FallenAngelBoss, head: Vector3, kind: String, murk: float) -> void:
+	var settings := UnnaturalSettings.shared()
+	var h := boss.height()
+	head += Vector3.UP * h * 0.55  # its tail clear of the seabed
+	boss.global_position = head
+	boss.facing = Vector3(-1.0, 0.0, 0.0)
+	boss.pose_for_shot(PackedVector3Array())
+	await _frames(3)
+	var mid := head + Vector3(0.0, -h * 0.45, 0.0)
+	settings.murk_density = 0.0
+	await _frames(2)
+	await _view(mid + Vector3(0.0, h * 0.1, h * 1.25), mid, "%s_side" % kind)
+	await _view(mid + Vector3(-h * 1.2, h * 0.15, h * 0.35), mid, "%s_front" % kind)
+	await _view(head + Vector3(-h * 0.45, h * 0.25, h * 0.35), head + Vector3(0.0, -h * 0.05, 0.0), "%s_head" % kind)
+	await _view(head + Vector3(0.0, h * 1.1, 0.5), head, "%s_top" % kind)
+	boss.flush = 1.0
+	boss.curl = 2.2
+	boss.tumble = 0.6
+	boss._pose()
+	boss._glow_now()
+	await _frames(3)
+	await _view(mid + Vector3(0.0, h * 0.1, h * 1.25), mid, "%s_curled" % kind)
+	boss.tumble = 0.0
+	boss.crown_open = 0.0
+	boss.flush = 0.0
+	boss.curl = 0.15
+	boss.lean = 0.0
+	boss._pose()
+	boss._glow_now()
+	await _frames(3)
+	await _view(mid + Vector3(-h * 0.9, h * 0.05, h * 0.9), mid, "%s_closed" % kind)
+	settings.murk_density = murk
+	await _frames(2)
+	await _view(head + Vector3(-h * 1.0, h * 0.1, h * 0.6), mid, "%s_murk" % kind)
 	boss.queue_free()
 	run.bosses.erase(boss)
 	await _frames(3)

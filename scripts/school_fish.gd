@@ -32,7 +32,11 @@ func place(transform: Transform3D, size: float, velocity: Vector3, tail_phase: f
 		model.scale = Vector3.ONE * size
 	if model.tail:
 		var effort := clampf(velocity.length() / (12.0 * size + 1.0), 0.0, 1.0)
-		model.tail.rotation.y = sin(tail_phase) * lerpf(0.2, 0.5, effort)
+		var wag := sin(tail_phase) * lerpf(0.2, 0.5, effort)
+		if model.fluke:
+			model.tail.rotation.x = wag  # a whale's flukes beat up and down
+		else:
+			model.tail.rotation.y = wag
 	model.react(delta, velocity)
 
 

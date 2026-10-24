@@ -708,9 +708,16 @@ var swishy := SwishySwim.new(self)
 ## GaitSettings (the GAITS tuning), so a change there applies on the next tick.
 ## The gait shapes the body's motion and the model only; the follow camera
 ## follows the body, so a gait's bob or tilt (on the model) never moves it.
-var gait: Gait = GaitSettings.shared().for_class(FishCharacter.FishClass.SKIRMISHER)
+## In Fish Sticks with gaits switched off there (GaitSettings.in_fish_sticks),
+## every class has the plain lateral gait.
+var gait: Gait:
+	get:
+		return GaitSettings.shared().active_for(character)
 ## Gait.Visual.FLAP: the flaps' beat now (rad, + up).
 var _flap := 0.0
+## Gait.PushAxis.BELL: how far the bell leans from upright toward the nose
+## (rad): it swims bell-first and hangs upright when it stops (_lean_bell).
+var bell_lean := 0.0
 
 ## The character's model (built in _apply_character) and the parts the swim
 ## animation moves.
@@ -770,7 +777,6 @@ func _ready() -> void:
 ## Become `character`: its car's hitbox, belly, centre of mass (rotations pivot
 ## about it, as in RL) and wheels, and its fish model.
 func _apply_character() -> void:
-	gait = GaitSettings.shared().for_class(character)
 	if _collision == null:  # set before _ready; applied there
 		return
 	center_of_mass = FishCharacter.com_from_hitbox(character)
@@ -1201,6 +1207,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	state.angular_velocity += _suspension_twist + _tyre_twist
 	# Before this tick's gravity and thrust, as RL damps the velocity the step starts with.
 	velocity = _apply_flip_z_damp(velocity, dt)
+	_lean_bell(velocity, forward, dt)
 	if on_surface:
 		velocity = _apply_ground(velocity, body_basis, dt)  # Gait.SurfaceMode.NONE: strides don't push here
 	else:
@@ -1699,6 +1706,29 @@ func _rl_steer_angle(ground_speed: float) -> float:
 	return RL_STEER_ANGLE_CURVE[-1].y
 
 
+## Gait.PushAxis.BELL: the bell leans toward the nose as it swims (fully with
+## the throttle held, a stride going or at bell_full_speed) and stands upright
+## as it stops; flat on a surface.
+func _lean_bell(velocity: Vector3, forward: Vector3, dt: float) -> void:
+	var g := gait
+	if g.push_axis != Gait.PushAxis.BELL:
+		bell_lean = 0.0
+		return
+	var pace := clampf(velocity.dot(forward) / maxf(g.bell_full_speed, 0.1), 0.0, 1.0)
+	if input_forward > 0.0 or swishy.power > 0.0 or is_boosting or on_surface:
+		pace = 1.0
+	var target := deg_to_rad(g.bell_lean_max) * pace
+	if on_surface:
+		target = PI / 2.0
+	bell_lean = lerpf(bell_lean, target, 1.0 - exp(-g.bell_lean_rate * dt))
+
+
+## Gait.PushAxis.BELL: the bell's axis in the fish's frame (unit): straight up
+## at rest, tipping toward the nose (-Z) by bell_lean.
+func bell_axis() -> Vector3:
+	return Vector3(0.0, cos(bell_lean), -sin(bell_lean))
+
+
 func _apply_strokes(velocity: Vector3, direction: Vector3) -> Vector3:
 	var strength := _queued_stroke
 	_queued_stroke = 0.0
@@ -2117,16 +2147,27 @@ func _process(delta: float) -> void:
 		# The idle wiggle only shows between strides.
 		var growth := stride_tail_growth * swishy.flow / maxf(stride_flow_max, 0.01)
 		_tail.scale = Vector3.ONE * (1.0 + growth) * (1.0 + 0.2 * swishy.power)
-		var swing := swishy.tail_swing * stride_tail_swing
-		var idle := sin(_swim_phase) * lerpf(0.1, 0.25, effort) * (1.0 - minf(swishy.tail_swing.length(), 1.0))
-		_tail.rotation.y = swing.x + idle + tail_kick
-		_tail.rotation.x = swing.y
+		if gait.visual == Gait.Visual.FLUKE:
+			# Gait.Visual.FLUKE: the flukes beat up and down whichever way the
+			# stick swept (SwishySwim.fluke_swing), with a slow idle beat between.
+			var idle := sin(_swim_phase * 0.6) * lerpf(0.08, 0.2, effort) * (1.0 - minf(absf(swishy.fluke_swing), 1.0))
+			_tail.rotation.x = swishy.fluke_swing * stride_tail_swing + idle
+			_tail.rotation.y = tail_kick
+		else:
+			var swing := swishy.tail_swing * stride_tail_swing
+			var idle := sin(_swim_phase) * lerpf(0.1, 0.25, effort) * (1.0 - minf(swishy.tail_swing.length(), 1.0))
+			_tail.rotation.y = swing.x + idle + tail_kick
+			_tail.rotation.x = swing.y
 	else:
 		_tail.scale = Vector3.ONE
 		# Swim strokes: the tail sweeps with the stick (side to side, or up and down like a dolphin).
 		var stroking := 1.0 if stroke_chain > 0 else 0.0
-		_tail.rotation.y = sin(_swim_phase) * lerpf(0.15, 0.45, effort) + tail_kick - input_stick.x * 0.5 * stroking
-		_tail.rotation.x = input_stick.y * 0.5 * stroking
+		if gait.visual == Gait.Visual.FLUKE:
+			_tail.rotation.x = sin(_swim_phase * 0.6) * lerpf(0.15, 0.4, effort) + input_stick.y * 0.5 * stroking
+			_tail.rotation.y = tail_kick - input_stick.x * 0.3 * stroking
+		else:
+			_tail.rotation.y = sin(_swim_phase) * lerpf(0.15, 0.45, effort) + tail_kick - input_stick.x * 0.5 * stroking
+			_tail.rotation.x = input_stick.y * 0.5 * stroking
 	_fin_left.rotation.y = lerpf(_fin_left.rotation.y, 0.9 * slide, 1.0 - exp(-15.0 * delta))
 	_fin_right.rotation.y = -_fin_left.rotation.y
 
@@ -2146,6 +2187,7 @@ func _process(delta: float) -> void:
 	_visual.grounded = on_surface
 	_visual.stride_swing = swishy.tail_swing if striding else Vector2.ZERO
 	_visual.stride_power = swishy.power if striding else 0.0
+	_visual.bell_lean = bell_lean if gait.visual == Gait.Visual.BELL_PULSE else -1.0
 	_visual.react(delta, linear_velocity)
 	var cue := swishy.cue() if swim_style == SwimStyle.EXTRA_SWISHY else Vector3.ZERO
 	_visual.set_stride_cue(cue.x, cue.y, cue.z)

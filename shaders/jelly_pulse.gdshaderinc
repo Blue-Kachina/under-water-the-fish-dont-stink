@@ -9,11 +9,18 @@ uniform float effort = 0.0;  // 0 idling to 1 flat out
 uniform float bell_apex = -0.6;  // the bell's front, z (m)
 uniform float bell_depth = 0.5;  // apex to rim (m)
 uniform float pulse = 0.09;  // how far the rim squeezes in, of its radius
+// Gait.Visual.BELL_PULSE: the current stride's power (0..1), which squeezes
+// the bell instead of the swim's beat, with a faint idle beat under it. Below
+// 0: off, the bell beats with the swim.
+uniform float stride_pulse = -1.0;
 
 // How squeezed the bell is now, 0..pulse: a quick contraction, a slow relax.
 float jelly_contraction() {
 	float x = fract(phase / TAU);
 	float c = x < 0.3 ? smoothstep(0.0, 0.3, x) : 1.0 - smoothstep(0.3, 1.0, x);
+	if (stride_pulse >= 0.0) {
+		return pulse * (0.25 * c + 1.7 * stride_pulse);
+	}
 	return c * pulse * (0.55 + 0.9 * effort);
 }
 

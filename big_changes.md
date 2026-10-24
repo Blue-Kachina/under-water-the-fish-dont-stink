@@ -107,6 +107,8 @@ Keep it as it is, since it still fits: **Remora Buddy** (remoras ride whales too
 
 **Size:** M (a new model plus the vertical stroke). Depends on Phase 1 (gait layer).
 
+**Built 2026-10-24 (Phase 4).** `WhaleModel` (`scripts/fish_models/whale_model.gd`, `whale_calf_skin` / `whale_calf_fin` shaders) with five species (D13): Humpback, Orca, Beluga, Sperm Whale and Blue Whale calves. Horizontal flukes on the tail pivot, and the body bends in its vertical plane (the existing bend handles pitch). `FishModel.fluke` marks a model whose tail beats up and down, so replays, Nature schools and the horde's poses beat it on that axis. The gait has `StrokeAxis.VERTICAL` (an up or down sweep kicks the way it went; a sideways one alternates up and down, D3) and `Visual.FLUKE` (`SwishySwim.beat`, `fluke_swing`). The whales stroke at a fish's timing: a slower `stroke_time` (1.15) cost about 15% of the distance, so it stays 1.0, and a whale gets as far as the Gliders (27.3 vs 27.2 m in `gait_probe`) with a ~8 cm bob. The Whale Shark's model and shaders are kept, unused (D14). Saved Whale Shark species picks fall back to the Humpback. D11's switch is built too: `GaitSettings.in_fish_sticks` (GAITS section, on by default); off, every class swims the plain fish gait in Free Play and 1v1.
+
 ---
 
 ## 3. New final boss: the Sea Angel (Phase 7)
@@ -148,6 +150,13 @@ It is built on `boss_mesh.gd`, with `spine_rig.gd` for the body and tail curl (t
 - Test: `tank_boss` puts it in the Test Tank, and `boss_shots` renders it.
 
 **Size:** L (a new upright mesh with wings and tentacle chains, a new movement style, the crown telegraph, the tumbling grab hooked into the existing Grabbed code, and a new zombie kind).
+
+**Built 2026-10-24 (Phase 7).** `FallenAngelBoss` (`scripts/unnatural/bosses/fallen_angel_boss.gd`; `boss_angel`, `boss_angel_organ` and `angel_tentacle` shaders). It extends `BloodLeviathan` (phases, hp, holds, net), with its own states: HOVER, CROWN, FLURRY and HELD. The settings are the `angel_*` group under Final Bosses. Its body is one seamless mesh on the spine rig, posed upright from the boss's facing, lean, curl and tumble (`_frames_facing` keeps its front toward its prey). The glowing organs are a second bent mesh inside it. The wings and the six crown tentacles are nodes posed every frame; a tentacle bends in an arc in its shader. It joins the alternates (each of the four at 10%), `final_boss` 5, the Test Tank's `tank_boss` and `boss_shots`. Differences from the plan:
+- Its lock-on shows as the boss lane (Telegraphs) from it to its prey, not a ring round the target.
+- In fury its lashes go for the nearest player in reach. It holds one player at a time (the shared hold code holds one).
+- Swallowed zombies darken its gut (`fed`) rather than showing whole.
+- In SPIT, Sea Butterflies replace its bolts: 14 every `leviathan_bolt_every` × 2 s.
+- `final_boss_probe` covers it.
 
 ---
 
@@ -319,6 +328,8 @@ The fish are RocketSim cars, so **they already have wheels and can touch surface
 
 **D9:** should a bottom-dweller class (octopus first) be scheduled after this roadmap, or stay a brainstorm for now?
 
+**Built 2026-10-24 (Phase 5): the Drifters' tilt and pulse.** `PushAxis.BELL`, `StrokeAxis.RADIAL` (no side kick) and `Visual.BELL_PULSE`, plus three bell exports on the gait: `bell_lean_max` (75°), `bell_full_speed` (6 m/s) and `bell_lean_rate` (4/s). `FishController.bell_lean` is how far the bell leans from upright. It leans fully while the throttle is held, a stride is going or it's boosting (or at `bell_full_speed` when coasting), and lies level on a surface. A stride pushes along the bell's axis. The model tilts with it (`FishModel.bell_lean`; it's built bell-first, so upright is a quarter turn nose-up), and every jelly shader squeezes with the stride (`jelly_pulse.gdshaderinc`'s `stride_pulse`). The Drifters' gait: stroke time ×0.8, power ×0.8, coast drag ×1.8, coast buoyancy −2 m/s². A jelly gets 31 m where it got 27 m before, and sinks about 0.5 m/s between pulses. In Fish Sticks with gaits off it lies nose-first, as before.
+
 **Size:** Phase 1 S–M (the layer, no new behaviour). Each new gait is S, plus whatever its model needs.
 
 **Built 2026-10-24 (Phase 1).** `Gait` (`scripts/gait.gd`) holds `stroke_axis`, `push_axis`, `stroke_time` (× the fish's stride peak and fade times; the plan's "cadence"), `stroke_power` (× stride force), `coast_drag` (× linear drag between strides), `coast_buoyancy` (m/s² between strides), `surface_mode` and `visual`. Each enum lists only what's built (today's `LATERAL` / `NOSE` / `NONE` / `TAIL_BEND`), and later phases add values at the end. `GaitSettings.shared()` keeps one Gait per class and is the new **GAITS** tuning section (after Fish): a heading per class, options named `<class key>_<export>` (e.g. `drifter_coast_drag`). It is saved in presets (`[gaits]`), sent by the co-op host, and described from gait.gd's comments (`gen_setting_docs`). An enum only shows in the panel once it has a second value. `FishController.gait` is its class's Gait. `SwishySwim.peak_time()` / `fade_time()` / `push_direction()` read it, and `_apply_water` uses the coast values. The camera follows the body, so bob or tilt on the model never moves it. `gait_probe` checks that every class swims **bit-for-bit** as before against `tests/fixtures/gait_baseline.json` (recorded on the pre-gait code; `-- --record` re-records it), and checks each number, the panel/preset/co-op wiring and the camera.
@@ -333,10 +344,10 @@ The fish are RocketSim cars, so **they already have wheels and can touch surface
 | **1** | Gait layer, lateral default, no visible change (§6). **Built 2026-10-24** | — | S–M |
 | **2** | Brawlers: Cavitation Punch, Recoil Dash, new twist (§4). Depth Charges stays in the card pool, ownerless, until Phase 3 replaces it. **Built 2026-10-24** | ~~D6~~ | M |
 | **3** | Alchemists: Sea Hare model + 3 species, Purple Haze (built from Depth Charges, which is then retired), Unpalatable, Flutter, flap gait (§5) (Regen signature; Drifters → Quantity, D8). **Built 2026-10-24** | ~~D8~~ | L |
-| **4** | Breachers: whale model + species, vertical gait; remove the Whale Shark (§2) | ~~D3, D4~~ | M |
-| **5** | Drifters: tilt-and-pulse gait for the jellies (§6) | — | S–M |
-| **6** | Zombie roster: every class appears as a zombie (§8) | ~~D10~~ | M–L |
-| **7** | The Fallen Angel (Sea Angel) boss + Sea Butterfly zombies (§3) | ~~D5, D12~~ | L |
+| **4** | Breachers: whale model + species, vertical gait; remove the Whale Shark (§2). **Built 2026-10-24** | ~~D3, D4~~ | M |
+| **5** | Drifters: tilt-and-pulse gait for the jellies (§6). **Built 2026-10-24** | — | S–M |
+| **6** | Zombie roster: every class appears as a zombie (§8). **Built 2026-10-24** | ~~D10~~ | M–L |
+| **7** | The Fallen Angel (Sea Angel) boss + Sea Butterfly zombies (§3). **Built 2026-10-24** | ~~D5, D12~~ | L |
 
 Phases 2, 3 and 4 don't depend on each other once 0 and 1 are in, so they can be done in whatever order you want to test them. Phase 6 goes after 3 and 4 so it includes the Sea Hares and the whales. Phase 7 goes last because it's the biggest single piece and benefits from the new zombie kinds.
 
@@ -379,6 +390,24 @@ Adding a kind has a real cost: `Horde._add_set()` builds **9 MultiMeshes per kin
 - Also fixes an old shortcut: give the sardine its own small model instead of a shrunken clownfish.
 - Bench: `split_bench` at 3P has to stay within 10% of the current fps.
 
+**Built 2026-10-24 (Phase 6).** `EnemyKind.defaults()` has 13 kinds (the order goes over the network, so new ones are added at the end):
+
+| Kind | Class | Behaviour |
+|---|---|---|
+| Drowned Koi | Charmers | `SCHOOL`: closes to `school_ring` (9 m), circles for `school_circle` (3 s), darts in for `school_dart` (1.2 s) |
+| Cinder Lionfish | Scorchers | Chase, with `trail`: fire patches every `cinder_every` (0.9 s; 1.2 m, 2 s, 4 dmg) |
+| Grave Jelly | Drifters | `DRIFT`: surges to `drift_surge` (2.6×) its speed every `drift_pulse` (1.6 s); its touch slows you for `jelly_sting_time` |
+| Rotten Mantis | Brawlers | `PUNCH`: stops at 4.5 m, winds up 0.6 s (the lunge glow and lane), punches 6 m ahead in a 45° cone for its touch damage, knocking you back |
+| Bloated Whale Calf | Breachers | Tank that bobs (`bob`); bursts like the boxfish and spills 4 sardines (`death_spawn`) |
+| Sour Sea Hare | Alchemists | Chase; dying leaves a slowing cloud (`death_cloud`, `zombie_haze_*`) |
+| Ghoul Shark | Hunters | Lunge with a shorter wind-up (×0.6) and a faster lunge (×1.3), from minute 7. The Drowned Shark mini-boss stays (D15) |
+| Sea Butterfly | (its own) | Phase 7: only the Fallen Angel sheds them |
+
+- The sardines have their own model (`ZombieLooks`, `sardine_skin.gdshader`); a kind's `look` names one. `SchoolLook` bakes a class or a look id.
+- The rotation (D10): `stage_kinds` (6) kinds a stage, picked at the start of the run and of each stage by `EnemyKind.rotation()`. It always has the sardines and one kind that comes from minute 0; the rest are by chance, with kinds from the last stage at a third of the odds. `EvilDirector.rotation` limits `pick_kind()`. 0 plays every kind at once. Looks with no zombies drawn are hidden, so the draw calls follow what's on screen.
+- Bench (`split_bench --kinds=...`, 3 players, 2,000 zombies; run-to-run noise is about ±15%, CPU-bound): the original five average 22.6 ms a frame over 4 runs (21.0 to 25.0), a six-kind rotation of the new ones 23.6 ms (22.1 to 24.3), about 4% slower: within the 10%. Draw calls go up 15 to 20% (about 3,200 vs 2,700): the jelly (5 shaders) and the lionfish (18 parts) merge least. A lighter far LOD for those two is the lever if it shows.
+- `roster_probe` covers it. `murk_probe` now bakes kinds by their look, and accepts the jelly's far look keeping its five surfaces (each has its own shader).
+
 ---
 
 ## 9. Risks and what to watch
@@ -408,3 +437,7 @@ Adding a kind has a real cost: `Horde._add_set()` builds **9 MultiMeshes per kin
 | D10 | ~~Zombie roster: a rotation of ~6 kinds per stage, or all at once?~~ **Answered 2026-10-24:** rotation | — |
 | D11 | ~~Gaits in Soccer mode too?~~ **Answered 2026-10-24:** everywhere, with a setting to switch gaits off in Fish Sticks (on by default) | — |
 | D12 | ~~Sea Angel lashes: can a single well-timed stride dodge a lash?~~ **Answered 2026-10-24:** a timed stride dodges | — |
+| D13 | ~~Blue Whale Calf (optional 5th Breacher species)?~~ **Answered 2026-10-24:** yes, five species | — |
+| D14 | ~~Whale Shark model once the class is whales?~~ **Answered 2026-10-24:** keep its model/skins code in place, unused by the class | — |
+| D15 | ~~Ghoul Shark zombie as well as the Drowned Shark mini-boss?~~ **Answered 2026-10-24:** both | — |
+| D16 | ~~Builds per phase or one at the end?~~ **Answered 2026-10-24:** one per phase, without waiting for a test between them | — |

@@ -191,8 +191,10 @@ func _process(real_delta: float) -> void:
 		_tail.rotation = Vector3(fx[ReplayData.FX_TAIL_PITCH], fx[ReplayData.FX_TAIL_YAW], 0.0)
 		_tail.scale = Vector3.ONE * maxf(fx[ReplayData.FX_TAIL_SCALE], 0.01)
 	else:
-		_tail.rotation.y = sin(_swim_phase) * lerpf(0.15, 0.45, effort) - input_stick.x * 0.6 * slide
-		_tail.rotation.x = 0.0
+		var wag := sin(_swim_phase) * lerpf(0.15, 0.45, effort)
+		var flukes := _visual != null and _visual.fluke  # a whale's flukes beat up and down
+		_tail.rotation.y = (0.0 if flukes else wag) - input_stick.x * 0.6 * slide
+		_tail.rotation.x = wag if flukes else 0.0
 	_fin_left.rotation.y = lerpf(_fin_left.rotation.y, 0.9 * slide, 1.0 - exp(-15.0 * delta))
 	_fin_right.rotation.y = -_fin_left.rotation.y
 	var flutter := sin(Time.get_ticks_msec() * 0.05) * 0.7 * input_reverse

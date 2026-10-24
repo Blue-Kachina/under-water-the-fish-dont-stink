@@ -63,6 +63,11 @@ var _kill_times := PackedFloat32Array()
 var _read_left := 0.0
 
 
+## The kinds this stage plays (EnemyKind.rotation(): 1 per kind in it);
+## empty: every kind. UnnaturalRun sets it at each stage's start.
+var rotation := PackedByteArray()
+
+
 func _init(director_settings: UnnaturalSettings, director_horde: Horde, dice: RandomNumberGenerator) -> void:
 	settings = director_settings
 	horde = director_horde
@@ -71,6 +76,7 @@ func _init(director_settings: UnnaturalSettings, director_horde: Horde, dice: Ra
 
 func reset() -> void:
 	elapsed = 0.0
+	rotation = PackedByteArray()
 	next_pack = 0.0
 	packs = 0
 	pressure = 1.0
@@ -191,20 +197,26 @@ func _read() -> void:
 		pressure = move_toward(pressure, 1.0, settings.pressure_rate * 0.25 * READ_INTERVAL)
 
 
-## A kind unlocked by now, by weight (the first kind if none are).
+## A kind in the stage's rotation and unlocked by now, by weight (the first
+## kind if none are).
 func pick_kind() -> int:
 	var total := 0.0
-	for kind in horde.kinds:
-		if kind.unlock_minute <= minutes():
-			total += kind.weight
+	for k in horde.kinds.size():
+		if _can_pick(k):
+			total += horde.kinds[k].weight
 	if total <= 0.0:
 		return 0
 	var roll := rng.randf() * total
 	for k in horde.kinds.size():
-		var kind := horde.kinds[k]
-		if kind.unlock_minute > minutes():
+		if not _can_pick(k):
 			continue
-		roll -= kind.weight
+		roll -= horde.kinds[k].weight
 		if roll <= 0.0:
 			return k
 	return 0
+
+
+func _can_pick(k: int) -> bool:
+	if k < rotation.size() and rotation[k] == 0:
+		return false
+	return horde.kinds[k].unlock_minute <= minutes()

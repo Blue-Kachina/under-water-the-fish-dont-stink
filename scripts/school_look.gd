@@ -8,7 +8,9 @@ class_name SchoolLook
 ## school shows each fish in the pose for where its tail is in its beat, a
 ## flipbook wag (pose_for()).
 ##
-## Baked the first time each kind is asked for, then kept.
+## Baked the first time each kind is asked for, then kept. A kind is a class
+## (FishCharacter.FishClass) or a zombie's own look's id (ZombieLooks: "sardine").
+## A whale (FishModel.fluke) beats its tail up and down in its poses.
 
 ## The tail's swing (rad) in each pose.
 const POSES := [0.0, 0.42, -0.42]
@@ -24,8 +26,8 @@ static var _importers := {}
 static var _detailed := {}
 
 
-## The baked meshes for `fish_class`, one per pose in POSES.
-static func meshes(fish_class: FishCharacter.FishClass) -> Array:
+## The baked meshes for `fish_class` (a class, or a ZombieLooks id), one per pose in POSES.
+static func meshes(fish_class: Variant) -> Array:
 	if not _baked.has(fish_class):
 		var baked := []
 		for importer: ImporterMesh in _importers_for(fish_class):
@@ -38,10 +40,10 @@ static func meshes(fish_class: FishCharacter.FishClass) -> Array:
 ## its coarsest LOD whose error is within `error` (a share of the part's size;
 ## 0: full detail). For a MultiMesh spread over a whole arena (the Horde),
 ## where Godot's own LOD, picked by the MultiMesh's bounds, never steps down.
-static func detail_meshes(fish_class: FishCharacter.FishClass, error: float) -> Array:
+static func detail_meshes(fish_class: Variant, error: float) -> Array:
 	if error <= 0.0:
 		return meshes(fish_class)
-	var key := "%d:%.4f" % [fish_class, error]
+	var key := "%s:%.4f" % [str(fish_class), error]
 	if not _detailed.has(key):
 		var built := []
 		for importer: ImporterMesh in _importers_for(fish_class):
@@ -50,13 +52,20 @@ static func detail_meshes(fish_class: FishCharacter.FishClass, error: float) -> 
 	return _detailed[key]
 
 
-static func _importers_for(fish_class: FishCharacter.FishClass) -> Array:
+static func _importers_for(fish_class: Variant) -> Array:
 	if not _importers.has(fish_class):
-		var model := FishModel.build(fish_class)
+		var model: FishModel
+		if fish_class is String:
+			model = ZombieLooks.build(fish_class, FishCharacter.FishClass.SKIRMISHER)
+		else:
+			model = FishModel.build(fish_class)
 		var baked := []
 		for swing: float in POSES:
 			if model.tail:
-				model.tail.rotation.y = swing
+				if model.fluke:
+					model.tail.rotation.x = swing
+				else:
+					model.tail.rotation.y = swing
 				model.apply_bend()
 			baked.append(_bake(model))
 		model.free()

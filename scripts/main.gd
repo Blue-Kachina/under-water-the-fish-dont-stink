@@ -654,6 +654,7 @@ func set_mode(mode: String, remember := true) -> void:
 	if mode == REPLAYS and not was_replays and current_mode in MODES:
 		_mode_before_replays = current_mode
 	current_mode = mode
+	GaitSettings.fish_sticks_now = mode in [FREE_PLAY, ONE_V_ONE]
 	if was_replays and mode != REPLAYS:
 		_leave_replays()
 	if current_environment != MODE_ENVIRONMENTS[mode]:

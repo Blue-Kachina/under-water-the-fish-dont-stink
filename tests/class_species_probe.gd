@@ -53,7 +53,8 @@ func _run() -> void:
 	old.set_value("playground", "skin_whale_shark", "basking")
 	check(FishCharacter.from_key(str(old.get_value("playground", "character"))) == FishCharacter.FishClass.BRAWLER, "character mantis: Brawlers")
 	check(MAIN_SCRIPT.saved_species(old, FishCharacter.FishClass.BRAWLER) == 1, "skin_mantis zebra: the Brawlers' species 1")
-	check(MAIN_SCRIPT.saved_species(old, FishCharacter.FishClass.BREACHER) == 3, "skin_whale_shark basking: the Breachers' species 3")
+	check(MAIN_SCRIPT.saved_species(old, FishCharacter.FishClass.BREACHER) == 0,
+			"skin_whale_shark basking (retired with the whale sharks): the Breachers' first species")
 	MAIN_SCRIPT.store_species(old, FishCharacter.FishClass.BRAWLER, 2)
 	check(old.get_value("playground", "species_brawler", "") == "purple_spot", "a new pick is stored as species_brawler")
 	check(MAIN_SCRIPT.saved_species(old, FishCharacter.FishClass.BRAWLER) == 2, "and the new key wins over the old")

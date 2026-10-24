@@ -200,6 +200,44 @@ static func shared() -> UnnaturalSettings:
 ## Rays aim where the player will be in glide_lead seconds, sweeping glide_sweep m either side.
 @export_range(0.0, 5.0, 0.05, "or_greater") var glide_lead := 1.2
 @export_range(0.0, 60.0, 0.5, "or_greater") var glide_sweep := 10.0
+## How many of the zombie kinds a stage plays (big_changes.md §8, D10): the
+## sardines, one that comes from minute 0, then others by chance (favouring
+## those the last stage didn't have). 0: every kind at once (more variety, more
+## draw calls).
+@export_range(0, 30, 1, "or_greater") var stage_kinds := 6
+## Drowned Koi close to school_ring m round their target and circle it for
+## school_circle s, then dart in for school_dart s (and circle again).
+@export_range(1.0, 40.0, 0.5, "or_greater") var school_ring := 9.0
+@export_range(0.0, 20.0, 0.1, "or_greater") var school_circle := 3.0
+@export_range(0.1, 10.0, 0.1, "or_greater") var school_dart := 1.2
+## Grave Jellies surge once every drift_pulse s, at up to drift_surge x their
+## speed, and coast between; their sting slows (frozen_slow) for jelly_sting_time s.
+@export_range(0.2, 10.0, 0.1, "or_greater") var drift_pulse := 1.6
+@export_range(1.0, 10.0, 0.1, "or_greater") var drift_surge := 2.6
+@export_range(0.0, 10.0, 0.1, "or_greater") var jelly_sting_time := 1.5
+## Rotten Mantises stop at zombie_punch_range m, wind up for
+## zombie_punch_telegraph s (a red glow), then punch everything within
+## zombie_punch_reach m and zombie_punch_cone degrees of their aim for their
+## contact damage, knocked back at zombie_punch_knock m/s; then they rest
+## zombie_punch_rest s.
+@export_range(0.5, 30.0, 0.25, "or_greater") var zombie_punch_range := 4.5
+@export_range(0.0, 5.0, 0.05, "or_greater") var zombie_punch_telegraph := 0.6
+@export_range(0.5, 30.0, 0.25, "or_greater") var zombie_punch_reach := 6.0
+@export_range(5.0, 180.0, 1.0) var zombie_punch_cone := 45.0
+@export_range(0.0, 60.0, 0.5, "or_greater") var zombie_punch_knock := 12.0
+@export_range(0.0, 10.0, 0.05, "or_greater") var zombie_punch_rest := 1.2
+## Cinder Lionfish drop a patch of fire every cinder_every s (cinder_radius m,
+## cinder_time s, cinder_damage a touch; weaker than a Burning elite's). At
+## most cinder_max patches out.
+@export_range(0.1, 10.0, 0.05, "or_greater") var cinder_every := 0.9
+@export_range(0.2, 10.0, 0.1, "or_greater") var cinder_radius := 1.2
+@export_range(0.2, 20.0, 0.1, "or_greater") var cinder_time := 2.0
+@export_range(0.0, 200.0, 1.0, "or_greater") var cinder_damage := 4.0
+@export_range(0, 500, 1, "or_greater") var cinder_max := 30
+## A Sour Sea Hare dying leaves a cloud zombie_haze_radius m round for
+## zombie_haze_time s that slows players in it (frozen_slow).
+@export_range(0.0, 20.0, 0.1, "or_greater") var zombie_haze_radius := 3.5
+@export_range(0.0, 20.0, 0.1, "or_greater") var zombie_haze_time := 3.0
 ## A boxfish bursts on death into a cloud burst_radius m round that hurts
 ## (burst_damage a touch, with i-frames) for burst_time s: don't batter one point blank.
 @export_range(0.0, 20.0, 0.1, "or_greater") var burst_radius := 3.0
@@ -389,7 +427,7 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 2.0, 0.05, "or_greater") var heavy_time := 0.35
 @export_range(0, 20, 1, "or_greater") var heavy_max := 3
 @export_range(1, 200, 1, "or_greater") var heavy_flings := 24
-## Baby Whale Shark, Escort: holding still (slower than chest_still_speed), it heals this
+## Breachers (baby whales), Escort: holding still (slower than chest_still_speed), it heals this
 ## many hp a second.
 @export_range(0.0, 100.0, 0.25, "or_greater") var escort_regen := 4.0
 ## Swordfish, Streamlined: swims this much faster (+share).
@@ -450,7 +488,7 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 2.0, 0.05, "or_greater") var recoil_time := 0.25
 @export_range(0.0, 2.0, 0.05, "or_greater") var recoil_iframes := 0.2
 @export_range(0.1, 60.0, 0.1, "or_greater") var recoil_cooldown := 2.0
-## Baby Whale Shark, Gulp: sucks every zombie within gulp_range m ahead of it
+## Breachers (baby whales), Gulp: sucks every zombie within gulp_range m ahead of it
 ## in (pulled at gulp_pull m/s), gulp_damage each.
 @export_range(1.0, 60.0, 0.5, "or_greater") var gulp_range := 14.0
 @export_range(0.0, 100.0, 0.5, "or_greater") var gulp_pull := 25.0
@@ -629,9 +667,10 @@ static func shared() -> UnnaturalSettings:
 @export_group("Final Bosses")
 ## Which final boss comes: the King of Herrings (a giant rotting oarfish), or
 ## one of its alternates, by alternate_boss_chance (each equally likely):
-## the Gulper Mother, the Whale Fall, the Lamprey Queen. Pick one to always get
-## it (testing). They share the Blood Leviathan group's hp, speed and timings.
-@export_enum("Random", "King of Herrings", "Gulper Mother", "Whale Fall", "Lamprey Queen") var final_boss := 0
+## the Gulper Mother, the Whale Fall, the Lamprey Queen, the Fallen Angel. Pick
+## one to always get it (testing). They share the Blood Leviathan group's hp,
+## speed and timings.
+@export_enum("Random", "King of Herrings", "Gulper Mother", "Whale Fall", "Lamprey Queen", "Fallen Angel") var final_boss := 0
 @export_range(0.0, 1.0, 0.05) var alternate_boss_chance := 0.4
 ## The Gulper and the Lamprey grab a player whose fish touches their mouth as
 ## they charge: held there, drained final_hold_damage every 0.75 s, until they
@@ -670,6 +709,35 @@ static func shared() -> UnnaturalSettings:
 @export_range(0, 50, 1, "or_greater") var brood_count := 6
 @export_range(1.0, 10.0, 0.1, "or_greater") var gill_bonus := 2.0
 @export_range(0.0, 200.0, 1.0, "or_greater") var blood_cloud_damage := 8.0
+## The Fallen Angel (a zombie sea angel, big_changes.md §3): angel_height m
+## from its horns to its tail tip, hovering upright on wingbeats every
+## angel_beat s. It locks on to a player, its head bursting into a crown of
+## six tentacles over angel_crown s (angel_fury_crown in fury), then tumbles in
+## for angel_flurry s, lashing angel_lashes times (angel_fury_lashes in fury)
+## at everything within angel_lash_reach m of its head and angel_lash_cone
+## degrees of the lash. A lash grabs a player (held as the Gulper holds) unless
+## they strode within angel_dodge s before it, and eats the zombies it catches
+## (each healing angel_eat_heal of its max hp). It rests angel_rest s between
+## flurries. Hits on its glowing head and gut do angel_weak times the damage,
+## angel_crown_weak times more while the crown's open. From two thirds it
+## sheds angel_butterflies Sea Butterflies each time it would spit, and turns
+## its flurries on them when they're near (angel_butterfly_heal each).
+@export_range(10.0, 120.0, 1.0, "or_greater") var angel_height := 40.0
+@export_range(0.2, 5.0, 0.05, "or_greater") var angel_beat := 1.1
+@export_range(0.1, 5.0, 0.05, "or_greater") var angel_crown := 1.2
+@export_range(0.1, 5.0, 0.05, "or_greater") var angel_fury_crown := 0.8
+@export_range(0.5, 6.0, 0.1, "or_greater") var angel_flurry := 2.0
+@export_range(1, 10, 1, "or_greater") var angel_lashes := 3
+@export_range(1, 10, 1, "or_greater") var angel_fury_lashes := 4
+@export_range(2.0, 40.0, 0.5, "or_greater") var angel_lash_reach := 12.0
+@export_range(10.0, 180.0, 1.0) var angel_lash_cone := 55.0
+@export_range(0.0, 2.0, 0.05, "or_greater") var angel_dodge := 0.4
+@export_range(0.0, 0.05, 0.0005, "or_greater") var angel_eat_heal := 0.002
+@export_range(0.0, 20.0, 0.25, "or_greater") var angel_rest := 2.5
+@export_range(1.0, 10.0, 0.1, "or_greater") var angel_weak := 2.0
+@export_range(1.0, 5.0, 0.05, "or_greater") var angel_crown_weak := 1.5
+@export_range(0, 100, 1, "or_greater") var angel_butterflies := 14
+@export_range(0.0, 0.05, 0.0005, "or_greater") var angel_butterfly_heal := 0.004
 
 @export_group("Levels")
 ## XP to the next level: xp_base * level ^ xp_curve.
@@ -899,7 +967,7 @@ static func shared() -> UnnaturalSettings:
 ## it (a new pick swaps it, None sends it away), and on R. Its hits show in the
 ## DPS readout. Beaten, it comes back after tank_boss_respawn s (0: not until
 ## R); no whirlpool or chests there.
-@export_enum("None", "Drowned Shark", "King of Herrings", "Gulper Mother", "Whale Fall", "Lamprey Queen") var tank_boss := 0
+@export_enum("None", "Drowned Shark", "King of Herrings", "Gulper Mother", "Whale Fall", "Lamprey Queen", "Fallen Angel") var tank_boss := 0
 ## Its hp (0: its own, shark_hp or leviathan_hp).
 @export_range(0.0, 1000000.0, 100.0, "or_greater") var tank_boss_hp := 0.0
 ## Seconds after it's beaten before it comes back (0: not until R).

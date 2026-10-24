@@ -119,15 +119,16 @@ A **class** is a group of fish that play the same way; its **species** change on
 | **Charmers** (CHARMER, Hybrid) | Butterfly koi: Kohaku, Showa, Yamabuki Ogon, Asagi | Bubble Volley | Luck +0.1 | **Graceful:** +0.5 s of i-frames after every hit (1.2 s total) | **Leap:** leaps up at 12 m/s; at the top it splashes down for 30 dmg within 7 m. Cooldown 2.5 s |
 | **Bulwarks** (BULWARK, Merc) | Boxfish: Yellow Boxfish, Longhorn Cowfish, Spotted Boxfish, Scrawled Cowfish | Spine Burst | Armour +1 | **Armoured:** takes 70% of damage, swims at 88% speed | **Brace:** for 2.5 s takes 25% of damage, swims at 70% speed. Cooldown 8.0 s |
 | **Scorchers** (SCORCHER, Octane) | Lionfish: Red, Clearfin, Fuzzy Dwarf, Spotfin | Greek Fire Trail | Duration +10% | **Wake:** Greek Fire burns up to +60% harder the nearer it swims to battering speed | **Flare Dash:** dashes at 30 m/s for 0.35 s; 60 dmg to everything within 4 m on the way. Cooldown 3.5 s |
-| **Drifters** (DRIFTER, Hybrid) | Jellies: Moon Jelly, Pacific Sea Nettle, Lion's Mane, Purple-striped Jelly | Jellyfish Halo | Quantity +0.33 (`signature_quantity`; the floor counts) | **Many Arms:** +1 jelly in its Halo | **Go Quiet:** switches its stink off for up to 8 s: nothing fires and zombies lose track of it. Being hurt ends it, or press again to end it early. Cooldown 6.0 s |
+| **Drifters** (DRIFTER, Hybrid) | Jellies: Moon Jelly, Pacific Sea Nettle, Lion's Mane, Purple-striped Jelly (tilt and pulse: upright at rest, leaning bell-first as they swim) | Jellyfish Halo | Quantity +0.33 (`signature_quantity`; the floor counts) | **Many Arms:** +1 jelly in its Halo | **Go Quiet:** switches its stink off for up to 8 s: nothing fires and zombies lose track of it. Being hurt ends it, or press again to end it early. Cooldown 6.0 s |
 | **Brawlers** (BRAWLER, Dominus) | Mantis shrimp: Peacock, Zebra, Purple-spot, Pink-eared | Cavitation Punch | Knockback +15% | **Heavy Hitter:** a zombie its punches knock back flies as a missile for 0.35 s; each other zombie it hits (up to 3) takes 50% of the punch, knocked on. At most 24 missiles at once | **Recoil Dash:** throws a full Cavitation Punch one way and is thrown the other at 20 m/s, no drag for 0.25 s, untouchable 0.2 s. It goes the way the stick leans, else backwards (so the punch goes ahead). Cooldown 2.0 s |
-| **Breachers** (BREACHER, Plank) | Baby whale sharks: Whale Shark, Deep Charcoal, Juvenile, Basking Shark | Remora Buddy | Pearl Chance +15% | **Escort:** heals 4 HP/s while holding still (under 3 m/s) | **Gulp:** pulls in every zombie in a 14 m cone ahead (25 m/s) and hits each for 25. Cooldown 5.0 s |
+| **Breachers** (BREACHER, Plank) | Baby whales: Humpback Calf, Orca Calf, Beluga Calf, Sperm Whale Calf, Blue Whale Calf (up-and-down fluke strokes) | Remora Buddy | Pearl Chance +15% | **Escort:** heals 4 HP/s while holding still (under 3 m/s) | **Gulp:** pulls in every zombie in a 14 m cone ahead (25 m/s) and hits each for 25. Cooldown 5.0 s |
 | **Alchemists** (ALCHEMIST, Merc) | Sea hares (California, Spotted, Ragged) and a nudibranch (Tinctoria) | Purple Haze | Regen +0.4 HP/s | **Unpalatable:** a zombie that touches it is coated for 2 s: slowed 30%, and takes +20% from Purple Haze | **Flutter:** 3 big flaps 0.25 s apart, each a 9 m/s push forward and up (60% up), carrying it up over the pack; a Purple Haze cloud bursts where it took off. Cooldown 4.0 s |
 
 - Every class starts with its own weapon (a `FishAttack`, `FishAttack.FOR_CLASS`) in slot 1, as the `attack` weapon.
 - Species: each class has several real species or colour morphs (`FishCharacter.SPECIES`). They change only the look, never stats.
 - The RL hitbox is the Rocket League box the class uses (RL replays name it; later classes share one of the first six). Saves and clips from before classes still load: the old keys (`octane`, `mantis`, `whale_shark`...) are aliases.
 - The twist switch is `UnnaturalSettings.twists`. Off, every class swims the same.
+- Gaits (`GaitSettings`, the GAITS tuning section) change how a class's strides move and look, not the controls. Breachers: vertical fluke strokes (any sweep counts; a sideways one alternates up and down), same pace as the Gliders. Drifters: each stride is a short squeeze along the bell (stroke time ×0.8, power ×0.8), then a draggy coast (×1.8 drag, sinking 2 m/s²); the bell leans up to 75° toward the nose as it swims. Alchemists: flap. `in_fish_sticks` off gives every class the plain fish gait in Fish Sticks.
 
 ---
 
@@ -356,7 +357,8 @@ Drops are timed as well as rolled: after a drop of a kind, that kind waits its "
 | **The Gulper Mother** | A 92 m gulper eel: a pouch of a mouth on thin jaws, needle teeth, a stretched glowing belly showing the zombies it swallowed, a whip tail with a glowing lure | Every 7 s gulps the zombies within 20 m of its mouth (up to 40), each healing 0.3% of its hp; spits bile and vomits 12 zombies; in fury, swallows a player it reaches |
 | **The Whale Fall** | A 45 m dead blue whale on its side, chest torn open to the ribs, with 5 giant hagfish (22 m) coming out of its eye sockets, chest, a wound and its blowhole | Each hagfish lunges (3.5 s) at a player within reach; spitting, they spray slime (5 a touch, slows); they hold 60% of its hp, each dying on its own; the carcass takes 25% damage while any lives; in fury they tear loose and hunt |
 | **The Lamprey Queen** | An 88 m sea lamprey: a disc of hooked teeth in five rings round a rasping tongue, seven gill holes a side, her brood clamped to her flanks | Every 8 s one of her brood drops off as 6 zombies; spitting, her gills pulse out blood clouds (8 a touch); her gills take 2× damage; in fury, latches onto a player it reaches |
-| Grabbed (Gulper, Lamprey) | | Held at the mouth for up to 3 s, drained 10 every 0.75 s; 3 strides break free |
+| **The Fallen Angel** | A 40 m zombie sea angel hanging upright: a glass-clear hooded body with its orange head and gut glowing through, two torn wings at its shoulders, two horns, a long tail with an orange tip, and a crown of six tentacles folded in its head | Hovers 19 m off its prey on wingbeats (1.1 s). Opens its crown over 1.2 s (0.8 s in fury; its lane shows), then tumbles in for 2 s, lashing 3 times (4 in fury) at everything within 12 m and 55° of the lash: a lash grabs a player unless they strode within 0.4 s before it, and eats the zombies it catches (+0.2% hp each). Rests 2.5 s. Its head and gut take 2× damage (3× with the crown open). From 2/3 hp it sheds 14 Sea Butterflies every 8 s instead of spitting, and when hurt half its flurries go for them (+0.4% hp each). In fury its lashes take turns between the two nearest players |
+| Grabbed (Gulper, Lamprey, Fallen Angel) | | Held at the mouth (the Angel: in its crown) for up to 3 s, drained 10 every 0.75 s; 3 strides break free |
 
 ### Shrines (P5, `shrine.gd`): 4 per stage, one of each, Jump over one to use it
 
@@ -366,6 +368,24 @@ Drops are timed as well as rolled: after a drop of a kind, that kind waits its "
 | **Chance** | Pay 6 pearls (growing as chests do, ×1.5 a try) for a 50% chance at an item (a chest's pick). 3 tries per player |
 | **Deep** | More elites for the rest of the stage (×2 chance), and every boss drops one more chest |
 | **Pearls** | Every pearl out flies to the nearest player, and 10 more spill out |
+
+### Zombies (`enemy_kind.gd`): one per class, plus the sardines. Each stage plays a rotation of `stage_kinds` (6) of them: the sardines, one from minute 0, then others by chance (favouring ones the last stage didn't have). 0 plays them all at once
+
+| Zombie (id) | Model | Size | HP | Speed | Touch | XP | From minute | Behaviour |
+|---|---|---|---|---|---|---|---|---|
+| Rotten Sardine (`sardine`) | its own (sardine) | 0.55 | 8 | 7.0 | 6 | 1 | 0 | Swarm: weaves in. In every rotation |
+| Ghoul Clownfish (`clownfish`) | Skirmishers | 1.0 | 22 | 5.0 | 10 | 2 | 0 | Chase |
+| Bloated Boxfish (`boxfish`) | Bulwarks | 1.6 | 90 | 3.0 | 18 | 6 | 2 | Tank: bursts into a 3 m cloud on death |
+| Lunging Swordfish (`swordfish`) | Lancers | 1.2 | 45 | 6.5 | 16 | 5 | 4 | Lunge: 0.7 s wind-up, 24 m/s |
+| Grave Ray (`ray`) | Gliders | 1.4 | 55 | 7.5 | 14 | 5 | 6 | Glide: cuts across where you're going |
+| Drowned Koi (`koi`) | Charmers | 1.0 | 28 | 6.5 | 10 | 3 | 0 | School: closes to a 9 m ring, circles 3 s, darts in 1.2 s |
+| Cinder Lionfish (`lionfish`) | Scorchers | 1.0 | 35 | 5.5 | 12 | 4 | 3 | Chase, dropping fire every 0.9 s (1.2 m, 2 s, 4 dmg; at most 30 out) |
+| Grave Jelly (`jelly`) | Drifters | 1.1 | 40 | 3.5 | 8 | 3 | 0 | Drift: surges to 2.6× speed every 1.6 s; its sting slows you (`frozen_slow`) for 1.5 s |
+| Rotten Mantis (`mantis`) | Brawlers | 1.0 | 50 | 5.5 | 18 | 5 | 4 | Punch: stops at 4.5 m, 0.6 s wind-up, punches 6 m ahead (45° cone) for its touch damage, knocks you back 12 m/s, rests 1.2 s |
+| Bloated Whale Calf (`whale`) | Breachers | 1.5 | 120 | 2.8 | 18 | 8 | 5 | Tank that bobs; on death bursts (as the boxfish) and spills 4 sardines |
+| Sour Sea Hare (`sea_hare`) | Alchemists | 1.0 | 40 | 4.0 | 10 | 4 | 2 | Chase; dying leaves a 3.5 m cloud for 3 s that slows you |
+| Ghoul Shark (`shark`) | Hunters | 1.2 | 60 | 7.5 | 18 | 6 | 7 | Lunge: wind-up ×0.6, lunge speed ×1.3 |
+| Sea Butterfly (`butterfly`) | its own (a shelled sea snail) | 0.45 | 6 | 6.5 | 4 | 0.5 | — | Swarm. Only the Fallen Angel sheds them (never in a rotation) |
 
 ### Elites: 2.2× the size of their kind, 5× hp, 2× contact damage. Elite modifiers (P5): 60% of elites have one, and drop chests ×1.5 more often
 

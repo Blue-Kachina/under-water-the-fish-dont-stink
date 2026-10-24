@@ -39,6 +39,7 @@ func _run() -> void:
 	settings.card_choices = 0  # level-ups without cards here (levels_probe has them)
 	settings.enemy_speed_scale = 0.0  # zombies hold still unless a test wants them moving
 	settings.bite_damage = 30.0  # one bite kills a clownfish (22 hp) in the checks below
+	fish.character = FishCharacter.FishClass.HUNTER  # the Shark, whatever was picked last (an Alchemist's Regen skews the hp checks)
 	main.set_mode(main.UNNATURAL)
 	await _ticks(3)
 	check(main._match_card != null, "Unnatural waits on its card")

@@ -15,7 +15,9 @@ extends RefCounted
 ##   ruffled, twisting membrane ribbons (jelly_strand.gdshader).
 ## - Tentacles: thin tubes off the margin, evenly, in its notches or in
 ##   clusters (jelly_strand.gdshader).
-## The bell pulses with the swim; arms and tentacles sway in waves and bend
+## The bell pulses with the swim (or with each stride, Gait.Visual.BELL_PULSE,
+## when the whole model also leans from upright as it swims, FishModel.bell_lean);
+## arms and tentacles sway in waves and bend
 ## round after the tail pivot's swing (Sway feeds them the swing each frame).
 ## The fin pivots are empty: a jelly has no fins.
 ##
@@ -167,6 +169,11 @@ static func build(m: FishModel) -> void:
 		m.add_child(tentacles)
 		sway.materials.append(tentacle_material)
 	m.add_child(sway)
+	# Every part pulses with the bell: with each stride under Gait.Visual.BELL_PULSE.
+	for node in m.find_children("*", "MeshInstance3D", true, false):
+		var material := (node as MeshInstance3D).material_override as ShaderMaterial
+		if material and material.shader in [BELL, BELL_INNER, ORGAN, STRAND] and not m._bell_pulses.has(material):
+			m._bell_pulses.append(material)
 
 
 ## The bell's measurements (m): its rim's half width `rx` and half height `ry`,

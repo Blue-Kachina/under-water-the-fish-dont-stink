@@ -2,7 +2,7 @@ class_name BloodLeviathan
 extends Boss
 ## The final boss (planning_unnatural.md §3, D5), and the base of every final
 ## boss: by default the King of Herrings, a giant oarfish weeks dead; its
-## alternates (GulperBoss, WhaleFallBoss, LampreyBoss) extend it. Beating it
+## alternates (GulperBoss, WhaleFallBoss, LampreyBoss, FallenAngelBoss) extend it. Beating it
 ## opens the whirlpool. Its body is one seamless mesh bent along the way it
 ## swam (SpineRig, spine_bend.gdshaderinc), with leviathan_segments proxies
 ## along it. Its phases, by the hp it has left:

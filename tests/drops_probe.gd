@@ -54,6 +54,7 @@ func _run() -> void:
 	settings.lightning_chance = 0.0
 	settings.difficulty_per_minute = 0.0
 	settings.card_choices = 0
+	fish.character = FishCharacter.FishClass.HUNTER  # whatever was picked last (an Alchemist's Regen skews the hp checks)
 	main.set_mode(main.UNNATURAL)
 	await _ticks(3)
 	main._match_card.play_requested.emit()

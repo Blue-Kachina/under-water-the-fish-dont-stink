@@ -76,11 +76,11 @@ func _run() -> void:
 	check(all_default, "every class has a gait, all on today's defaults but those given their own")
 	var flap := settings.for_class(FishCharacter.FishClass.ALCHEMIST)
 	check(flap.stroke_axis == Gait.StrokeAxis.FLAP and flap.visual == Gait.Visual.FLAP, "the Alchemists flap")
-	fish.set_look(FishCharacter.FishClass.DRIFTER, 0)
-	check(fish.gait == settings.for_class(FishCharacter.FishClass.DRIFTER), "a fish holds its class's gait")
-	settings.set("drifter_coast_drag", 3.0)
-	check(is_equal_approx(fish.gait.coast_drag, 3.0) and is_equal_approx(settings.get("drifter_coast_drag"), 3.0),
-			"setting drifter_coast_drag reaches the drifter's gait")
+	fish.set_look(FishCharacter.FishClass.LANCER, 0)
+	check(fish.gait == settings.for_class(FishCharacter.FishClass.LANCER), "a fish holds its class's gait")
+	settings.set("lancer_coast_drag", 3.0)
+	check(is_equal_approx(fish.gait.coast_drag, 3.0) and is_equal_approx(settings.get("lancer_coast_drag"), 3.0),
+			"setting lancer_coast_drag reaches the lancer's gait")
 	check(is_equal_approx(settings.for_class(FishCharacter.FishClass.SKIRMISHER).coast_drag, 1.0), "and no other class's")
 	var shown := 0
 	var groups := 0
@@ -93,11 +93,11 @@ func _run() -> void:
 	check(shown == GaitSettings.gait_properties().size() and shown >= 4, "each class shows the gait's options (%d)" % shown)
 	check(panel.option_range("gaits/lancer_stroke_time").get("allow_greater", false), "the panel has a GAITS section (lancer_stroke_time)")
 	check(not panel.option_range("gaits/lancer_visual").has("min"), "single-value enums aren't shown yet")
-	check(panel.tuning_snapshot().get("gaits", {}).get("drifter_coast_drag", 0.0) == 3.0, "presets save the gaits")
+	check(panel.tuning_snapshot().get("gaits", {}).get("lancer_coast_drag", 0.0) == 3.0, "presets save the gaits")
 	check("gaits" in CoopSession.TUNING_SECTIONS, "the host's gaits go to guests")
-	check(SettingDocs.DOCS.has("gaits/drifter_coast_drag"), "the options have descriptions")
-	panel.restore_tuning({"gaits": {"drifter_coast_drag": 1.0}})
-	check(settings.for_class(FishCharacter.FishClass.DRIFTER).is_default(), "restoring puts it back")
+	check(SettingDocs.DOCS.has("gaits/lancer_coast_drag"), "the options have descriptions")
+	panel.restore_tuning({"gaits": {"lancer_coast_drag": 1.0}})
+	check(settings.for_class(FishCharacter.FishClass.LANCER).is_default(), "restoring puts it back")
 
 	print("what each number does (Skirmishers):")
 	var gait := settings.for_class(FishCharacter.FishClass.SKIRMISHER)
@@ -125,6 +125,79 @@ func _run() -> void:
 	gait.coast_buoyancy = 0.0
 	check(sunk.y < coasted.y - 3.0, "coast buoyancy -8 sinks it between strides (%.1f vs %.1f m/s up)" % [sunk.y, coasted.y])
 	check(gait.is_default(), "all back to defaults")
+
+	print("Breachers (vertical strokes):")
+	var whale := settings.for_class(FishCharacter.FishClass.BREACHER)
+	check(whale.stroke_axis == Gait.StrokeAxis.VERTICAL and whale.visual == Gait.Visual.FLUKE, "the Breachers stroke up and down")
+	var glider_run := await _trajectory(FishCharacter.FishClass.GLIDER)
+	var whale_run := await _trajectory(FishCharacter.FishClass.BREACHER)
+	var glider_far := _end(glider_run, STRIDE_TICKS).z
+	var whale_far := _end(whale_run, STRIDE_TICKS).z
+	check(absf(whale_far / glider_far - 1.0) <= 0.05, "a whale gets as far as the Gliders on the same hitbox (%.2f vs %.2f m, within 5%%)" % [whale_far, glider_far])
+	var bob := _bob(whale_run)
+	var glider_bob := _bob(glider_run)
+	check(bob > 0.01 and bob < 0.6, "it rises and falls with its strokes (%.3f m about its line; Gliders %.3f m)" % [bob, glider_bob])
+	fish.set_look(FishCharacter.FishClass.BREACHER, 0)
+	var swings := []
+	input.clear()
+	for tick in 120:
+		input.forward = 1.0
+		var peak_ticks := maxi(roundi(fish.swishy.peak_time() * Engine.physics_ticks_per_second), 1)
+		input.stick = Vector2.RIGHT * (1.0 if floori(float(tick) / peak_ticks) % 2 == 0 else -1.0)
+		await get_tree().physics_frame
+		await get_tree().process_frame
+		swings.append(fish._tail.rotation.x)
+	input.clear()
+	check(swings.max() > 0.2 and swings.min() < -0.2, "sideways sweeps beat the flukes up and down (%.2f..%.2f rad)" % [swings.min(), swings.max()])
+	GaitSettings.fish_sticks_now = true
+	settings.in_fish_sticks = false
+	check(fish.gait.is_default(), "with gaits off in Fish Sticks, a whale swims the plain way there")
+	GaitSettings.fish_sticks_now = false
+	check(fish.gait == whale, "and keeps its own gait elsewhere")
+	settings.in_fish_sticks = true
+	check(panel.tuning_snapshot().get("gaits", {}).has("in_fish_sticks"), "the Fish Sticks switch is in the GAITS section and presets")
+
+	print("Drifters (tilt and pulse):")
+	var jelly := settings.for_class(FishCharacter.FishClass.DRIFTER)
+	check(jelly.push_axis == Gait.PushAxis.BELL and jelly.visual == Gait.Visual.BELL_PULSE and jelly.stroke_axis == Gait.StrokeAxis.RADIAL,
+			"the Drifters push along the bell and pulse")
+	var baseline_jelly: Array = baseline[str(FishCharacter.FishClass.DRIFTER)]
+	var then_far := _end(baseline_jelly, STRIDE_TICKS).z
+	var jelly_run := await _trajectory(FishCharacter.FishClass.DRIFTER)
+	var now_far := _end(jelly_run, STRIDE_TICKS).z
+	check(now_far > then_far * 0.8 and now_far < then_far * 1.2, "a jelly still gets about as far (%.2f m, was %.2f m)" % [now_far, then_far])
+	var leaned := rad_to_deg(fish.bell_lean)
+	var coast_sink := _coast(jelly_run).y
+	check(coast_sink < -0.3, "it sinks slowly between pulses (%.2f m/s)" % coast_sink)
+	input.clear()
+	fish.set_look(FishCharacter.FishClass.DRIFTER, 0)
+	fish.request_reset()
+	for i in 20:
+		await get_tree().physics_frame
+	input.forward = 1.0
+	for i in 150:
+		await get_tree().physics_frame
+	leaned = rad_to_deg(fish.bell_lean)
+	await get_tree().process_frame
+	var model_tilt := rad_to_deg(fish._visual.rotation.x)
+	check(absf(leaned - jelly.bell_lean_max) < 3.0 and absf(model_tilt - (90.0 - leaned)) < 3.0,
+			"swimming, the bell leans %.0f° toward the nose and the model with it (%.0f° up)" % [leaned, model_tilt])
+	input.clear()
+	for i in 600:
+		await get_tree().physics_frame
+	await get_tree().process_frame
+	check(rad_to_deg(fish.bell_lean) < 10.0 and rad_to_deg(fish._visual.rotation.x) > 80.0,
+			"stopped, it hangs upright (%.0f° lean)" % rad_to_deg(fish.bell_lean))
+	var up_push: Vector3 = fish.swishy.push_direction(Basis.IDENTITY)
+	check(up_push.y > 0.95, "an upright bell pulses upward (%.2f up)" % up_push.y)
+	GaitSettings.fish_sticks_now = true
+	settings.in_fish_sticks = false
+	for i in 5:
+		await get_tree().physics_frame
+	await get_tree().process_frame
+	check(fish.bell_lean == 0.0 and is_zero_approx(fish._visual.rotation.x), "gaits off in Fish Sticks: the jelly lies nose-first as before")
+	GaitSettings.fish_sticks_now = false
+	settings.in_fish_sticks = true
 
 	print("camera:")
 	var camera: Camera3D = main.get_node("FollowCamera")
@@ -178,6 +251,21 @@ func _trajectory(fish_class: int) -> Array:
 func _end(samples: Array, tick: int) -> Vector3:
 	var row: Array = samples[floori(float(tick) / SAMPLE_EVERY) - 1]
 	return Vector3(0.0, 0.0, Vector3(row[0], row[1], row[2]).length())
+
+
+## How far it strays up and down about a straight line through its stride
+## samples (m, root mean square): the bob a vertical stroke adds.
+func _bob(samples: Array) -> float:
+	var count := floori(float(STRIDE_TICKS) / SAMPLE_EVERY)
+	var first: Array = samples[2]
+	var last: Array = samples[count - 1]
+	var total := 0.0
+	for i in range(2, count):
+		var row: Array = samples[i]
+		var t := float(i - 2) / (count - 3)
+		var line := lerpf(float(first[1]), float(last[1]), t)
+		total += pow(float(row[1]) - line, 2.0)
+	return sqrt(total / (count - 2))
 
 
 ## The coast: Vector3(speed at its end, vertical speed at its end, 0).

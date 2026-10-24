@@ -39,6 +39,10 @@ var squash_strength := 0.0
 var grounded := false
 var stride_swing := Vector2.ZERO
 var stride_power := 0.0
+## Whether its tail beats up and down (a whale's flukes, Gait.Visual.FLUKE)
+## rather than side to side: what idle animations without a gait (replays,
+## schools) swing.
+var fluke := false
 
 var _size := Vector3.ONE  # the hitbox (m): width, height, length
 var _body_material: StandardMaterial3D
@@ -110,6 +114,12 @@ var _flaps: Array[Node3D] = []
 ## Materials whose body wave grows with each stride (sea_hare_skin.gdshader's
 ## `stride`), set by _swim.
 var _body_waves: Array[ShaderMaterial] = []
+## Gait.Visual.BELL_PULSE (the jellies): how far the bell leans from upright
+## toward the nose (rad, FishController.bell_lean), or -1 when it doesn't (the
+## model lies nose-first as built). Set before react(), which tilts the model
+## with it; the jelly's shaders in `_bell_pulses` squeeze with each stride.
+var bell_lean := -1.0
+var _bell_pulses: Array[ShaderMaterial] = []
 
 
 static func build(character: FishCharacter.FishClass, species := 0) -> FishModel:
@@ -138,7 +148,7 @@ static func build(character: FishCharacter.FishClass, species := 0) -> FishModel
 		FishCharacter.FishClass.BRAWLER:
 			MantisModel.build(model)
 		FishCharacter.FishClass.BREACHER:
-			WhaleSharkModel.build(model)
+			WhaleModel.build(model)
 		FishCharacter.FishClass.ALCHEMIST:
 			SeaHareModel.build(model)
 	return model
@@ -152,6 +162,9 @@ static func build(character: FishCharacter.FishClass, species := 0) -> FishModel
 ## (the bottom, when it isn't moving up or down, so it squashes onto the floor).
 func react(delta: float, velocity: Vector3) -> void:
 	apply_bend()
+	if not _bell_pulses.is_empty():
+		# Built bell-first along -Z: upright is a quarter turn nose-up.
+		rotation.x = PI / 2.0 - bell_lean if bell_lean >= 0.0 else 0.0
 	if not _waving.is_empty():
 		_swim(delta, velocity)
 	if squash == null or delta <= 0.0:
@@ -282,6 +295,8 @@ func _swim(delta: float, velocity: Vector3) -> void:
 		material.set_shader_parameter("effort", effort)
 	for material in _body_waves:
 		material.set_shader_parameter("stride", stride_power)
+	for material in _bell_pulses:
+		material.set_shader_parameter("stride_pulse", stride_power if bell_lean >= 0.0 else -1.0)
 	_follow_flaps()
 	if _skin == null or delta <= 0.0:
 		return

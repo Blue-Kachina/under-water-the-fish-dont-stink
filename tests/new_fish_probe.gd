@@ -116,7 +116,7 @@ func _run() -> void:
 	await _ticks(4)
 	var shark := run.twist_of(fish)
 	var before_gap := horde.enemy_position(gulped).distance_to(fish.global_position)
-	check(shark.mobility() and shark.gulps == 1, "Baby Whale Shark, Gulp goes off")
+	check(shark.mobility() and shark.gulps == 1, "Breachers (baby whales), Gulp goes off")
 	await _ticks(20)
 	check(run.stats_of(fish).by_source.get("gulp", 0.0) > 0.0, "and hurts the zombie ahead")
 	var health := run.health_of(fish)
