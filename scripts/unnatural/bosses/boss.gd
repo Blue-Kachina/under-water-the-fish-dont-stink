@@ -75,6 +75,12 @@ func contact() -> float:
 	return 0.0
 
 
+## The attack it's winding up now, for its warning lane (Telegraphs): {from,
+## dir (unit), length (m), width (m), progress (0 to 1)}, or {} for none.
+func telegraph() -> Dictionary:
+	return {}
+
+
 func share() -> float:
 	return clampf(hp / maxf(max_hp, 1.0), 0.0, 1.0)
 

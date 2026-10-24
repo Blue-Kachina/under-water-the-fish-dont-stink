@@ -33,7 +33,7 @@ func on_tick(delta: float) -> void:
 func dash(from: Vector3, through: Vector3) -> void:
 	var way := (through - from).normalized() if through.distance_squared_to(from) > 0.0001 else -fish.global_basis.z
 	var to := from + way * settings.ghost_length
-	var width := settings.ghost_width * area_scale()
+	var width := settings.ghost_width * size_scale()
 	var middle := (from + to) * 0.5
 	for i in run.horde.query_sphere(middle, settings.ghost_length * 0.5 + width):
 		var at := run.horde.enemy_position(i)

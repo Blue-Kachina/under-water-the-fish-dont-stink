@@ -100,7 +100,7 @@ func _run() -> void:
 	powers.remora_stacks = 1
 	horde.clear()
 	await _ticks(2)
-	var remora: RemoraBuddy = run.powerups_of(fish).held["remora_buddy"]
+	var remora := run.powerups_of(fish).weapon("attack_remora_buddy") as RemoraBuddy
 	horde.spawn(2, fish.global_position + Vector3(2, 0, -4))
 	await _seconds(2.0)
 	check(remora.nips >= 1 and _dealt("remora_buddy") > 0.0, "it nips the zombie near (%d nips)" % remora.nips)
@@ -160,7 +160,7 @@ func _run() -> void:
 	powers.jelly_stacks = 2
 	horde.clear()
 	await _ticks(2)
-	var halo: JellyfishHalo = run.powerups_of(fish).held["jellyfish_halo"]
+	var halo := run.powerups_of(fish).weapon("attack_jellyfish_halo") as JellyfishHalo
 	var halo_node := run.find_child("JellyHalo", false, false)
 	check(halo.count() == 2 and halo_node != null and halo_node.get_child_count() == 2, "x2: two jellies orbiting")
 	var before := halo.jelly_position(0)
@@ -199,7 +199,7 @@ func _run() -> void:
 	powers.charge_interval = 0.5
 	horde.clear()
 	await _ticks(2)
-	var charges: DepthCharges = run.powerups_of(fish).held["depth_charges"]
+	var charges := run.powerups_of(fish).weapon("attack_depth_charges") as DepthCharges
 	await _seconds(0.7)
 	check(charges.dropped >= 1 and charges.mines.size() >= 1, "mines drop behind the fish (%d)" % charges.dropped)
 	var behind := (charges.mines[0].global_position - fish.global_position).dot(fish.global_basis.z) > 0.0 if not charges.mines.is_empty() else false
@@ -211,10 +211,11 @@ func _run() -> void:
 	var hp_v := horde.enemy_hp(victim)
 	await _ticks(4)
 	check(charges.blown >= 1 and horde.enemy_hp(victim) < hp_v, "a zombie near an armed one sets it off, and it's hurt")
+	var dropped_mines := charges.mines.duplicate()
 	powers.charge_stacks = 0
 	powers.charge_interval = 4.0
 	await _ticks(2)
-	check(charges.mines.is_empty(), "without it, the mines go")
+	check(dropped_mines.all(func(mine: Variant) -> bool: return not is_instance_valid(mine)), "without it, the mines go")
 
 	print("anglerfish lure:")
 	powers.lure_stacks = 1
@@ -244,7 +245,7 @@ func _run() -> void:
 			"no tomes: its life, blast and interval are the base ones")
 	block.add("duration", 0.5)
 	block.add("attack_speed", 0.25)
-	block.add("area", 0.5)
+	block.add("size", 0.5)
 	check(is_equal_approx(lure.life(), powers.lure_life * 1.5), "Tome of Ages: a decoy lasts 50%% longer (%.1f s)" % lure.life())
 	check(is_equal_approx(lure.interval(), powers.lure_interval / 1.25), "Tome of Tides: it's dropped sooner (%.1f s)" % lure.interval())
 	check(is_equal_approx(lure.blast(), powers.lure_blast * 1.5), "Tome of the Reef: the burst is wider (%.1f m)" % lure.blast())

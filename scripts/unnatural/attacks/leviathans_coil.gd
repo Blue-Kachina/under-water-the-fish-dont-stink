@@ -1,6 +1,6 @@
 class_name LeviathansCoil
-extends Powerup
-## Leviathan's Coil (planning_unnatural.md §7b, D13), a boss weapon (the Blood
+extends FishAttack
+## Leviathan's Coil (planning_unnatural.md §7b, D13), a steady boss weapon (FishAttack; the Blood
 ## Leviathan's): a trail of glowing coils follows the fish, like the
 ## Leviathan's own body (count(): coil_segments, + the count facet,
 ## coil_spacing m apart along the way it swam). Every tick() s each hurts the
@@ -38,20 +38,29 @@ var _tail_left := TAIL_EVERY
 var _loop := 0
 
 
+## It reads its own facets, and has no attacks to count (FishAttack).
+func own_facets() -> bool:
+	return true
+
+
+func counts_uses() -> bool:
+	return false
+
+
 func count() -> int:
-	return (settings.coil_segments + facet_count("count")) * (LONG_SCALE if milestone(4) else 1)
+	return (powers.coil_segments + facet_count("count")) * (LONG_SCALE if milestone(4) else 1)
 
 
 func damage() -> float:
-	return settings.coil_damage * (1.0 + facet("damage"))
+	return powers.coil_damage * (1.0 + facet("damage"))
 
 
 func size() -> float:
-	return settings.coil_radius * (1.0 + facet("size")) * area_scale()
+	return powers.coil_radius * (1.0 + facet("size")) * size_scale
 
 
 func tick() -> float:
-	return settings.coil_tick / (1.0 + facet("rate")) / rate_scale()
+	return powers.coil_tick / (1.0 + facet("rate")) / attack_speed
 
 
 func on_removed() -> void:
@@ -64,13 +73,13 @@ func on_removed() -> void:
 	_drawn.clear()
 
 
-func on_tick(delta: float) -> void:
+func _work(delta: float) -> void:
 	var at := fish.global_position
 	if _loop == 0:
 		_loop = Sfx.start_loop("pw/coil_loop", fish)
 	if trail.is_empty():
 		trail.append(at)
-	elif at.distance_to(trail[0]) >= settings.coil_spacing:
+	elif at.distance_to(trail[0]) >= powers.coil_spacing:
 		trail.insert(0, at)
 	if trail.size() > count() + 1:
 		trail.resize(count() + 1)
@@ -82,19 +91,19 @@ func on_tick(delta: float) -> void:
 			var target := run.horde.nearest_in_cone(trail[1], Vector3.FORWARD, SNAP_REACH, -1.0)
 			if target >= 0:
 				var to := run.horde.enemy_position(target)
-				PowerupFx.flash(run, to, 0.9, color(id), 0.2)
-				run.hit(target, damage() * SNAP_DAMAGE, fish, id, (to - trail[1]).normalized(), settings.coil_proc, [id])
+				PowerupFx.flash(run, to, 0.9, tint(), 0.2)
+				strike(target, damage() * SNAP_DAMAGE, (to - trail[1]).normalized(), powers.coil_proc)
 	if milestone(3) and trail.size() > 2:
 		_tail_left -= delta
 		if _tail_left <= 0.0:
 			_tail_left = TAIL_EVERY
 			lashes += 1
 			var end := trail[trail.size() - 1]
-			PowerupFx.shock(run, end, TAIL_REACH, color(id), Vector3.UP, 0.35)
+			PowerupFx.shock(run, end, TAIL_REACH, tint(), Vector3.UP, 0.35)
 			for i in run.horde.query_sphere(end, TAIL_REACH):
 				var out := run.horde.enemy_position(i) - end
-				run.hit(i, damage() * TAIL_DAMAGE, fish, id, out.normalized() if out.length_squared() > 0.0001 else Vector3.UP,
-						settings.coil_proc, [id])
+				strike(i, damage() * TAIL_DAMAGE, out.normalized() if out.length_squared() > 0.0001 else Vector3.UP,
+						powers.coil_proc)
 	_tick_left -= delta
 	if _tick_left > 0.0:
 		return
@@ -106,8 +115,8 @@ func on_tick(delta: float) -> void:
 			var push := run.horde.enemy_position(i) - trail[k]
 			if slow:
 				run.horde.shove(i, -run.horde.enemy_velocity(i) * SLOW_SHARE)
-			run.hit(i, damage(), fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP,
-					settings.coil_proc, [id])
+			strike(i, damage(), push.normalized() if push.length_squared() > 0.0001 else Vector3.UP,
+					powers.coil_proc)
 
 
 ## The serpent along the trail (the first spot is the fish itself, so not
@@ -132,7 +141,7 @@ func _draw() -> void:
 		_spine = MeshInstance3D.new()
 		_spine.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_coils.add_child(_spine)
-		_spine_material = FxKit.glow(Color(color(id).lerp(Color.WHITE, 0.2), 0.8), FxKit.across(), true)
+		_spine_material = FxKit.glow(Color(tint().lerp(Color.WHITE, 0.2), 0.8), FxKit.across(), true)
 		_spine_material.vertex_color_use_as_albedo = true
 		_drawn = PackedVector3Array()  # a new node: draw it all
 	if trail == _drawn:
@@ -172,10 +181,10 @@ func _vertebra_mesh() -> ArrayMesh:
 	var glow := worn_material(1.4)
 	FxKit.fade_near(glow)
 	var dark := StandardMaterial3D.new()
-	dark.albedo_color = color(id).darkened(0.65)
+	dark.albedo_color = tint().darkened(0.65)
 	dark.roughness = 0.4
 	dark.emission_enabled = true
-	dark.emission = color(id)
+	dark.emission = tint()
 	dark.emission_energy_multiplier = 0.25
 	FxKit.fade_near(dark)
 	var mesh := ArrayMesh.new()

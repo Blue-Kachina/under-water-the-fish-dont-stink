@@ -51,7 +51,9 @@ func _run() -> void:
 	print("each fish its own:")
 	check(run.attack_of(fish) is ShockLash, "the String Ray lashes")
 	var expected := {FishCharacter.Family.OCTANE: AnemoneSting, FishCharacter.Family.DOMINUS: GhostBite,
-			FishCharacter.Family.BREAKOUT: BillThrust, FishCharacter.Family.HYBRID: BubbleVolley, FishCharacter.Family.MERC: SpineBurst}
+			FishCharacter.Family.BREAKOUT: BillThrust, FishCharacter.Family.HYBRID: BubbleVolley, FishCharacter.Family.MERC: SpineBurst,
+			FishCharacter.Family.LIONFISH: GreekFire, FishCharacter.Family.MOON_JELLY: JellyfishHalo, FishCharacter.Family.MANTIS: DepthCharges,
+			FishCharacter.Family.WHALE_SHARK: RemoraBuddy}
 	for family: FishCharacter.Family in expected:
 		var made := FishAttack.make(FishAttack.kind_for(family))
 		check(made.get_script() == expected[family], "%s: %s" % [FishCharacter.CARS[family].fish, FishAttack.title(made.kind)])

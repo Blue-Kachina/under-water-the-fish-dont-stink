@@ -30,6 +30,8 @@ is a **Fish Fry**. Teams are team colours / team 0, 1. "Demo" is only for Rocket
 ## Status
 **Phases 0 to 8 are built (2026-10-17), and so is the second play-test's round of changes (Round 2
 below). Phase 9 isn't started.** Pick **Unnatural** or **Test Tank** in the mode list.
+**The Playability pass's P3 (feel and readability) is built (2026-10-23): see "P3 as built".**
+Next is P4.
 
 ### Handoff (2026-10-18, balance pass 1): start here
 **State:** the defaults are rebalanced from 10 rounds of sims and the user's own logs (see
@@ -736,7 +738,7 @@ the XP bar.
 - **Test Tank presets:** one button for "all slots full, Lv 10" and one for "all slots full, Lv 5",
   for power and frame benchmarks.
 
-### P3. Feel and readability (§2; takes in phase 9's juice)
+### P3. Feel and readability (§2; takes in phase 9's juice) (built 2026-10-23: "P3 as built")
 - **Damage numbers** at scale (phase 9's plan). Crits are bigger and coloured, and a
   `damage_numbers_min` setting shows only big hits.
 - **Hit flash and kill pop:** a one-frame white flash through a MultiMesh instance uniform, and a
@@ -1016,6 +1018,37 @@ Greek Fire also changed:
 - `fire_life_per_stack` 1 → 0.4, `fire_radius_step` 0.15 → 0.1, `fire_density_step` 0.2 → 0.12.
 - `fire_patches_step` 10 → 5 and `fire_max_patches` 80 → 60.
 - The flare is 0.5 s of burn at ×1.4 reach; the creep is 1 m/s within 5 m.
+
+### P3 as built (2026-10-23)
+Every item of P3 is in. The numbers are panel settings in two new groups, **Feel** and
+**Assist**, on a new **Feel** tab of the UNNATURAL section. The Leviathan's two warnings are in
+its own group.
+
+| P3 item | What it does | Where |
+|---|---|---|
+| Damage numbers | One per hit over the zombie; hits on the same zombie within `damage_number_merge` (0.3 s) add up and bump it; crits are gold, `crit_number_scale` bigger, with a "!"; a killing blow shows what it took, not its overkill (`UnnaturalRun.last_hit_dealt`); smaller further off; `damage_numbers_min` hides small ones; at most `damage_numbers_max` (48), the oldest go first; teammates' only with `damage_numbers_team` | `damage_numbers.gd` (in each player's HUD); `UnnaturalRun.last_hit_crit` / `last_hit_dealt` |
+| Hit flash and kill pop | The flash already existed; now `hit_flash` scales it (above 1: a brighter glow). Each kill pops a burst (white core, a ring, sparks) in its rot colour warmed to blood-orange, hotter for an elite: one MultiMesh, at most `kill_pop_max` (96), `kill_pop_size`. The dying zombie swells by `kill_swell` before it shrinks | `kill_pops.gd`, `shaders/kill_pop.gdshader`, `horde.gd` `_draw_horde` |
+| Target marker | Turning brackets round the zombie each aimed weapon will go for next, in its colour, nested when two share one. `FishAttack.aim_target()` is what the weapon really fires at (the bite, the thrust, the lash and the bubbles now call it). The area and steady weapons don't aim, so they get none | `combat_markers.gd`, `fish_attack.gd`, `ghost_bite.gd`, `bill_thrust.gd`, `shock_lash.gd`, `bubble_volley.gd` |
+| Threat arrows, boss bar | Arrows at the view's edge, out of view only: bosses (with their distance), lungers winding up at you ("!"), elites within `threat_range`; nearest first, at most `threat_arrows_max`; kept off the minimap. The boss bar now trails what the last hits took and flashes when hit | `combat_markers.gd`, `unnatural_hud.gd` |
+| Telegraphs | Lunges' glow scales with `telegraph_glow`. A red lane (`telegraph_lines`) lies along the path of each winding-up lunge and the Drowned Shark's charge, filling from its start to its end as the wind-up runs out; it ignores the fog. The Leviathan now winds up each dive (`leviathan_dive_telegraph` 1 s: slower, glowing, its lane) and glows before it spits (`leviathan_spit_telegraph` 0.6 s). Online, its net mode carries the wind-up (+8) | `telegraphs.gd`, `shaders/telegraph.gdshader`, `Boss.telegraph()`, `drowned_shark.gd`, `blood_leviathan.gd`, `Horde.telegraphing` |
+| Hurt feedback | A ragged red vignette flushes when you're hit (stronger for a bigger share of max hp); under `low_hp_share` (0.25) a lub-dub heartbeat pulses it, quicker the lower you are. The heartbeat sound now starts at the same `low_hp_share`. The thud is the existing `unnatural/hurt` | `shaders/hurt_vignette.gdshader`, `unnatural_hud.gd` `_update_hurt`, `unnatural_sounds.gd` |
+| Pickup clarity | The four drops already had their own shapes; the magnet was the heart's red and is now violet. The halo ignores the fog, and a beam of the drop's colour (`pickup_beam` 6 m) stands up through the murk. Drops within `pickup_sense_range` (45 m) ping: at the edge when out of view, in view past 12 m | `pickup.gd`, `shaders/pickup_beam.gdshader`, `combat_markers.gd` |
+| Camera | The survivor cam sits up to `camera_crowd_pull` (3 m) further back once `camera_crowd_full` (40) zombies are within `camera_crowd_range` (15 m), plus `camera_size_pull` (2 m) per +100% Size, eased at `camera_pull_rate`. The crowd is counted 4 times a second (a 15 m grid query visits every bucket) | `UnnaturalRun.camera_pull_of()` / `_pull_camera`, `steady_camera(..., pull)`, `main.gd` |
+| Depth assist | `depth_assist` (default 0.4; 0 off): zombies climb or dive toward their target's depth on top of their chase (`Horde.DEPTH_DRIFT`), and auto-aim counts each metre of height as 1.5 × `depth_assist` m further (`Horde.aim_gap()`, used by `nearest_in_cone()` and the bubbles' sort) | `horde.gd` |
+
+**Checks:** `tests/feel_probe` (headless) covers all of it. `tests/feel_shots` (windowed, `--
+--out=DIR`) takes screenshots of the numbers and pops, the lanes, the threats and drops, and the
+low-hp vignette.
+
+**Open for the user's play-test:**
+- Is the depth assist's default (0.4) too much or too little? It changes how the horde moves, so
+  the sims will shift a little.
+- The damage numbers' size and the merge window. Do teammates' numbers belong on by default in
+  split-screen?
+- The kill pops' colour (rot warmed to blood-orange) and size. In a big wipe only the newest 96 show.
+- Should the camera pull be stronger, or follow Size more?
+- The thud is still the existing `unnatural/hurt` sound. The new things have no sounds of their
+  own yet (a crit, a lane, a threat).
 
 ## Existing pieces to reuse
 | Piece | Where | Use in Unnatural |

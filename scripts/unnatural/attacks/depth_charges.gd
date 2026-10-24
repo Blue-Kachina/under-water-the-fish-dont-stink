@@ -1,6 +1,7 @@
 class_name DepthCharges
-extends Powerup
-## Depth Charges (planning_unnatural.md §7b, D14), a weapon: a mine rack under
+extends FishAttack
+## Depth Charges (planning_unnatural.md §7b, D14), a steady weapon (FishAttack),
+## the Mantis Shrimp's own: a mine rack under
 ## the fish. A mine drops behind it every interval() s; it arms after arm_time()
 ## s, then blows when a zombie comes within charge_trigger m (or when life() s
 ## are up): damage() to every zombie within blast() m (proc coefficient
@@ -38,31 +39,40 @@ var _aftershocks: Array = []
 var aftershocks := 0
 
 
+## It reads its own facets, and has no attacks to count (FishAttack).
+func own_facets() -> bool:
+	return true
+
+
+func counts_uses() -> bool:
+	return false
+
+
 func interval() -> float:
-	return settings.charge_interval / (1.0 + facet("rate")) / rate_scale()
+	return powers.charge_interval / (1.0 + facet("rate")) / attack_speed
 
 
 func damage() -> float:
-	return settings.charge_damage * (1.0 + facet("damage"))
+	return powers.charge_damage * (1.0 + facet("damage"))
 
 
 func blast() -> float:
-	return settings.charge_blast * (1.0 + facet("blast")) * area_scale()
+	return powers.charge_blast * (1.0 + facet("blast")) * size_scale
 
 
 func arm_time() -> float:
-	return settings.charge_arm / (1.0 + facet("arm"))
+	return powers.charge_arm / (1.0 + facet("arm"))
 
 
 func life() -> float:
-	return settings.charge_life * duration_scale()
+	return powers.charge_life * duration_scale
 
 
 func max_mines() -> int:
-	return settings.charge_max + facet_count("mines")
+	return powers.charge_max + facet_count("mines")
 
 
-func on_tick(delta: float) -> void:
+func _work(delta: float) -> void:
 	for k in range(_aftershocks.size() - 1, -1, -1):
 		var shock: Array = _aftershocks[k]
 		shock[0] -= delta
@@ -95,7 +105,7 @@ func on_tick(delta: float) -> void:
 			Sfx.play_at("pw/depth_charge_arm", mine.global_position)
 		if armed and milestone(3):
 			_drift(mine, delta)
-		if mine.age >= life() or (armed and not run.horde.query_sphere(mine.global_position, settings.charge_trigger).is_empty()):
+		if mine.age >= life() or (armed and not run.horde.query_sphere(mine.global_position, powers.charge_trigger).is_empty()):
 			if milestone(1) and mine.age < life():
 				mine.fuse = PULL_TIME  # the first milestone: it draws them in, then blows
 				continue
@@ -129,7 +139,7 @@ func drop() -> void:
 		if is_instance_valid(oldest):
 			oldest.queue_free()
 	var mine := Mine.new()
-	mine.tint = color(id)
+	mine.tint = tint()
 	mine.arm_time = arm_time()
 	run.add_child(mine)
 	mine.global_position = fish.global_position + fish.global_basis.z * (fish.hitbox_length * 0.6)
@@ -150,11 +160,11 @@ func explode(at: Vector3) -> void:
 func _blast(at: Vector3, reach: float, amount: float, aftershock := false) -> void:
 	if milestone(4) and not aftershock:
 		_aftershocks.append([AFTERSHOCK_AFTER, at, reach, amount * AFTERSHOCK_SHARE])
-	Explosion.spawn(run.ocean, at, color(id), reach, 0.0, 0.3)
+	Explosion.spawn(run.ocean, at, tint(), reach, 0.0, 0.3)
 	Sfx.play_at("fx/explosion", at, clampf(reach / 6.0, 0.0, 1.0))
 	for i in run.horde.query_sphere(at, reach):
 		var push := run.horde.enemy_position(i) - at
-		run.hit(i, amount, fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP, settings.charge_proc, [id])
+		strike(i, amount, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP, powers.charge_proc)
 
 
 func on_removed() -> void:

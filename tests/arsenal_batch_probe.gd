@@ -90,9 +90,10 @@ func _run() -> void:
 func _weapons() -> void:
 	print("weapons:")
 	var pool := Weapons.card_pool(FishAttack.Kind.BITE)
-	check("attack_bite" not in pool and "attack_sting" in pool and "attack_spines" in pool and "greek_fire" in pool and "leviathans_coil" not in pool,
+	check("attack_bite" not in pool and "attack_sting" in pool and "attack_spines" in pool and "attack_greek_fire" in pool and "attack_leviathans_coil" not in pool,
 			"a Shark's new-weapon pool: every other fish's attack and the powerup weapons (%d)" % pool.size())
-	check(Weapons.card_pool(FishAttack.Kind.NONE).size() == pool.size() + 1, "a fish with no attack of its own may get any attack")
+	check(Weapons.card_pool(FishAttack.Kind.FIRE).size() == pool.size() and "attack_bite" in Weapons.card_pool(FishAttack.Kind.FIRE)
+			and "attack_greek_fire" not in Weapons.card_pool(FishAttack.Kind.FIRE), "a Lionfish's: every other fish's, the Shark's bite too, not its own fire")
 	settings.card_choices = 3
 	settings.card_weight_weapon = 0.0
 	settings.card_weight_tome = 0.0
@@ -151,7 +152,7 @@ func _texts() -> void:
 	check(Powerup.blurb_lines("treasure_map").size() == 2 and Powerup.blurb_lines("treasure_map")[0] == "Chest Drops +30%", "an item's effects one a line")
 	check(Powerup.curse_lines("glass_coral") == PackedStringArray(["Max HP -50%"]) and Powerup.blurb_lines("glass_coral") == PackedStringArray(["Damage +100%"]),
 			"a curse's upside and downside apart")
-	var gains := Weapons.describe_all("greek_fire", {"burn": 0.2, "patches": 1.0})
+	var gains := Weapons.describe_all("attack_greek_fire", {"burn": 0.2, "patches": 1.0})
 	check(gains.size() == 2 and gains[0] == "Burn damage +20%", "a weapon card's facets one a line (%s)" % ", ".join(gains))
 
 
@@ -330,8 +331,8 @@ func _legendaries() -> void:
 	powers.engine_stacks = 2
 	await _ticks(2)
 	var block := run.block_of(fish)
-	check(is_equal_approx(block.bonus.get("projectile_count", 0.0), 2.0) and is_equal_approx(block.bonus.get("area", 0.0), powers.engine_area * 2.0),
-			"Abyssal Engine x2: +2 projectiles, +%.0f%% area" % (powers.engine_area * 200.0))
+	check(is_equal_approx(block.bonus.get("projectile_count", 0.0), 2.0) and is_equal_approx(block.bonus.get("size", 0.0), powers.engine_size * 2.0),
+			"Abyssal Engine x2: +2 projectiles, +%.0f%% size" % (powers.engine_size * 200.0))
 	powers.engine_stacks = 0
 
 	powers.moon_pearl_stacks = 1

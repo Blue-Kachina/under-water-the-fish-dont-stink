@@ -1,6 +1,7 @@
 class_name GreekFire
-extends Powerup
-## Greek Fire Trail (planning_unnatural.md §7), a weapon: burning patches left
+extends FishAttack
+## Greek Fire Trail (planning_unnatural.md §7), a steady weapon (FishAttack),
+## the Lionfish's own: burning patches left
 ## behind as the fish swims, one every spacing() m. Zombies in a patch burn
 ## (damage over time, BURN_TICK at a time, proc coefficient fire_proc). Its
 ## facets (Weapons): burn damage, patch life, patch size, a denser trail, more
@@ -31,27 +32,40 @@ var _flare_left := FLARE_EVERY
 var flares := 0
 
 
+## It reads its own facets, and has no attacks to count (FishAttack).
+func own_facets() -> bool:
+	return true
+
+
+func counts_uses() -> bool:
+	return false
+
+
 func spacing() -> float:
-	return settings.fire_spacing / (1.0 + facet("density")) / rate_scale()
+	return powers.fire_spacing / (1.0 + facet("density")) / attack_speed
 
 
 func radius() -> float:
-	return settings.fire_radius * (1.0 + facet("radius")) * area_scale()
+	return powers.fire_radius * (1.0 + facet("radius")) * size_scale
 
 
 func life() -> float:
-	return (settings.fire_life + facet("life")) * duration_scale()
+	return (powers.fire_life + facet("life")) * duration_scale
 
 
 func dps() -> float:
-	return settings.fire_dps * (1.0 + facet("burn"))
+	return powers.fire_dps * (1.0 + facet("burn"))
+
+
+func damage() -> float:
+	return dps()
 
 
 func max_patches() -> int:
-	return settings.fire_max_patches + facet_count("patches")
+	return powers.fire_max_patches + facet_count("patches")
 
 
-func on_tick(delta: float) -> void:
+func _work(delta: float) -> void:
 	# Burnt-out patches go first (by index: a freed one in a typed loop or
 	# erase errors).
 	for k in range(patches.size() - 1, -1, -1):
@@ -81,12 +95,12 @@ func on_tick(delta: float) -> void:
 	var burn := dps() * BURN_TICK
 	for patch in patches:
 		for i in run.horde.query_sphere(patch.global_position, patch.radius):
-			run.hit(i, burn, fish, id, Vector3.ZERO, settings.fire_proc, [id])
+			strike(i, burn, Vector3.ZERO, powers.fire_proc)
 
 
 ## The first milestone: a zombie burnt to death leaves a patch where it fell.
 func on_kill(at: Vector3, source: String) -> void:
-	if source == id and milestone(1) and _kill_patch_left <= 0.0:
+	if source == source() and milestone(1) and _kill_patch_left <= 0.0:
 		_kill_patch_left = KILL_PATCH_GAP
 		_drop(at)
 
@@ -99,9 +113,9 @@ func _flare() -> void:
 		if not is_instance_valid(patch):
 			continue
 		var reach := patch.radius * FLARE_REACH
-		PowerupFx.ring(run, patch.global_position, reach, color(id), Vector3.UP, 0.4)
+		PowerupFx.ring(run, patch.global_position, reach, tint(), Vector3.UP, 0.4)
 		for i in run.horde.query_sphere(patch.global_position, reach):
-			run.hit(i, burn, fish, id, Vector3.UP, settings.fire_proc, [id])
+			strike(i, burn, Vector3.UP, powers.fire_proc)
 
 
 ## The fourth: the patches creep toward the nearest zombie close by (looked
@@ -170,7 +184,7 @@ func make_worn() -> Node3D:
 	base.radial_segments = 8
 	lantern.add_child(worn_mesh(base, brass, Vector3(0.0, -0.05, 0.0)))
 	var light := OmniLight3D.new()
-	light.light_color = color(id)
+	light.light_color = tint()
 	light.light_energy = 0.8
 	light.omni_range = 2.5
 	light.position.y = 0.07

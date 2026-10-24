@@ -121,7 +121,7 @@ func _run() -> void:
 	check(run.chest_price(chest) == 20, "the price: base x (1 + growth x minutes) (%d at 2:00)" % run.chest_price(chest))
 	var cursed := run.add_chest(far + Vector3(10, 0, 0), 0.0, -INF, TreasureChest.Kind.CURSED)
 	check(run.chest_price(cursed) == 30, "a cursed one's x chest_cursed_price (%d)" % run.chest_price(cursed))
-	var boss := run.add_chest(far + Vector3(20, 0, 0), 0.0, -INF, TreasureChest.Kind.BOSS, "leviathans_coil")
+	var boss := run.add_chest(far + Vector3(20, 0, 0), 0.0, -INF, TreasureChest.Kind.BOSS, "attack_leviathans_coil")
 	check(run.chest_price(boss) == 0, "a boss's is free")
 	run._purses[fish] = 5
 	fish.global_position = chest.global_position + Vector3(0, 1, 2)

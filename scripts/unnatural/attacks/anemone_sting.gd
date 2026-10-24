@@ -88,7 +88,7 @@ func proc() -> float:
 
 ## The pulse's radius (m): sting_radius, or more if the bow wave reaches further.
 func radius() -> float:
-	return maxf(settings.sting_radius, GhostBite.bow_reach(fish) * settings.sting_over_bow) * area_scale
+	return maxf(settings.sting_radius, GhostBite.bow_reach(fish) * settings.sting_over_bow) * size_scale
 
 
 func busy() -> bool:
@@ -156,7 +156,7 @@ func _make_echo() -> AnemoneSting:
 		_echo.settings = settings
 		_echo.on_hit = on_hit
 		add_child(_echo)
-	_echo.area_scale = area_scale * ECHO_SIZE
+	_echo.size_scale = size_scale * ECHO_SIZE
 	_echo.damage_scale = damage_scale * ECHO_DAMAGE
 	_echo.knock_scale = knock_scale
 	_echo.milestones = milestones

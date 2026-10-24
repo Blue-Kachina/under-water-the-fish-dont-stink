@@ -5,8 +5,8 @@ extends Powerup
 ##   of its hp (not bosses; UnnaturalRun.hit asks);
 ## - Moon Pearl: pearl_picks more cards from each level-up's offer, a stack
 ##   (UnnaturalRun.pick);
-## - Abyssal Engine: engine_projectiles more projectiles and engine_area more
-##   area, a stack.
+## - Abyssal Engine: engine_projectiles more projectiles and engine_size more
+##   Size, a stack.
 
 
 func execute_share() -> float:
@@ -21,7 +21,7 @@ func extra_level_picks() -> int:
 
 func stat_bonus() -> Dictionary:
 	if id == "abyssal_engine":
-		return {"projectile_count": settings.engine_projectiles * stacks, "area": settings.engine_area * stacks}
+		return {"projectile_count": settings.engine_projectiles * stacks, "size": settings.engine_size * stacks}
 	return {}
 
 

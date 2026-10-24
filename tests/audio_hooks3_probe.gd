@@ -232,16 +232,16 @@ func _powerups() -> void:
 	print("powerups:")
 	var powers := run.powerups_of(fish)
 	heard.clear()
-	for id in ["depth_charges", "anglerfish_lure", "torpedo", "electric_eel", "tsunami_heart", "bubble_wrap",
-			"pufferfish_spines", "greek_fire", "jellyfish_halo", "leviathans_coil"]:
+	for id in ["attack_depth_charges", "anglerfish_lure", "torpedo", "electric_eel", "tsunami_heart", "bubble_wrap",
+			"pufferfish_spines", "attack_greek_fire", "attack_jellyfish_halo", "attack_leviathans_coil"]:
 		powers.add(id)
 	await _seconds(0.2)
 	var worn_loops := heard.duplicate()
 	var held: Dictionary = powers.held
 	heard.clear()
-	var charges: DepthCharges = held["depth_charges"]
+	var charges := powers.weapon("attack_depth_charges") as DepthCharges
 	charges.drop()
-	charges.on_tick(charges.arm_time() + 0.1)
+	charges._work(charges.arm_time() + 0.1)
 	charges.explode(fish.global_position + Vector3(0, 5, 0))
 	check(heard.has("pw/depth_charge_drop") and heard.has("pw/depth_charge_arm") and heard.has("fx/explosion"), "depth charges: drop, arm, blast")
 	heard.clear()
@@ -267,7 +267,7 @@ func _powerups() -> void:
 	check(heard.has("pw/bubble_wrap_ready"), "the bubble is up")
 	check(wrap.blocks_hit(1.0) and heard.has("pw/bubble_wrap_pop"), "and pops")
 	heard.clear()
-	(held["greek_fire"] as GreekFire)._drop(fish.global_position + Vector3(0, -2, 0))
+	(powers.weapon("attack_greek_fire") as GreekFire)._drop(fish.global_position + Vector3(0, -2, 0))
 	check(heard.has("pw/greek_fire_loop") and worn_loops.has("pw/jelly_halo_loop") and worn_loops.has("pw/coil_loop"), "the fire patch, the halo and the coil loop")
 	powers.clear()
 	main.set_mode(main.FREE_PLAY)

@@ -44,24 +44,28 @@ func _run() -> void:
 	horde = run.horde
 
 	print("starting weapons:")
-	var expected := {FishCharacter.Family.LIONFISH: "greek_fire", FishCharacter.Family.MOON_JELLY: "jellyfish_halo",
-			FishCharacter.Family.MANTIS: "depth_charges", FishCharacter.Family.WHALE_SHARK: "remora_buddy"}
+	var expected := {FishCharacter.Family.LIONFISH: FishAttack.Kind.FIRE, FishCharacter.Family.MOON_JELLY: FishAttack.Kind.HALO,
+			FishCharacter.Family.MANTIS: FishAttack.Kind.CHARGES, FishCharacter.Family.WHALE_SHARK: FishAttack.Kind.REMORA}
 	for family: FishCharacter.Family in expected:
 		await _be(family)
 		var name: String = FishCharacter.CARS[family].fish
 		var loadout := run.loadout_of(fish)
-		check(run.attack_of(fish).kind == FishAttack.Kind.NONE, "%s has no attack of its own" % name)
-		check(loadout.weapons == [expected[family]] and run.powerups_of(fish).stacks(expected[family]) == 1,
-				"%s starts with %s alone (%s)" % [name, expected[family], loadout.weapons])
+		check(run.attack_of(fish).kind == expected[family], "%s's own attack is its %s (a FishAttack)" % [name, FishAttack.title(expected[family])])
+		check(loadout.weapons == [Weapons.ATTACK] and run.powerups_of(fish).list().is_empty(),
+				"%s starts with its attack alone (%s)" % [name, loadout.weapons])
 		check(loadout.weapons.size() < settings.weapon_slots, "%s has a free weapon slot" % name)
 		var model := FishModel.build(family)
 		check(model.tail != null and model.fin_left != null and model.fin_right != null and model.get_child_count() > 3, "%s has a model with swim pivots" % name)
 		model.free()
 		check(FishDetails.sections(family).size() == 5 and Traversal.title(family) != "" and (FishDetails.twist_text(family, settings) as String) != "", "%s has details and a twist" % name)
-		run.take_card(fish, {"kind": "weapon", "weapon": expected[family], "gains": {}})
-		check(loadout.earned_level(expected[family]) == 2, "its card upgrades the weapon")
+		var was := loadout.earned_level(Weapons.ATTACK)
+		run.take_card(fish, {"kind": "weapon", "weapon": Weapons.ATTACK, "gains": {}})
+		check(loadout.earned_level(Weapons.ATTACK) == was + 1 and run.attack_of(fish).level == was + 1, "its card upgrades the weapon")
+		var as_second := FishAttack.weapon_id_of(expected[family])
+		check(as_second in Weapons.card_pool(FishAttack.Kind.BITE) and as_second not in Weapons.card_pool(expected[family]),
+				"other fish can take it as a second weapon; it can't")
 	await _be(FishCharacter.Family.PLANK)
-	check(run.loadout_of(fish).weapons == [Weapons.ATTACK] and run.loadout_of(fish).starting == "", "back to a fish with an attack: the attack returns")
+	check(run.loadout_of(fish).weapons == [Weapons.ATTACK] and run.attack_of(fish).kind == FishAttack.Kind.LASH, "another fish: its own attack")
 
 	print("passives and skills:")
 	await _be(FishCharacter.Family.LIONFISH)
@@ -79,7 +83,7 @@ func _run() -> void:
 	check(run.stats_of(fish).by_source.get("flare", 0.0) > 0.0, "and burns what it passes")
 
 	await _be(FishCharacter.Family.MOON_JELLY)
-	var halo: JellyfishHalo = run.powerups_of(fish).held["jellyfish_halo"]
+	var halo := run.attack_of(fish) as JellyfishHalo
 	check(halo.count() == settings_jellies() + settings.arms_extra, "Moon Jelly, Many Arms: %d jellies" % halo.count())
 	twist = run.twist_of(fish)
 	horde.spawn(1, Vector3(2, 0, 0))

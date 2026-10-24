@@ -5,9 +5,10 @@
 // (instance uniforms), so a fin material shared with other fins lights only
 // the tail's.
 
-instance uniform float stride_fill = 0.0;  // lit from the root up to here, 0..1
-instance uniform float stride_glow = 0.0;  // brightness, 0 = off
-instance uniform float stride_sweet = 0.0;  // 0 building (blue) to 1 at the peak (gold)
+// Indices pinned after fish_bend.gdshaderinc's 0-1 (see there).
+instance uniform float stride_fill : instance_index(2) = 0.0;  // lit from the root up to here, 0..1
+instance uniform float stride_glow : instance_index(3) = 0.0;  // brightness, 0 = off
+instance uniform float stride_sweet : instance_index(4) = 0.0;  // 0 building (blue) to 1 at the peak (gold)
 
 vec3 stride_cue(float along) {
 	if (stride_glow <= 0.0) {

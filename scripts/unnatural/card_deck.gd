@@ -31,7 +31,7 @@ static func deal(run: UnnaturalRun, fish: FishController, count: int) -> Array:
 		"new_tome": [] as Array[String],
 	}
 	if loadout.weapons.size() < settings.weapon_slots:
-		for id in Weapons.card_pool(attack.kind if attack else FishAttack.Kind.NONE):
+		for id in Weapons.card_pool(attack.kind if attack else loadout.attack_kind):
 			if not loadout.has_weapon(id):
 				pools.new_weapon.append(id)
 	if loadout.tomes.size() < settings.tome_slots:
@@ -82,15 +82,19 @@ static func tome_useful(run: UnnaturalRun, fish: FishController, id: String) -> 
 			var attack := run.attack_of(fish)
 			if attack != null and attack.uses_stat("projectile_count"):
 				return true
-			for held: String in run.loadout_of(fish).weapons:
-				if FishAttack.kind_uses_stat(Weapons.attack_kind_of(held), "projectile_count"):
+			var held_by := run.loadout_of(fish)
+			for held: String in held_by.weapons:
+				if FishAttack.kind_uses_stat(Weapons.attack_kind_of(held, held_by.attack_kind), "projectile_count"):
 					return true
 			return false
 		"ages":
 			var loadout := run.loadout_of(fish)
 			var powerups := run.powerups_of(fish)
-			for user in Tomes.DURATION_USERS:
-				if loadout.has_weapon(user) or powerups.stacks(user) > 0:
+			for held: String in loadout.weapons:
+				if Weapons.attack_kind_of(held, loadout.attack_kind) in Tomes.DURATION_WEAPONS:
+					return true
+			for user in Tomes.DURATION_ITEMS:
+				if powerups.stacks(user) > 0:
 					return true
 			return false
 	return true

@@ -19,8 +19,6 @@ const MOAN_RANGE := 35.0
 const MOAN_FULL := 30.0
 ## Lunges and spawns further than this from every local player (m) are not played.
 const EARSHOT := 50.0
-## Under this share of max hp, the heartbeat.
-const LOW_HP := 0.25
 ## Loops are looked after this often (s).
 const LOOP_INTERVAL := 0.2
 ## Kills (XP) and pearls this soon (s) after the last one climb the scale.
@@ -38,7 +36,7 @@ const HIT_SOUNDS := {
 	"jellyfish_halo": "pw/jelly_sting",
 	"leviathans_coil": "pw/coil_hit",
 }
-const PICKUPS := ["heart", "magnet", "hourglass"]
+const PICKUPS := ["heart", "magnet", "hourglass", "lightning"]
 ## An attack's hit source -> the sound for its hits (cheaper than building it per hit).
 const ATTACK_HITS := {
 	"sting": "unnatural/sting_hit", "bite": "unnatural/bite_hit", "lash": "unnatural/lash_hit",
@@ -278,7 +276,8 @@ func _update_loops() -> void:
 			weakest = minf(weakest, health.hp / maxf(health.max_hp, 1.0))
 		revived = maxf(revived, run.revive_progress(fish))
 	_moan = _loop(_moan, "unnatural/zombie_moan_loop", crowd > 0, clampf(crowd / MOAN_FULL, 0.15, 1.0))
-	_heartbeat = _loop(_heartbeat, "unnatural/low_hp_loop", weakest < LOW_HP, 1.0 - weakest / LOW_HP, lerpf(1.0, 1.4, 1.0 - weakest / LOW_HP))
+	var low := maxf(run.settings.low_hp_share, 0.001)  # under it, the heartbeat (the HUD's beats with it)
+	_heartbeat = _loop(_heartbeat, "unnatural/low_hp_loop", weakest < low, 1.0 - weakest / low, lerpf(1.0, 1.4, 1.0 - weakest / low))
 	_revive = _loop(_revive, "unnatural/revive_loop", revived > 0.0, 0.4 + 0.6 * revived, 0.9 + 0.4 * revived)
 	_magnet = _loop(_magnet, "unnatural/magnet_pull_loop", _magnet_left > 0.0, 1.0)
 

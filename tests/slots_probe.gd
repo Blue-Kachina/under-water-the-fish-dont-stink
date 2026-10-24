@@ -35,14 +35,14 @@ func _run() -> void:
 	var sizes_ok := true
 	for tier in 5:
 		for n in 2000:
-			var gains := Weapons.roll(rng, "greek_fire", FishAttack.Kind.BITE, tier, settings, powers)
+			var gains := Weapons.roll(rng, "attack_greek_fire", FishAttack.Kind.BITE, tier, settings, powers)
 			table_ok = table_ok and gains.size() == settings.facets_for(tier)
 			for facet: String in gains:
-				var entry := Weapons.facet_def("greek_fire", facet)
+				var entry := Weapons.facet_def("attack_greek_fire", facet)
 				sizes_ok = sizes_ok and is_equal_approx(gains[facet], Weapons.step_amount(entry, settings.facet_size_for(tier), powers))
 	check(table_ok, "10,000 rolls: each rarity raises its number of facets (1, 1, 2, 2, 3), all different")
 	check(sizes_ok, "each by its rarity's size of a step (x1, x1.5, x1.5, x2, x2.5)")
-	var count_entry := Weapons.facet_def("jellyfish_halo", "count")
+	var count_entry := Weapons.facet_def("attack_jellyfish_halo", "count")
 	check(Weapons.step_amount(count_entry, 1.5, powers) == 2.0 and Weapons.step_amount(count_entry, 1.0, powers) == 1.0,
 			"a count facet stays whole (x1: +1 jelly, x1.5: +2)")
 
@@ -76,7 +76,7 @@ func _run() -> void:
 	check(not kinds.has("tome"), "no tome upgrades before a tome is held")
 
 	# Fill the slots: one more weapon, two tomes.
-	run.take_card(fish, {"kind": "new_weapon", "weapon": "greek_fire", "tier": 0, "level": 1, "gains": {}})
+	run.take_card(fish, {"kind": "new_weapon", "weapon": "attack_greek_fire", "tier": 0, "level": 1, "gains": {}})
 	var block := run.block_of(fish)
 	var damage_before := block.value("damage")
 	var teeth := Tomes.gives("teeth", Rarity.multiplier(settings, Rarity.Tier.RARE), settings)
@@ -87,17 +87,17 @@ func _run() -> void:
 	run.take_card(fish, {"kind": "new_tome", "tome": "shell", "tier": 0, "level": 1, "gives": shell})
 	check(shell.size() == 3 and is_equal_approx(shell.armour, StatBlock.amount("armour", settings.tome_multi_share)),
 			"a three-stat tome gives each tome_multi_share of a step (%s)" % [shell])
-	check(run.powerups_of(fish).stacks("greek_fire") == 1, "a new weapon is held at Lv 1 (as a powerup)")
+	check(run.powerups_of(fish).stacks("attack_greek_fire") == 1, "a new weapon is held at Lv 1 (as a powerup)")
 	kinds = _kinds_over(run, 300)
 	check(not kinds.has("new_weapon") and not kinds.has("new_tome"), "slots full: only upgrades (%s)" % [kinds.keys()])
 	check(kinds.has("weapon") and kinds.has("tome"), "weapon and tome upgrades both come")
 
 	print("caps and fallbacks:")
-	loadout._levels["greek_fire"] = settings.weapon_max_level
+	loadout._levels["attack_greek_fire"] = settings.weapon_max_level
 	var offered_capped := false
 	for n in 200:
 		for card: Dictionary in CardDeck.deal(run, fish, 3):
-			offered_capped = offered_capped or card.get("weapon", "") == "greek_fire"
+			offered_capped = offered_capped or card.get("weapon", "") == "attack_greek_fire"
 	check(not offered_capped, "a weapon at weapon_max_level isn't offered")
 	loadout._levels[Weapons.ATTACK] = settings.weapon_max_level
 	loadout._tome_levels["teeth"] = settings.tome_max_level
@@ -110,25 +110,25 @@ func _run() -> void:
 	check(run.purse_of(fish) == purse + cards[0].amount, "the pearl purse pays out (+%d)" % cards[0].amount)
 
 	print("upgrades and milestones:")
-	loadout._levels["greek_fire"] = 3
-	var fire: GreekFire = run.powerups_of(fish).held.get("greek_fire")
+	loadout._levels["attack_greek_fire"] = 3
+	var fire := run.powerups_of(fish).weapon("attack_greek_fire") as GreekFire
 	var life_before := fire.life()
-	run.take_card(fish, {"kind": "weapon", "weapon": "greek_fire", "tier": 0, "level": 4, "gains": {"life": 1.0}})
-	check(loadout.earned_level("greek_fire") == 4 and is_equal_approx(fire.life(), life_before + 1.0), "an upgrade raises its level and its facet")
+	run.take_card(fish, {"kind": "weapon", "weapon": "attack_greek_fire", "tier": 0, "level": 4, "gains": {"life": 1.0}})
+	check(loadout.earned_level("attack_greek_fire") == 4 and is_equal_approx(fire.life(), life_before + 1.0), "an upgrade raises its level and its facet")
 	check(not fire.milestone(1), "no milestone at Lv 4")
-	run.take_card(fish, {"kind": "weapon", "weapon": "greek_fire", "tier": 0, "level": 5, "gains": {"burn": 0.25}})
+	run.take_card(fish, {"kind": "weapon", "weapon": "attack_greek_fire", "tier": 0, "level": 5, "gains": {"burn": 0.25}})
 	run.powerups_of(fish).refresh()
-	check(fire.stacks == 5 and fire.milestone(1) and not fire.milestone(2), "the first milestone at Lv 5")
-	loadout._levels["greek_fire"] = 10
+	check(fire.level == 5 and fire.milestone(1) and not fire.milestone(2), "the first milestone at Lv 5")
+	loadout._levels["attack_greek_fire"] = 10
 	run.powerups_of(fish).refresh()
 	check(fire.milestone(2), "the second at Lv 10")
-	loadout._levels["greek_fire"] = 15
+	loadout._levels["attack_greek_fire"] = 15
 	run.powerups_of(fish).refresh()
 	check(fire.milestone(3) and not fire.milestone(4), "the third at Lv 15")
-	loadout._levels["greek_fire"] = 20
+	loadout._levels["attack_greek_fire"] = 20
 	run.powerups_of(fish).refresh()
 	check(fire.milestone(4), "the fourth at Lv 20")
-	loadout._levels["greek_fire"] = 10
+	loadout._levels["attack_greek_fire"] = 10
 	run.powerups_of(fish).refresh()
 	var lined := true
 	for key: Variant in Weapons.MILESTONES:
@@ -155,31 +155,31 @@ func _run() -> void:
 	print("boss weapons:")
 	var offers := []
 	run.cards_offered.connect(func(_f: FishController, offer: Array, _h: String, _l: String) -> void: offers.append(offer))
-	run._offers[fish] = [{"powerup": "leviathans_coil", "stacks": 1, "tier": Rarity.Tier.BOSS}]
+	run._offers[fish] = [{"powerup": "attack_leviathans_coil", "stacks": 1, "tier": Rarity.Tier.BOSS}]
 	run._offer_kind[fish] = "chest"
 	run.pick(fish, 0)
 	await _frames(1)
-	check(not offers.is_empty() and offers[-1].any(func(c: Dictionary) -> bool: return c.kind == "swap" and c.weapon == "greek_fire"),
+	check(not offers.is_empty() and offers[-1].any(func(c: Dictionary) -> bool: return c.kind == "swap" and c.weapon == "attack_greek_fire"),
 			"slots full: the Coil asks which weapon to swap")
 	check(offers[-1].any(func(c: Dictionary) -> bool: return c.kind == "keep"), "or to keep yours")
 	run.pick(fish, 0)
 	await _frames(1)
-	check(loadout.has_weapon("leviathans_coil") and not loadout.has_weapon("greek_fire"), "the swap replaces Greek Fire")
-	check(loadout.earned_level("leviathans_coil") == powers.coil_arrive_level, "the Coil arrives at Lv %d" % powers.coil_arrive_level)
-	check(not run.powerups_of(fish).held.has("greek_fire") and run.powerups_of(fish).held.has("leviathans_coil"), "and the powerups follow")
+	check(loadout.has_weapon("attack_leviathans_coil") and not loadout.has_weapon("attack_greek_fire"), "the swap replaces Greek Fire")
+	check(loadout.earned_level("attack_leviathans_coil") == powers.coil_arrive_level, "the Coil arrives at Lv %d" % powers.coil_arrive_level)
+	check(not run.powerups_of(fish).held.has("attack_greek_fire") and run.powerups_of(fish).held.has("attack_leviathans_coil"), "and the powerups follow")
 
 	print("testing overrides:")
 	powers.jelly_stacks = 4
 	run.powerups_of(fish).refresh()
-	var halo: JellyfishHalo = run.powerups_of(fish).held.get("jellyfish_halo")
-	check(halo != null and halo.stacks == 4, "a level override puts a weapon on at that level, slots or not")
+	var halo := run.powerups_of(fish).weapon("attack_jellyfish_halo") as JellyfishHalo
+	check(halo != null and halo.level == 4, "a level override puts a weapon on at that level, slots or not")
 	var spread := 0.0
-	for facet: String in loadout.facets_of("jellyfish_halo"):
-		spread += 1.0 if loadout.facet("jellyfish_halo", facet) > 0.0 else 0.0
+	for facet: String in loadout.facets_of("attack_jellyfish_halo"):
+		spread += 1.0 if loadout.facet("attack_jellyfish_halo", facet) > 0.0 else 0.0
 	check(spread == 3.0, "its 3 upgrades spread over 3 facets")
 	powers.jelly_stacks = 0
 	run.powerups_of(fish).refresh()
-	check(not run.powerups_of(fish).held.has("jellyfish_halo"), "and it's gone when the override is")
+	check(not run.powerups_of(fish).held.has("attack_jellyfish_halo"), "and it's gone when the override is")
 
 	print("restart:")
 	main.reset_play()

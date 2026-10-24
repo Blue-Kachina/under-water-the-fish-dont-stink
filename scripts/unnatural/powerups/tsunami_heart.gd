@@ -13,7 +13,7 @@ var _cool := 0.0
 
 
 func width() -> float:
-	return (settings.tsunami_width + settings.tsunami_width_per_stack * (stacks - 1)) * area_scale()
+	return (settings.tsunami_width + settings.tsunami_width_per_stack * (stacks - 1)) * size_scale()
 
 
 func damage() -> float:

@@ -202,7 +202,7 @@ func _run() -> void:
 	horde.clear()
 	fish.revive(Transform3D(Basis.looking_at(Vector3.FORWARD), Vector3(0, 0, 60)))
 	await _ticks(2)
-	var coil: LeviathansCoil = run.powerups_of(fish).held["leviathans_coil"]
+	var coil := run.powerups_of(fish).weapon("attack_leviathans_coil") as LeviathansCoil
 	for t in 240:
 		fish.linear_velocity = Vector3.FORWARD * 8.0
 		await get_tree().physics_frame

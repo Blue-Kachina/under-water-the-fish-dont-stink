@@ -9,7 +9,7 @@ class_name Tomes
 const TOMES := {
 	"teeth": ["Tome of Teeth", ["damage"], Color(1.0, 0.45, 0.4)],
 	"tides": ["Tome of Tides", ["attack_speed"], Color(0.45, 0.85, 1.0)],
-	"reef": ["Tome of the Reef", ["area"], Color(1.0, 0.55, 0.75)],
+	"reef": ["Tome of the Reef", ["size"], Color(1.0, 0.55, 0.75)],
 	"schools": ["Tome of Schools", ["projectile_count"], Color(0.6, 0.75, 1.0)],
 	"currents": ["Tome of Currents", ["projectile_speed", "knockback"], Color(0.4, 0.7, 0.95)],
 	"kill": ["Tome of the Kill", ["crit_chance", "crit_damage"], Color(1.0, 0.3, 0.3)],
@@ -20,8 +20,10 @@ const TOMES := {
 	"fortune": ["Tome of Fortune", ["luck"], Color(1.0, 0.85, 0.35)],
 	"ages": ["Tome of Ages", ["duration"], Color(0.75, 0.6, 1.0)],
 }
-## What Tome of Ages' duration lasts longer: these weapons' and items' effects.
-const DURATION_USERS: Array[String] = ["greek_fire", "depth_charges", "anglerfish_lure"]
+## What Tome of Ages' duration lasts longer: these weapons' (by their attack's
+## kind) and items' effects.
+const DURATION_WEAPONS: Array[FishAttack.Kind] = [FishAttack.Kind.FIRE, FishAttack.Kind.CHARGES]
+const DURATION_ITEMS: Array[String] = ["anglerfish_lure"]
 
 
 static func ids() -> Array[String]:

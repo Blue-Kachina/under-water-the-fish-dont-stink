@@ -361,7 +361,7 @@ func _process(_delta: float) -> void:
 		reset_play()
 	if unnatural_run:
 		for slot in _local.slots:
-			UnnaturalRun.steady_camera(slot.camera, true, unnatural_run.settings)  # live from the panel
+			UnnaturalRun.steady_camera(slot.camera, true, unnatural_run.settings, unnatural_run.camera_pull_of(slot.fish))  # live from the panel
 
 
 ## R or the pause menu's reset: a 1v1 back to a kickoff, otherwise the fish

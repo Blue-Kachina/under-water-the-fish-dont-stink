@@ -26,7 +26,8 @@ const LINE_SIDE := 16.0
 const LINE_COUNT := 5
 ## tank_preset's levels, and what fills the slots, in order.
 const PRESET_LEVELS := [0, 5, 10, 20]
-const PRESET_WEAPONS: Array[String] = ["greek_fire", "jellyfish_halo", "depth_charges", "remora_buddy", "leviathans_coil"]
+const PRESET_WEAPONS: Array[String] = ["attack_greek_fire", "attack_jellyfish_halo", "attack_depth_charges", "attack_remora_buddy",
+		"attack_leviathans_coil"]
 const PRESET_TOMES: Array[String] = ["teeth", "tides", "reef", "shell", "schools", "kill", "ages", "currents", "fins", "ram",
 		"fortune", "pearls"]
 

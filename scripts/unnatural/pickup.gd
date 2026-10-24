@@ -4,16 +4,21 @@ extends Node3D
 ## first player to touch it takes it (UnnaturalRun applies it):
 ## - HEART: heals every player who's up by heart_heal of their max hp (D12);
 ## - MAGNET: every XP pearl out flies to the taker;
-## - HOURGLASS: every zombie stops dead for hourglass_time.
+## - HOURGLASS: every zombie stops dead for hourglass_time;
+## - LIGHTNING: a shock across the whole arena kills every zombie (not bosses).
 ## A glowing token that turns and bobs where it fell, drawn to a player close
-## by. It never fades.
+## by. It never fades. Each has its own shape and colour (P3: no two alike),
+## a halo the fog doesn't dim, and a beam of its colour standing up from it
+## (pickup_beam m tall) to spot it through the murk; the HUD pings it.
 
 signal taken(pickup: Pickup, by: FishController)
 
-enum Kind { HEART, MAGNET, HOURGLASS }
+enum Kind { HEART, MAGNET, HOURGLASS, LIGHTNING }
 
-const NAMES := ["HEART", "MAGNET", "HOURGLASS"]
-const COLORS := [Color(1.0, 0.25, 0.35), Color(0.95, 0.3, 0.25), Color(0.55, 0.85, 1.0)]
+const NAMES := ["HEART", "MAGNET", "HOURGLASS", "LIGHTNING"]
+## Rose red, violet, ice blue, gold.
+const COLORS := [Color(1.0, 0.22, 0.32), Color(0.72, 0.42, 1.0), Color(0.55, 0.85, 1.0), Color(1.0, 0.88, 0.2)]
+const BEAM_SHADER := preload("res://shaders/pickup_beam.gdshader")
 ## Within this (m) it's drawn to a player; within TAKE_REACH it's taken.
 const PULL_REACH := 4.0
 const TAKE_REACH := 1.4
@@ -24,6 +29,8 @@ var kind := Kind.HEART
 var id := -1
 ## Who can take it here (this machine's players).
 var collectors: Array[FishController] = []
+## Its beam of light (null with pickup_beam 0).
+var beam: MeshInstance3D
 
 var _token := Node3D.new()
 var _age := randf() * TAU
@@ -96,6 +103,21 @@ func _ready() -> void:
 				cap.height = 0.05
 				cap.radial_segments = 12
 				_token.add_child(_mesh(cap, wood, Vector3(0.0, y, 0.0)))
+		Kind.LIGHTNING:
+			# A zigzag bolt: a slanted bar, a short kink across, a slanted bar
+			# and a point at the bottom.
+			var upper := _mesh(_box(Vector3(0.12, 0.34, 0.1)), shine, Vector3(0.06, 0.2, 0.0))
+			upper.rotation.z = -0.45
+			_token.add_child(upper)
+			var kink := _mesh(_box(Vector3(0.26, 0.1, 0.1)), shine, Vector3(0.0, 0.03, 0.0))
+			kink.rotation.z = 0.35
+			_token.add_child(kink)
+			var lower := _mesh(_box(Vector3(0.12, 0.3, 0.1)), shine, Vector3(-0.05, -0.13, 0.0))
+			lower.rotation.z = -0.45
+			_token.add_child(lower)
+			var point := _mesh(_cone(0.08, 0.16), shine, Vector3(-0.13, -0.32, 0.0))
+			point.rotation.z = PI - 0.45
+			_token.add_child(point)
 	var light := OmniLight3D.new()
 	light.light_color = color
 	light.light_energy = 1.5
@@ -106,11 +128,30 @@ func _ready() -> void:
 	halo.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	halo.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	halo.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	halo.albedo_color = Color(color, 0.18)
+	halo.albedo_color = Color(color, 0.22)
 	halo.no_depth_test = false
+	halo.disable_fog = true
 	var glow := _sphere(0.65, halo, Vector3.ZERO)
 	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(glow)
+	var tall := UnnaturalSettings.shared().pickup_beam
+	if tall > 0.0:
+		var column := CylinderMesh.new()
+		column.top_radius = 0.35
+		column.bottom_radius = 0.35
+		column.height = tall
+		column.radial_segments = 10
+		column.rings = 1
+		column.cap_top = false
+		column.cap_bottom = false
+		var light_column := ShaderMaterial.new()
+		light_column.shader = BEAM_SHADER
+		light_column.set_shader_parameter("color", color)
+		light_column.set_shader_parameter("height", tall)
+		beam = _mesh(column, light_column, Vector3(0.0, tall * 0.5, 0.0))
+		beam.name = "Beam"
+		beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(beam)
 
 
 func _physics_process(delta: float) -> void:

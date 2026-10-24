@@ -156,7 +156,7 @@ func _run() -> void:
 	run.hit(leviathan.parts[0], leviathan.hp + 1.0, fish, "battery")
 	await _ticks(3)
 	check(not completed[0] and not run.is_over and is_instance_valid(run.whirlpool), "beaten: the run goes on and a whirlpool opens")
-	var coil_chest := run.chests.filter(func(c: TreasureChest) -> bool: return is_instance_valid(c) and c.item == "leviathans_coil")
+	var coil_chest := run.chests.filter(func(c: TreasureChest) -> bool: return is_instance_valid(c) and c.item == "attack_leviathans_coil")
 	check(coil_chest.size() == 1 and (coil_chest[0] as TreasureChest).kind == TreasureChest.Kind.BOSS, "and it leaves a boss chest with the Leviathan's Coil")
 	fish.global_position = run.whirlpool.global_position + Vector3(settings.whirlpool_range + 20.0, 0, 0)
 	check(not run.near_whirlpool(fish), "far from the whirlpool: no prompt")

@@ -8,6 +8,8 @@ extends Boss
 ## 2. SPIT (from two thirds): as well, every leviathan_bolt_every s it spits a
 ##    fan of leviathan_bolts blood bolts at its target (they hurt players);
 ## 3. FURY (under a third): faster, it charges the target again and again.
+## Each dive is wound up first (leviathan_dive_telegraph: slower, glowing, its
+## lane showing, telegraph()), and it glows before it spits.
 ## Not beaten leviathan_enrage s after it came, it enrages (enrage_scale on
 ## speed and contact damage; UnnaturalRun has the director escalate too).
 
@@ -33,6 +35,11 @@ var _trail := PackedVector3Array()
 var _bolt_left := 0.0
 var _dive_left := 4.0
 var _diving := 0.0
+## Winding up a dive (s left; leviathan_dive_telegraph), and the way it'll go.
+## A puppet only knows that it is (the host's mode says so).
+var _dive_warn := 0.0
+var _dive_dir := Vector3.FORWARD
+var _puppet_warn := false
 var _orbit := 1.0
 var _material := StandardMaterial3D.new()
 var _bolts: Array[Dictionary] = []
@@ -150,10 +157,19 @@ func _move(delta: float) -> void:
 		var round_dir := Vector3.UP.cross(flat.normalized()) * _orbit if gap > 0.01 else Vector3.FORWARD
 		var inward := flat.normalized() * clampf((gap - 22.0) / 10.0, -1.0, 1.0) if gap > 0.01 else Vector3.ZERO
 		wanted = (round_dir + inward + Vector3.UP * sin(age * 0.7) * 0.3).normalized() * speed()
-		if _dive_left <= 0.0 and prey:
-			_diving = 2.2
-			dives += 1
-			_orbit = -_orbit
+		if _dive_warn > 0.0:
+			# Gathering itself to dive: slower, glowing, its lane showing.
+			_dive_warn -= delta
+			_dive_dir = to_prey.normalized() if to_prey.length_squared() > 0.01 else -global_basis.z
+			wanted *= 0.5
+			if _dive_warn <= 0.0:
+				_dive()
+		elif _dive_left <= 0.0 and prey:
+			if settings.leviathan_dive_telegraph > 0.0:
+				_dive_warn = settings.leviathan_dive_telegraph
+				_dive_dir = to_prey.normalized() if to_prey.length_squared() > 0.01 else -global_basis.z
+			else:
+				_dive()
 	steer(wanted, 1.4 if phase != Phase.FURY else 2.2, 10.0, delta)
 	global_position += velocity * delta
 	face(velocity)
@@ -164,7 +180,39 @@ func _move(delta: float) -> void:
 			_spit(prey.global_position)
 	_update_bolts(delta)
 	_trail_body()
-	_material.emission_energy_multiplier = (1.5 if enraged else 0.4) + flash * 2.0
+	_glow_now()
+
+
+## Straight through its target, now.
+func _dive() -> void:
+	_dive_warn = 0.0
+	_diving = 2.2
+	dives += 1
+	_orbit = -_orbit
+
+
+## Winding up a dive (a puppet: the host says it is).
+func winding_up() -> bool:
+	return _puppet_warn if puppet else _dive_warn > 0.0
+
+
+## Its dive's lane while it winds one up.
+func telegraph() -> Dictionary:
+	if not winding_up():
+		return {}
+	var dir := -global_basis.z if puppet else _dive_dir
+	var progress := 0.6 if puppet else 1.0 - _dive_warn / maxf(settings.leviathan_dive_telegraph, 0.01)
+	return {"from": global_position, "dir": dir, "length": speed() * 1.4 * 2.2, "width": settings.leviathan_girth * 1.4, "progress": progress}
+
+
+## Its glow: brighter enraged, flashing when hit, pulsing while it winds up a
+## dive or is about to spit (telegraph_glow).
+func _glow_now() -> void:
+	var warn := winding_up()
+	if not puppet and phase != Phase.CIRCLE and settings.leviathan_bolts > 0 and _bolt_left < settings.leviathan_spit_telegraph:
+		warn = true
+	var pulse := (0.5 + 0.5 * sin(age * 26.0)) * 3.0 * settings.telegraph_glow if warn else 0.0
+	_material.emission_energy_multiplier = (1.5 if enraged else 0.4) + flash * 2.0 + pulse
 
 
 func _enrage_now() -> void:
@@ -173,11 +221,14 @@ func _enrage_now() -> void:
 	enraged_now.emit()
 
 
+## Its phase, plus 8 while it winds up a dive.
 func _net_mode() -> int:
-	return phase
+	return phase + (8 if _dive_warn > 0.0 else 0)
 
 
 func _set_net_mode(net_mode: int) -> void:
+	_puppet_warn = (net_mode & 8) != 0
+	net_mode &= 7
 	if net_mode != phase:
 		phase = net_mode as Phase
 		phase_changed.emit(phase)
@@ -189,7 +240,7 @@ func _place_body() -> void:
 
 func _puppet_update(delta: float) -> void:
 	_update_bolts(delta)
-	_material.emission_energy_multiplier = (1.5 if enraged else 0.4) + flash * 2.0
+	_glow_now()
 
 
 ## A fan of blood bolts at `at`.

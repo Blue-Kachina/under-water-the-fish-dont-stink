@@ -14,15 +14,10 @@ const BLURBS := {
 	FishAttack.Kind.THRUST: "A spear at the nearest zombie in front that pierces through the ones behind it.",
 	FishAttack.Kind.BUBBLES: "A volley of homing bubbles that pop in a splash. Gentle, and hard to dodge.",
 	FishAttack.Kind.SPINES: "A ring of spines fired out all round when zombies crowd in. Pierces two.",
-}
-
-
-## The powerup weapons the later fish start with.
-const WEAPON_BLURBS := {
-	"greek_fire": "Swimming leaves a trail of burning patches that scorch every zombie that crosses them. The faster you swim, the more you burn.",
-	"jellyfish_halo": "Jellyfish orbit you and sting whatever comes close. A slow, steady shield of damage.",
-	"depth_charges": "Mines drop behind you, arm, then blow up when zombies wander near.",
-	"remora_buddy": "Remoras ride along and nip the nearest zombie in turn. Steady, safe damage.",
+	FishAttack.Kind.FIRE: "Swimming leaves a trail of burning patches that scorch every zombie that crosses them. The faster you swim, the more you burn.",
+	FishAttack.Kind.HALO: "Jellyfish orbit you and sting whatever comes close. A slow, steady shield of damage.",
+	FishAttack.Kind.CHARGES: "Mines drop behind you, arm, then blow up when zombies wander near.",
+	FishAttack.Kind.REMORA: "Remoras ride along and nip the nearest zombie in turn. Steady, safe damage.",
 }
 
 
@@ -32,11 +27,7 @@ static func sections(family: FishCharacter.Family) -> Array:
 	var attack_kind := FishAttack.kind_for(family)
 	var signature := StatBlock.signature(family)
 	var out := []
-	var weapon := FishAttack.starting_weapon(family)
-	if weapon != "":
-		out.append(["Starting weapon  ·  %s" % Powerup.title(weapon), WEAPON_BLURBS.get(weapon, "")])
-	else:
-		out.append(["Starting weapon  ·  %s" % FishAttack.title(attack_kind), BLURBS.get(attack_kind, "")])
+	out.append(["Starting weapon  ·  %s" % FishAttack.title(attack_kind), BLURBS.get(attack_kind, "")])
 	out.append(["Grows by itself  ·  %s" % StatBlock.title(signature),
 			"Every level up gives %s, on top of the cards you pick." % StatBlock.describe(signature, StatBlock.amount(signature))])
 	out.append(["Passive  ·  %s" % Traversal.title(family), twist_text(family, s)])

@@ -59,7 +59,7 @@ func count() -> int:
 
 
 func reach() -> float:
-	return settings.spine_range * area_scale * (FAR_REACH if milestones >= 1 else 1.0)
+	return settings.spine_range * size_scale * (FAR_REACH if milestones >= 1 else 1.0)
 
 
 func fire() -> bool:
@@ -108,4 +108,4 @@ func _burst(n: int) -> void:
 			var angle := k * PI * (3.0 - sqrt(5.0)) + _turn
 			out = Vector3(cos(angle) * ring, y, sin(angle) * ring)
 		out = (basis * out).normalized()
-		spines.fire(at + out * 0.6, out * speed, settings.spine_damage, settings.spine_size * area_scale, far / speed, settings.spine_pierce + (MORE_PIERCE if milestones >= 3 else 0))
+		spines.fire(at + out * 0.6, out * speed, settings.spine_damage, settings.spine_size * size_scale, far / speed, settings.spine_pierce + (MORE_PIERCE if milestones >= 3 else 0))

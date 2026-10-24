@@ -33,7 +33,7 @@ const INFO := {
 	"sonar_pinger": ["Sonar Pinger", Color(0.4, 0.95, 0.85), "SP", "Every 6 s a pulse marks the zombies near you\nDamage to marked zombies +25%", Rarity.Tier.UNCOMMON],
 	"cold_seep": ["Cold Seep", Color(0.65, 0.9, 1.0), "CO", "Hits: 8% chance to freeze a zombie for 1.5 s", Rarity.Tier.UNCOMMON],
 	"whirlpool_charm": ["Whirlpool Charm", Color(0.35, 0.7, 0.95), "WC", "Kills: 6% chance to open a whirlpool that pulls zombies in and grinds them", Rarity.Tier.UNCOMMON],
-	"greek_fire": ["Greek Fire Trail", Color(1.0, 0.45, 0.1), "GF", "Burning patches behind you burn the zombies in them.", Rarity.Tier.UNCOMMON],
+	"attack_greek_fire": ["Greek Fire Trail", Color(1.0, 0.45, 0.1), "GF", "Burning patches behind you burn the zombies in them.", Rarity.Tier.UNCOMMON],
 	"chain_lightning": ["Chain Lightning", Color(0.45, 0.8, 1.0), "CL", "Hits may start lightning that jumps between zombies.", Rarity.Tier.UNCOMMON],
 	"torpedo": ["Torpedo Launcher", Color(0.9, 0.85, 0.3), "TL", "Hits may fire heat-seeking torpedoes that explode.", Rarity.Tier.RARE],
 	"krakens_grasp": ["Kraken's Grasp", Color(0.7, 0.3, 0.55), "KG", "Hits: 5% chance a tentacle slams the area\nZombies it hits are held still", Rarity.Tier.RARE],
@@ -47,19 +47,19 @@ const INFO := {
 	"hermit_shell": ["Hermit Shell", Color(0.95, 0.6, 0.45), "HS", "Max HP +15", Rarity.Tier.COMMON],
 	"fizzy_soda": ["Fizzy Soda", Color(0.55, 1.0, 0.75), "FS", "Attack Speed +8%", Rarity.Tier.COMMON],
 	"speedy_seahorse": ["Speedy Seahorse", Color(1.0, 0.8, 0.3), "SH", "Swim Speed +6%", Rarity.Tier.COMMON],
-	"remora_buddy": ["Remora Buddy", Color(0.62, 0.68, 0.8), "RB", "A remora rides along, nipping the nearest zombie. More: more remoras.", Rarity.Tier.COMMON],
+	"attack_remora_buddy": ["Remora Buddy", Color(0.62, 0.68, 0.8), "RB", "A remora rides along, nipping the nearest zombie. More: more remoras.", Rarity.Tier.COMMON],
 	"bubble_wrap": ["Bubble Wrap", Color(0.7, 0.9, 1.0), "BW", "Blocks the next hit after 8 s untouched", Rarity.Tier.COMMON],
 	"pufferfish_spines": ["Pufferfish Spines", Color(0.95, 0.85, 0.4), "PS", "Zombies that touch you take damage back\nSpines burst out when you're touched", Rarity.Tier.UNCOMMON],
-	"jellyfish_halo": ["Jellyfish Halo", Color(0.85, 0.5, 1.0), "JH", "Jellies orbit you, stinging what they touch.", Rarity.Tier.UNCOMMON],
+	"attack_jellyfish_halo": ["Jellyfish Halo", Color(0.85, 0.5, 1.0), "JH", "Jellies orbit you, stinging what they touch.", Rarity.Tier.UNCOMMON],
 	"electric_eel": ["Electric Eel", Color(0.4, 1.0, 0.9), "EE", "Batteries send out a shock ring", Rarity.Tier.UNCOMMON],
-	"depth_charges": ["Depth Charges", Color(0.6, 0.66, 0.55), "DC", "Drops mines behind you that blow up the zombies that follow.", Rarity.Tier.RARE],
+	"attack_depth_charges": ["Depth Charges", Color(0.6, 0.66, 0.55), "DC", "Drops mines behind you that blow up the zombies that follow.", Rarity.Tier.RARE],
 	"anglerfish_lure": ["Anglerfish Lure", Color(0.6, 1.0, 0.5), "AL", "Drops a glowing decoy the zombies chase\nIt bursts after a while", Rarity.Tier.RARE],
 	"tsunami_heart": ["Tsunami Heart", Color(0.3, 0.6, 1.0), "TH", "Batteries send a wave rolling along your heading", Rarity.Tier.LEGENDARY],
 	"poseidons_trident": ["Poseidon's Trident", Color(0.4, 0.75, 1.0), "PT", "Every 3rd attack calls lightning down on the biggest zombie near", Rarity.Tier.LEGENDARY],
 	"megalodon_tooth": ["Megalodon Tooth", Color(0.95, 0.92, 0.85), "MT", "Crits finish off zombies under 15% HP (not bosses)", Rarity.Tier.LEGENDARY],
 	"moon_pearl": ["Moon Pearl", Color(0.85, 0.88, 1.0), "MP", "Level-Up Picks +1", Rarity.Tier.LEGENDARY],
-	"abyssal_engine": ["Abyssal Engine", Color(0.5, 0.25, 0.75), "AE", "Projectiles +1\nArea +15%", Rarity.Tier.LEGENDARY],
-	"leviathans_coil": ["Leviathan's Coil", Color(0.85, 0.15, 0.2), "LC", "A trail of coils behind you hurts whatever they touch.", Rarity.Tier.BOSS],
+	"abyssal_engine": ["Abyssal Engine", Color(0.5, 0.25, 0.75), "AE", "Projectiles +1\nSize +15%", Rarity.Tier.LEGENDARY],
+	"attack_leviathans_coil": ["Leviathan's Coil", Color(0.85, 0.15, 0.2), "LC", "A trail of coils behind you hurts whatever they touch.", Rarity.Tier.BOSS],
 	"attack_sting": ["Anemone Sting", Color(1.0, 0.55, 0.3), "ST", "A stinging pulse all round you hits everything inside.", Rarity.Tier.COMMON],
 	"attack_bite": ["Ghost Bite", Color(0.7, 0.85, 1.0), "GB", "Huge spectral jaws snap shut on the zombies ahead.", Rarity.Tier.COMMON],
 	"attack_lash": ["Shock Lash", Color(0.5, 0.8, 1.0), "SL", "Your tail whips the nearest zombie, and the shock arcs on.", Rarity.Tier.COMMON],
@@ -85,8 +85,6 @@ var _worn: Node3D
 static func create(powerup_id: String) -> Powerup:
 	var made: Powerup
 	match powerup_id:
-		"greek_fire":
-			made = GreekFire.new()
 		"chain_lightning":
 			made = ChainLightning.new()
 		"torpedo":
@@ -103,27 +101,19 @@ static func create(powerup_id: String) -> Powerup:
 			made = MomentumFin.new()
 		"treasure_map":
 			made = TreasureMap.new()
-		"remora_buddy":
-			made = RemoraBuddy.new()
 		"bubble_wrap":
 			made = BubbleWrap.new()
 		"pufferfish_spines":
 			made = PufferfishSpines.new()
-		"jellyfish_halo":
-			made = JellyfishHalo.new()
 		"electric_eel":
 			made = ElectricEel.new()
-		"depth_charges":
-			made = DepthCharges.new()
 		"anglerfish_lure":
 			made = AnglerfishLure.new()
 		"tsunami_heart":
 			made = TsunamiHeart.new()
-		"leviathans_coil":
-			made = LeviathansCoil.new()
 		"blood_moon_shard", "glass_coral", "sirens_song", "abyssal_hunger", "sunken_idol":
 			made = CursedPowerup.new()
-		"attack_sting", "attack_bite", "attack_lash", "attack_thrust", "attack_bubbles", "attack_spines":
+		_ when Weapons.ATTACK_WEAPONS.has(powerup_id):
 			made = AttackWeapon.new()
 		"sticky_anemone", "cold_seep", "krakens_grasp":
 			made = HitProc.new()
@@ -270,9 +260,9 @@ func rate_scale() -> float:
 	return maxf(1.0 + run.block_of(fish).value("attack_speed"), 0.1) if run and is_instance_valid(fish) else 1.0
 
 
-## 1 + the player's Area (Tome of the Reef): how much bigger weapons' reach and blasts are.
-func area_scale() -> float:
-	return maxf(1.0 + run.block_of(fish).value("area"), 0.1) if run and is_instance_valid(fish) else 1.0
+## 1 + the player's Size (Tome of the Reef): how much bigger weapons' reach and blasts are.
+func size_scale() -> float:
+	return maxf(1.0 + run.block_of(fish).value("size"), 0.1) if run and is_instance_valid(fish) else 1.0
 
 
 func on_hit(_index: int, _damage: float, _source: String, _proc: float, _chain: Array) -> void:

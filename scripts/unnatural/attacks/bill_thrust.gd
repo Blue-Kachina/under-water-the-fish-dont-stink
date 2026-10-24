@@ -9,7 +9,7 @@ extends FishAttack
 ##
 ## As a weapon (Weapons): at its first milestone the spears pierce one more
 ## zombie; at its second, a spear that flies its full range bursts, hurting
-## every zombie within BURST_REACH (times area) for BURST_SHARE of its damage;
+## every zombie within BURST_REACH (times Size) for BURST_SHARE of its damage;
 ## at its third, MORE_SPEARS more spears fan out with each thrust; at its
 ## fourth, they pierce everything in their way.
 
@@ -37,7 +37,7 @@ func _ready() -> void:
 	spears.on_expire = func(at: Vector3, amount: float) -> void:
 		if milestones < 2:
 			return
-		var reach := BURST_REACH * area_scale
+		var reach := BURST_REACH * size_scale
 		PowerupFx.pop(self, at, reach, COLOR, 0.25)
 		for i in horde.query_sphere(at, reach):
 			strike(i, amount * BURST_SHARE, toward(at, i, Vector3.UP))
@@ -59,10 +59,15 @@ func speed() -> float:
 	return settings.thrust_speed * projectile_speed
 
 
+## The nearest zombie within thrust_range and thrust_aim_cone of the nose.
+func aim_target() -> int:
+	return horde.nearest_in_cone(origin(), nose(), settings.thrust_range, cos(deg_to_rad(settings.thrust_aim_cone)))
+
+
 func fire() -> bool:
 	var at := origin()
 	var ahead := nose()
-	var target := horde.nearest_in_cone(at, ahead, settings.thrust_range, cos(deg_to_rad(settings.thrust_aim_cone)))
+	var target := aim_target()
 	if target < 0:
 		return false
 	var aim := toward(at, target, ahead)
@@ -74,6 +79,6 @@ func fire() -> bool:
 	for n in count:
 		var offset := (n - (count - 1) * 0.5) * deg_to_rad(settings.thrust_spread)
 		var direction := aim.rotated(up, offset)
-		spears.fire(tip, direction * speed(), settings.thrust_damage, settings.thrust_size * area_scale,
+		spears.fire(tip, direction * speed(), settings.thrust_damage, settings.thrust_size * size_scale,
 				settings.thrust_range / settings.thrust_speed, pierce)
 	return true

@@ -26,7 +26,7 @@ func on_kill(at: Vector3, _source: String) -> void:
 func open_at(at: Vector3) -> Vortex:
 	var vortex := Vortex.new()
 	vortex.owner_charm = self
-	vortex.radius = settings.charm_radius * area_scale()
+	vortex.radius = settings.charm_radius * size_scale()
 	vortex.life = settings.charm_time * duration_scale()
 	vortex.dps = settings.charm_dps + settings.charm_dps_per_stack * (stacks - 1)
 	vortex.pull = settings.charm_pull

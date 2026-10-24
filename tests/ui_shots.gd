@@ -84,11 +84,11 @@ func _run() -> void:
 	UnnaturalSettings.shared().spawning = false
 	var held := run.powerups_of(fish)
 	for id: String in ["chain_lightning", "chain_lightning", "torpedo", "hermit_shell", "hermit_shell", "hermit_shell",
-			"tsunami_heart", "leviathans_coil", "blood_moon_shard"]:
+			"tsunami_heart", "attack_leviathans_coil", "blood_moon_shard"]:
 		held.add(id)
 	# The slots: the attack and Greek Fire at Lv 3 and 5; one tome, one free.
 	var loadout := run.loadout_of(fish)
-	loadout.add_weapon("greek_fire", 5)
+	loadout.add_weapon("attack_greek_fire", 5)
 	loadout.upgrade_weapon(Weapons.ATTACK, {"damage": 0.2})
 	loadout.upgrade_weapon(Weapons.ATTACK, {"rate": 0.12})
 	loadout.add_tome("teeth")
@@ -166,21 +166,21 @@ func _run() -> void:
 	await _shot("cards_cursed")
 	var settings := UnnaturalSettings.shared()
 	cards.attack_kind = run.attack_of(fish).kind
-	cards.open([{"kind": "weapon", "weapon": "greek_fire", "tier": Rarity.Tier.EPIC, "level": 5, "gains": {"burn": 0.5, "life": 2.0}},
-			{"kind": "new_weapon", "weapon": "jellyfish_halo", "tier": Rarity.Tier.UNCOMMON, "level": 1,
-					"gains": Weapons.roll(run.rng, "jellyfish_halo", cards.attack_kind, Rarity.Tier.UNCOMMON, settings, run.powerup_settings)},
+	cards.open([{"kind": "weapon", "weapon": "attack_greek_fire", "tier": Rarity.Tier.EPIC, "level": 5, "gains": {"burn": 0.5, "life": 2.0}},
+			{"kind": "new_weapon", "weapon": "attack_jellyfish_halo", "tier": Rarity.Tier.UNCOMMON, "level": 1,
+					"gains": Weapons.roll(run.rng, "attack_jellyfish_halo", cards.attack_kind, Rarity.Tier.UNCOMMON, settings, run.powerup_settings)},
 			{"kind": "tome", "tome": "kill", "tier": Rarity.Tier.LEGENDARY, "level": 3, "gives": Tomes.gives("kill", Rarity.multiplier(settings, Rarity.Tier.LEGENDARY), settings)}],
-			"LEVEL 4", "+10 MAX HP  ·  +10% AREA (SIGNATURE)  ·  WEAPONS 2/2  ·  TOMES 1/2", null)
+			"LEVEL 4", "+10 MAX HP  ·  +10% SIZE (SIGNATURE)  ·  WEAPONS 2/2  ·  TOMES 1/2", null)
 	await _frames(6)
 	await _shot("cards_level")
 	cards.open([{"kind": "weapon", "weapon": Weapons.ATTACK, "tier": Rarity.Tier.RARE, "level": 3, "gains": {"damage": 0.3, "size": 0.18}},
 			{"kind": "new_tome", "tome": "pearls", "tier": Rarity.Tier.COMMON, "level": 1, "gives": Tomes.gives("pearls", 1.0, settings)},
 			{"kind": "fallback", "what": "pearls", "tier": Rarity.Tier.COMMON, "amount": 14}], "LEVEL 9",
-			"+10 MAX HP  ·  +10% AREA (SIGNATURE)  ·  WEAPONS 2/2  ·  TOMES 2/2", null)
+			"+10 MAX HP  ·  +10% SIZE (SIGNATURE)  ·  WEAPONS 2/2  ·  TOMES 2/2", null)
 	await _frames(6)
 	await _shot("cards_level_2")
-	cards.open([{"kind": "swap", "weapon": "greek_fire", "incoming": "leviathans_coil", "tier": Rarity.Tier.BOSS, "level": 5},
-			{"kind": "keep", "weapon": "leviathans_coil", "tier": Rarity.Tier.COMMON}], "LEVIATHAN'S COIL: NO FREE SLOT",
+	cards.open([{"kind": "swap", "weapon": "attack_greek_fire", "incoming": "attack_leviathans_coil", "tier": Rarity.Tier.BOSS, "level": 5},
+			{"kind": "keep", "weapon": "attack_leviathans_coil", "tier": Rarity.Tier.COMMON}], "LEVIATHAN'S COIL: NO FREE SLOT",
 			"SWAP A WEAPON FOR IT, OR KEEP YOURS", null)
 	await _frames(6)
 	await _shot("cards_swap")

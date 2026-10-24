@@ -18,7 +18,7 @@ const STATS := {
 	"armour": ["Armour", 1.0, false, true],
 	"damage": ["Damage", 0.1, true, true],
 	"attack_speed": ["Attack Speed", 0.08, true, true],
-	"area": ["Area", 0.1, true, true],
+	"size": ["Size", 0.1, true, true],
 	"projectile_count": ["Projectiles", 1.0, false, false],
 	"projectile_speed": ["Projectile Speed", 0.1, true, false],
 	"crit_chance": ["Crit Chance", 0.05, true, true],
@@ -36,13 +36,13 @@ const STATS := {
 ## Each fish's signature stat (+1 step every level).
 const SIGNATURE := {
 	FishCharacter.Family.DOMINUS: "damage",
-	FishCharacter.Family.OCTANE: "area",
+	FishCharacter.Family.OCTANE: "size",
 	FishCharacter.Family.BREAKOUT: "projectile_speed",
 	FishCharacter.Family.HYBRID: "luck",
 	FishCharacter.Family.MERC: "armour",
 	FishCharacter.Family.PLANK: "attack_speed",
 	FishCharacter.Family.LIONFISH: "duration",
-	FishCharacter.Family.MOON_JELLY: "area",
+	FishCharacter.Family.MOON_JELLY: "size",
 	FishCharacter.Family.MANTIS: "knockback",
 	FishCharacter.Family.WHALE_SHARK: "pearl_chance",
 }

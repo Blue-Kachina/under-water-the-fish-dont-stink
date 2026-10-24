@@ -7,7 +7,8 @@ extends Node
 ## - every chest is every player's: in split-screen one player opening it hides
 ##   it from their view alone (render layers), and the other can still open it;
 ## - drops: a heart heals, a magnet draws every pearl to the taker, an
-##   hourglass stops every zombie (they don't bite meanwhile);
+##   hourglass stops every zombie (they don't bite meanwhile), a lightning bolt
+##   kills every zombie in the arena (not a boss's body) and its kills drop nothing;
 ## - zombies spawned later are tougher and bigger (the difficulty level);
 ## - every powerup is worn on the fish;
 ## - the scoreboard shows your own stats beside it.
@@ -50,6 +51,7 @@ func _run() -> void:
 	settings.heart_chance = 0.0
 	settings.magnet_chance = 0.0
 	settings.hourglass_chance = 0.0
+	settings.lightning_chance = 0.0
 	settings.difficulty_per_minute = 0.0
 	settings.card_choices = 0
 	main.set_mode(main.UNNATURAL)
@@ -169,6 +171,21 @@ func _run() -> void:
 	check(is_equal_approx(health.hp, health.max_hp), "and doesn't bite")
 	horde.frozen_left = 0.0
 	settings.enemy_speed_scale = 0.0
+	horde.clear()
+	var far_off: Array[int] = []
+	for n in 6:
+		far_off.append(horde.spawn(0, fish.global_position + Vector3(-40 + n * 16, 0, 45)))
+	var part := horde.spawn_proxy(fish.global_position + Vector3(30, 0, -30), 2.0)
+	settings.heart_chance = 1.0  # a bolt's kills must not roll drops anyway
+	var kills_before := run.kills
+	var drops_before := run.pickups.size()
+	run.drop_pickup(Pickup.Kind.LIGHTNING, fish.global_position + Vector3(0, 0, -6))
+	await _hold(fish.global_position + Vector3(0, 0, -6), 0.3)
+	settings.heart_chance = 0.0
+	check(far_off.all(func(i: int) -> bool: return not horde.is_alive(i)), "a lightning bolt: every zombie across the arena dies")
+	check(run.kills - kills_before == far_off.size(), "...credited as %d kills" % (run.kills - kills_before))
+	check(horde.is_alive(part), "...but a boss's body is spared")
+	check(run.pickups.size() <= drops_before, "...and its kills drop nothing")
 	horde.clear()
 
 	print("difficulty:")

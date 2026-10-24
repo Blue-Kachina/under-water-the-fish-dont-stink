@@ -1,13 +1,20 @@
 class_name FishAttack
 extends Node3D
-## A fish's auto-attack in Unnatural (planning_unnatural.md §5): each fish
-## fires its own on a cooldown, aimed for it. make() builds the one for a fish
-## (FOR_FAMILY, or UnnaturalSettings.fish_attack for every fish).
+## A fish's weapon in Unnatural (planning_unnatural.md §5): every weapon is
+## one of these, the fish's own (FOR_FAMILY, or UnnaturalSettings.fish_attack
+## for every fish) and any second one alike (AttackWeapon holds those). make()
+## builds one of a kind.
 ##
-## A subclass gives cooldown() and damage(), and fire() returns whether it went
-## off (nothing in range: it waits, ready). _animate() runs every frame, firing
-## or not. Every zombie it hurts goes through strike(), which hands it to
-## on_hit (UnnaturalRun.hit) with the attack's source and proc coefficient.
+## Two sorts:
+## - Fired ones (the sting, the bite...): a subclass gives cooldown() and
+##   damage(), and fire() returns whether it went off (nothing in range: it
+##   waits, ready).
+## - Steady ones (the fire trail, the halo, the mines, the remoras, the coil):
+##   they do their work in _work(delta), every tick they're active, on their
+##   own timers. They read their own facets (facet()), so own_facets() is true.
+## _animate() runs every frame, active or not. Every zombie it hurts goes
+## through strike(), which hands it to on_hit (UnnaturalRun.hit) with the
+## attack's source and proc coefficient.
 ##
 ## Melee attacks (the sting, the bite) must out-reach the bow wave
 ## (GhostBite.bow_reach) at its biggest: aiming in 3D water is hard, and
@@ -16,7 +23,7 @@ extends Node3D
 ## The attack went off (fire() returned true).
 signal fired
 
-enum Kind { OWN, STING, BITE, LASH, THRUST, BUBBLES, SPINES, NONE }
+enum Kind { OWN, STING, BITE, LASH, THRUST, BUBBLES, SPINES, FIRE, HALO, CHARGES, REMORA, COIL }
 ## Each fish's own.
 const FOR_FAMILY := {
 	FishCharacter.Family.OCTANE: Kind.STING,
@@ -25,20 +32,13 @@ const FOR_FAMILY := {
 	FishCharacter.Family.BREAKOUT: Kind.THRUST,
 	FishCharacter.Family.HYBRID: Kind.BUBBLES,
 	FishCharacter.Family.MERC: Kind.SPINES,
-	# The later fish start with a powerup weapon instead (STARTING_WEAPON): no attack of their own.
-	FishCharacter.Family.LIONFISH: Kind.NONE,
-	FishCharacter.Family.MOON_JELLY: Kind.NONE,
-	FishCharacter.Family.MANTIS: Kind.NONE,
-	FishCharacter.Family.WHALE_SHARK: Kind.NONE,
+	FishCharacter.Family.LIONFISH: Kind.FIRE,
+	FishCharacter.Family.MOON_JELLY: Kind.HALO,
+	FishCharacter.Family.MANTIS: Kind.CHARGES,
+	FishCharacter.Family.WHALE_SHARK: Kind.REMORA,
 }
-## The weapon (Weapons.POWERUPS) each later fish starts with, in the slot a fish's own attack takes.
-const STARTING_WEAPON := {
-	FishCharacter.Family.LIONFISH: "greek_fire",
-	FishCharacter.Family.MOON_JELLY: "jellyfish_halo",
-	FishCharacter.Family.MANTIS: "depth_charges",
-	FishCharacter.Family.WHALE_SHARK: "remora_buddy",
-}
-## Kind -> [name, hit source].
+## Kind -> [name, hit source]. Held as a second weapon, its id is "attack_" +
+## its source (Weapons.ATTACK_WEAPONS).
 const INFO := {
 	Kind.STING: ["Anemone Sting", "sting"],
 	Kind.BITE: ["Ghost Bite", "bite"],
@@ -46,31 +46,47 @@ const INFO := {
 	Kind.THRUST: ["Bill Thrust", "thrust"],
 	Kind.BUBBLES: ["Bubble Volley", "bubbles"],
 	Kind.SPINES: ["Spine Burst", "spines"],
+	Kind.FIRE: ["Greek Fire Trail", "greek_fire"],
+	Kind.HALO: ["Jellyfish Halo", "jellyfish_halo"],
+	Kind.CHARGES: ["Depth Charges", "depth_charges"],
+	Kind.REMORA: ["Remora Buddy", "remora_buddy"],
+	Kind.COIL: ["Leviathan's Coil", "leviathans_coil"],
 }
 
 var fish: FishController
 var horde: Horde
 var settings: UnnaturalSettings
+## The run it fights in (the steady weapons drop things into it, heal, and roll).
+var run: UnnaturalRun
+## The weapon numbers (PowerupSettings: the steady weapons' fire_*, jelly_*...).
+var powers := PowerupSettings.shared()
 ## Called for each zombie hurt: (index, damage, by, source, push, proc).
 var on_hit: Callable
 ## Which attack this is (Kind).
 var kind := Kind.BITE
 ## The player's stats on it: attacks per second scale (attack speed), size
-## scale (area), damage scale (the Damage stat applies in UnnaturalRun.hit(),
-## not here), extra projectiles and the projectiles' speed scale.
+## scale (Size), damage scale (the Damage stat applies in UnnaturalRun.hit(),
+## not here), extra projectiles, the projectiles' speed scale and how much
+## longer timed things last (Duration).
 var attack_speed := 1.0
-var area_scale := 1.0
+var size_scale := 1.0
 var damage_scale := 1.0
 var extra_projectiles := 0
 var projectile_speed := 1.0
-## Its weapon facets on top (Weapons, set by UnnaturalRun._apply_stats): how
-## hard it knocks zombies back, and the milestones it has reached (0 to 4).
+var duration_scale := 1.0
+## Its weapon facets on top (Weapons, set by configure()): how hard it knocks
+## zombies back, and the milestones it has reached (0 to 4) at its level.
 var knock_scale := 1.0
 var milestones := 0
+var level := 0
+## Its facets' totals (facet id -> amount), for the steady weapons to read.
+var facets := {}
 var cooldown_left := 0.0
 ## Attacks made, and zombies hurt.
 var uses := 0
 var struck := 0
+## Its look on the fish (make_worn()), while it's out.
+var _worn: Node3D
 
 
 ## The attack for `family`, or `override` (a Kind, not OWN) for every fish.
@@ -80,7 +96,7 @@ static func kind_for(family: FishCharacter.Family, override := Kind.OWN) -> Kind
 	return FOR_FAMILY.get(family, Kind.BITE)
 
 
-## A new attack of `attack_kind` (set fish, horde, settings and on_hit, then add it).
+## A new attack of `attack_kind` (set fish, horde, settings, run and on_hit, then add it).
 static func make(attack_kind: Kind) -> FishAttack:
 	var attack: FishAttack
 	match attack_kind:
@@ -94,8 +110,16 @@ static func make(attack_kind: Kind) -> FishAttack:
 			attack = BubbleVolley.new()
 		Kind.SPINES:
 			attack = SpineBurst.new()
-		Kind.NONE:
-			attack = FishAttack.new()  # never fires: the fish's weapon is a powerup
+		Kind.FIRE:
+			attack = GreekFire.new()
+		Kind.HALO:
+			attack = JellyfishHalo.new()
+		Kind.CHARGES:
+			attack = DepthCharges.new()
+		Kind.REMORA:
+			attack = RemoraBuddy.new()
+		Kind.COIL:
+			attack = LeviathansCoil.new()
 		_:
 			attack = GhostBite.new()
 			attack_kind = Kind.BITE
@@ -111,6 +135,11 @@ static func source_of(attack_kind: Kind) -> String:
 	return INFO[attack_kind][1] if INFO.has(attack_kind) else "attack"
 
 
+## Its id held as a second weapon ("attack_sting", "attack_greek_fire"...).
+static func weapon_id_of(attack_kind: Kind) -> String:
+	return "attack_" + source_of(attack_kind)
+
+
 ## Every attack's hit source.
 static func sources() -> Array[String]:
 	var all: Array[String] = []
@@ -119,9 +148,14 @@ static func sources() -> Array[String]:
 	return all
 
 
-## This attack's hit source ("sting", "bite"...).
+## This attack's hit source ("sting", "bite", "greek_fire"...).
 func source() -> String:
 	return source_of(kind)
+
+
+## Its colour (the weapon's, Powerup.INFO).
+func tint() -> Color:
+	return Powerup.color(weapon_id_of(kind))
 
 
 ## Seconds between attacks, before attack speed.
@@ -140,6 +174,18 @@ func proc() -> float:
 	return 1.0
 
 
+## Whether it reads its own facets (the steady weapons) rather than having
+## the shared ones (rate, size, damage, knock, count, speed) put on its scales.
+func own_facets() -> bool:
+	return false
+
+
+## Whether its uses count as attacks (Poseidon's Trident counts them). The
+## steady weapons have none: the Trident strikes on its own timer for them.
+func counts_uses() -> bool:
+	return true
+
+
 ## Whether the player's stat `id` does anything for it (projectile stats are
 ## offered on cards only to fish whose attack uses them).
 func uses_stat(id: String) -> bool:
@@ -156,9 +202,63 @@ static func kind_uses_stat(attack_kind: Kind, id: String) -> bool:
 	return false
 
 
-## Counts down and fires; `active` false holds it (down, picking a card).
+## The player's stats (`block`), this weapon's facets (`held`: facet id ->
+## total) and its level on it: UnnaturalRun does it for the fish's own, an
+## AttackWeapon for a second.
+func configure(block: StatBlock, held: Dictionary, at_level: int) -> void:
+	facets = held
+	var rate := maxf(1.0 + block.value("attack_speed"), 0.1)
+	var bigger := maxf(1.0 + block.value("size"), 0.1)
+	duration_scale = 1.0 + block.value("duration")
+	if own_facets():
+		attack_speed = rate
+		size_scale = bigger
+		damage_scale = 1.0
+		knock_scale = 1.0
+		extra_projectiles = roundi(block.value("projectile_count"))
+		projectile_speed = 1.0 + block.value("projectile_speed")
+	else:
+		attack_speed = rate * (1.0 + facet("rate"))
+		size_scale = bigger * (1.0 + facet("size"))
+		damage_scale = 1.0 + facet("damage")
+		knock_scale = 1.0 + facet("knock")
+		extra_projectiles = roundi(block.value("projectile_count") + facet("count"))
+		projectile_speed = (1.0 + block.value("projectile_speed")) * (1.0 + facet("speed"))
+	milestones = settings.milestones_at(at_level) if settings else 0
+	if at_level != level:
+		level = at_level
+		_level_changed()
+		wear()
+
+
+## Its level went up or down (or a testing override changed it).
+func _level_changed() -> void:
+	pass
+
+
+## Facet `facet_id`'s total (0: none).
+func facet(facet_id: String) -> float:
+	return float(facets.get(facet_id, 0.0))
+
+
+## A whole-number facet (a count).
+func facet_count(facet_id: String) -> int:
+	return roundi(facet(facet_id))
+
+
+## Whether it has reached milestone `n` (1 to 4: Lv milestone_first to milestone_fourth).
+func milestone(n: int) -> bool:
+	if settings == null or n <= 0:
+		return false
+	var at := settings.milestone_level(n)
+	return at > 0 and level >= at
+
+
+## Counts down and fires; `active` false holds it (down, picking a card, quiet).
 func update(delta: float, active := true) -> void:
 	_animate(delta)
+	if active:
+		_work(delta)
 	cooldown_left = maxf(cooldown_left - delta * attack_speed, 0.0)
 	if not active or cooldown_left > 0.0 or busy() or fish.battered or damage() <= 0.0:
 		return
@@ -173,6 +273,17 @@ func fire() -> bool:
 	return false
 
 
+## The zombie it would aim at if it fired now (-1: none, or it doesn't aim:
+## the area and steady weapons). The HUD's target marker shows it.
+func aim_target() -> int:
+	return -1
+
+
+## A steady weapon's tick while it's active.
+func _work(_delta: float) -> void:
+	pass
+
+
 ## Still playing out the last one (it can't fire again yet).
 func busy() -> bool:
 	return false
@@ -180,6 +291,22 @@ func busy() -> bool:
 
 func _animate(_delta: float) -> void:
 	pass
+
+
+## A zombie died to one of `fish`'s hits from `source` (a kill of its own if
+## it's this attack's source).
+func on_kill(_at: Vector3, _source: String) -> void:
+	pass
+
+
+## Going away: clears what it put in the world (patches, mines, jellies...).
+func on_removed() -> void:
+	pass
+
+
+func _exit_tree() -> void:
+	on_removed()
+	take_off()
 
 
 ## Hurts zombie `index` by `amount` (before damage_scale), pushed along `push`.
@@ -216,6 +343,42 @@ static func ghost_material(color: Color) -> StandardMaterial3D:
 	return material
 
 
-## The powerup weapon `family` starts with instead of an attack ("": it has an attack).
-static func starting_weapon(family: FishCharacter.Family) -> String:
-	return STARTING_WEAPON.get(family, "")
+## Its look on the fish, built fresh (null: none), grown a little each level.
+func make_worn() -> Node3D:
+	return null
+
+
+## Puts its look on the fish (once), sized by its level.
+func wear() -> void:
+	if not is_instance_valid(fish):
+		return
+	if _worn == null or not is_instance_valid(_worn):
+		_worn = make_worn()
+		if _worn == null:
+			return
+		fish.add_child(_worn)
+	_worn.scale = Vector3.ONE * minf(1.0 + 0.15 * (level - 1), 2.0)
+
+
+## Takes its look off the fish.
+func take_off() -> void:
+	if _worn and is_instance_valid(_worn):
+		if _worn.get_parent():
+			_worn.get_parent().remove_child(_worn)  # off now, not at the frame's end
+		_worn.queue_free()
+	_worn = null
+
+
+## A glowing material in this weapon's colour, for its look.
+func worn_material(glow := 0.6) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = tint()
+	material.roughness = 0.35
+	material.emission_enabled = true
+	material.emission = tint()
+	material.emission_energy_multiplier = glow
+	return material
+
+
+static func worn_mesh(mesh: Mesh, material: Material, at: Vector3, turn := Vector3.ZERO) -> MeshInstance3D:
+	return Powerup.worn_mesh(mesh, material, at, turn)

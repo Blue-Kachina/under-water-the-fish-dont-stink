@@ -103,12 +103,12 @@ static func _tooth_glow() -> GradientTexture2D:
 ## How far ahead of the hitbox's middle the jaws reach (m): bite_reach, or
 ## more if the bow wave reaches further.
 func reach() -> float:
-	return maxf(settings.bite_reach, bow_reach(fish) * settings.bite_over_bow) * area_scale
+	return maxf(settings.bite_reach, bow_reach(fish) * settings.bite_over_bow) * size_scale
 
 
 ## The jaws' half-width (m), likewise against the bow wave's.
 func half_width() -> float:
-	return maxf(settings.bite_width, bow_half_width(fish) * settings.bite_over_bow) * area_scale
+	return maxf(settings.bite_width, bow_half_width(fish) * settings.bite_over_bow) * size_scale
 
 
 ## How far ahead of the hitbox's middle `of`'s bow wave reaches at its biggest (m).
@@ -139,11 +139,16 @@ func update(delta: float, active := true) -> void:
 	if not active or cooldown_left > 0.0 or _age >= 0.0 or fish.battered or settings.bite_damage <= 0.0:
 		return
 	var nose := -fish.global_basis.z
-	var target := horde.nearest_in_cone(origin(), nose, reach(), cos(deg_to_rad(settings.bite_aim_cone)))
+	var target := aim_target()
 	if target < 0:
 		return
 	var toward := horde.enemy_position(target) - origin()
 	start(toward.normalized() if toward.length_squared() > 0.0001 else nose)
+
+
+## The nearest zombie within reach and bite_aim_cone of the nose.
+func aim_target() -> int:
+	return horde.nearest_in_cone(origin(), -fish.global_basis.z, reach(), cos(deg_to_rad(settings.bite_aim_cone)))
 
 
 ## Opens the jaws toward `direction` (unit); they snap shut SNAP_TIME later.
@@ -191,7 +196,7 @@ func _echo(n: int) -> GhostBite:
 		add_child(echo)
 		_echoes.append(echo)
 	var echo := _echoes[n]
-	echo.area_scale = area_scale
+	echo.size_scale = size_scale
 	echo.damage_scale = damage_scale
 	echo.knock_scale = knock_scale
 	return echo

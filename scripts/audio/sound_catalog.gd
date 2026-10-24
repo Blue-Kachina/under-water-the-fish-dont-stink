@@ -156,6 +156,7 @@ const ROWS := [
 	["unnatural/pickup_heart", 1, "", "Heart pickup."],
 	["unnatural/pickup_magnet", 1, "", "Magnet pickup."],
 	["unnatural/pickup_hourglass", 1, "", "Hourglass pickup."],
+	["unnatural/pickup_lightning", 1, "", "Lightning bolt pickup: a big arena-wide electric crack."],
 	["unnatural/magnet_pull_loop", 3, "loop voices=1", "The magnet hoovering up XP."],
 	["unnatural/chest_buried", 2, "3d", "A treasure chest appears."],
 	["unnatural/chest_open", 1, "3d", "A chest opens."],

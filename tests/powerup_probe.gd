@@ -189,13 +189,14 @@ func _run() -> void:
 		fish.linear_velocity = Vector3.FORWARD * 6.0
 		await get_tree().physics_frame
 	fish.linear_velocity = Vector3.ZERO
-	var fire: GreekFire = run.powerups_of(fish).held["greek_fire"]
+	var fire := run.powerups_of(fish).weapon("attack_greek_fire") as GreekFire
 	check(fire.patches.size() > 3, "swimming leaves a trail of fire (%d patches)" % fire.patches.size())
+	var lit := fire.patches.duplicate()
 	var burnt: float = run.stats_of(fish).by_source.get("greek_fire", 0.0) - swim_start
 	check(burnt > 0.0, "zombies in it burn (%.0f damage)" % burnt)
 	powers.fire_stacks = 0
 	await _ticks(2)
-	check(fire.patches.is_empty(), "losing it puts the fires out")
+	check(lit.all(func(patch: Variant) -> bool: return not is_instance_valid(patch)), "losing it puts the fires out")
 
 	print("bow grow bow:")
 	horde.clear()

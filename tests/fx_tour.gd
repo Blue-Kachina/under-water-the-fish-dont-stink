@@ -49,7 +49,7 @@ func _run() -> void:
 	var up := camera.global_basis.y.lerp(-camera.global_basis.z, 0.5).normalized()  # rings seen at a slant
 	PowerupFx.ring(run, at(-4.5, 1.5, 12.0), 2.5, Traversal.FIN_COLOR, up, 10.0)
 	PowerupFx.shock(run, at(4.5, 1.5, 12.0), 3.0, Powerup.color("electric_eel"), up, 10.0)
-	PowerupFx.flash(run, at(-3.0, -1.5, 8.0), 0.6, Powerup.color("remora_buddy"), 10.0)
+	PowerupFx.flash(run, at(-3.0, -1.5, 8.0), 0.6, Powerup.color("attack_remora_buddy"), 10.0)
 	PowerupFx.spikes(run, at(0.0, 2.5, 10.0), 2.5, Powerup.color("pufferfish_spines"), 10.0)
 	PowerupFx.pop(run, at(3.0, -1.5, 8.0), 1.0, Powerup.color("bubble_wrap"), 10.0)
 	await _seconds(1.5)
@@ -118,10 +118,10 @@ func _run() -> void:
 
 	# The lingering ones: mines, a lure, the jellies and the coil.
 	var held := run.powerups_of(fish)
-	for id: String in ["depth_charges", "anglerfish_lure", "jellyfish_halo", "leviathans_coil"]:
+	for id: String in ["attack_depth_charges", "anglerfish_lure", "attack_jellyfish_halo", "attack_leviathans_coil"]:
 		held.add(id)
 	await _frames(5)
-	var charges: DepthCharges = held.held["depth_charges"]
+	var charges := held.weapon("attack_depth_charges") as DepthCharges
 	for n in 3:
 		charges.drop()
 	for n in charges.mines.size():
@@ -130,7 +130,7 @@ func _run() -> void:
 	var lure_powerup: AnglerfishLure = held.held["anglerfish_lure"]
 	lure_powerup.drop()
 	lure_powerup.lures[-1].global_position = at(4.0, 1.0, 10.0)
-	var coil: LeviathansCoil = held.held["leviathans_coil"]
+	var coil := held.weapon("attack_leviathans_coil") as LeviathansCoil
 	var trail := PackedVector3Array([fish.global_position])
 	for k in coil.count():
 		trail.append(fish.global_position + camera.global_basis.x * (1.5 + k * 1.2) + Vector3.UP * sin(k * 0.8) * 1.2 + camera.global_basis.z * k * 0.4)
@@ -138,13 +138,13 @@ func _run() -> void:
 	coil._draw()
 	await _seconds(0.6)
 	await _shot("fx_lingering")
-	for id: String in ["depth_charges", "anglerfish_lure", "leviathans_coil"]:
+	for id: String in ["attack_depth_charges", "anglerfish_lure", "attack_leviathans_coil"]:
 		held.remove_stack(id)
 	await _frames(3)
 
 	# An explosion (a torpedo's) and a small pop, a moment in.
 	Explosion.spawn(run.ocean, at(-2.0, 0.5, 14.0), Powerup.color("torpedo"), 4.0, 0.0, 1.0)
-	Explosion.spawn(run.ocean, at(4.0, -1.0, 10.0), Powerup.color("depth_charges"), 2.5, 0.0, 0.3)
+	Explosion.spawn(run.ocean, at(4.0, -1.0, 10.0), Powerup.color("attack_depth_charges"), 2.5, 0.0, 0.3)
 	await _seconds(0.15)
 	await _shot("fx_explosion")
 	print("fx_tour: saved to %s" % out_dir)

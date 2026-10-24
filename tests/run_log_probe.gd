@@ -37,6 +37,7 @@ func _run() -> void:
 	settings.heart_chance = 0.0
 	settings.magnet_chance = 0.0
 	settings.hourglass_chance = 0.0
+	settings.lightning_chance = 0.0
 	settings.run_logs = true
 	settings.run_logs_keep = 3
 	RunLog.dir = "user://run_logs_probe"  # never the real logs (this prunes to 3)
@@ -131,9 +132,9 @@ func _run() -> void:
 	var loadout := tank_run.loadout_of(fish)
 	check(powerups.attack_level == 10 and powerups.fire_stacks == 10 and powerups.jelly_stacks == 10 and powerups.charge_stacks == 0,
 			"weapon slots full at Lv 10 (attack, Greek Fire, Halo)")
-	check(loadout.level(Weapons.ATTACK) == 10 and tank_run.powerups_of(fish).stacks("greek_fire") > 0, "and the run has them")
+	check(loadout.level(Weapons.ATTACK) == 10 and tank_run.powerups_of(fish).stacks("attack_greek_fire") > 0, "and the run has them")
 	var damage := StatBlock.amount("damage", 10.0)
-	check(is_equal_approx(settings.tank_damage, damage) and settings.tank_attack_speed > 0.0 and settings.tank_area == 0.0,
+	check(is_equal_approx(settings.tank_damage, damage) and settings.tank_attack_speed > 0.0 and settings.tank_size == 0.0,
 			"tome slots full: Teeth and Tides at 10 cards (+%.0f%% damage)" % (damage * 100.0))
 	check(is_equal_approx(tank_run.block_of(fish).value("damage"), damage), "on the player's stats")
 	settings.tank_preset = 0

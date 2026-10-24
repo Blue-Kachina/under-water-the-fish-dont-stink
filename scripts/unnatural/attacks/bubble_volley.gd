@@ -38,7 +38,7 @@ func _ready() -> void:
 	bubbles.horde = horde
 	bubbles.on_hit = func(index: int, amount: float, push: Vector3) -> void: strike(index, amount, push)
 	bubbles.on_pop = func(at: Vector3, radius: float) -> void:
-		PowerupFx.pop(self, at, maxf(radius, settings.bubble_pop * area_scale * 0.5), COLOR, 0.25)
+		PowerupFx.pop(self, at, maxf(radius, settings.bubble_pop * size_scale * 0.5), COLOR, 0.25)
 
 
 func cooldown() -> float:
@@ -59,7 +59,12 @@ func uses_stat(id: String) -> bool:
 
 func _physics_process(_delta: float) -> void:
 	bubbles.homing = settings.bubble_turn
-	bubbles.pop = settings.bubble_pop * area_scale * (WIDE_POP if milestones >= 1 else 1.0)
+	bubbles.pop = settings.bubble_pop * size_scale * (WIDE_POP if milestones >= 1 else 1.0)
+
+
+## The nearest zombie within bubble_range (as auto-aim counts it): the first bubble's.
+func aim_target() -> int:
+	return horde.nearest_in_cone(origin(), nose(), settings.bubble_range, -1.0)
 
 
 func fire() -> bool:
@@ -68,8 +73,7 @@ func fire() -> bool:
 	if near.is_empty():
 		return false
 	var sorted := Array(near)
-	sorted.sort_custom(func(a: int, b: int) -> bool:
-		return horde.enemy_position(a).distance_squared_to(at) < horde.enemy_position(b).distance_squared_to(at))
+	sorted.sort_custom(func(a: int, b: int) -> bool: return horde.aim_gap(at, a) < horde.aim_gap(at, b))
 	var count := (settings.bubble_count + extra_projectiles) * (2 if milestones >= 3 else 1)
 	var basis := fish.global_basis
 	var speed := settings.bubble_speed * projectile_speed

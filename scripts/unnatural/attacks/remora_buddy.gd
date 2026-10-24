@@ -1,6 +1,7 @@
 class_name RemoraBuddy
-extends Powerup
-## Remora Buddy (planning_unnatural.md §7b, D14), a weapon: remoras ride
+extends FishAttack
+## Remora Buddy (planning_unnatural.md §7b, D14), a steady weapon (FishAttack),
+## the Baby Whale Shark's own: remoras ride
 ## along under the fish (count(): remora_count, + the count facet). Each nips
 ## the nearest zombie within reach() every interval() s for damage() (proc
 ## coefficient remora_proc); they take turns, so the nips come evenly.
@@ -38,27 +39,36 @@ var _splits := PackedFloat32Array()
 var _heal_left := 0.0
 
 
+## It reads its own facets, and has no attacks to count (FishAttack).
+func own_facets() -> bool:
+	return true
+
+
+func counts_uses() -> bool:
+	return false
+
+
 func count() -> int:
-	return settings.remora_count + facet_count("count") + _splits.size()
+	return powers.remora_count + facet_count("count") + _splits.size()
 
 
 func damage() -> float:
-	return settings.remora_damage * (1.0 + facet("damage"))
+	return powers.remora_damage * (1.0 + facet("damage"))
 
 
 func interval() -> float:
-	return settings.remora_interval / (1.0 + facet("rate")) / rate_scale()
+	return powers.remora_interval / (1.0 + facet("rate")) / attack_speed
 
 
 func reach() -> float:
-	return settings.remora_range * (1.0 + facet("reach")) * area_scale()
+	return powers.remora_range * (1.0 + facet("reach")) * size_scale
 
 
-func on_stacks_changed() -> void:
+func _level_changed() -> void:
 	take_off()  # worn again with the new number of remoras
 
 
-func on_tick(delta: float) -> void:
+func _work(delta: float) -> void:
 	_heal_left -= delta
 	_tick_splits(delta)
 	_tick_latched(delta)
@@ -78,13 +88,13 @@ func on_tick(delta: float) -> void:
 	nips += 1
 	var to := run.horde.enemy_position(target)
 	_lunge(nips, to)
-	PowerupFx.flash(run, to, 0.8, color(id), 0.2)
-	run.hit(target, damage(), fish, id, (to - at).normalized(), settings.remora_proc, [id])
+	PowerupFx.flash(run, to, 0.8, tint(), 0.2)
+	strike(target, damage(), (to - at).normalized(), powers.remora_proc)
 	if milestone(3):
 		for i in run.horde.query_sphere(to, TEAR_REACH):
 			if i != target:
 				tears += 1
-				run.hit(i, damage() * TEAR_SHARE, fish, id, (run.horde.enemy_position(i) - to).normalized(), settings.remora_proc * TEAR_SHARE, [id])
+				strike(i, damage() * TEAR_SHARE, (run.horde.enemy_position(i) - to).normalized(), powers.remora_proc * TEAR_SHARE)
 	if milestone(1) and run.horde.is_alive(target):
 		_latched.append([target, LATCH_BITES, LATCH_GAP])
 
@@ -110,25 +120,30 @@ func _lunge(turn: int, to: Vector3) -> void:
 	dart.scale = home.global_transform.basis.get_scale()
 	home.visible = false
 	lunges += 1
+	# The worn remoras are rebuilt when a split one comes or goes: hold its
+	# home weakly, so a dart out when that happens just doesn't swim back.
+	var home_ref: WeakRef = weakref(home)
 	var tween := dart.create_tween()
 	tween.tween_property(dart, "global_position", to, LUNGE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.tween_method(func(t: float) -> void:
-		if is_instance_valid(home) and home.is_inside_tree():
-			dart.global_position = to.lerp(home.global_position, t), 0.0, 1.0, RETURN_TIME)
+		var back := home_ref.get_ref() as Node3D
+		if back and back.is_inside_tree():
+			dart.global_position = to.lerp(back.global_position, t), 0.0, 1.0, RETURN_TIME)
 	tween.tween_callback(func() -> void:
-		if is_instance_valid(home):
-			home.visible = true
+		var back := home_ref.get_ref() as Node3D
+		if back:
+			back.visible = true
 		dart.queue_free())
 
 
 ## The second milestone: a remora's kill splits one off for a while.
 func on_kill(_at: Vector3, source: String) -> void:
-	if source == id and milestone(4) and _heal_left <= 0.0:
+	if source == source() and milestone(4) and _heal_left <= 0.0:
 		var health := run.health_of(fish)
 		if health and not health.down:
 			_heal_left = HEAL_GAP
 			health.heal(health.max_hp * HEAL_SHARE)
-	if source == id and milestone(2) and _splits.size() < settings.remora_count + facet_count("count"):
+	if source == source() and milestone(2) and _splits.size() < powers.remora_count + facet_count("count"):
 		_splits.append(SPLIT_TIME)
 		wear()
 
@@ -158,8 +173,8 @@ func _tick_latched(delta: float) -> void:
 		latch[2] = LATCH_GAP
 		nips += 1
 		var to := run.horde.enemy_position(target)
-		PowerupFx.flash(run, to, 0.3, color(id), 0.12)
-		run.hit(target, damage() * LATCH_SHARE, fish, id, Vector3.ZERO, settings.remora_proc * LATCH_SHARE, [id])
+		PowerupFx.flash(run, to, 0.3, tint(), 0.12)
+		strike(target, damage() * LATCH_SHARE, Vector3.ZERO, powers.remora_proc * LATCH_SHARE)
 
 
 func on_removed() -> void:

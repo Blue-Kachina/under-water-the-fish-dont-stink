@@ -4,7 +4,7 @@ extends Node
 ## formula says; in the real game a level-up pauses a solo run and offers
 ## three cards, each a different weapon or tome (CardDeck; slots_probe has
 ## the pools), picked with the controls; the pick does what it says, the
-## stats do what they say (damage, attack speed, area, swim speed, armour,
+## stats do what they say (damage, attack speed, size, swim speed, armour,
 ## max hp), each level gives the fish's signature stat,
 ## several levels at once queue their picks, and leaving the mode puts the
 ## fish's swimming back.
@@ -117,12 +117,12 @@ func _run() -> void:
 
 	print("what stats do:")
 	block.add("attack_speed", 0.5)
-	block.add("area", 0.5)
+	block.add("size", 0.5)
 	block.add("swim_speed", 0.2)
 	block.add("max_hp", 25.0)
 	run._apply_stats(fish)
 	check(is_equal_approx(bite.attack_speed, 1.0 + block.value("attack_speed")), "attack speed speeds up the bite")
-	check(bite.reach() > reach_before * 1.4, "area grows the jaws (%.1f -> %.1f m)" % [reach_before, bite.reach()])
+	check(bite.reach() > reach_before * 1.4, "size grows the jaws (%.1f -> %.1f m)" % [reach_before, bite.reach()])
 	check(is_equal_approx(fish.speed_scale, 1.0 + block.value("swim_speed")), "swim speed scales the fish's swimming")
 	check(is_equal_approx(run.health_of(fish).max_hp, run.max_hp() + block.value("max_hp")), "max hp cards add to max hp")
 	var health := run.health_of(fish)

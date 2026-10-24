@@ -52,7 +52,7 @@ func on_hit(index: int, _damage: float, _source: String, proc: float, chain: Arr
 
 ## A tentacle slamming down at `at`.
 func slam(at: Vector3, chain: Array) -> void:
-	var reach := settings.kraken_radius * area_scale()
+	var reach := settings.kraken_radius * size_scale()
 	var damage := settings.kraken_damage + settings.kraken_damage_per_stack * (stacks - 1)
 	for i in run.horde.query_sphere(at, reach):
 		run.horde.slow(i, 1.0, settings.kraken_hold * duration_scale())

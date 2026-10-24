@@ -1,8 +1,8 @@
 class_name PoseidonsTrident
 extends Powerup
 ## Poseidon's Trident (planning_unnatural.md §7b, legendary): every
-## trident_every-th attack the fish makes (its own and any fish attacks it
-## holds as weapons; a fish with no attack of its own and none held: every
+## trident_every-th attack the fish makes (its fired weapons, own and held;
+## a fish with only steady ones, like the fire trail or the halo: every
 ## trident_every s, sooner with attack speed) calls lightning down on the
 ## biggest zombie within trident_range m: trident_damage (more
 ## trident_damage_per_stack a stack) to everything within trident_radius m.
@@ -33,17 +33,18 @@ func on_tick(delta: float) -> void:
 		strike()
 
 
-## Attacks made so far by the fish's attacks (-1: it has none).
+## Attacks made so far by the fish's fired weapons (-1: it has none, only
+## steady ones like the fire trail: FishAttack.counts_uses).
 func _attacks_made() -> int:
 	var made := 0
 	var any := false
 	var own := run.attack_of(fish)
-	if own and own.kind != FishAttack.Kind.NONE:
+	if own and own.counts_uses():
 		made += own.uses
 		any = true
 	for id_held: String in run.powerups_of(fish).held:
 		var held: Powerup = run.powerups_of(fish).held[id_held]
-		if held is AttackWeapon and is_instance_valid((held as AttackWeapon).attack):
+		if held is AttackWeapon and is_instance_valid((held as AttackWeapon).attack) and (held as AttackWeapon).attack.counts_uses():
 			made += (held as AttackWeapon).attack.uses
 			any = true
 	return made if any else -1
@@ -63,7 +64,7 @@ func strike() -> void:
 	bolts += 1
 	var at := horde.enemy_position(best)
 	var damage := settings.trident_damage + settings.trident_damage_per_stack * (stacks - 1)
-	var reach := settings.trident_radius * area_scale()
+	var reach := settings.trident_radius * size_scale()
 	for i in horde.query_sphere(at, reach):
 		run.hit(i, damage, fish, id, (horde.enemy_position(i) - at).normalized(), 1.0, [id])
 	var bolt := ChainLightning.Bolt.new()

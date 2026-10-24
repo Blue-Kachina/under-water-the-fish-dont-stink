@@ -26,7 +26,7 @@ func on_tick(_delta: float) -> void:
 func flash() -> void:
 	flashes += 1
 	var at := fish.global_position
-	var reach := (settings.biolum_radius + settings.biolum_radius_per_stack * (stacks - 1)) * area_scale()
+	var reach := (settings.biolum_radius + settings.biolum_radius_per_stack * (stacks - 1)) * size_scale()
 	var damage := (settings.biolum_damage + settings.biolum_damage_per_stack * (stacks - 1)) * run.levels.level
 	for i in run.horde.query_sphere(at, reach):
 		run.hit(i, damage, fish, id, (run.horde.enemy_position(i) - at).normalized(), 1.0, [id])

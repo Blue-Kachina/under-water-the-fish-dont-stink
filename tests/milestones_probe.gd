@@ -53,12 +53,13 @@ func _run() -> void:
 	var held := run.powerups_of(fish).held
 	print("the weapons at Lv 20:")
 	for id: String in TestTank.PRESET_WEAPONS:
-		check(held.has(id) and (held[id] as Powerup).stacks == 20 and (held[id] as Powerup).milestone(4), "%s on, with all four milestones" % id)
-	var fire: GreekFire = held.get("greek_fire")
-	var halo: JellyfishHalo = held.get("jellyfish_halo")
-	var charges: DepthCharges = held.get("depth_charges")
-	var remora: RemoraBuddy = held.get("remora_buddy")
-	var coil: LeviathansCoil = held.get("leviathans_coil")
+		var weapon := run.powerups_of(fish).weapon(id)
+		check(held.has(id) and (held[id] as Powerup).stacks == 20 and weapon and weapon.milestone(4), "%s on, with all four milestones" % id)
+	var fire := run.powerups_of(fish).weapon("attack_greek_fire") as GreekFire
+	var halo := run.powerups_of(fish).weapon("attack_jellyfish_halo") as JellyfishHalo
+	var charges := run.powerups_of(fish).weapon("attack_depth_charges") as DepthCharges
+	var remora := run.powerups_of(fish).weapon("attack_remora_buddy") as RemoraBuddy
+	var coil := run.powerups_of(fish).weapon("attack_leviathans_coil") as LeviathansCoil
 
 	var kinds := [FishAttack.Kind.STING, FishAttack.Kind.BITE, FishAttack.Kind.LASH, FishAttack.Kind.THRUST,
 			FishAttack.Kind.BUBBLES, FishAttack.Kind.SPINES]
@@ -98,16 +99,17 @@ func _run() -> void:
 		var source := FishAttack.source_of(kind)
 		check(float(damage_by.get(source, 0.0)) > 0.0, "%s deals damage (%.0f)" % [FishAttack.title(kind), float(damage_by.get(source, 0.0))])
 
-	print("the powerup weapons' third and fourth milestones:")
+	print("the steady weapons' third and fourth milestones:")
 	for id: String in TestTank.PRESET_WEAPONS:
-		check(float(damage_by.get(id, 0.0)) > 0.0, "%s deals damage (%.0f)" % [id, float(damage_by.get(id, 0.0))])
+		var source := FishAttack.source_of(Weapons.ATTACK_WEAPONS[id])
+		check(float(damage_by.get(source, 0.0)) > 0.0, "%s deals damage (%.0f)" % [id, float(damage_by.get(source, 0.0))])
 	check(fire and fire.flares > 0, "Greek Fire's patches flare (%d)" % (fire.flares if fire else 0))
 	check(halo and halo.jumps > 0, "the Halo's stings jump on (%d)" % (halo.jumps if halo else 0))
 	check(halo and is_instance_valid(halo._halo) and halo._halo.get_child_count() == halo.count() * 3, "and it has its outer ring")
 	check(charges and charges.aftershocks > 0, "Depth Charges' blasts go off again (%d)" % (charges.aftershocks if charges else 0))
 	check(remora and remora.tears > 0, "the Remoras tear into the zombies round their bites (%d)" % (remora.tears if remora else 0))
 	check(coil and coil.lashes > 0, "the Coil's tail lashes (%d)" % (coil.lashes if coil else 0))
-	check(coil and coil.count() == (coil.settings.coil_segments + coil.facet_count("count")) * LeviathansCoil.LONG_SCALE, "and it's twice as long")
+	check(coil and coil.count() == (coil.powers.coil_segments + coil.facet_count("count")) * LeviathansCoil.LONG_SCALE, "and it's twice as long")
 
 	settings.tank_preset = 0
 	await _ticks(3)

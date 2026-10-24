@@ -514,10 +514,10 @@ static func shared() -> PowerupSettings:
 
 @export_group("Abyssal Engine")
 ## A churning engine (legendary): engine_projectiles more projectiles and
-## engine_area more area (0.15: +15%) to every attack, a stack.
+## engine_size more Size (0.15: +15%) to every attack, a stack.
 @export_range(0, 20, 1, "or_greater") var engine_stacks := 0
 @export_range(0.0, 10.0, 1.0, "or_greater") var engine_projectiles := 1.0
-@export_range(0.0, 2.0, 0.05, "or_greater") var engine_area := 0.15
+@export_range(0.0, 2.0, 0.05, "or_greater") var engine_size := 0.15
 
 ## Powerup id -> its testing override's setting.
 const STACKS := {
@@ -545,7 +545,7 @@ const STACKS := {
 	"clam_shield": "clam_stacks",
 	"momentum_fin": "momentum_stacks",
 	"treasure_map": "map_stacks",
-	"greek_fire": "fire_stacks",
+	"attack_greek_fire": "fire_stacks",
 	"chain_lightning": "lightning_stacks",
 	"torpedo": "torpedo_stacks",
 	"bow_grow_bow": "bow_stacks",
@@ -553,15 +553,15 @@ const STACKS := {
 	"hermit_shell": "hermit_stacks",
 	"fizzy_soda": "soda_stacks",
 	"speedy_seahorse": "seahorse_stacks",
-	"remora_buddy": "remora_stacks",
+	"attack_remora_buddy": "remora_stacks",
 	"bubble_wrap": "bubble_stacks",
 	"pufferfish_spines": "spine_stacks",
-	"jellyfish_halo": "jelly_stacks",
+	"attack_jellyfish_halo": "jelly_stacks",
 	"electric_eel": "eel_stacks",
-	"depth_charges": "charge_stacks",
+	"attack_depth_charges": "charge_stacks",
 	"anglerfish_lure": "lure_stacks",
 	"tsunami_heart": "tsunami_stacks",
-	"leviathans_coil": "coil_stacks",
+	"attack_leviathans_coil": "coil_stacks",
 	"blood_moon_shard": "shard_stacks",
 	"glass_coral": "coral_stacks",
 	"sirens_song": "siren_stacks",

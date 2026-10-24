@@ -48,6 +48,12 @@ extends Node3D
 ## index_of_net(), net_id_of(). spawned and removed tell the host's
 ## UnnaturalNet what to send; kill() and correct() apply what a guest is told.
 ##
+## Feel (the Playability pass, P3): a hit's flash scales with hit_flash and a
+## lunge's glow with telegraph_glow; a dying zombie swells (kill_swell) before
+## it shrinks; `telegraphing` lists the lungers winding up. Depth assist
+## (depth_assist) draws each toward its target's depth, and auto-aim's nearest
+## (nearest_in_cone(), aim_gap()) favours zombies at the aimer's depth.
+##
 ## Written to port straight to the GDExtension (a HordeSim on the same packed
 ## arrays) once GDScript is the limit.
 
@@ -91,6 +97,13 @@ const ELITE_HP := 5.0
 const STRIDE := 16
 ## Detail bands per look (near, mid, far: settings.lod_*).
 const BANDS := 3
+## Depth assist (settings.depth_assist, P3): at 1 a zombie climbs or dives
+## toward its target's depth at DEPTH_DRIFT of its speed on top of its chase
+## (easing in within DEPTH_SOFT m of it), and auto-aim counts each metre of
+## height between DEPTH_AIM metres further off.
+const DEPTH_DRIFT := 0.5
+const DEPTH_SOFT := 3.0
+const DEPTH_AIM := 1.5
 
 var settings: UnnaturalSettings
 var kinds: Array[EnemyKind] = []
@@ -112,6 +125,9 @@ var bounded := true
 var grid := HordeGrid.new()
 ## The live zombies as of the last step (indices).
 var alive := PackedInt32Array()
+## The live lungers winding up (Lunge.TELEGRAPH) as of the last step, for
+## their warning lanes (Telegraphs) and the threat arrows.
+var telegraphing := PackedInt32Array()
 ## The difficulty level new zombies spawn at (UnnaturalRun sets it from the
 ## clock): more hp, damage and speed, and bigger (UnnaturalSettings' Difficulty).
 var difficulty := 0.0
@@ -337,6 +353,7 @@ func clear() -> void:
 	frozen_left = 0.0
 	_by_net.clear()
 	alive.clear()
+	telegraphing.clear()
 	grid.build(_position, alive)
 
 
@@ -580,6 +597,26 @@ func enemy_target(index: int) -> int:
 	return _target[index]
 
 
+## The way a lunger winding up (or lunging) will go (unit).
+func lunge_aim(index: int) -> Vector3:
+	return _lunge[index]
+
+
+## How far a lunger is through winding up (0 to 1; 0 when it isn't).
+func telegraph_progress(index: int) -> float:
+	if _mode[index] != Lunge.TELEGRAPH or settings.lunge_telegraph <= 0.0:
+		return 0.0
+	return clampf(1.0 - _mode_left[index] / settings.lunge_telegraph, 0.0, 1.0)
+
+
+## How far off zombie `index` counts for auto-aim from `from`: its distance,
+## plus its height off `from` weighted by depth assist (so with the assist on
+## a zombie at your depth wins over a nearer one far above or below).
+func aim_gap(from: Vector3, index: int) -> float:
+	var offset := enemy_position(index) - from
+	return offset.length() + absf(offset.y) * settings.depth_assist * DEPTH_AIM
+
+
 ## The biggest zombie's hit radius (m): queries reach this much further.
 func max_radius() -> float:
 	return _max_radius
@@ -662,15 +699,18 @@ func query_sphere(centre: Vector3, reach: float) -> PackedInt32Array:
 
 
 ## The live zombie nearest `origin` within `reach`, no more than acos(min_cos)
-## off `forward` (unit), or -1.
+## off `forward` (unit), or -1. Nearest as auto-aim counts it (aim_gap(): depth
+## assist favours zombies at origin's depth).
 func nearest_in_cone(origin: Vector3, forward: Vector3, reach: float, min_cos: float) -> int:
 	var best := -1
 	var best_gap := INF
+	var depth := settings.depth_assist * DEPTH_AIM
 	for j in query_sphere(origin, reach):
 		var offset := enemy_position(j) - origin
 		var gap := offset.length()
 		if gap > 0.001 and offset.dot(forward) / gap < min_cos:
 			continue
+		gap += absf(offset.y) * depth
 		if gap < best_gap:
 			best_gap = gap
 			best = j
@@ -721,11 +761,14 @@ func step_once(delta: float) -> void:
 				_by_net.erase(_net[i])
 				_free.append(i)
 	alive.resize(_alive_count)
+	telegraphing.clear()
 	var n := 0
 	for i in _high:
 		if _state[i] == State.ALIVE:
 			alive[n] = i
 			n += 1
+			if _mode[i] == Lunge.TELEGRAPH and _proxy[i] == 0:
+				telegraphing.append(i)
 	alive.resize(n)
 	grid.build(_position, alive)
 
@@ -745,6 +788,7 @@ func _steer(delta: float) -> void:
 	var floor_y := arena_centre.y + settings.arena_floor + 1.0
 	var ceiling_y := arena_centre.y + settings.arena_ceiling
 	var turn := 1.0 - exp(-FACE_RATE * delta)
+	var assist := settings.depth_assist * DEPTH_DRIFT
 	for i in alive:
 		if _proxy[i] == 1:
 			continue  # its boss moves it
@@ -801,6 +845,9 @@ func _steer(delta: float) -> void:
 							accel = 200.0
 					_:
 						wanted = ahead * speed
+				if assist > 0.0 and _mode[i] != Lunge.LUNGE:
+					# Depth assist: toward its target's depth sooner than the chase alone.
+					wanted.y += clampf(toward.y / DEPTH_SOFT, -1.0, 1.0) * speed * assist
 			else:
 				wanted = -_axis_z[i] * speed * 0.35  # nobody to chase: mill about
 				_mode[i] = Lunge.STALK
@@ -943,7 +990,9 @@ func _draw_horde(delta: float) -> void:
 	var glint_strength := settings.glint_strength
 	var mid_squared := settings.lod_mid_distance * settings.lod_mid_distance
 	var far_squared := settings.lod_far_distance * settings.lod_far_distance
-	var warning := 0.6 + 0.4 * sin(_time * 30.0)
+	var warning := (0.6 + 0.4 * sin(_time * 30.0)) * settings.telegraph_glow
+	var flash_scale := settings.hit_flash
+	var swell := settings.kill_swell
 	drawn_count = 0
 	drawn_instances = 0
 	for i in _high:
@@ -958,7 +1007,8 @@ func _draw_horde(delta: float) -> void:
 		var drawn_size := size
 		if state == State.DYING:
 			dead = 1.0 - clampf(_dying[i] / DYING_TIME, 0.0, 1.0)
-			drawn_size *= 1.0 - dead * 0.85
+			# It swells (the kill's pop), then shrinks away.
+			drawn_size *= (1.0 + swell * sin(clampf(dead * 1.6, 0.0, 1.0) * PI)) * (1.0 - dead * 0.85)
 		var slack := size * 1.5 + 1.0
 		var slack_squared := slack * slack
 		var reach_squared := size * size
@@ -1054,7 +1104,7 @@ func _draw_horde(delta: float) -> void:
 			buffer[k + 9] = y.z
 			buffer[k + 10] = z.z
 			buffer[k + 11] = at.z
-			buffer[k + 12] = flash
+			buffer[k + 12] = flash * flash_scale
 			buffer[k + 13] = dead
 			buffer[k + 14] = elite
 			buffer[k + 15] = warn

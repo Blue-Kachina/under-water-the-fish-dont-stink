@@ -31,7 +31,7 @@ func on_tick(delta: float) -> void:
 func ping() -> void:
 	pings += 1
 	var at := fish.global_position
-	var reach := settings.sonar_radius * area_scale()
+	var reach := settings.sonar_radius * size_scale()
 	for i in run.horde.query_sphere(at, reach):
 		run.horde.mark(i, every() + 0.25)
 	PowerupFx.ring(run, at, reach, color(id), Vector3.UP, 0.6)

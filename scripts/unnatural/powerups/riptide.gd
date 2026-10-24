@@ -26,7 +26,7 @@ func leave(from: Vector3, to: Vector3) -> Current:
 	current.owner_tide = self
 	current.from = from
 	current.to = to
-	current.width = settings.riptide_width * area_scale()
+	current.width = settings.riptide_width * size_scale()
 	current.life = settings.riptide_time * duration_scale()
 	current.dps = settings.riptide_dps + settings.riptide_dps_per_stack * (stacks - 1)
 	current.drag = settings.riptide_drag

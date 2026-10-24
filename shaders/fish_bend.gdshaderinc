@@ -11,9 +11,14 @@
 // already swings). Off (all 0) for a baked school or horde fish.
 //
 // Call fish_bend(VERTEX, NORMAL) in vertex() after keeping the rest shape.
+//
+// The indices are pinned (stride_cue.gdshaderinc takes 2-4): left to the
+// compiler they follow include order, so a mesh drawn with fin_membrane (stride
+// cue first) and a skin disagreed, and Godot warned on every material
+// re-gather. A horde look re-gathers whenever its visible count changes.
 
-instance uniform vec3 bend_turn = vec3(0.0);  // rad, a rotation vector: x the tail tip down, y toward +X
-instance uniform vec2 bend_span = vec2(0.0);  // z the bend starts at and the z it ends at
+instance uniform vec3 bend_turn : instance_index(0) = vec3(0.0);  // rad, a rotation vector: x the tail tip down, y toward +X
+instance uniform vec2 bend_span : instance_index(1) = vec2(0.0);  // z the bend starts at and the z it ends at
 
 vec3 bend_rotate(vec3 v, vec3 axis, float angle) {
 	float c = cos(angle);

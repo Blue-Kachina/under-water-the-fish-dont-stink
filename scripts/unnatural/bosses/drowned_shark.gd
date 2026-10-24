@@ -68,6 +68,16 @@ func contact() -> float:
 	return settings.shark_contact * (1.6 if mode == Mode.CHARGE else 1.0) * settings.enemy_damage_scale
 
 
+## While it glows: its charge's lane, as long as the charge will go.
+func telegraph() -> Dictionary:
+	if mode != Mode.TELEGRAPH:
+		return {}
+	var dir := -global_basis.z if puppet else _charge_dir
+	var progress := 0.6 if puppet else 1.0 - _mode_left / maxf(settings.shark_telegraph, 0.01)
+	return {"from": global_position, "dir": dir, "length": settings.shark_charge_speed * settings.shark_charge_time + _length * 0.5,
+			"width": _length * 0.25, "progress": progress}
+
+
 func _move(delta: float) -> void:
 	var prey := target()
 	var toward := Vector3.ZERO
@@ -108,7 +118,7 @@ func _move(delta: float) -> void:
 
 func _puppet_update(_delta: float) -> void:
 	var pulse := 0.5 + 0.5 * sin(age * 30.0)
-	_glow.light_energy = (6.0 * pulse if mode == Mode.TELEGRAPH else 0.0) + flash * 4.0
+	_glow.light_energy = (6.0 * pulse * settings.telegraph_glow if mode == Mode.TELEGRAPH else 0.0) + flash * 4.0
 
 
 func _place_body() -> void:

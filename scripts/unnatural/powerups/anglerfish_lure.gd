@@ -24,7 +24,7 @@ func life() -> float:
 
 
 func blast() -> float:
-	return settings.lure_blast * area_scale()
+	return settings.lure_blast * size_scale()
 
 
 func damage() -> float:

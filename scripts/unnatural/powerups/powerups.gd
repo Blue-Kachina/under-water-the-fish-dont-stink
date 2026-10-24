@@ -36,6 +36,12 @@ func stacks(id: String) -> int:
 	return powerup.stacks if powerup else 0
 
 
+## The attack of second weapon `id` (AttackWeapon) held (null: not held).
+func weapon(id: String) -> FishAttack:
+	var holder := held.get(id) as AttackWeapon
+	return holder.attack if holder and is_instance_valid(holder.attack) else null
+
+
 ## Every powerup with its stacks, in order: [[id, stacks], ...].
 func list() -> Array:
 	var all := []

@@ -87,6 +87,7 @@ const TABS := {
 			["Battering", ["Battered fish", "School Reactions", "Multis & Sprees"]],
 			["Pearls & Targets", ["Pearls", "Targeting"]]],
 	"unnatural": [["Arena", ["Arena", "Murk", "Minimap", "Camera"]],
+			["Feel", ["Feel", "Assist"]],
 			["Horde", ["Director", "Enemies", "Twists"]],
 			["Survivor", ["Player", "Batteries", "Levels", "Weapons and Tomes", "Pearls"]],
 			["Attacks", ["Attacks", "Ghost Bite", "Anemone Sting", "Shock Lash", "Bill Thrust", "Bubble Volley", "Spine Burst"]],

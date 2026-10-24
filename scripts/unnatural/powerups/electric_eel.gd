@@ -11,7 +11,7 @@ var _cool := 0.0
 
 
 func radius() -> float:
-	return (settings.eel_radius + settings.eel_radius_per_stack * (stacks - 1)) * area_scale()
+	return (settings.eel_radius + settings.eel_radius_per_stack * (stacks - 1)) * size_scale()
 
 
 func damage() -> float:

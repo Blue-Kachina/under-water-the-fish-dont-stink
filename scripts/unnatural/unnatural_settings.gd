@@ -218,7 +218,8 @@ static func shared() -> UnnaturalSettings:
 @export var god_mode := false
 ## Co-op (D7): a downed player is revived by a teammate staying within
 ## revive_range (m) of them for revive_time (s), back up with revive_hp of their max hp.
-@export_range(0.5, 50.0, 0.5, "or_greater") var revive_range := 4.0
+## (Defaults to chest_reach, the chest-opening distance.)
+@export_range(0.5, 50.0, 0.5, "or_greater") var revive_range := 8.0
 @export_range(0.0, 30.0, 0.25, "or_greater") var revive_time := 3.0
 @export_range(0.05, 1.0, 0.05) var revive_hp := 0.5
 
@@ -245,7 +246,8 @@ static func shared() -> UnnaturalSettings:
 @export_group("Attacks")
 ## Each fish fires its own auto-attack (FishAttack.FOR_FAMILY); pick one here
 ## to give every fish that one instead (testing). Live.
-@export_enum("Own fish's", "Anemone Sting", "Ghost Bite", "Shock Lash", "Bill Thrust", "Bubble Volley", "Spine Burst") var fish_attack := 0
+@export_enum("Own fish's", "Anemone Sting", "Ghost Bite", "Shock Lash", "Bill Thrust", "Bubble Volley", "Spine Burst",
+		"Greek Fire Trail", "Jellyfish Halo", "Depth Charges", "Remora Buddy", "Leviathan's Coil") var fish_attack := 0
 
 @export_group("Ghost Bite")
 ## The Shark's auto-attack: huge spectral jaws that snap shut on the zone in front.
@@ -479,6 +481,12 @@ static func shared() -> UnnaturalSettings:
 @export_range(0, 50, 1, "or_greater") var leviathan_bolts := 7
 @export_range(0.0, 30.0, 0.25, "or_greater") var leviathan_bolt_every := 4.0
 @export_range(0.0, 500.0, 1.0, "or_greater") var leviathan_bolt_damage := 15.0
+## Its warnings (the Playability pass, P3): before each dive through its target
+## it slows and glows for leviathan_dive_telegraph s, a red lane showing the way
+## it'll come (0: no warning); its head glows for leviathan_spit_telegraph s
+## before it spits.
+@export_range(0.0, 5.0, 0.05, "or_greater") var leviathan_dive_telegraph := 1.0
+@export_range(0.0, 5.0, 0.05, "or_greater") var leviathan_spit_telegraph := 0.6
 ## Not beaten leviathan_enrage s after it came, it enrages: faster and harder
 ## by enrage_scale, and the director keeps escalating (D5: no time limit).
 @export_range(0.0, 3600.0, 5.0, "or_greater") var leviathan_enrage := 120.0
@@ -492,8 +500,8 @@ static func shared() -> UnnaturalSettings:
 ## times its value.
 @export_range(0.0, 10.0, 0.05, "or_greater") var xp_gain := 1.0
 ## Each level-up offers this many cards, each a different weapon or tome (0:
-## no cards, just the hp and signature stat). Every weapon (each fish's own
-## attack and the powerup weapons) is equally likely as a new one, and a card's
+## no cards, just the hp and signature stat). Every other fish's weapon is
+## equally likely as a new one, and a card's
 ## rarity is rolled for it, not fixed by the weapon.
 @export_range(0, 6, 1) var card_choices := 3
 ## Solo, the game pauses while the cards are up (co-op: the picker can't be
@@ -582,14 +590,16 @@ static func shared() -> UnnaturalSettings:
 
 @export_group("Drops")
 ## A kill's chance of dropping a heart (heals the whole team heart_heal of max
-## hp), a magnet (every XP pearl out flies to the taker) or an hourglass
-## (every zombie stops dead for hourglass_time s; bosses don't). An elite's:
-## 5x. The first player to touch one takes it.
-@export_range(0.0, 1.0, 0.0005) var heart_chance := 0.004
+## hp), a magnet (every XP pearl out flies to the taker), an hourglass
+## (every zombie stops dead for hourglass_time s; bosses don't) or a lightning
+## bolt (a shock across the whole arena kills every zombie; bosses are spared).
+## An elite's: 5x. The first player to touch one takes it.
+@export_range(0.0, 1.0, 0.0005) var heart_chance := 0.0015
 @export_range(0.0, 1.0, 0.01) var heart_heal := 0.5
 @export_range(0.0, 1.0, 0.0005) var magnet_chance := 0.0015
-@export_range(0.0, 1.0, 0.0005) var hourglass_chance := 0.002
+@export_range(0.0, 1.0, 0.0005) var hourglass_chance := 0.0015
 @export_range(0.0, 120.0, 0.5, "or_greater") var hourglass_time := 15.0
+@export_range(0.0, 1.0, 0.0005) var lightning_chance := 0.0015
 
 @export_group("Rarity")
 ## Each card's rarity: these base weights, each times (1 + luck * luck_effect) ^ tier.
@@ -661,7 +671,7 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 50.0, 0.5, "or_greater") var tank_armour := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_damage := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_attack_speed := 0.0
-@export_range(0.0, 10.0, 0.05, "or_greater") var tank_area := 0.0
+@export_range(0.0, 10.0, 0.05, "or_greater") var tank_size := 0.0
 @export_range(0.0, 20.0, 1, "or_greater") var tank_projectile_count := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_projectile_speed := 0.0
 @export_range(0.0, 1.0, 0.01, "or_greater") var tank_crit_chance := 0.0
@@ -675,6 +685,71 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_xp_gain := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_pearl_chance := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_luck := 0.0
+
+@export_group("Feel")
+## Damage numbers (the Playability pass, P3) over the zombies your hits land on.
+## Hits on the same zombie within damage_number_merge s add up into one number
+## (so a burning crowd stays readable); only numbers of damage_numbers_min or
+## more show (0: all). At most damage_numbers_max at once (the oldest go first).
+@export var damage_numbers := true
+@export_range(0.0, 10000.0, 1.0, "or_greater") var damage_numbers_min := 0.0
+@export_range(1, 400, 1, "or_greater") var damage_numbers_max := 48
+## Their size (px at 720p, 14 m from the camera: smaller further off), how
+## long each floats up (s), and the merge window (s).
+@export_range(6.0, 96.0, 1.0, "or_greater") var damage_number_size := 17.0
+@export_range(0.1, 5.0, 0.05, "or_greater") var damage_number_time := 0.8
+@export_range(0.0, 2.0, 0.05, "or_greater") var damage_number_merge := 0.3
+## A crit's number is this many times bigger (and gold).
+@export_range(1.0, 4.0, 0.05, "or_greater") var crit_number_scale := 1.35
+## Teammates' hits show too (fainter).
+@export var damage_numbers_team := false
+## How white a hit zombie flashes (0: no flash).
+@export_range(0.0, 3.0, 0.05, "or_greater") var hit_flash := 1.0
+## A burst where a zombie dies: a ring and sparks, kill_pop_size times the
+## zombie's size (0: none), at most kill_pop_max at once (a big wipe shows the
+## newest). The dying zombie swells by kill_swell before it shrinks away.
+@export_range(0.0, 5.0, 0.05, "or_greater") var kill_pop_size := 1.0
+@export_range(1, 1000, 1, "or_greater") var kill_pop_max := 96
+@export_range(0.0, 2.0, 0.05, "or_greater") var kill_swell := 0.3
+## Brackets round the zombie each aimed weapon (the bite, the lash, the thrust,
+## the bubbles) will go for next, in that weapon's colour.
+@export var target_marker := true
+## Arrows at the view's edge toward bosses, elites and lunges at you that are
+## out of view (or behind you), within threat_range m; at most threat_arrows_max.
+@export var threat_arrows := true
+@export_range(0.0, 500.0, 5.0, "or_greater") var threat_range := 60.0
+@export_range(1, 32, 1, "or_greater") var threat_arrows_max := 8
+## How hard lunges and bosses' attacks glow while they wind up (0: no glow),
+## and a red lane on the water showing where a lunge or a boss's charge will go.
+@export_range(0.0, 4.0, 0.05, "or_greater") var telegraph_glow := 1.0
+@export var telegraph_lines := true
+## The red pulse round the view's edge when you're hurt (0: none), and the
+## heartbeat it beats while you're under low_hp_share of your hp (the heartbeat
+## sound starts there too).
+@export_range(0.0, 3.0, 0.05, "or_greater") var hurt_vignette := 1.0
+@export_range(0.0, 3.0, 0.05, "or_greater") var heartbeat_vignette := 1.0
+@export_range(0.0, 1.0, 0.01) var low_hp_share := 0.25
+## Drops (hearts, magnets, hourglasses, bolts) send up a beam of their colour
+## this tall (m; 0: none) that shows through the murk, and ping at the view's
+## edge within pickup_sense_range m (0: no pings).
+@export_range(0.0, 60.0, 0.5, "or_greater") var pickup_beam := 6.0
+@export_range(0.0, 500.0, 5.0, "or_greater") var pickup_sense_range := 45.0
+
+@export_group("Assist")
+## Depth assist (0: off, 1: strong, more: stronger still): the horde drifts
+## toward the depth of the player it chases, and auto-aim favours zombies near
+## your own depth, so the 40 m band plays more like a 2.5D arena without being
+## locked to one.
+@export_range(0.0, 3.0, 0.05, "or_greater") var depth_assist := 0.4
+## The survivor cam pulls back as the horde thickens round you: up to
+## camera_crowd_pull m further once camera_crowd_full zombies are within
+## camera_crowd_range m; and camera_size_pull m per +100% of the Size stat,
+## so big builds still fit. It eases there at camera_pull_rate (1/s).
+@export_range(0.0, 40.0, 0.25, "or_greater") var camera_crowd_pull := 3.0
+@export_range(1.0, 100.0, 1.0, "or_greater") var camera_crowd_range := 15.0
+@export_range(1, 1000, 1, "or_greater") var camera_crowd_full := 40
+@export_range(0.0, 40.0, 0.25, "or_greater") var camera_size_pull := 2.0
+@export_range(0.05, 20.0, 0.05, "or_greater") var camera_pull_rate := 1.0
 
 @export_group("Performance")
 ## The most zombies at once (the Horde's arrays are this big).

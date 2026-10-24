@@ -40,7 +40,7 @@ func uses_stat(id: String) -> bool:
 ## How far the tail reaches (m): lash_range, never less than the bow wave's
 ## full reach times the bite's margin (it's a whip: it must out-reach ramming).
 func reach() -> float:
-	return maxf(settings.lash_range, GhostBite.bow_reach(fish) * settings.bite_over_bow) * area_scale
+	return maxf(settings.lash_range, GhostBite.bow_reach(fish) * settings.bite_over_bow) * size_scale
 
 
 func arcs() -> int:
@@ -52,8 +52,13 @@ func tail() -> Vector3:
 	return origin() + fish.global_basis.z * fish.hitbox_length * 0.5
 
 
+## The nearest zombie within reach, any way round.
+func aim_target() -> int:
+	return horde.nearest_in_cone(origin(), nose(), reach(), -1.0)
+
+
 func fire() -> bool:
-	var first := horde.nearest_in_cone(origin(), nose(), reach(), -1.0)
+	var first := aim_target()
 	if first < 0:
 		return false
 	var struck_now := {}
@@ -81,7 +86,7 @@ func _lash(first: int, struck_now: Dictionary) -> void:
 	strike(first, settings.lash_damage, toward(from, first, nose()))
 	struck_now[first] = true
 	var last := horde.enemy_position(first)
-	var arc_reach := settings.lash_arc_range * area_scale * (FAR_ARCS if milestones >= 2 else 1.0)
+	var arc_reach := settings.lash_arc_range * size_scale * (FAR_ARCS if milestones >= 2 else 1.0)
 	for n in arcs():
 		var best := -1
 		var best_gap := INF

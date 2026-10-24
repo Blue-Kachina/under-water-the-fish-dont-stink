@@ -53,8 +53,10 @@ func _ready() -> void:
 			var offset: Vector3 = horde.enemy_position(i) - centre
 			if offset.length() > 0.001 and offset.normalized().dot(forward) < 0.5:
 				continue
-			if offset.length() < best_gap:
-				best_gap = offset.length()
+			# As auto-aim counts it: height weighs more with depth assist (Horde.aim_gap()).
+			var gap := offset.length() + absf(offset.y) * settings.depth_assist * Horde.DEPTH_AIM
+			if gap < best_gap:
+				best_gap = gap
 				best = i
 		cone_matched = cone_matched and nearest == best
 	check(matched, "60 sphere queries match brute force")

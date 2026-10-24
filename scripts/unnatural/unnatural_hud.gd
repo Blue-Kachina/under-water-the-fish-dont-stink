@@ -14,8 +14,12 @@ extends CanvasLayer
 ## With show_director on, the director's live numbers sit under the clock. In
 ## the Test Tank a DPS readout (TestTank's numbers) sits on the right.
 ## - the stage: each event's warning splash, the next one under the kills,
-##   and a boss's health bar under the XP bar while it's out; beating the
-##   Leviathan puts up STAGE COMPLETE, then the board.
+##   and a boss's health bar under the XP bar while it's out (what the last
+##   hits took trailing behind); beating the Leviathan puts up STAGE COMPLETE,
+##   then the board.
+## - feel (the Playability pass, P3): damage numbers (DamageNumbers), target
+##   brackets, threat arrows and drop pings (CombatMarkers), and the hurt
+##   vignette: a red flush when hit and a heartbeat under low_hp_share of hp.
 
 const HP_COLOR := Color(0.9, 0.18, 0.2)
 const XP_COLOR := Color(0.55, 0.85, 1.0)
@@ -23,6 +27,12 @@ const BOARD_COLOR := Color(0.55, 0.08, 0.1)
 const HEADINGS := ["KILLS", "DAMAGE", "ATTACK", "BATTERY", "BATTERED FISH", "PEARLS", "TOP KM/H"]
 ## How long the run-over splash shows before the board comes up (s).
 const OVER_SPLASH := 2.5
+const HURT_SHADER := preload("res://shaders/hurt_vignette.gdshader")
+## A hit's flush starts at least this strong, more for a bigger share of max hp
+## (HURT_PER_SHARE per whole max hp), and fades this fast (1/s).
+const HURT_MIN := 0.45
+const HURT_PER_SHARE := 3.0
+const HURT_FADE := 1.6
 
 var run: UnnaturalRun
 var fish: FishController
@@ -36,6 +46,15 @@ var player_camera: Camera3D:
 		if is_instance_valid(player_camera) and player_camera.has_signal("survivor_cam_swapped"):
 			player_camera.connect("survivor_cam_swapped", _show_cam_mode)
 
+## Feel (P3): the damage numbers and the target, threat and drop marks over the view.
+var numbers := DamageNumbers.new()
+var markers := CombatMarkers.new()
+## The hurt vignette now: the hit's flush (1 fading to 0), the heartbeat's
+## thump (0..1) and how low the hp is (0 above low_hp_share, 1 at none).
+var hurt_level := 0.0
+var beat_level := 0.0
+var low_level := 0.0
+
 var _bars := Bars.new()
 var _minimap := Minimap.new()
 var _clock := Label.new()
@@ -45,19 +64,33 @@ var _director := Label.new()
 var _splash := BroadcastUI.Splash.new()
 var _board := BroadcastUI.StatsBoard.new()
 var _hurt := ColorRect.new()
+## The Lightning Bolt's white-gold flash.
+var _shock := ColorRect.new()
 var _cards := LevelUpCards.new()
 var _dps := DpsPanel.new()
 var _stats := StatsPanel.new()
 var _over_age := -1.0
 var _cam_note := Label.new()
+var _hurt_material := ShaderMaterial.new()
+var _beat_phase := 0.0
 
 
 func _ready() -> void:
 	layer = 2
 	_hurt.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_hurt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hurt.color = Color(0.8, 0.0, 0.05, 0.0)
+	_hurt_material.shader = HURT_SHADER
+	_hurt.material = _hurt_material
+	_hurt.visible = false
 	add_child(_hurt)
+	_shock.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_shock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_shock.color = Color(1.0, 0.95, 0.7, 0.0)
+	add_child(_shock)
+	numbers.hud = self
+	add_child(numbers)
+	markers.hud = self
+	add_child(markers)
 	_bars.hud = self
 	_bars.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_bars)
@@ -143,9 +176,11 @@ func _ready() -> void:
 		run.card_picked.connect(func(for_fish: FishController, _card: Dictionary) -> void:
 			if for_fish == fish and not run.is_picking(fish):
 				_cards.close())
-		run.player_hurt.connect(func(hurt_fish: FishController, _amount: float) -> void:
+		run.player_hurt.connect(func(hurt_fish: FishController, amount: float) -> void:
 			if hurt_fish == fish:
-				_hurt.color.a = 0.32)
+				var health := run.health_of(fish)
+				var share := amount / maxf(health.max_hp if health else 100.0, 1.0)
+				hurt_level = maxf(hurt_level, clampf(HURT_MIN + share * HURT_PER_SHARE, HURT_MIN, 1.0)))
 		run.run_over.connect(func() -> void:
 			_over_age = 0.0
 			_splash.play("THE BLOOD MOON WINS", "OVERRUN", "SURVIVED %s  ·  %d KILLS" % [_time_text(run.elapsed), run.kills],
@@ -173,6 +208,12 @@ func _ready() -> void:
 			_splash.hide_now())
 
 
+## Where the minimap sits on the view (an empty rect when it's hidden), so
+## the edge marks keep off it.
+func minimap_rect() -> Rect2:
+	return _minimap.get_rect() if _minimap.visible else Rect2()
+
+
 func _show_cam_mode(free: bool) -> void:
 	_note(("FREE CAM  ·  RIGHT STICK AIMS" if free else "FOLLOW CAM") + "  ·  Y SWAPS", Color.WHITE)
 
@@ -194,12 +235,16 @@ func _show_drop(kind: int, by: FishController) -> void:
 			_note("MAGNET  ·  EVERY PEARL TO %s" % ("YOU" if by == fish else (by.display_name.to_upper() if is_instance_valid(by) and by.display_name else "A FRIEND")), color)
 		Pickup.Kind.HOURGLASS:
 			_note("HOURGLASS  ·  THE DEAD STAND STILL  ·  %d S" % roundi(run.settings.hourglass_time), color)
+		Pickup.Kind.LIGHTNING:
+			_note("LIGHTNING  ·  THE WHOLE ARENA SHOCKED", color)
+			_shock.color.a = 0.75
 
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(run):
 		return
-	_hurt.color.a = move_toward(_hurt.color.a, 0.0, delta * 0.9)
+	_update_hurt(delta)
+	_shock.color.a = move_toward(_shock.color.a, 0.0, delta * 1.2)
 	_cam_note.modulate.a = move_toward(_cam_note.modulate.a, 0.0, delta * 0.8)
 	if is_instance_valid(fish) and run.near_whirlpool(fish):
 		_note("JUMP  ·  ENTER THE WHIRLPOOL AND FINISH THE RUN", TreasureChest.GOLD)  # held while you're near
@@ -225,6 +270,37 @@ func _process(delta: float) -> void:
 	if _over_age >= 0.0:
 		_over_age += delta
 	_update_board()
+
+
+## The hurt vignette: the last hit's flush fading, and under low_hp_share of
+## max hp a heartbeat (lub-dub, quicker the lower you are) over a faint red.
+func _update_hurt(delta: float) -> void:
+	var settings := run.settings
+	hurt_level = move_toward(hurt_level, 0.0, delta * HURT_FADE)
+	var health := run.health_of(fish) if is_instance_valid(fish) else null
+	var low := maxf(settings.low_hp_share, 0.001)
+	low_level = 0.0
+	if health and not health.down and not run.is_over and health.share() < low:
+		low_level = 1.0 - health.share() / low
+	beat_level = 0.0
+	if low_level > 0.0:
+		var period := lerpf(1.1, 0.6, low_level)
+		_beat_phase = fmod(_beat_phase + delta / period, 1.0)
+		var lub := exp(-pow((_beat_phase - 0.05) / 0.05, 2.0))
+		var dub := exp(-pow((_beat_phase - 0.28) / 0.06, 2.0)) * 0.7
+		beat_level = maxf(lub, dub) * (0.5 + 0.5 * low_level)
+	else:
+		_beat_phase = 0.0
+	var hurt := hurt_level * settings.hurt_vignette
+	var beat := beat_level * settings.heartbeat_vignette
+	var standing := low_level * settings.heartbeat_vignette
+	_hurt.visible = hurt + beat + standing > 0.001
+	if _hurt.visible:
+		var view := _hurt.size
+		_hurt_material.set_shader_parameter("hurt", hurt)
+		_hurt_material.set_shader_parameter("beat", beat)
+		_hurt_material.set_shader_parameter("low", standing)
+		_hurt_material.set_shader_parameter("aspect", view.x / maxf(view.y, 1.0))
 
 
 func _update_board() -> void:
@@ -444,6 +520,9 @@ class Bars extends Control:
 
 	var hud: UnnaturalHud
 	var _shown_hp := 1.0
+	## The boss on the bar, and its trailing share.
+	var _boss_shown: Boss
+	var _boss_trail := 1.0
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -513,7 +592,15 @@ class Bars extends Control:
 		var width := minf(size.x * 0.5, 720.0)
 		var bar := Rect2((size.x - width) * 0.5, 128.0, width, 14.0)
 		draw_rect(bar.grow(3.0), Color(BroadcastUI.INK, 0.85))
+		# What the last hits took, trailing behind (P3), then the hp left.
+		if boss != _boss_shown:
+			_boss_shown = boss
+			_boss_trail = boss.share()
+		_boss_trail = maxf(move_toward(_boss_trail, boss.share(), get_process_delta_time() * 0.25), boss.share())
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * _boss_trail, bar.size.y)), Color(1.0, 0.9, 0.8, 0.55))
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * boss.share(), bar.size.y)), Color(1.0, 0.4, 0.2) if boss.enraged else HP_COLOR)
+		if boss.flash > 0.0:
+			draw_rect(Rect2(bar.position, Vector2(bar.size.x * boss.share(), bar.size.y)), Color(1.0, 1.0, 1.0, boss.flash * 0.35))
 		var name_line := boss.title + ("  ·  ENRAGED" if boss.enraged else "")
 		BroadcastUI.text(self, Rect2(bar.position.x, bar.position.y - 26.0, bar.size.x, 24.0), name_line, 18, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 800)
 

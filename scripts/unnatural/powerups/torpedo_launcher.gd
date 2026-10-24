@@ -30,7 +30,7 @@ func count() -> int:
 
 
 func blast() -> float:
-	return (settings.torpedo_blast + settings.torpedo_blast_per_stack * (stacks - 1)) * area_scale()
+	return (settings.torpedo_blast + settings.torpedo_blast_per_stack * (stacks - 1)) * size_scale()
 
 
 func on_hit(_index: int, _damage: float, _source: String, proc: float, chain: Array) -> void:

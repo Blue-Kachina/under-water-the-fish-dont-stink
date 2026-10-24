@@ -1,6 +1,7 @@
 class_name JellyfishHalo
-extends Powerup
-## Jellyfish Halo (planning_unnatural.md §7b, D14), a weapon: jellies orbit
+extends FishAttack
+## Jellyfish Halo (planning_unnatural.md §7b, D14), a steady weapon (FishAttack),
+## the Moon Jelly's own: jellies orbit
 ## the fish (count(): jelly_count, + the count facet) orbit_radius() m out,
 ## spin() turns a second. Every sting_tick() s each stings the zombies it
 ## touches (jelly_radius) for damage(), proc coefficient jelly_proc. The
@@ -39,31 +40,40 @@ var _pulse_age := 0.0
 var _built := Vector3i(-1, -1, -1)
 
 
+## It reads its own facets, and has no attacks to count (FishAttack).
+func own_facets() -> bool:
+	return true
+
+
+func counts_uses() -> bool:
+	return false
+
+
 func count() -> int:
 	var twist := run.twist_of(fish)
-	return settings.jelly_count + facet_count("count") + (twist.halo_bonus() if twist else 0)
+	return powers.jelly_count + facet_count("count") + (twist.halo_bonus() if twist else 0)
 
 
 func orbit_radius() -> float:
-	var reach := settings.halo_radius * (1.0 + facet("radius")) * area_scale()
+	var reach := powers.halo_radius * (1.0 + facet("radius")) * size_scale
 	if milestone(2) and _pulse_age < PULSE_TIME:
 		reach *= 1.0 + (PULSE_REACH - 1.0) * sin(PI * _pulse_age / PULSE_TIME)
 	return reach
 
 
 func spin() -> float:
-	return settings.halo_spin * (1.0 + facet("spin"))
+	return powers.halo_spin * (1.0 + facet("spin"))
 
 
 func damage() -> float:
-	return settings.jelly_damage * (1.0 + facet("damage"))
+	return powers.jelly_damage * (1.0 + facet("damage"))
 
 
 func sting_tick() -> float:
-	return settings.jelly_tick / (1.0 + facet("rate")) / rate_scale()
+	return powers.jelly_tick / (1.0 + facet("rate")) / attack_speed
 
 
-func on_stacks_changed() -> void:
+func _level_changed() -> void:
 	_build()
 
 
@@ -82,7 +92,7 @@ func jelly_position(k: int, lag := 0.0, outer := false) -> Vector3:
 	return fish.global_position + Vector3(cos(a), 0.15 * sin(a * 3.0 + _turn), sin(a)) * orbit_radius() * (OUTER_REACH if outer else 1.0)
 
 
-func on_tick(delta: float) -> void:
+func _work(delta: float) -> void:
 	var trail := milestone(1)
 	var outer := milestone(3)
 	if not is_instance_valid(_halo) or _built != Vector3i(count(), 1 if trail else 0, 1 if outer else 0):
@@ -97,12 +107,12 @@ func on_tick(delta: float) -> void:
 		jelly.global_position = jelly_position(k)
 		# Swimming: the bell squeezes and lets go, each a beat after the last.
 		var beat := sin(_turn * 3.0 + k * 1.7)
-		jelly.scale = Vector3(1.0 + 0.1 * beat, 1.0 - 0.12 * beat, 1.0 + 0.1 * beat) * settings.jelly_radius
+		jelly.scale = Vector3(1.0 + 0.1 * beat, 1.0 - 0.12 * beat, 1.0 + 0.1 * beat) * powers.jelly_radius
 	if trail:
 		for k in mini(n, _halo.get_child_count() - n):
 			var ghost := _halo.get_child(n + k) as Node3D
 			ghost.global_position = jelly_position(k, TRAIL_LAG)
-			ghost.scale = Vector3.ONE * settings.jelly_radius * 0.7
+			ghost.scale = Vector3.ONE * powers.jelly_radius * 0.7
 	if outer:
 		var first := n * (2 if trail else 1)
 		for k in mini(n, _halo.get_child_count() - first):
@@ -114,19 +124,19 @@ func on_tick(delta: float) -> void:
 	_sting_left += sting_tick()
 	_sting_left = maxf(_sting_left, 0.0)
 	for k in n:
-		_sting(jelly_position(k), settings.jelly_radius, damage())
+		_sting(jelly_position(k), powers.jelly_radius, damage())
 		if trail:
-			_sting(jelly_position(k, TRAIL_LAG), settings.jelly_radius * 0.7, damage() * TRAIL_SHARE)
+			_sting(jelly_position(k, TRAIL_LAG), powers.jelly_radius * 0.7, damage() * TRAIL_SHARE)
 		if outer:
-			_sting(jelly_position(k, 0.0, true), settings.jelly_radius, damage() * OUTER_SHARE)
+			_sting(jelly_position(k, 0.0, true), powers.jelly_radius, damage() * OUTER_SHARE)
 
 
 func _sting(at: Vector3, reach: float, amount: float) -> void:
 	for i in run.horde.query_sphere(at, reach):
 		stings += 1
 		var push := run.horde.enemy_position(i) - at
-		run.hit(i, amount, fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP,
-				settings.jelly_proc, [id])
+		strike(i, amount, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP,
+				powers.jelly_proc)
 		if milestone(4):
 			_jump(i, amount * JUMP_SHARE)
 
@@ -148,8 +158,8 @@ func _jump(from: int, amount: float) -> void:
 		return
 	jumps += 1
 	var to := run.horde.enemy_position(best)
-	PowerupFx.flash(run, to, 0.4, color(id), 0.15)
-	run.hit(best, amount, fish, id, (to - at).normalized(), settings.jelly_proc * 0.5, [id])
+	PowerupFx.flash(run, to, 0.4, tint(), 0.15)
+	strike(best, amount, (to - at).normalized(), powers.jelly_proc * 0.5)
 
 
 func _build() -> void:
@@ -164,22 +174,22 @@ func _build() -> void:
 	var trail := milestone(1)
 	var outer := milestone(3)
 	_built = Vector3i(count(), 1 if trail else 0, 1 if outer else 0)
-	var mesh := _jelly_mesh(color(id))
+	var mesh := _jelly_mesh(tint())
 	for k in count():
 		var jelly := MeshInstance3D.new()
 		jelly.mesh = mesh
 		jelly.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		jelly.scale = Vector3.ONE * settings.jelly_radius
+		jelly.scale = Vector3.ONE * powers.jelly_radius
 		_halo.add_child(jelly)
 		jelly.global_position = jelly_position(k)
 	if trail:
-		var faint := _jelly_mesh(color(id).darkened(0.4))
+		var faint := _jelly_mesh(tint().darkened(0.4))
 		for k in count():
 			var ghost := MeshInstance3D.new()
 			ghost.name = "Ghost"
 			ghost.mesh = faint
 			ghost.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			ghost.scale = Vector3.ONE * settings.jelly_radius * 0.7
+			ghost.scale = Vector3.ONE * powers.jelly_radius * 0.7
 			_halo.add_child(ghost)
 			ghost.global_position = jelly_position(k, TRAIL_LAG)
 	if outer:
@@ -188,7 +198,7 @@ func _build() -> void:
 			far.name = "Outer"
 			far.mesh = mesh
 			far.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			far.scale = Vector3.ONE * settings.jelly_radius
+			far.scale = Vector3.ONE * powers.jelly_radius
 			_halo.add_child(far)
 			far.global_position = jelly_position(k, 0.0, true)
 

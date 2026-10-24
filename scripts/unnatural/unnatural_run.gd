@@ -129,7 +129,7 @@ signal drop_taken(kind: int, by: FishController)
 signal powerup_lost(fish: FishController, id: String)
 ## A zombie (or a boss's body) was hurt, by whatever source (the hits' one door,
 ## hit(), and a guest's claimed hits): its slot, the damage, who, with what, and
-## the powerups that led to it (a chain).
+## the powerups that led to it (a chain). last_hit_crit says whether it crit.
 signal zombie_hit(index: int, amount: float, by: FishController, source: String, chain: Array)
 ## A local player took a pearl (the currency).
 signal pearl_collected(by: FishController)
@@ -148,6 +148,10 @@ const FLICKER_RATE := 16.0
 const ELITE_XP := 5.0
 ## An elite's kill is this many times likelier to drop a chest or a pickup.
 const ELITE_CHEST := 5.0
+## How often the crowd round each player is counted for the camera's pull (s).
+const CROWD_EVERY := 0.25
+## The hit source of the Lightning Bolt drop's arena-wide shock.
+const LIGHTNING_SOURCE := "lightning"
 ## A beaten boss's pearls' ids: this minus the boss's x 1000, minus the pearl's
 ## number (zombies' are their net ids).
 const BOSS_PEARL := 2000000000
@@ -245,6 +249,20 @@ var _clouds: Array[BurstCloud] = []
 var _relocate_left := 0.0
 ## The run's log (null in the Test Tank): saved when the run ends.
 var run_log: RunLog
+## Whether the hit zombie_hit is telling of now was a crit (read it while the
+## signal's going out: the damage numbers do), and how much of it landed (no
+## more than the hp it had: a killing blow's overkill left off).
+var last_hit_crit := false
+var last_hit_dealt := 0.0
+## Feel (P3): the kill bursts and the warning lanes, in the world.
+var kill_pops: KillPops
+var telegraphs: Telegraphs
+## Each local player's survivor cam pull-back now (m: the crowd and their Size,
+## camera_pull_of()), eased.
+var _camera_pull := {}
+## Each local player's crowd (zombies within camera_crowd_range), counted every CROWD_EVERY s.
+var _crowd := {}
+var _crowd_left := 0.0
 
 
 func setup(run_ocean: Ocean, player_fish: FishController) -> void:
@@ -292,6 +310,14 @@ func _ready() -> void:
 	blood_moon.strength = settings.blood_moon
 	blood_moon.settings = settings
 	add_child(blood_moon)
+	kill_pops = KillPops.new()
+	kill_pops.name = "KillPops"
+	kill_pops.settings = settings
+	add_child(kill_pops)
+	telegraphs = Telegraphs.new()
+	telegraphs.name = "Telegraphs"
+	telegraphs.run = self
+	add_child(telegraphs)
 	ocean.boundary_center = centre
 	ocean.boundary_radius = settings.arena_radius
 	if not test_tank:
@@ -333,6 +359,8 @@ func start() -> void:
 	cleared_at = -1.0
 	swarm = {}
 	horde.clear()
+	if kill_pops:
+		kill_pops.clear()
 	director.reset()
 	timeline.reset()
 	stage_complete = false
@@ -424,8 +452,8 @@ func remove_player(fish: FishController) -> void:
 ## FollowCamera), or takes it off (`on` false: the usual chase view). Called
 ## every frame, live from the panel: camera_mode only sets the follow or free
 ## cam when it's put on, or when the setting changes, so the camera's own swap
-## button sticks in between.
-static func steady_camera(camera: Node, on: bool, from: UnnaturalSettings) -> void:
+## button sticks in between. `pull`: m further back on top (camera_pull_of()).
+static func steady_camera(camera: Node, on: bool, from: UnnaturalSettings, pull := 0.0) -> void:
 	if not is_instance_valid(camera):
 		return
 	var steady := on and from.steady_camera
@@ -443,8 +471,8 @@ static func steady_camera(camera: Node, on: bool, from: UnnaturalSettings) -> vo
 	camera.set("steady_heading", steady)
 	camera.set("heading_rate", from.camera_turn_rate)
 	camera.set("heading_climb", from.camera_climb)
-	camera.set("extra_distance", from.camera_distance if steady else 0.0)
-	camera.set("extra_height", from.camera_height if steady else 0.0)
+	camera.set("extra_distance", from.camera_distance + pull if steady else 0.0)
+	camera.set("extra_height", from.camera_height + pull * 0.3 if steady else 0.0)
 	camera.set("extra_angle", from.camera_tilt if steady else 0.0)
 
 
@@ -676,11 +704,6 @@ static func _fresh_stats() -> Dictionary:
 ## `fish`'s attack: its own (or the panel's fish_attack), built anew if that changed.
 func _make_attack(fish: FishController) -> FishAttack:
 	var kind := FishAttack.kind_for(fish.character, settings.fish_attack as FishAttack.Kind)
-	var start := FishAttack.starting_weapon(fish.character) if kind == FishAttack.Kind.NONE else ""
-	if loadout_of(fish).starting != start:
-		loadout_of(fish).start_with(start)  # a powerup weapon takes the attack's slot
-		powerups_of(fish).clear()
-		powerups_of(fish).refresh()
 	var attack: FishAttack = _attacks.get(fish)
 	if is_instance_valid(attack) and attack.kind == kind:
 		return attack
@@ -690,6 +713,8 @@ func _make_attack(fish: FishController) -> FishAttack:
 	attack.fish = fish
 	attack.horde = horde
 	attack.settings = settings
+	attack.run = self
+	attack.powers = powerup_settings
 	attack.on_hit = hit
 	add_child(attack)
 	_attacks[fish] = attack
@@ -705,15 +730,8 @@ func _apply_stats(fish: FishController) -> void:
 	if attack:
 		var loadout := loadout_of(fish)
 		loadout.attack_kind = attack.kind
-		var own := Weapons.ATTACK
-		attack.attack_speed = (1.0 + block.value("attack_speed")) * (1.0 + loadout.facet(own, "rate"))
-		attack.area_scale = (1.0 + block.value("area")) * (1.0 + loadout.facet(own, "size"))
-		attack.damage_scale = 1.0 + loadout.facet(own, "damage")
-		attack.knock_scale = 1.0 + loadout.facet(own, "knock")
-		attack.extra_projectiles = roundi(block.value("projectile_count") + loadout.facet(own, "count"))
-		attack.projectile_speed = (1.0 + block.value("projectile_speed")) * (1.0 + loadout.facet(own, "speed"))
-		var level := loadout.level(own)
-		attack.milestones = settings.milestones_at(level)
+		var level := loadout.level(Weapons.ATTACK)
+		attack.configure(block, loadout.facets_of(Weapons.ATTACK), level)
 		_attack_levels[fish] = level
 	if is_instance_valid(fish) and not fish.puppet:
 		fish.speed_scale = _swim_scale(fish)
@@ -749,10 +767,15 @@ func _physics_process(delta: float) -> void:
 		director.update(delta, around)
 		horde.difficulty = difficulty()
 		_relocate_strays(delta)
+	_crowd_left -= delta
+	var count_crowd := _crowd_left <= 0.0
+	if count_crowd:
+		_crowd_left = CROWD_EVERY
 	for fish in local_players():
 		var health: FishHealth = _health.get(fish)
 		if health == null:
 			continue
+		_pull_camera(fish, delta, count_crowd)
 		_keep_in_arena(fish, delta)
 		health.update(delta, settings.regen + block_of(fish).value("regen"))
 		if is_picking(fish):
@@ -782,6 +805,23 @@ func _physics_process(delta: float) -> void:
 			_touch_zombies(fish)
 			_touch_clouds(fish)
 	_sync_pearls()
+
+
+## How much further back `fish`'s survivor cam sits now (m), for the crowd
+## round it and its Size stat (camera_crowd_pull, camera_size_pull).
+func camera_pull_of(fish: FishController) -> float:
+	return _camera_pull.get(fish, 0.0)
+
+
+## Eases `fish`'s camera pull toward what the crowd (counted again when
+## `count`) and its Size ask for.
+func _pull_camera(fish: FishController, delta: float, count: bool) -> void:
+	if count:
+		_crowd[fish] = horde.query_sphere(fish.global_position, settings.camera_crowd_range).size() if settings.camera_crowd_pull > 0.0 else 0
+	var crowd := clampf(float(_crowd.get(fish, 0)) / maxf(settings.camera_crowd_full, 1.0), 0.0, 1.0)
+	var goal := settings.camera_crowd_pull * crowd + settings.camera_size_pull * maxf(block_of(fish).value("size"), 0.0)
+	var now: float = _camera_pull.get(fish, 0.0)
+	_camera_pull[fish] = lerpf(now, goal, 1.0 - exp(-settings.camera_pull_rate * delta))
 
 
 ## How many more zombies the players' curses call (Siren's Song): 1 without.
@@ -836,6 +876,7 @@ func _update_targets() -> void:
 func hit(index: int, amount: float, by: FishController, source: String, push := Vector3.ZERO, proc := 1.0, chain: Array = []) -> void:
 	if not horde.is_alive(index):
 		return
+	last_hit_crit = false
 	if by:
 		var block := block_of(by)
 		amount *= 1.0 + block.value("damage")
@@ -849,6 +890,7 @@ func hit(index: int, amount: float, by: FishController, source: String, push := 
 		if block.value("crit_chance") > 0.0 and rng.randf() < block.value("crit_chance"):
 			amount *= 1.5 + block.value("crit_damage")
 			stats.crits += 1
+			last_hit_crit = true
 			# Megalodon Tooth: a crit that leaves it under the share finishes it (not a boss).
 			var execute := powerups.execute_share() if powerups else 0.0
 			if execute > 0.0 and not boss_at(index) and horde.enemy_hp(index) - amount < horde.enemy_max_hp(index) * execute:
@@ -859,6 +901,7 @@ func hit(index: int, amount: float, by: FishController, source: String, push := 
 	if tank:
 		tank.log_hit(source, amount)
 	var boss := boss_at(index)
+	last_hit_dealt = amount if horde.is_immortal(index) and not boss else minf(amount, boss.hp if boss else horde.enemy_hp(index))
 	if boss:
 		boss.take(amount, by, source)
 	else:
@@ -875,11 +918,13 @@ func hit(index: int, amount: float, by: FishController, source: String, push := 
 func apply_claimed_hit(index: int, amount: float, by: FishController, source: String) -> void:
 	if not horde.is_alive(index) or amount <= 0.0:
 		return
+	last_hit_crit = false
 	if by:
 		var stats := stats_of(by)
 		stats.damage += amount
 		stats.by_source[source] = stats.by_source.get(source, 0.0) + amount
 	var boss := boss_at(index)
+	last_hit_dealt = amount if horde.is_immortal(index) and not boss else minf(amount, boss.hp if boss else horde.enemy_hp(index))
 	if boss:
 		boss.take(amount, by, source)
 	else:
@@ -1197,6 +1242,8 @@ func _on_killed(index: int, kind_index: int, at: Vector3, source: String, by: Ob
 	var kind := horde.kinds[kind_index]
 	if kind.behaviour == EnemyKind.Behaviour.TANK and settings.burst_radius > 0.0 and settings.burst_time > 0.0:
 		_burst(at, settings.burst_radius * horde.enemy_size(index) / kind.size)
+	if kill_pops and not horde.is_proxy(index):
+		kill_pops.pop(at, horde.enemy_size(index), kind.tint, horde.is_elite(index))
 	var fish := by as FishController
 	if fish:
 		var stats := stats_of(fish)
@@ -1205,6 +1252,9 @@ func _on_killed(index: int, kind_index: int, at: Vector3, source: String, by: Ob
 			stats.battered += 1
 		if _twists.has(fish):
 			(_twists[fish] as Traversal).on_kill()
+		var own: FishAttack = _attacks.get(fish)
+		if is_instance_valid(own):
+			own.on_kill(at, source)
 		if _powerups.has(fish):
 			(_powerups[fish] as Powerups).on_kill(at, source)
 	if tank:
@@ -1214,9 +1264,10 @@ func _on_killed(index: int, kind_index: int, at: Vector3, source: String, by: Ob
 	credit_xp(kind.xp * (ELITE_XP if elite else 1.0), fish)
 	if authority:
 		_roll_pearl(at, fish, elite, horde.net_id_of(index))
-		if _rolls_chest(fish, elite):
-			drop_chest(at)
-		_roll_drop(at, fish, elite)
+		if source != LIGHTNING_SOURCE:  # a bolt's kills drop no chests or drops (no chain of bolts)
+			if _rolls_chest(fish, elite):
+				drop_chest(at)
+			_roll_drop(at, fish, elite)
 	zombie_killed.emit(at, kind, fish, source)
 
 
@@ -1430,7 +1481,7 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 		_open_whirlpool(boss.global_position)
 		# And its loot: the Coil, in a chest beside the whirlpool (on every machine, like the shark's).
 		var loot := add_chest(boss.global_position + Vector3(9.0, 0.0, 0.0), 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
-				TreasureChest.Kind.BOSS, "leviathans_coil")
+				TreasureChest.Kind.BOSS, "attack_leviathans_coil")
 		loot.name = "LeviathanChest"
 
 
@@ -1851,7 +1902,7 @@ func _offer_swap(fish: FishController, incoming: String) -> void:
 	var loadout := loadout_of(fish)
 	var cards := []
 	for id in loadout.weapons:
-		if id != Weapons.ATTACK and id != loadout.starting:
+		if id != Weapons.ATTACK:
 			cards.append({"kind": "swap", "weapon": id, "incoming": incoming, "tier": Powerup.tier(incoming),
 					"level": loadout.earned_level(id)})
 	cards.append({"kind": "keep", "weapon": incoming, "tier": Rarity.Tier.COMMON})
@@ -1897,14 +1948,16 @@ func add_chest(at: Vector3, turn: float, sink_to := -INF, kind := TreasureChest.
 	return chest
 
 
-## Maybe a drop where `by`'s kill was (the host rolls): a heart, a magnet or an
-## hourglass, each by its chance (elite: x ELITE_CHEST), raised by their luck.
+## Maybe a drop where `by`'s kill was (the host rolls): a heart, a magnet, an
+## hourglass or a lightning bolt, each by its chance (elite: x ELITE_CHEST),
+## raised by their luck.
 func _roll_drop(at: Vector3, by: FishController, elite := false) -> void:
 	var luck := block_of(by).value("luck") if is_instance_valid(by) and _blocks.has(by) else 0.0
 	var lift := maxf(1.0 + luck * settings.chest_drop_luck, 0.0) * (ELITE_CHEST if elite else 1.0)
 	var roll := rng.randf()
-	for kind in [Pickup.Kind.HEART, Pickup.Kind.MAGNET, Pickup.Kind.HOURGLASS]:
-		var chance := [settings.heart_chance, settings.magnet_chance, settings.hourglass_chance][kind] as float * lift
+	var chances := [settings.heart_chance, settings.magnet_chance, settings.hourglass_chance, settings.lightning_chance]
+	for kind in [Pickup.Kind.HEART, Pickup.Kind.MAGNET, Pickup.Kind.HOURGLASS, Pickup.Kind.LIGHTNING]:
+		var chance := chances[kind] as float * lift
 		if roll < chance:
 			drop_pickup(kind, at)
 			return
@@ -1975,7 +2028,22 @@ func apply_pickup(kind: int, by: FishController) -> void:
 					pearl.drawn_by = by
 		Pickup.Kind.HOURGLASS:
 			horde.freeze(settings.hourglass_time)
+		Pickup.Kind.LIGHTNING:
+			if authority:  # the host kills; guests hear of each kill
+				lightning_strike(by)
 	drop_taken.emit(kind, by)
+
+
+## The Lightning Bolt: a shock across the whole arena kills every zombie,
+## credited to `by`. Bosses (and their body parts) and undying ones are spared.
+## Returns how many died.
+func lightning_strike(by: FishController) -> int:
+	var struck := 0
+	for i in horde.capacity:
+		if horde.is_alive(i) and not horde.is_proxy(i) and not horde.is_immortal(i) and boss_at(i) == null:
+			horde.kill(i, LIGHTNING_SOURCE, by)
+			struck += 1
+	return struck
 
 
 ## A chest dropped by a kill at `at`, sinking to the seabed.
