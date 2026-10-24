@@ -31,9 +31,7 @@ func on_battery(_index: int) -> void:
 	var reach := radius()
 	PowerupFx.shock(run, at, reach, color(id), fish.global_basis.y)
 	Sfx.play_at("pw/eel_shock_ring", at)
-	for i in run.horde.query_sphere(at, reach):
-		var push := run.horde.enemy_position(i) - at
-		run.hit(i, damage(), fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP, settings.eel_proc, [id])
+	run.hit_area(run.horde.query_sphere(at, reach), damage(), fish, id, at, 1.0, settings.eel_proc, [id])
 
 
 ## An eel wound round the middle, glowing.

@@ -35,11 +35,15 @@ func dash(from: Vector3, through: Vector3) -> void:
 	var to := from + way * settings.ghost_length
 	var width := settings.ghost_width * size_scale()
 	var middle := (from + to) * 0.5
+	var cut := PackedInt32Array()
+	var pushes := PackedVector3Array()
 	for i in run.horde.query_sphere(middle, settings.ghost_length * 0.5 + width):
 		var at := run.horde.enemy_position(i)
 		var along := clampf((at - from).dot(way), 0.0, settings.ghost_length)
 		if at.distance_to(from + way * along) <= width + run.horde.enemy_radius(i):
-			run.hit(i, settings.ghost_damage, fish, id, way, 1.0, [id])
+			cut.append(i)
+			pushes.append(way)
+	run.hit_area(cut, settings.ghost_damage, fish, id, Vector3.INF, 0.0, 1.0, [id], pushes)
 	dashes += 1
 	streak(run, from, to, color(id), 0.9, 0.35)
 	Sfx.play("pw/drowned_fin_dash")

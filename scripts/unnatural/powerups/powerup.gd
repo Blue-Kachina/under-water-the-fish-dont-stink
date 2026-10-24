@@ -78,6 +78,11 @@ var stacks := 0
 var run: UnnaturalRun
 var fish: FishController
 var settings: PowerupSettings
+## It doesn't hear hits, or add to hits on a zombie (bonus_on): set by the base
+## hooks the first time they run (an item that overrides them never sets them),
+## so Powerups stops calling them on every hit (the perf pass).
+var deaf := false
+var no_bonus := false
 ## Its look on the fish (make_worn()), while held.
 var _worn: Node3D
 
@@ -232,6 +237,21 @@ func roll(chance: float) -> bool:
 	return chance > 0.0 and run.rng.randf() < chance
 
 
+## The most power a capped proc (torpedoes in flight, lightning and slams a
+## second) keeps for its next one, so a long cap can't build one absurd hit.
+const BANK_MAX := 25.0
+
+
+## A proc's roll that keeps what's past certain (the perf pass): 0 if it
+## failed, 1 if it went off, or `chance` itself when that's over 1 (an area
+## hit's few rolls each stand for many zombies). Callers make the proc that
+## much stronger, so power isn't lost when work is saved.
+func proc_power(chance: float) -> float:
+	if chance >= 1.0:
+		return chance
+	return 1.0 if roll(chance) else 0.0
+
+
 ## A weapon's facet `facet_id` (its total from upgrades, Loadout.facet).
 func facet(facet_id: String) -> float:
 	return run.loadout_of(fish).facet(id, facet_id) if run and is_instance_valid(fish) else 0.0
@@ -265,8 +285,12 @@ func size_scale() -> float:
 	return maxf(1.0 + run.block_of(fish).value("size"), 0.1) if run and is_instance_valid(fish) else 1.0
 
 
+## A hit by the fish (UnnaturalRun.hit(), or once for each of a few of an area
+## hit's zombies: `proc` is then bigger, and past certain it's the proc's
+## strength, proc_power()). An override must not call this one: it marks the
+## item deaf, and it's never called again.
 func on_hit(_index: int, _damage: float, _source: String, _proc: float, _chain: Array) -> void:
-	pass
+	deaf = true
 
 
 func on_kill(_at: Vector3, _source: String) -> void:
@@ -335,6 +359,7 @@ func chest_ping_bonus() -> float:
 
 ## How much more its hits do to zombie `index` (Sonar Pinger's marks: 0.25 = +25%).
 func bonus_on(_index: int) -> float:
+	no_bonus = true  # (an override never gets here: see `deaf`)
 	return 0.0
 
 

@@ -120,12 +120,16 @@ class Wave extends Node3D:
 		global_position += heading * step
 		var run := heart.run
 		var at := global_position
+		var reached := PackedInt32Array()
+		var pushes := PackedVector3Array()
 		for i in run.horde.query_sphere(at, width * 0.5):
 			if _hit.has(i):
 				continue
 			_hit[i] = true
 			heart.swept += 1
-			run.hit(i, heart.damage(), heart.fish, heart.id, heading * 3.0, heart.settings.tsunami_proc, [heart.id])
+			reached.append(i)
+			pushes.append(heading * 3.0)
+		run.hit_area(reached, heart.damage(), heart.fish, heart.id, Vector3.INF, 0.0, heart.settings.tsunami_proc, [heart.id], pushes)
 		var t := _gone / reach
 		_material.albedo_color.a = 0.6 * (1.0 - t)
 		if _gone >= reach:

@@ -1047,7 +1047,48 @@ low-hp vignette.
   magnets, hourglasses and bolts (the 16-min log had 62,678 kills). Drops are timed now: each kind
   waits `heart_every` 45 s / `magnet_every` 90 / `hourglass_every` 120 / `lightning_every` 150
   after its last, and any drop holds every kind back `drop_gap` 20 s. `drops_probe` checks it.
-- Performance with Torpedoes and Chain Lightning together: brainstormed, not built yet.
+- Performance with Torpedoes and Chain Lightning together: see "Perf pass 3" below (the user
+  picked ideas 2, 3 and 4 of the brainstorm).
+
+### Perf pass 3: the hit path (2026-10-23)
+Late runs lagged with Torpedoes and Chain Lightning. Every hit ran the whole path on its own:
+crit roll, stats, the hit signal, and a call to every held powerup's `on_hit`. A torpedo blast on
+30 zombies did all of that 30 times, and each of those hits could start more.
+- **Only listeners hear hits (2).** `Powerup.on_hit` / `bonus_on` mark an item `deaf` /
+  `no_bonus` the first time the base no-op runs; `Powerups` keeps lists of the rest
+  (`_hearing`, `_bonusing`), rebuilt as new arrays (a hit's procs can hit again mid-loop).
+  `damage_scale()` is cached once a physics tick. Rule: an `on_hit` override must not call super.
+- **Area hits (3).** `UnnaturalRun.hit_area()`: each zombie is hurt as `hit()` would (own crit
+  roll, marks, Megalodon, the same `zombie_hit` / `hit_claimed` signals), but the player's numbers
+  are worked out once, the stats written once, and the powerups hear at most
+  `AREA_PROC_ROLLS` (3) of its zombies, each with the proc coefficient × targets ÷ 3. Average procs
+  are unchanged. `FishAttack.strike_area()` is the weapons' way in. Converted: torpedo blasts,
+  lightning chains, Kraken slams, Eel, Bioluminescence, Trident, Lure, Pufferfish burst, Riptide,
+  Whirlpool Charm, Tsunami, Ghost Swordfish; Greek Fire (all patches in one hit a tick), bite,
+  sting, depth charges, halo, coil, remora tears, thrust bursts. Projectiles and the dash moves
+  still hit one at a time.
+- **Overflow becomes power (4).** `Powerup.proc_power()`: a proc chance past 1 is the proc's
+  strength. Torpedoes carry a power (blast damage ×, the blast a little wider); a launch with no
+  room under `torpedo_max` folds into the torpedoes flying. Lightning and Kraken bank the strikes
+  their rate caps hold back into the next one. Both are capped at `Powerup.BANK_MAX` (25).
+- **Measuring.** `UnnaturalRun.hit_usec` / `hits_counted` time the outermost hit calls.
+  `UnnaturalRun.batch_hits = false` brings back the old path for A/B. `tests/torpedo_bench` has
+  `--old`, `--build` (the user's 16-minute build), `--build=id,id` and `--set=name=value`.
+  Probe: `tests/perf_pass_probe`.
+
+Bench, 16 torpedo stacks + 8 lightning, 1,000 zombies, RTX 4070 Ti SUPER:
+
+| | hit path (ms per s) | frame |
+|---|---|---|
+| bite only, old / new | 15.3 / 11.5 | 5.3 / 5.3 ms |
+| + the user's late build, old / new | 72.6 / 31.8 | 18.3 / 17.2 ms |
+
+**What's left:** with the late build the frame is still about 17 ms, and the hit path isn't most
+of it any more: about 15 ms of process time and about 1,600 draw calls (from about 650). The
+suspects are effects made as nodes per event (`PowerupFx` rings, shocks and spikes, Kraken slams,
+Ghost Swordfish streaks, lightning bolt meshes) and the worn models. Each item alone measured only
+about 4 ms frames; Kraken's Grasp was the costliest on the hit path (14.8 ms/s for 148 hits/s, its
+slam's effects and slows inside the hit). Next: pool the effects (idea 6) and find the draw calls.
 
 **Open for the user's play-test:**
 - Is the depth assist's default (0.4) too much or too little? It changes how the horde moves, so

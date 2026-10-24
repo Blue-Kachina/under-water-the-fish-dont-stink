@@ -127,10 +127,12 @@ func _animate(delta: float) -> void:
 	_age += delta
 	if before < GROW_TIME and _age >= GROW_TIME:
 		var at := origin()
-		for i in horde.query_sphere(at, radius()):
-			strike(i, settings.sting_damage, toward(at, i, nose()))
-			if milestones >= 2:
-				horde.shove(i, -horde.enemy_velocity(i) * SLOW_SHARE)
+		var stung := horde.query_sphere(at, radius())
+		strike_area(stung, settings.sting_damage, at)
+		if milestones >= 2:
+			for i in stung:
+				if horde.is_alive(i):
+					horde.shove(i, -horde.enemy_velocity(i) * SLOW_SHARE)
 		if milestones >= 3:
 			for i in horde.query_sphere(at, radius() * PULL_REACH):
 				var inward := at - horde.enemy_position(i)

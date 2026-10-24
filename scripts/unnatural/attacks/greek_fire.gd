@@ -93,9 +93,11 @@ func _work(delta: float) -> void:
 		return
 	_burn_left += BURN_TICK
 	var burn := dps() * BURN_TICK
+	# Every patch's zombies in one area hit (one in two patches burns twice, as before).
+	var burning := PackedInt32Array()
 	for patch in patches:
-		for i in run.horde.query_sphere(patch.global_position, patch.radius):
-			strike(i, burn, Vector3.ZERO, powers.fire_proc)
+		burning.append_array(run.horde.query_sphere(patch.global_position, patch.radius))
+	strike_area(burning, burn, Vector3.INF, powers.fire_proc)
 
 
 ## The first milestone: a zombie burnt to death leaves a patch where it fell.
@@ -109,13 +111,17 @@ func on_kill(at: Vector3, source: String) -> void:
 func _flare() -> void:
 	flares += 1
 	var burn := dps() * FLARE_BURN
+	var flared := PackedInt32Array()
 	for patch in patches:
 		if not is_instance_valid(patch):
 			continue
 		var reach := patch.radius * FLARE_REACH
 		PowerupFx.ring(run, patch.global_position, reach, tint(), Vector3.UP, 0.4)
-		for i in run.horde.query_sphere(patch.global_position, reach):
-			strike(i, burn, Vector3.UP, powers.fire_proc)
+		flared.append_array(run.horde.query_sphere(patch.global_position, reach))
+	var ups := PackedVector3Array()
+	ups.resize(flared.size())
+	ups.fill(Vector3.UP)
+	strike_area(flared, burn, Vector3.INF, powers.fire_proc, ups)
 
 
 ## The fourth: the patches creep toward the nearest zombie close by (looked

@@ -9,9 +9,10 @@ extends Powerup
 ## They fly as one pooled swarm (TorpedoSwarm), at most torpedo_max at once,
 ## and only torpedo_fx_rate blasts a second are shown: a big launcher stays smooth.
 
-## Torpedoes fired and blasts so far, for the probes.
+## Torpedoes fired and blasts so far, and launches folded into others (no room), for the probes.
 var fired := 0
 var blasts := 0
+var folded := 0
 
 var _swarm: TorpedoSwarm
 var _loop := 0
@@ -34,8 +35,9 @@ func blast() -> float:
 
 
 func on_hit(_index: int, _damage: float, _source: String, proc: float, chain: Array) -> void:
-	if roll(chance() * proc):
-		launch(chain)
+	var power := proc_power(chance() * proc)
+	if power > 0.0:
+		launch(chain, power)
 
 
 ## Torpedoes flying now.
@@ -44,10 +46,17 @@ func in_flight() -> int:
 
 
 ## count() torpedoes from the fish, each at one of its nearest zombies (the
-## nearest first), while fewer than torpedo_max are flying.
-func launch(chain: Array) -> void:
+## nearest first), `power` times as strong (Powerup.proc_power()), while fewer
+## than torpedo_max are flying. Those there's no room for aren't lost (the perf
+## pass): their power goes into the torpedoes launched now, or with none, into
+## those already flying, so a big launcher costs no more work, only hits harder.
+func launch(chain: Array, power := 1.0) -> void:
 	var room := settings.torpedo_max - in_flight()
+	var total := count() * maxf(power, 1.0)
 	if room <= 0:
+		folded += 1
+		if is_instance_valid(_swarm):
+			_swarm.boost(total)
 		return
 	if not is_instance_valid(_swarm):
 		_swarm = TorpedoSwarm.new()
@@ -56,12 +65,15 @@ func launch(chain: Array) -> void:
 		run.add_child(_swarm)
 	var from := fish.global_position
 	var wanted := mini(count(), room)
+	if wanted < count():
+		folded += 1
+	var each := total / wanted
 	var nearest := _nearest(from, 25.0, wanted)
 	var from_chain := chain + [id]
 	for n in wanted:
 		var spread := Vector3(run.rng.randf_range(-1, 1), run.rng.randf_range(0.2, 1.0), run.rng.randf_range(-1, 1)).normalized()
 		var velocity := (-fish.global_basis.z * 0.6 + spread * 0.4).normalized() * settings.torpedo_speed * 0.5
-		_swarm.add(from + spread * 0.6, velocity, nearest[n % nearest.size()] if not nearest.is_empty() else -1, from_chain)
+		_swarm.add(from + spread * 0.6, velocity, nearest[n % nearest.size()] if not nearest.is_empty() else -1, from_chain, each)
 		fired += 1
 	Sfx.play_at("pw/torpedo_launch", from)
 
@@ -107,10 +119,11 @@ func on_removed() -> void:
 	_loop = 0
 
 
-## A torpedo's blast at `at`.
-func explode(at: Vector3, chain: Array) -> void:
+## A torpedo's blast at `at`, `power` times its damage (a folded torpedo's
+## blast is a little wider too).
+func explode(at: Vector3, chain: Array, power := 1.0) -> void:
 	blasts += 1
-	var reach := blast()
+	var reach := blast() * minf(1.0 + 0.1 * (maxf(power, 1.0) - 1.0), 1.6)
 	Sfx.play_at("fx/explosion", at, clampf(reach / 6.0, 0.0, 1.0))
 	var now := Time.get_ticks_msec() / 1000.0
 	_fx_left = minf(_fx_left + (now - _fx_time) * settings.torpedo_fx_rate, settings.torpedo_fx_rate * 0.5)
@@ -118,10 +131,8 @@ func explode(at: Vector3, chain: Array) -> void:
 	if _fx_left >= 1.0:
 		_fx_left -= 1.0
 		Explosion.spawn(run.ocean, at, Powerup.color(id), reach, 0.0, 0.25)
-	for i in run.horde.query_sphere(at, reach):
-		var push := run.horde.enemy_position(i) - at
-		run.hit(i, settings.torpedo_damage, fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP,
-				run.powerup_settings.torpedo_proc, chain)
+	run.hit_area(run.horde.query_sphere(at, reach), settings.torpedo_damage * maxf(power, 1.0), fish, id, at, 1.0,
+			run.powerup_settings.torpedo_proc, chain)
 
 
 ## Twin launch tubes along the flanks, their muzzles glowing.
@@ -166,6 +177,8 @@ class TorpedoSwarm extends MultiMeshInstance3D:
 	var _velocity := PackedVector3Array()
 	var _target := PackedInt32Array()
 	var _age := PackedFloat32Array()
+	## Each torpedo's power (its blast's damage multiplier: launches folded into it).
+	var _power := PackedFloat32Array()
 	var _chain: Array = []
 	var _ticks := 0
 
@@ -184,12 +197,30 @@ class TorpedoSwarm extends MultiMeshInstance3D:
 	func count() -> int:
 		return _position.size()
 
-	func add(at: Vector3, velocity: Vector3, target: int, chain: Array) -> void:
+	func add(at: Vector3, velocity: Vector3, target: int, chain: Array, power := 1.0) -> void:
 		_position.append(at)
 		_velocity.append(velocity)
 		_target.append(target)
 		_age.append(0.0)
+		_power.append(minf(power, Powerup.BANK_MAX))
 		_chain.append(chain)
+
+	## `power` more spread over the torpedoes flying (a launch with no room
+	## left), each up to Powerup.BANK_MAX.
+	func boost(power: float) -> void:
+		var n := _power.size()
+		if n == 0:
+			return
+		var each := power / n
+		for i in n:
+			_power[i] = minf(_power[i] + each, Powerup.BANK_MAX)
+
+	## The total power flying now (probes).
+	func power_total() -> float:
+		var total := 0.0
+		for p in _power:
+			total += p
+		return total
 
 	func _physics_process(delta: float) -> void:
 		_ticks += 1
@@ -224,8 +255,9 @@ class TorpedoSwarm extends MultiMeshInstance3D:
 			var i := blown[b]
 			var at := _position[i]
 			var chain: Array = _chain[i]
+			var power := _power[i]
 			_remove(i)
-			launcher.explode(at, chain)
+			launcher.explode(at, chain, power)
 		_draw()
 
 	func _remove(i: int) -> void:
@@ -234,11 +266,13 @@ class TorpedoSwarm extends MultiMeshInstance3D:
 		_velocity[i] = _velocity[last]
 		_target[i] = _target[last]
 		_age[i] = _age[last]
+		_power[i] = _power[last]
 		_chain[i] = _chain[last]
 		_position.resize(last)
 		_velocity.resize(last)
 		_target.resize(last)
 		_age.resize(last)
+		_power.resize(last)
 		_chain.resize(last)
 
 	func _draw() -> void:

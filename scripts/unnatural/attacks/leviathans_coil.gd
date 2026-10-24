@@ -100,23 +100,24 @@ func _work(delta: float) -> void:
 			lashes += 1
 			var end := trail[trail.size() - 1]
 			PowerupFx.shock(run, end, TAIL_REACH, tint(), Vector3.UP, 0.35)
-			for i in run.horde.query_sphere(end, TAIL_REACH):
-				var out := run.horde.enemy_position(i) - end
-				strike(i, damage() * TAIL_DAMAGE, out.normalized() if out.length_squared() > 0.0001 else Vector3.UP,
-						powers.coil_proc)
+			strike_area(run.horde.query_sphere(end, TAIL_REACH), damage() * TAIL_DAMAGE, end, powers.coil_proc)
 	_tick_left -= delta
 	if _tick_left > 0.0:
 		return
 	_tick_left = maxf(_tick_left + tick(), 0.0)
 	var slow := milestone(1)
+	# Every segment's zombies in one area hit, each pushed off its own segment.
+	var squeezed := PackedInt32Array()
+	var pushes := PackedVector3Array()
 	for k in range(1, trail.size()):
 		for i in run.horde.query_sphere(trail[k], size()):
 			hits += 1
 			var push := run.horde.enemy_position(i) - trail[k]
 			if slow:
 				run.horde.shove(i, -run.horde.enemy_velocity(i) * SLOW_SHARE)
-			strike(i, damage(), push.normalized() if push.length_squared() > 0.0001 else Vector3.UP,
-					powers.coil_proc)
+			squeezed.append(i)
+			pushes.append(push.normalized() if push.length_squared() > 0.0001 else Vector3.UP)
+	strike_area(squeezed, damage(), Vector3.INF, powers.coil_proc, pushes)
 
 
 ## The serpent along the trail (the first spot is the fish itself, so not

@@ -107,10 +107,11 @@ class Vortex extends Node3D:
 		var grind := _tick <= 0.0
 		if grind:
 			_tick += TICK
-		for i in run.horde.query_sphere(centre, radius):
+		var caught := run.horde.query_sphere(centre, radius)
+		for i in caught:
 			var inward := centre - run.horde.enemy_position(i)
 			if inward.length_squared() > 0.04 and not run.horde.is_proxy(i):
 				var swirl := Vector3.UP.cross(inward).normalized()
 				run.horde.shove(i, (inward.normalized() * pull + swirl * pull * 0.5) * delta * 4.0)
-			if grind and is_instance_valid(owner_charm.fish):
-				run.hit(i, dps * TICK, owner_charm.fish, owner_charm.id, Vector3.ZERO, run.powerup_settings.fire_proc, [owner_charm.id])
+		if grind and is_instance_valid(owner_charm.fish):
+			run.hit_area(caught, dps * TICK, owner_charm.fish, owner_charm.id, Vector3.INF, 0.0, run.powerup_settings.fire_proc, [owner_charm.id])

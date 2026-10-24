@@ -28,8 +28,7 @@ func flash() -> void:
 	var at := fish.global_position
 	var reach := (settings.biolum_radius + settings.biolum_radius_per_stack * (stacks - 1)) * size_scale()
 	var damage := (settings.biolum_damage + settings.biolum_damage_per_stack * (stacks - 1)) * run.levels.level
-	for i in run.horde.query_sphere(at, reach):
-		run.hit(i, damage, fish, id, (run.horde.enemy_position(i) - at).normalized(), 1.0, [id])
+	run.hit_area(run.horde.query_sphere(at, reach), damage, fish, id, at, 1.0, 1.0, [id])
 	PowerupFx.flash(run, at, reach * 0.6, color(id), 0.5)
 	PowerupFx.ring(run, at, reach, color(id), Vector3.UP, 0.5)
 	Sfx.play("pw/eel_shock_ring")

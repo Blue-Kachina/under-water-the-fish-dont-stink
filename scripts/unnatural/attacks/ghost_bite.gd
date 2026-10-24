@@ -237,9 +237,7 @@ func _animate(delta: float) -> void:
 		_snapped = true
 		var hits := zone_hits()
 		bitten += hits.size()
-		for i in hits:
-			var push := horde.enemy_position(i) - origin()
-			strike(i, settings.bite_damage, push.normalized() if push.length_squared() > 0.0001 else _aim)
+		strike_area(PackedInt32Array(hits), settings.bite_damage, origin())
 	if _age >= SNAP_TIME + FADE_TIME:
 		_age = -1.0
 		visible = false

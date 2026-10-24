@@ -150,6 +150,19 @@ const ELITE_XP := 5.0
 const ELITE_CHEST := 5.0
 ## How often the crowd round each player is counted for the camera's pull (s).
 const CROWD_EVERY := 0.25
+## An area hit (hit_area()) has its powerups hear this many of its zombies at most.
+const AREA_PROC_ROLLS := 3
+
+## The perf pass's switch, for A/B benches: off, an area hit is a hit() apiece
+## and every powerup hears every hit, as before it.
+static var batch_hits := true
+## The hit path's cost (benches read and reset these): microseconds inside the
+## outermost hit() / hit_area() calls (what they set off included), and how
+## many zombies were hit.
+static var hit_usec := 0
+static var hits_counted := 0
+static var _hit_depth := 0
+static var _hit_started := 0
 ## The hit source of the Lightning Bolt drop's arena-wide shock.
 const LIGHTNING_SOURCE := "lightning"
 ## A beaten boss's pearls' ids: this minus the boss's x 1000, minus the pearl's
@@ -880,6 +893,26 @@ func _update_targets() -> void:
 ## the hit's proc coefficient (1 for an attack or battery); `chain` lists the
 ## powerups that led to it, which it can't start again.
 func hit(index: int, amount: float, by: FishController, source: String, push := Vector3.ZERO, proc := 1.0, chain: Array = []) -> void:
+	_enter_hit()
+	_hit(index, amount, by, source, push, proc, chain)
+	_leave_hit(1)
+
+
+## The hit path's timing (hit_usec): only the outermost call counts the clock.
+static func _enter_hit() -> void:
+	if _hit_depth == 0:
+		_hit_started = Time.get_ticks_usec()
+	_hit_depth += 1
+
+
+static func _leave_hit(zombies: int) -> void:
+	_hit_depth -= 1
+	hits_counted += zombies
+	if _hit_depth == 0:
+		hit_usec += Time.get_ticks_usec() - _hit_started
+
+
+func _hit(index: int, amount: float, by: FishController, source: String, push: Vector3, proc: float, chain: Array) -> void:
 	if not horde.is_alive(index):
 		return
 	last_hit_crit = false
@@ -917,6 +950,110 @@ func hit(index: int, amount: float, by: FishController, source: String, push := 
 		hit_claimed.emit(horde.net_id_of(index), amount, source, by)
 	if by and _powerups.has(by):
 		(_powerups[by] as Powerups).on_hit(index, amount, source, proc, chain)
+
+
+## Hurts every zombie in `targets` by `amount` from `source` at once (an area
+## hit: a blast, a tick of fire, a lightning chain), credited to `by` (the perf
+## pass). Each is hurt as hit() would (its own crit roll, marks, Megalodon
+## Tooth, the same signals), but the player's numbers are worked out once, the
+## stats written once, and the powerups hear only AREA_PROC_ROLLS of them, each
+## with the proc coefficient times targets / AREA_PROC_ROLLS: as many procs on
+## average as a hit apiece would start, and past certain each one stronger
+## (Powerup.proc_power()). Knockback: `pushes` (one per target), or away from
+## `centre` times `push` (centre Vector3.INF, or push 0: none).
+func hit_area(targets: PackedInt32Array, amount: float, by: FishController, source: String, centre := Vector3.INF, push := 1.0,
+		proc := 1.0, chain: Array = [], pushes := PackedVector3Array()) -> void:
+	_enter_hit()
+	if batch_hits:
+		_hit_area(targets, amount, by, source, centre, push, proc, chain, pushes)
+	else:
+		for n in targets.size():
+			var shove := pushes[n] if n < pushes.size() else Vector3.ZERO
+			if pushes.is_empty() and centre != Vector3.INF and push != 0.0 and horde.is_alive(targets[n]):
+				var away := horde.enemy_position(targets[n]) - centre
+				shove = (away.normalized() if away.length_squared() > 0.0001 else Vector3.UP) * push
+			_hit(targets[n], amount, by, source, shove, proc, chain)
+	_leave_hit(targets.size())
+
+
+func _hit_area(targets: PackedInt32Array, amount: float, by: FishController, source: String, centre: Vector3, push: float,
+		proc: float, chain: Array, pushes: PackedVector3Array) -> void:
+	var alive := PackedInt32Array()
+	var own_pushes := not pushes.is_empty()
+	var kept_pushes := PackedVector3Array()
+	for n in targets.size():
+		if horde.is_alive(targets[n]):
+			alive.append(targets[n])
+			if own_pushes:
+				kept_pushes.append(pushes[n] if n < pushes.size() else Vector3.ZERO)
+	if alive.is_empty():
+		return
+	var scale := 1.0
+	var crit_chance := 0.0
+	var crit_scale := 1.5
+	var knock := 1.0
+	var execute := 0.0
+	var block: StatBlock = null
+	var powerups: Powerups = _powerups.get(by) if by else null
+	var stats: Dictionary = {}
+	if by:
+		block = block_of(by)
+		scale *= 1.0 + block.value("damage")
+		var twist: Traversal = _twists.get(by)
+		if twist:
+			scale *= twist.damage_factor(source)
+		if powerups:
+			scale *= powerups.damage_scale()
+			execute = powerups.execute_share()
+		crit_chance = block.value("crit_chance")
+		crit_scale = 1.5 + block.value("crit_damage")
+		knock = 1.0 + block.value("knockback")
+		stats = stats_of(by)
+	var claim := not authority and by and not by.puppet
+	var total := 0.0
+	var crits := 0
+	for n in alive.size():
+		var index := alive[n]
+		if not horde.is_alive(index):
+			continue  # killed by an earlier one's knock-on (a burst cloud, a powerup)
+		var dealt := amount * scale
+		if powerups:
+			dealt *= 1.0 + powerups.bonus_on(index)  # Sonar Pinger's marks
+		last_hit_crit = false
+		var boss := boss_at(index)
+		if crit_chance > 0.0 and rng.randf() < crit_chance:
+			dealt *= crit_scale
+			crits += 1
+			last_hit_crit = true
+			if execute > 0.0 and not boss and horde.enemy_hp(index) - dealt < horde.enemy_max_hp(index) * execute:
+				dealt = maxf(dealt, horde.enemy_hp(index) + 1.0)
+		total += dealt
+		if tank:
+			tank.log_hit(source, dealt)
+		var shove := Vector3.ZERO
+		if own_pushes:
+			shove = kept_pushes[n] * knock
+		elif push != 0.0 and centre != Vector3.INF:
+			var away := horde.enemy_position(index) - centre
+			shove = (away.normalized() if away.length_squared() > 0.0001 else Vector3.UP) * push * knock
+		last_hit_dealt = dealt if horde.is_immortal(index) and not boss else minf(dealt, boss.hp if boss else horde.enemy_hp(index))
+		if boss:
+			boss.take(dealt, by, source)
+		else:
+			horde.damage(index, dealt, source, by, shove)
+		zombie_hit.emit(index, dealt, by, source, chain)
+		if claim:
+			hit_claimed.emit(horde.net_id_of(index), dealt, source, by)
+	if by:
+		stats.damage += total
+		stats.by_source[source] = stats.by_source.get(source, 0.0) + total
+		stats.crits += crits
+	# The powerups hear a few, each standing for its share of the rest.
+	if powerups and powerups.hears_hits():
+		var rolls := mini(alive.size(), AREA_PROC_ROLLS)
+		var each := proc * float(alive.size()) / rolls
+		for n in rolls:
+			powerups.on_hit(alive[n], amount * scale, source, each, chain)
 
 
 ## A guest's hit on zombie `index`, claimed to us (the host): its damage

@@ -74,9 +74,7 @@ func pop(at: Vector3) -> void:
 	Explosion.spawn(run.ocean, at, color(id), reach, 0.0, 0.3)
 	Sfx.play_at("pw/lure_burst", at)
 	Sfx.play_at("fx/explosion", at, clampf(reach / 6.0, 0.0, 1.0))
-	for i in run.horde.query_sphere(at, reach):
-		var push := run.horde.enemy_position(i) - at
-		run.hit(i, damage(), fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP, settings.lure_proc, [id])
+	run.hit_area(run.horde.query_sphere(at, reach), damage(), fish, id, at, 1.0, settings.lure_proc, [id])
 
 
 func on_removed() -> void:

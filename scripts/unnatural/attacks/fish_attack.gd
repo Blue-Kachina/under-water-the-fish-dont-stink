@@ -315,6 +315,26 @@ func strike(index: int, amount: float, push: Vector3, coefficient := -1.0) -> vo
 	on_hit.call(index, amount * damage_scale, fish, source(), push * knock_scale, proc() if coefficient < 0.0 else coefficient)
 
 
+## Hurts every zombie in `targets` by `amount` (before damage_scale) at once (an
+## area: a blast, a tick of fire, a swing), as UnnaturalRun.hit_area(): pushed
+## along `pushes` (one each), or away from `centre` (Vector3.INF: not pushed).
+## Hands each to on_hit if that isn't the run's own hit().
+func strike_area(targets: PackedInt32Array, amount: float, centre := Vector3.INF, coefficient := -1.0, pushes := PackedVector3Array()) -> void:
+	if targets.is_empty():
+		return
+	var proc_now := proc() if coefficient < 0.0 else coefficient
+	if run == null or on_hit.get_object() != run or on_hit.get_method() != &"hit":
+		for n in targets.size():
+			var push := pushes[n] if n < pushes.size() else (toward(centre, targets[n], Vector3.UP) if centre != Vector3.INF else Vector3.ZERO)
+			strike(targets[n], amount, push, proc_now)
+		return
+	struck += targets.size()
+	var scaled := PackedVector3Array()
+	for push in pushes:
+		scaled.append(push * knock_scale)
+	run.hit_area(targets, amount * damage_scale, fish, source(), centre, knock_scale, proc_now, [], scaled)
+
+
 ## The fish's hitbox middle (where reaches are measured from).
 func origin() -> Vector3:
 	return (fish.get_node("Collision") as Node3D).global_position

@@ -162,9 +162,7 @@ func _blast(at: Vector3, reach: float, amount: float, aftershock := false) -> vo
 		_aftershocks.append([AFTERSHOCK_AFTER, at, reach, amount * AFTERSHOCK_SHARE])
 	Explosion.spawn(run.ocean, at, tint(), reach, 0.0, 0.3)
 	Sfx.play_at("fx/explosion", at, clampf(reach / 6.0, 0.0, 1.0))
-	for i in run.horde.query_sphere(at, reach):
-		var push := run.horde.enemy_position(i) - at
-		strike(i, amount, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP, powers.charge_proc)
+	strike_area(run.horde.query_sphere(at, reach), amount, at, powers.charge_proc)
 
 
 func on_removed() -> void:

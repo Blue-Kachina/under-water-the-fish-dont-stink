@@ -39,8 +39,7 @@ func _ready() -> void:
 			return
 		var reach := BURST_REACH * size_scale
 		PowerupFx.pop(self, at, reach, COLOR, 0.25)
-		for i in horde.query_sphere(at, reach):
-			strike(i, amount * BURST_SHARE, toward(at, i, Vector3.UP))
+		strike_area(horde.query_sphere(at, reach), amount * BURST_SHARE, at)
 
 
 func cooldown() -> float:

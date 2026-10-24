@@ -26,9 +26,7 @@ func on_hurt(amount: float, from: int) -> void:
 	bursts += 1
 	PowerupFx.spikes(run, at, settings.spine_burst_radius, color(id), 0.22)
 	Sfx.play_at("pw/puffer_spines", at)
-	for i in run.horde.query_sphere(at, settings.spine_burst_radius):
-		var push := run.horde.enemy_position(i) - at
-		run.hit(i, burst(), fish, id, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP, settings.spine_proc, [id])
+	run.hit_area(run.horde.query_sphere(at, settings.spine_burst_radius), burst(), fish, id, at, 1.0, settings.spine_proc, [id])
 
 
 ## Spines standing out all round the body.

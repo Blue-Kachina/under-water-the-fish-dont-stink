@@ -12,6 +12,14 @@ var settings := PowerupSettings.shared()
 var held := {}
 ## Id -> stacks got from chests.
 var _earned := {}
+## The perf pass: the powerups that hear hits and that add to hits on a zombie
+## (not yet found deaf: Powerup.deaf / no_bonus), rebuilt when that changes, so
+## a hit calls only those; and damage_scale() worked out once a physics tick.
+var _hearing: Array[Powerup] = []
+var _bonusing: Array[Powerup] = []
+var _lists_stale := true
+var _scale := 1.0
+var _scale_tick := -1
 
 
 func _init(owner_run: UnnaturalRun, owner_fish: FishController) -> void:
@@ -70,6 +78,7 @@ func refresh() -> void:
 				powerup.take_off()
 				held.erase(id)
 				changed = true
+				_lists_stale = true
 			continue
 		if powerup == null:
 			powerup = Powerup.create(id)
@@ -77,6 +86,8 @@ func refresh() -> void:
 			powerup.fish = fish
 			powerup.settings = settings
 			held[id] = powerup
+			_lists_stale = true
+			_scale_tick = -1
 		if powerup.stacks != wanted:
 			powerup.stacks = wanted
 			powerup.on_stacks_changed()
@@ -109,6 +120,8 @@ func clear() -> void:
 		(held[id] as Powerup).take_off()
 	held.clear()
 	_earned.clear()
+	_lists_stale = true
+	_scale_tick = -1
 	_update_bonus()
 
 
@@ -158,11 +171,17 @@ func horde_scale() -> float:
 	return scale
 
 
-## What the damage this player deals is multiplied by now (Momentum Fin).
+## What the damage this player deals is multiplied by now (Momentum Fin):
+## worked out once a physics tick (it's asked on every hit).
 func damage_scale() -> float:
+	var tick := Engine.get_physics_frames()
+	if tick == _scale_tick and UnnaturalRun.batch_hits:
+		return _scale
 	var scale := 1.0
 	for id: String in held:
 		scale *= (held[id] as Powerup).damage_factor()
+	_scale = scale
+	_scale_tick = tick
 	return scale
 
 
@@ -184,10 +203,42 @@ func chest_ping_bonus() -> float:
 
 ## How much more this player's hits do to zombie `index` (Sonar Pinger's marks).
 func bonus_on(index: int) -> float:
+	if not UnnaturalRun.batch_hits:
+		var all := 0.0
+		for id: String in held:
+			all += (held[id] as Powerup).bonus_on(index)
+		return all
+	if _lists_stale:
+		_rebuild_lists()
 	var more := 0.0
-	for id: String in held:
-		more += (held[id] as Powerup).bonus_on(index)
+	for powerup in _bonusing:
+		more += powerup.bonus_on(index)
+		if powerup.no_bonus:
+			_lists_stale = true
 	return more
+
+
+## Whether any powerup held may hear a hit (some aren't known deaf yet).
+func hears_hits() -> bool:
+	if _lists_stale:
+		_rebuild_lists()
+	return not _hearing.is_empty()
+
+
+## New lists (not the old ones cleared: a hit's powerups can hit again, and an
+## outer loop may still be walking the old list).
+func _rebuild_lists() -> void:
+	var hearing: Array[Powerup] = []
+	var bonusing: Array[Powerup] = []
+	for id: String in held:
+		var powerup := held[id] as Powerup
+		if not powerup.deaf:
+			hearing.append(powerup)
+		if not powerup.no_bonus:
+			bonusing.append(powerup)
+	_hearing = hearing
+	_bonusing = bonusing
+	_lists_stale = false
 
 
 ## The share of its hp under which this player's crit finishes a zombie (Megalodon Tooth).
@@ -223,10 +274,22 @@ func earned() -> Array[String]:
 	return ids
 
 
+## A hit by the fish: only the powerups that hear hits are told (the others
+## found deaf the first time).
 func on_hit(index: int, damage: float, source: String, proc: float, chain: Array) -> void:
-	for id: String in held:
-		if id not in chain:
-			(held[id] as Powerup).on_hit(index, damage, source, proc, chain)
+	if not UnnaturalRun.batch_hits:
+		# The A/B switch off: every powerup hears every hit, as before the perf pass.
+		for id: String in held:
+			if id not in chain:
+				(held[id] as Powerup).on_hit(index, damage, source, proc, chain)
+		return
+	if _lists_stale:
+		_rebuild_lists()
+	for powerup in _hearing:
+		if powerup.id not in chain:
+			powerup.on_hit(index, damage, source, proc, chain)
+			if powerup.deaf:
+				_lists_stale = true
 
 
 func on_kill(at: Vector3, source: String) -> void:

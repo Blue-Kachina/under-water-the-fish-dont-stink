@@ -7,7 +7,9 @@ extends Powerup
 ## torpedoes, but never lightning again). More stacks: more chance, more jumps.
 ## At most lightning_max_rate strikes a second (a short burst may go a
 ## little over), and at most MAX_BOLTS bolts shown at once, so a big proc
-## chain stays smooth.
+## chain stays smooth. Strikes past the rate aren't lost: they bank into the
+## next strike's power (up to Powerup.BANK_MAX), and a strike's jumps land as
+## one area hit (UnnaturalRun.hit_area()).
 
 ## Bolts shown at once, at most (past it a strike still hurts, unseen).
 const MAX_BOLTS := 40
@@ -16,6 +18,8 @@ static var _bolts := 0
 
 ## Jumps made so far (all bolts), for the probes.
 var jumps_made := 0
+## Strikes held back by lightning_max_rate, kept as the next strike's power.
+var banked := 0.0
 ## Strikes it may make now (refilled at lightning_max_rate a second).
 var _strikes_left := 0.0
 var _refilled := -1.0
@@ -37,19 +41,29 @@ func on_hit(index: int, _damage: float, _source: String, proc: float, chain: Arr
 	else:
 		_strikes_left = minf(_strikes_left + (now - _refilled) * rate, maxf(rate * 0.1, 1.0))
 	_refilled = now
-	if _strikes_left < 1.0 or not roll(chance() * proc):
+	var power := proc_power(chance() * proc)
+	if power <= 0.0:
+		return
+	if _strikes_left < 1.0:
+		# Over lightning_max_rate: not lost, it goes into the next strike (the perf pass).
+		banked = minf(banked + power, BANK_MAX)
 		return
 	_strikes_left -= 1.0
-	strike(index, chain)
+	strike(index, chain, power + banked)
+	banked = 0.0
 
 
-## Lightning from zombie `index`, jumping jumps() times.
-func strike(index: int, chain: Array) -> void:
+## Lightning from zombie `index`, jumping jumps() times, `power` times
+## lightning_damage at each (an area hit's proc past certain, or strikes the
+## rate held back). The jumps are found first, then hit as one area hit.
+func strike(index: int, chain: Array, power := 1.0) -> void:
 	var horde := run.horde
 	var struck := {index: true}
 	var from := horde.enemy_position(index)
 	var path := PackedVector3Array([from])
 	var next_chain := chain + [id]
+	var targets := PackedInt32Array()
+	var pushes := PackedVector3Array()
 	for jump in jumps():
 		var best := _nearest_unstruck(from, struck)
 		if best < 0:
@@ -58,8 +72,10 @@ func strike(index: int, chain: Array) -> void:
 		var to := horde.enemy_position(best)
 		path.append(to)
 		jumps_made += 1
-		run.hit(best, settings.lightning_damage, fish, id, (to - from).normalized(), run.powerup_settings.chain_proc, next_chain)
+		targets.append(best)
+		pushes.append((to - from).normalized())
 		from = to
+	run.hit_area(targets, settings.lightning_damage * maxf(power, 1.0), fish, id, Vector3.INF, 0.0, run.powerup_settings.chain_proc, next_chain, pushes)
 	if path.size() > 1 and _bolts < MAX_BOLTS:
 		var bolt := Bolt.new()
 		bolt.path = path

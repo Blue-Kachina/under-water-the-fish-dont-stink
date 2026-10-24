@@ -10,6 +10,8 @@ extends Powerup
 
 ## Times it went off, for the probes.
 var procs := 0
+## Kraken's slams held back by kraken_max_rate, kept for the next one's power.
+var banked := 0.0
 var _slams_left := 0.0
 var _refilled := -1.0
 
@@ -31,9 +33,12 @@ func on_hit(index: int, _damage: float, _source: String, proc: float, chain: Arr
 		return
 	if id == "cold_seep" and horde.is_proxy(index):
 		return  # a boss's body
-	if id == "krakens_grasp" and not _may_slam():
+	var power := proc_power(chance() * proc)
+	if power <= 0.0:
 		return
-	if not roll(chance() * proc):
+	if id == "krakens_grasp" and not _may_slam():
+		# Over kraken_max_rate: not lost, it goes into the next slam (the perf pass).
+		banked = minf(banked + power, Powerup.BANK_MAX)
 		return
 	procs += 1
 	var at := horde.enemy_position(index)
@@ -47,16 +52,19 @@ func on_hit(index: int, _damage: float, _source: String, proc: float, chain: Arr
 			PowerupFx.flash(run, at, radius * 1.8, color(id), 0.45)
 		"krakens_grasp":
 			_slams_left -= 1.0
-			slam(at, chain)
+			slam(at, chain, power + banked)
+			banked = 0.0
 
 
-## A tentacle slamming down at `at`.
-func slam(at: Vector3, chain: Array) -> void:
+## A tentacle slamming down at `at`, `power` times as hard (an area hit's
+## proc past certain, Powerup.proc_power()).
+func slam(at: Vector3, chain: Array, power := 1.0) -> void:
 	var reach := settings.kraken_radius * size_scale()
-	var damage := settings.kraken_damage + settings.kraken_damage_per_stack * (stacks - 1)
-	for i in run.horde.query_sphere(at, reach):
+	var damage := (settings.kraken_damage + settings.kraken_damage_per_stack * (stacks - 1)) * maxf(power, 1.0)
+	var caught := run.horde.query_sphere(at, reach)
+	for i in caught:
 		run.horde.slow(i, 1.0, settings.kraken_hold * duration_scale())
-		run.hit(i, damage, fish, id, (run.horde.enemy_position(i) - at).normalized(), run.powerup_settings.chain_proc, chain + [id])
+	run.hit_area(caught, damage, fish, id, at, 1.0, run.powerup_settings.chain_proc, chain + [id])
 	PowerupFx.shock(run, at, reach, color(id), Vector3.UP, 0.45)
 	PowerupFx.spikes(run, at, reach * 0.8, color(id).lightened(0.3), 0.3)
 	Sfx.play("pw/depth_charge_arm")

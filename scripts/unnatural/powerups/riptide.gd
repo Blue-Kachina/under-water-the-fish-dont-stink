@@ -85,6 +85,7 @@ class Current extends Node:
 		var run := owner_tide.run
 		var length := from.distance_to(to)
 		var back := (to - from) / maxf(length, 0.01)
+		var caught := PackedInt32Array()
 		for i in run.horde.query_sphere((from + to) * 0.5, length * 0.5 + width):
 			var at := run.horde.enemy_position(i)
 			var along := clampf((at - from).dot(back), 0.0, length)
@@ -92,5 +93,6 @@ class Current extends Node:
 				continue
 			if not run.horde.is_proxy(i):
 				run.horde.shove(i, back * drag)
-			if is_instance_valid(owner_tide.fish):
-				run.hit(i, dps * TICK, owner_tide.fish, owner_tide.id, Vector3.ZERO, run.powerup_settings.fire_proc, [owner_tide.id])
+			caught.append(i)
+		if is_instance_valid(owner_tide.fish):
+			run.hit_area(caught, dps * TICK, owner_tide.fish, owner_tide.id, Vector3.INF, 0.0, run.powerup_settings.fire_proc, [owner_tide.id])

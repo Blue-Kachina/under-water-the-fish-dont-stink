@@ -132,12 +132,11 @@ func _work(delta: float) -> void:
 
 
 func _sting(at: Vector3, reach: float, amount: float) -> void:
-	for i in run.horde.query_sphere(at, reach):
-		stings += 1
-		var push := run.horde.enemy_position(i) - at
-		strike(i, amount, push.normalized() if push.length_squared() > 0.0001 else Vector3.UP,
-				powers.jelly_proc)
-		if milestone(4):
+	var stung := run.horde.query_sphere(at, reach)
+	stings += stung.size()
+	strike_area(stung, amount, at, powers.jelly_proc)
+	if milestone(4):
+		for i in stung:
 			_jump(i, amount * JUMP_SHARE)
 
 

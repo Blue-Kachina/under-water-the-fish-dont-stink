@@ -91,10 +91,12 @@ func _work(delta: float) -> void:
 	PowerupFx.flash(run, to, 0.8, tint(), 0.2)
 	strike(target, damage(), (to - at).normalized(), powers.remora_proc)
 	if milestone(3):
+		var torn := PackedInt32Array()
 		for i in run.horde.query_sphere(to, TEAR_REACH):
 			if i != target:
-				tears += 1
-				strike(i, damage() * TEAR_SHARE, (run.horde.enemy_position(i) - to).normalized(), powers.remora_proc * TEAR_SHARE)
+				torn.append(i)
+		tears += torn.size()
+		strike_area(torn, damage() * TEAR_SHARE, to, powers.remora_proc * TEAR_SHARE)
 	if milestone(1) and run.horde.is_alive(target):
 		_latched.append([target, LATCH_BITES, LATCH_GAP])
 
