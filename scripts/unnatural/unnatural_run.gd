@@ -263,6 +263,10 @@ var _camera_pull := {}
 ## Each local player's crowd (zombies within camera_crowd_range), counted every CROWD_EVERY s.
 var _crowd := {}
 var _crowd_left := 0.0
+## When (run s) the last drop came, and the last of each kind (Pickup.Kind -> s):
+## drops are timed (heart_every..., drop_gap).
+var _last_drop := -INF
+var _last_drop_of := {}
 
 
 func setup(run_ocean: Ocean, player_fish: FishController) -> void:
@@ -338,6 +342,8 @@ func start() -> void:
 	elapsed = 0.0
 	is_over = false
 	kills = 0
+	_last_drop = -INF
+	_last_drop_of.clear()
 	_relocate_left = RELOCATE_INTERVAL
 	_hold_for_cards(false)
 	_offers.clear()
@@ -1952,13 +1958,20 @@ func add_chest(at: Vector3, turn: float, sink_to := -INF, kind := TreasureChest.
 ## hourglass or a lightning bolt, each by its chance (elite: x ELITE_CHEST),
 ## raised by their luck.
 func _roll_drop(at: Vector3, by: FishController, elite := false) -> void:
+	if elapsed - _last_drop < settings.drop_gap:
+		return  # too soon after the last drop of any kind
 	var luck := block_of(by).value("luck") if is_instance_valid(by) and _blocks.has(by) else 0.0
 	var lift := maxf(1.0 + luck * settings.chest_drop_luck, 0.0) * (ELITE_CHEST if elite else 1.0)
 	var roll := rng.randf()
 	var chances := [settings.heart_chance, settings.magnet_chance, settings.hourglass_chance, settings.lightning_chance]
+	var waits := [settings.heart_every, settings.magnet_every, settings.hourglass_every, settings.lightning_every]
 	for kind in [Pickup.Kind.HEART, Pickup.Kind.MAGNET, Pickup.Kind.HOURGLASS, Pickup.Kind.LIGHTNING]:
+		if elapsed - float(_last_drop_of.get(kind, -INF)) < waits[kind]:
+			continue  # this kind dropped too recently
 		var chance := chances[kind] as float * lift
 		if roll < chance:
+			_last_drop = elapsed
+			_last_drop_of[kind] = elapsed
 			drop_pickup(kind, at)
 			return
 		roll -= chance

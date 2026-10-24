@@ -148,6 +148,26 @@ func _run() -> void:
 	await _hold(heart_at, 0.5)
 	check(is_equal_approx(health.hp, health.max_hp * 0.7) and run.pickups.is_empty(),
 			"taking it heals half the max hp (%.0f of %.0f)" % [health.hp, health.max_hp])
+	# Timed: no second heart within heart_every, nothing at all within drop_gap.
+	settings.heart_chance = 1.0
+	settings.magnet_chance = 0.0
+	run.hit(horde.spawn(1, fish.global_position + Vector3(4, 0, -10)), 1e6, fish, "probe")
+	await _ticks(2)
+	check(run.pickups.is_empty(), "a second heart straight after doesn't drop (heart_every %.0f s)" % settings.heart_every)
+	settings.heart_chance = 0.0
+	settings.magnet_chance = 1.0
+	run.hit(horde.spawn(1, fish.global_position + Vector3(-4, 0, -10)), 1e6, fish, "probe")
+	await _ticks(2)
+	check(run.pickups.is_empty(), "nor a magnet: nothing within drop_gap (%.0f s) of the last drop" % settings.drop_gap)
+	run._last_drop = -INF
+	run.hit(horde.spawn(1, fish.global_position + Vector3(-6, 0, -10)), 1e6, fish, "probe")
+	await _ticks(2)
+	check(run.pickups.size() == 1 and run.pickups[0].kind == Pickup.Kind.MAGNET, "once the gap's over, the magnet drops")
+	settings.magnet_chance = 0.0
+	for pickup in run.pickups.duplicate():
+		pickup.vanish()
+	run.pickups.clear()
+	await _ticks(2)
 	for n in 5:
 		run.drop_pearl(fish.global_position + Vector3(60 + n * 10, 0, 20), 1, 9100 + n)
 	run.drop_pickup(Pickup.Kind.MAGNET, fish.global_position + Vector3(0, 0, -6))
@@ -177,11 +197,16 @@ func _run() -> void:
 		far_off.append(horde.spawn(0, fish.global_position + Vector3(-40 + n * 16, 0, 45)))
 	var part := horde.spawn_proxy(fish.global_position + Vector3(30, 0, -30), 2.0)
 	settings.heart_chance = 1.0  # a bolt's kills must not roll drops anyway
+	var waits := [settings.heart_every, settings.drop_gap]
+	settings.heart_every = 0.0  # (and not because the timing holds them back)
+	settings.drop_gap = 0.0
 	var kills_before := run.kills
 	var drops_before := run.pickups.size()
 	run.drop_pickup(Pickup.Kind.LIGHTNING, fish.global_position + Vector3(0, 0, -6))
 	await _hold(fish.global_position + Vector3(0, 0, -6), 0.3)
 	settings.heart_chance = 0.0
+	settings.heart_every = waits[0]
+	settings.drop_gap = waits[1]
 	check(far_off.all(func(i: int) -> bool: return not horde.is_alive(i)), "a lightning bolt: every zombie across the arena dies")
 	check(run.kills - kills_before == far_off.size(), "...credited as %d kills" % (run.kills - kills_before))
 	check(horde.is_alive(part), "...but a boss's body is spared")

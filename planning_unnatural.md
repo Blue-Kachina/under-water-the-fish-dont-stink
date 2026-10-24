@@ -1040,6 +1040,15 @@ its own group.
 --out=DIR`) takes screenshots of the numbers and pops, the lanes, the threats and drops, and the
 low-hp vignette.
 
+**After the user's play-test (2026-10-23, build 21:16):**
+- Too many swordfish for a lane each: lunges' lanes are off by default (`lunge_lanes`); bosses keep
+  theirs, and swordfish keep their glow.
+- Drops came far too often: late runs kill thousands a minute, so a flat chance per kill rained
+  magnets, hourglasses and bolts (the 16-min log had 62,678 kills). Drops are timed now: each kind
+  waits `heart_every` 45 s / `magnet_every` 90 / `hourglass_every` 120 / `lightning_every` 150
+  after its last, and any drop holds every kind back `drop_gap` 20 s. `drops_probe` checks it.
+- Performance with Torpedoes and Chain Lightning together: brainstormed, not built yet.
+
 **Open for the user's play-test:**
 - Is the depth assist's default (0.4) too much or too little? It changes how the horde moves, so
   the sims will shift a little.

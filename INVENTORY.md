@@ -2,7 +2,7 @@
 
 Every playable fish, weapon, tome, powerup and bonus in Unnatural (the survivors mode), with their stats.
 
-- **Last synced with code:** 2026-10-20
+- **Last synced with code:** 2026-10-23
 - **Values are defaults.** Almost every number here is a tuning-panel setting (`UnnaturalSettings`, `PowerupSettings`), so a preset can change it. If this file and the code disagree, the code is right; fix this file.
 - **Sources of truth:**
 
@@ -283,12 +283,14 @@ Each one is strong but has a catch (the second column). Luck doesn't change the 
 
 ### Kill drops (`pickup.gd`): the first player to touch one takes it. Elites have 5× the chance
 
-| Drop | Chance per kill | Effect |
-|---|---|---|
-| **Heart** | 0.15% | Heals the whole team for 50% of max HP |
-| **Magnet** | 0.15% | Every XP pearl out flies to the taker |
-| **Hourglass** | 0.15% | Every zombie stops dead for 15 s (bosses don't) |
-| **Lightning Bolt** | 0.15% | A shock across the whole arena kills every zombie (bosses are spared). Its kills drop no chests or other drops |
+Drops are timed as well as rolled: after a drop of a kind, that kind waits its "at most every" time, and after any drop nothing drops for 20 s (`drop_gap`). Once the wait's up, kills roll the chance again.
+
+| Drop | Chance per kill | At most every | Effect |
+|---|---|---|---|
+| **Heart** | 0.15% | 45 s | Heals the whole team for 50% of max HP |
+| **Magnet** | 0.15% | 90 s | Every XP pearl out flies to the taker |
+| **Hourglass** | 0.15% | 120 s | Every zombie stops dead for 15 s (bosses don't) |
+| **Lightning Bolt** | 0.15% | 150 s | A shock across the whole arena kills every zombie (bosses are spared). Its kills drop no chests or other drops |
 
 ### Pearls (currency)
 

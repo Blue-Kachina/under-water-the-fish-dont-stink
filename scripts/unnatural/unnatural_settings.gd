@@ -600,6 +600,15 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 1.0, 0.0005) var hourglass_chance := 0.0015
 @export_range(0.0, 120.0, 0.5, "or_greater") var hourglass_time := 15.0
 @export_range(0.0, 1.0, 0.0005) var lightning_chance := 0.0015
+## Drops are timed, not only rolled: late in a run thousands of kills a minute
+## would roll one every few seconds. After a drop of a kind, that kind can't drop
+## again for its time below (s; 0: no wait), and after any drop nothing drops
+## for drop_gap s. Once the wait's up, kills roll for it again as above.
+@export_range(0.0, 600.0, 5.0, "or_greater") var heart_every := 45.0
+@export_range(0.0, 600.0, 5.0, "or_greater") var magnet_every := 90.0
+@export_range(0.0, 600.0, 5.0, "or_greater") var hourglass_every := 120.0
+@export_range(0.0, 600.0, 5.0, "or_greater") var lightning_every := 150.0
+@export_range(0.0, 300.0, 1.0, "or_greater") var drop_gap := 20.0
 
 @export_group("Rarity")
 ## Each card's rarity: these base weights, each times (1 + luck * luck_effect) ^ tier.
@@ -720,9 +729,12 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 500.0, 5.0, "or_greater") var threat_range := 60.0
 @export_range(1, 32, 1, "or_greater") var threat_arrows_max := 8
 ## How hard lunges and bosses' attacks glow while they wind up (0: no glow),
-## and a red lane on the water showing where a lunge or a boss's charge will go.
+## and a red lane on the water showing where a boss's charge or dive will go;
+## with lunge_lanes, every swordfish's lunge gets one too (off: there are a
+## lot of them, and their glow is warning enough).
 @export_range(0.0, 4.0, 0.05, "or_greater") var telegraph_glow := 1.0
 @export var telegraph_lines := true
+@export var lunge_lanes := false
 ## The red pulse round the view's edge when you're hurt (0: none), and the
 ## heartbeat it beats while you're under low_hp_share of your hp (the heartbeat
 ## sound starts there too).

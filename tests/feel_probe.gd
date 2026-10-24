@@ -192,11 +192,15 @@ func _run() -> void:
 
 	print("telegraphs:")
 	await _frames(2)
-	check(run.telegraphs.shown >= 1, "the lunger lays its lane (%d)" % run.telegraphs.shown)
+	check(run.telegraphs.shown == 0, "by default a lunger lays no lane (lunge_lanes off: only bosses get them)")
+	settings.lunge_lanes = true
+	await _frames(2)
+	check(run.telegraphs.shown >= 1, "lunge_lanes on: the lunger lays its lane (%d)" % run.telegraphs.shown)
 	settings.telegraph_lines = false
 	await _frames(2)
 	check(run.telegraphs.shown == 0 and not run.telegraphs.visible, "telegraph_lines off: none")
 	settings.telegraph_lines = true
+	settings.lunge_lanes = false
 	_clear()
 	await _ticks(2)
 	var shark := DrownedShark.new()
