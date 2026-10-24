@@ -1,7 +1,7 @@
 class_name LionfishModel
 extends RefCounted
-## The lionfish (FishModel.build hands it here): skin m.skin of
-## FishCharacter.SKINS[FishCharacter.Family.LIONFISH].
+## The Scorchers' lionfish (FishModel.build hands it here): species m.species of
+## FishCharacter.SPECIES[FishCharacter.FishClass.SCORCHER].
 ##
 ## One smooth lofted body (a big head tapering to a slim tail stalk) painted
 ## with bands, mottling and its face (lionfish_skin.gdshader); a crest of long
@@ -17,7 +17,7 @@ const SKIN := preload("res://shaders/lionfish_skin.gdshader")
 const SPINE := preload("res://shaders/lionfish_spine.gdshader")
 const WEB := preload("res://shaders/lionfish_web.gdshader")
 
-## Each skin's look, in FishCharacter.SKINS order. Lengths are shares of the
+## Each species' look, in FishCharacter.SPECIES order. Lengths are shares of the
 ## hitbox (l its length, h its height) unless they say m.
 const LOOKS := [
 	{  # Red Lionfish, Pterois volitans: maroon and cream zebra bands, banded spines, feathery fans.
@@ -79,7 +79,7 @@ const DORSAL := [0.5, 0.82, 0.97, 1.0, 0.97, 0.9, 0.82, 0.74, 0.65, 0.56, 0.47, 
 
 
 static func build(m: FishModel) -> void:
-	var look: Dictionary = LOOKS[clampi(m.skin, 0, LOOKS.size() - 1)]
+	var look: Dictionary = LOOKS[clampi(m.species, 0, LOOKS.size() - 1)]
 	var w := m._size.x
 	var h := m._size.y
 	var l := m._size.z

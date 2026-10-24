@@ -44,7 +44,7 @@ func _run() -> void:
 	settings.bite_damage = 0.0
 	settings.iframes = 0.0
 	settings.run_length = 0
-	fish.character = FishCharacter.Family.DOMINUS
+	fish.character = FishCharacter.FishClass.HUNTER
 	main.set_mode(main.UNNATURAL)
 	await _ticks(3)
 	main._match_card.play_requested.emit()

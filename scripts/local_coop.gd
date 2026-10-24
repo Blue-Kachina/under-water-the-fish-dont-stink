@@ -3,7 +3,7 @@ extends Node
 ## Split-screen co-op in Nature and Unnatural: up to MAX_PLAYERS players on one
 ## machine, a controller each (PlayerSlot). While a run is on, pressing Back/View
 ## (JOIN_BUTTON) on a controller nobody's using adds a player: their own fish
-## (a different character, which D-pad left/right changes, D-pad down its skin), camera, HUD,
+## (a different character, which D-pad left/right changes, D-pad down its species), camera, HUD,
 ## arcade looks and school wheel, in their own part of the window
 ## (SplitScreen). Holding Back/View for LEAVE_HOLD on a joined controller
 ## leaves. With one player left, the first player has the whole window back.
@@ -91,7 +91,7 @@ func _input(event: InputEvent) -> void:
 	elif owner and owner.index > 0 and button in [JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT] and not get_tree().paused:
 		_next_character(owner, 1 if button == JOY_BUTTON_DPAD_RIGHT else -1)
 	elif owner and owner.index > 0 and button == JOY_BUTTON_DPAD_DOWN and not get_tree().paused:
-		next_skin(owner, 1)
+		next_species(owner, 1)
 
 
 ## `pad` can be a new player's: not the first player's only controller. (A
@@ -381,31 +381,31 @@ func _refresh_cameras() -> void:
 
 
 ## A character none of the players are.
-func _unused_character() -> FishCharacter.Family:
-	var taken := slots.map(func(slot: PlayerSlot) -> FishCharacter.Family: return slot.fish.character)
-	for family: FishCharacter.Family in FishCharacter.CARS:
-		if family not in taken:
-			return family
-	return FishCharacter.CARS.keys()[0]
+func _unused_character() -> FishCharacter.FishClass:
+	var taken := slots.map(func(slot: PlayerSlot) -> FishCharacter.FishClass: return slot.fish.character)
+	for fish_class: FishCharacter.FishClass in FishCharacter.CLASSES:
+		if fish_class not in taken:
+			return fish_class
+	return FishCharacter.CLASSES.keys()[0]
 
 
 func _next_character(slot: PlayerSlot, step: int) -> void:
-	var families: Array = FishCharacter.CARS.keys()
-	var at := families.find(slot.fish.character)
-	slot.fish.character = families[posmod(at + step, families.size())]  # its first skin
+	var fish_classes: Array = FishCharacter.CLASSES.keys()
+	var at := fish_classes.find(slot.fish.character)
+	slot.fish.character = fish_classes[posmod(at + step, fish_classes.size())]  # its first species
 
 
-## `slot`'s fish in its character's next (+1) or previous (-1) unlocked skin
+## `slot`'s fish in its character's next (+1) or previous (-1) unlocked species
 ## (D-pad down for a joined player).
-func next_skin(slot: PlayerSlot, step: int) -> void:
-	var family := slot.fish.character
-	var count := FishCharacter.skin_count(family)
-	var skin := slot.fish.skin
+func next_species(slot: PlayerSlot, step: int) -> void:
+	var fish_class := slot.fish.character
+	var count := FishCharacter.species_count(fish_class)
+	var species := slot.fish.species
 	for i in count:
-		skin = posmod(skin + step, count)
-		if FishCharacter.is_skin_unlocked(family, skin):
+		species = posmod(species + step, count)
+		if FishCharacter.is_species_unlocked(fish_class, species):
 			break
-	slot.fish.skin = skin
+	slot.fish.species = species
 
 
 ## A connected controller other than `pad`, or -1.
@@ -429,9 +429,9 @@ func _copy_tuning(slot: PlayerSlot) -> void:
 	var first := slots[0]
 	if is_instance_valid(slot.fish):
 		var character := slot.fish.character
-		var skin := slot.fish.skin
+		var species := slot.fish.species
 		Match1v1.copy_tuning(first.fish, slot.fish)
-		slot.fish.set_look(character, skin)
+		slot.fish.set_look(character, species)
 	if is_instance_valid(slot.camera):
 		_copy_camera(first.camera, slot.camera)
 

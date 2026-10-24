@@ -28,7 +28,7 @@ func _run(main: Node) -> void:
 	shot.fov = 50.0
 	add_child(shot)
 	var settings := NatureSettings.shared()
-	for key: String in ["octane", "dominus", "plank", "breakout", "hybrid", "merc"]:
+	for key: String in ["skirmisher", "hunter", "glider", "lancer", "charmer", "bulwark"]:
 		var school := School.new()
 		main._environment.add_child(school)
 		school.setup(settings, Vector3.ZERO, Vector3.FORWARD, FishCharacter.from_key(key))
@@ -46,7 +46,7 @@ func _run(main: Node) -> void:
 		_aim(shot, centre + Vector3.UP * 12.0 + right * 0.1, centre)
 		await _frames(2)
 		_save("%s_above" % key)
-		if key == "octane":
+		if key == "skirmisher":
 			# A sharp turn, shot from above while it ripples through.
 			school.leader_heading = right
 			await _seconds(0.6)

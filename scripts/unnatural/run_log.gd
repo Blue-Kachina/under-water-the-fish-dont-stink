@@ -122,7 +122,7 @@ func finish(outcome: String) -> void:
 		if died and cause == "":
 			cause = _last_hurt.get(fish, "")
 		players.append({
-			"fish": FishCharacter.Family.keys()[fish.character] if fish.character < FishCharacter.Family.size() else str(fish.character),
+			"fish": FishCharacter.FishClass.keys()[fish.character] if fish.character < FishCharacter.FishClass.size() else str(fish.character),
 			"kills": stats.kills, "battered": stats.battered, "damage": snappedf(stats.damage, 0.1),
 			"by_source": _rounded(stats.by_source), "taken": snappedf(stats.taken, 0.1), "pearls": stats.pearls,
 			"chests": stats.get("chests", 0), "bosses": stats.get("bosses", 0), "down": died, "shrines": stats.get("shrines", 0),

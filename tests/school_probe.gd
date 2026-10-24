@@ -167,7 +167,7 @@ func _run() -> void:
 func _school(settings: NatureSettings, at: Vector3, heading: Vector3) -> School:
 	var school := School.new()
 	add_child(school)
-	school.setup(settings, at, heading, FishCharacter.Family.OCTANE)
+	school.setup(settings, at, heading, FishCharacter.FishClass.SKIRMISHER)
 	return school
 
 

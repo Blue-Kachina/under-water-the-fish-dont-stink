@@ -15,7 +15,7 @@ HITBOXES = {
 
 
 def family_for(name: str | None) -> tuple[str, bool]:
-    """Our family key for subtr-actor's `car_hitbox_family` name, and whether it was known.
+    """Our RL hitbox key (FishCharacter rl_hitbox: "octane"...) for subtr-actor's `car_hitbox_family` name, and whether it was known.
     Unknown or missing families fall back to Octane, the most common."""
     key = (name or "").strip().lower()
     if key in HITBOXES:

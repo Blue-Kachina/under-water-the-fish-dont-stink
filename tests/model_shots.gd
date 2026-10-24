@@ -2,13 +2,13 @@ extends Node3D
 ## Not a probe: screenshots of one fish model on its own (front three-quarter,
 ## side, top, back and below) for checking its look by eye, then swimming,
 ## wagging its tail (top views, to see the tail stay on the body) and mid
-## stride. Needs a window (not --headless). `--skin=N` picks a skin
-## (FishCharacter.SKINS); its shots are named <fish>_<skin key>_<view>.png.
-##   Godot_console.exe --path . res://tests/model_shots.tscn -- --fish=plank --skin=1 --out=DIR
+## stride. Needs a window (not --headless). `--species=N` picks a species
+## (FishCharacter.SPECIES); its shots are named <fish>_<species key>_<view>.png.
+##   Godot_console.exe --path . res://tests/model_shots.tscn -- --fish=glider --species=1 --out=DIR
 
 var out_dir := "user://model_shots"
-var fish_key := "plank"
-var skin := 0
+var fish_key := "glider"
+var species := 0
 var _name := ""
 
 
@@ -18,8 +18,8 @@ func _ready() -> void:
 			out_dir = arg.trim_prefix("--out=")
 		elif arg.begins_with("--fish="):
 			fish_key = arg.trim_prefix("--fish=")
-		elif arg.begins_with("--skin="):
-			skin = int(arg.trim_prefix("--skin="))
+		elif arg.begins_with("--species="):
+			species = int(arg.trim_prefix("--species="))
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	get_window().size = Vector2i(900, 700)
 	var environment := Environment.new()
@@ -35,9 +35,9 @@ func _ready() -> void:
 	sun.rotation = Vector3(-1.0, 0.6, 0.0)
 	sun.light_energy = 1.2
 	add_child(sun)
-	var family := FishCharacter.from_key(fish_key)
-	var model := FishModel.build(family, skin)
-	_name = "%s_%s" % [fish_key, FishCharacter.skin_key(family, model.skin)]
+	var fish_class := FishCharacter.from_key(fish_key)
+	var model := FishModel.build(fish_class, species)
+	_name = "%s_%s" % [fish_key, FishCharacter.species_key(fish_class, model.species)]
 	add_child(model)
 	_run.call_deferred(model)
 

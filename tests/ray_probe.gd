@@ -15,7 +15,7 @@ var model: FishModel
 
 
 func _ready() -> void:
-	model = FishModel.build(FishCharacter.Family.PLANK)
+	model = FishModel.build(FishCharacter.FishClass.GLIDER)
 	add_child(model)
 	_run.call_deferred()
 

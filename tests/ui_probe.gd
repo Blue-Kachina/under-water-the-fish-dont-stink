@@ -82,9 +82,9 @@ func _check_home() -> void:
 	check(home.is_open() and get_tree().paused, "open: the game paused behind it")
 	check(home._play.has_focus(), "Play focused")
 	check(home._play_note.text.begins_with("Hunt"), "Play says the last mode played: %s" % home._play_note.text)
-	var before: FishCharacter.Family = fish.character
+	var before: FishCharacter.FishClass = fish.character
 	await _button(JOY_BUTTON_RIGHT_SHOULDER)
-	check(fish.character != before and home._fish_name.text == FishCharacter.CARS[fish.character].fish, "RB: the next fish (%s)" % home._fish_name.text)
+	check(fish.character != before and home._fish_name.text == FishCharacter.display_name(fish.character), "RB: the next fish (%s)" % home._fish_name.text)
 	await _button(JOY_BUTTON_LEFT_SHOULDER)
 	check(fish.character == before, "LB: back to the first")
 	var items := home._menu.get_children()
@@ -344,7 +344,7 @@ func _check_settings() -> void:
 	var character_row: Button = panel._rows["game/character"]
 	character_row.grab_focus()
 	await _frames(2)
-	var was: FishCharacter.Family = fish.character
+	var was: FishCharacter.FishClass = fish.character
 	await _button(JOY_BUTTON_A)
 	await _frames(2)
 	var dropdown := get_viewport().gui_get_focus_owner() as OptionButton
@@ -362,7 +362,7 @@ func _check_settings() -> void:
 		check(fish.character != was and not dropdown.get_popup().visible, "A, down, A: another fish (%s)" % fish.character)
 		check(panel._in_detail(get_viewport().gui_get_focus_owner()), "still in the detail pane")
 	await _button(JOY_BUTTON_Y)
-	check(fish.character == FishCharacter.Family.OCTANE, "Y: back to the first fish")
+	check(fish.character == FishCharacter.FishClass.SKIRMISHER, "Y: back to the first fish")
 	await _button(JOY_BUTTON_B)
 	check(get_viewport().gui_get_focus_owner() == character_row, "B: back to the Fish row")
 	main.set_character(was)

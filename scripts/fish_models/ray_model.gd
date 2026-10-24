@@ -1,8 +1,8 @@
 class_name RayModel
 extends RefCounted
-## Plank's rays (FishModel.build hands it here): skin m.skin of
-## FishCharacter.SKINS[FishCharacter.Family.PLANK]. One smooth disc per species
-## (its outline, dome, head and eye mounds from SKINS below) drawn with
+## The Gliders' rays (FishModel.build hands it here): species m.species of
+## FishCharacter.SPECIES[FishCharacter.FishClass.GLIDER]. One smooth disc per species
+## (its outline, dome, head and eye mounds from LOOKS below) drawn with
 ## FishModel.RAY_SKIN, so FishModel's swim beats, ripples and banks the wings and
 ## bends the tail (m._skin, m._tail_skin, m._whip). The tail's thick root sits
 ## in a short stalk at the back of the disc, round the tail pivot, so it never
@@ -12,7 +12,7 @@ extends RefCounted
 ## The outline is (along nose 0 to tail end 1, half width) points, "tip" the
 ## index of a pointed wingtip (-1 rounded).
 
-const SKINS := [
+const LOOKS := [
 	{  # Reef manta (Mobula alfredi): wide swept wings, black back with white
 		# shoulder patches, white belly with dark spots, head lobes, short tail.
 		"pattern": 0,
@@ -133,7 +133,7 @@ const SKINS := [
 
 
 static func build(m: FishModel) -> void:
-	var p: Dictionary = SKINS[clampi(m.skin, 0, SKINS.size() - 1)]
+	var p: Dictionary = LOOKS[clampi(m.species, 0, LOOKS.size() - 1)]
 	var shape := Shape.new(m._size, p)
 	var w := m._size.x
 	var l := m._size.z

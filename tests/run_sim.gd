@@ -14,8 +14,8 @@ extends Node
 ## Options (after --):
 ##   --runs N        runs to play (6)
 ##   --minutes M     a run that lasts this long stops there (20)
-##   --fish F        a FishCharacter family or a list (OCTANE,DOMINUS,MERC: in turns; PLANK, BREAKOUT,
-##                   HYBRID, MERC), or "all" to take turns (all)
+##   --fish F        a FishCharacter class or a list (SKIRMISHER,HUNTER,BULWARK: in turns; GLIDER, LANCER,
+##                   CHARMER, BULWARK), or "all" to take turns (all)
 ##   --picks P       greedy, random, or mixed (turns) (greedy)
 ##   --god           the bot can't go down (to see the power curve all run)
 ##   --seed S        the bot's dice (random)
@@ -92,22 +92,22 @@ func _run() -> void:
 	add_child(main)
 	fish = main.get_node("Fish")
 	await _ticks(3)
-	var families: Array = FishCharacter.Family.keys()
+	var fish_classes: Array = FishCharacter.FishClass.keys()
 	print("run_sim: %d runs of up to %.0f min, fish %s, %s picks%s" % [options.runs, options.minutes, options.fish,
 			options.picks, ", god mode" if options.god else ""])
 	var clock := Time.get_ticks_msec()
 	for n in options.runs:
 		var listed: PackedStringArray = (options.fish as String).split(",", false)
-		var family: int = n % families.size() if options.fish == "all" else maxi(families.find(listed[n % listed.size()]), 0)
+		var fish_class: int = n % fish_classes.size() if options.fish == "all" else maxi(fish_classes.find(listed[n % listed.size()]), 0)
 		var picks := SurvivorBot.Picks.GREEDY
 		if options.picks == "random" or (options.picks == "mixed" and n % 2 == 1):
 			picks = SurvivorBot.Picks.RANDOM
 		var started := Time.get_ticks_msec()
-		var log_entry := await _play(family, picks, n)
+		var log_entry := await _play(fish_class, picks, n)
 		logs.append(log_entry)
 		var seconds := (Time.get_ticks_msec() - started) / 1000.0
 		var ending: Dictionary = log_entry.ending
-		print("  run %d: %s, %s picks: %s at %s, Lv %d, %d kills (%.0fx real time)%s" % [n + 1, families[family],
+		print("  run %d: %s, %s picks: %s at %s, Lv %d, %d kills (%.0fx real time)%s" % [n + 1, fish_classes[fish_class],
 				"greedy" if picks == SurvivorBot.Picks.GREEDY else "random", ending.outcome, _clock(ending.t), ending.level,
 				ending.kills, ending.t / maxf(seconds, 0.01), (", " + ending.cause) if ending.cause != "" else ""])
 	main.set_mode(main.FREE_SWIM)
@@ -118,11 +118,11 @@ func _run() -> void:
 	get_tree().quit(0)
 
 
-## One run with the bot as `family`, picking by `picks`: its log, ended.
-func _play(family: int, picks: int, n: int) -> Dictionary:
+## One run with the bot as `fish_class`, picking by `picks`: its log, ended.
+func _play(fish_class: int, picks: int, n: int) -> Dictionary:
 	main.set_mode(main.NATURE)  # the same ocean, so the next Unnatural is a fresh one
 	await _ticks(2)
-	fish.character = family
+	fish.character = fish_class
 	main.set_mode(main.UNNATURAL)
 	await _ticks(3)
 	main.play_match()
@@ -145,7 +145,7 @@ func _play(family: int, picks: int, n: int) -> Dictionary:
 	if run.run_log.ending.is_empty():
 		run.run_log.finish("time")
 	var entry := run.run_log.to_dict()
-	entry["fish"] = FishCharacter.Family.keys()[family]
+	entry["fish"] = FishCharacter.FishClass.keys()[fish_class]
 	entry["picks"] = "greedy" if picks == SurvivorBot.Picks.GREEDY else "random"
 	entry["bot_picked"] = bot.picked
 	bot.queue_free()

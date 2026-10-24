@@ -127,7 +127,7 @@ func _on_node_added(node: Node) -> void:
 		_watch(node, (node as PauseMenu).closed, request.bind("ui/unpause"))
 	elif node is HomeScreen:
 		_watch(node, (node as HomeScreen).character_changed, func(_character: int) -> void: request("ui/character_change"))
-		_watch(node, (node as HomeScreen).skin_changed, func(_skin: int) -> void: request("ui/character_change"))
+		_watch(node, (node as HomeScreen).species_changed, func(_species: int) -> void: request("ui/character_change"))
 		_watch(node, (node as HomeScreen).mode_chosen, func(_mode: String) -> void: request("ui/mode_chosen"))
 	elif node is MatchCard:
 		request("ui/match_card")

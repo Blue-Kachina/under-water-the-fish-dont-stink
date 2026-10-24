@@ -1,7 +1,7 @@
 class_name MantisModel
 extends RefCounted
-## The mantis shrimp (FishModel.build hands it here): skin m.skin of
-## FishCharacter.SKINS[FishCharacter.Family.MANTIS].
+## The Brawlers' mantis shrimp (FishModel.build hands it here): species m.species of
+## FishCharacter.SPECIES[FishCharacter.FishClass.BRAWLER].
 ##
 ## One continuous armoured body (_shell_mesh): a carapace, three free thoracic
 ## rings and six abdominal plates, each plate's front tucked under the one
@@ -16,11 +16,11 @@ const SHELL := preload("res://shaders/mantis_shell.gdshader")
 const LIMB := preload("res://shaders/mantis_limb.gdshader")
 const EYE := preload("res://shaders/mantis_eye.gdshader")
 
-## Each skin (FishCharacter.SKINS order): its colours and markings, and its
+## Each species (FishCharacter.SPECIES order): its colours and markings, and its
 ## body's layout along its length (m): where the front is, then how long the
 ## carapace, each free thoracic ring, each of abdominal plates 1-5, the 6th and
 ## the telson are; and its half width and its height over and under its middle.
-const SKINS := [
+const LOOKS := [
 	{  # Peacock Mantis (Odontodactylus scyllarus): a smasher.
 		"albedo": Color("3a9a3e"), "belly": Color("a8d878"), "belly_mix": 0.55, "top_shade": 0.55,
 		"pattern": 0, "mark": Color("0e3a14"), "mark2": Color("0e3a14"), "mark_size": 0.016, "band_width": 0.0,
@@ -119,7 +119,7 @@ class Builder:
 
 
 static func build(m: FishModel) -> void:
-	var sk: Dictionary = SKINS[clampi(m.skin, 0, SKINS.size() - 1)]
+	var sk: Dictionary = LOOKS[clampi(m.species, 0, LOOKS.size() - 1)]
 	var seams := _seams(sk)
 	var albedo: Color = sk.albedo
 	m._body_material = m._material(albedo)  # for set_body_color(); the shell shader does the shading

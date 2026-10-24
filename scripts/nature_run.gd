@@ -169,7 +169,7 @@ func _ready() -> void:
 		_join(fish)
 	target = FISH_SCENE.instantiate()
 	target.name = "TargetFish"
-	target.character = FishCharacter.Family.HYBRID
+	target.character = FishCharacter.FishClass.CHARMER
 	target.display_name = TARGET_NAMES[rng.randi_range(0, TARGET_NAMES.size() - 1)]
 	add_child(target)
 	Match1v1.copy_tuning(player, target)
@@ -433,7 +433,7 @@ func _add_school(around: Transform3D, first: bool) -> void:
 		var distance := rng.randf_range(settings.spawn_distance_min, maxf(settings.spawn_distance_min, settings.spawn_distance_max))
 		at = _hidden_point(around.origin, distance)
 	var heading := Vector3(rng.randf_range(-1.0, 1.0), 0.0, rng.randf_range(-1.0, 1.0)).normalized()
-	var kind: FishCharacter.Family = FishCharacter.CARS.keys()[rng.randi_range(0, FishCharacter.CARS.size() - 1)]
+	var kind: FishCharacter.FishClass = FishCharacter.CLASSES.keys()[rng.randi_range(0, FishCharacter.CLASSES.size() - 1)]
 	var school := spawn_school(_next_school_id, rng.randi() & 0x7fffffff, kind, at, heading)
 	_next_school_id += 1
 	school_spawned.emit(school, at, heading)
@@ -441,7 +441,7 @@ func _add_school(around: Transform3D, first: bool) -> void:
 
 ## Builds school `id` (the authority's numbering) from `school_seed`: the same
 ## school wherever it's built. Off the authority it follows the host's leader.
-func spawn_school(id: int, school_seed: int, kind: FishCharacter.Family, at: Vector3, heading: Vector3) -> School:
+func spawn_school(id: int, school_seed: int, kind: FishCharacter.FishClass, at: Vector3, heading: Vector3) -> School:
 	if _schools_by_id.has(id):
 		return _schools_by_id[id]
 	var school := School.new()

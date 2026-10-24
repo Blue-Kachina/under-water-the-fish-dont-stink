@@ -21,69 +21,69 @@ const BLURBS := {
 }
 
 
-## The panel's text for `family`: an Array of [heading, body] pairs.
-static func sections(family: FishCharacter.Family) -> Array:
+## The panel's text for `fish_class`: an Array of [heading, body] pairs.
+static func sections(fish_class: FishCharacter.FishClass) -> Array:
 	var s := UnnaturalSettings.shared()
-	var attack_kind := FishAttack.kind_for(family)
-	var signature := StatBlock.signature(family)
+	var attack_kind := FishAttack.kind_for(fish_class)
+	var signature := StatBlock.signature(fish_class)
 	var out := []
 	out.append(["Starting weapon  ·  %s" % FishAttack.title(attack_kind), BLURBS.get(attack_kind, "")])
 	out.append(["Grows by itself  ·  %s" % StatBlock.title(signature),
 			"Every level up gives %s, on top of the cards you pick." % StatBlock.describe(signature, StatBlock.amount(signature))])
-	out.append(["Passive  ·  %s" % Traversal.title(family), twist_text(family, s)])
-	out.append(["Mobility (RB)  ·  %s" % Traversal.skill_title(family), skill_text(family, s)])
-	out.append(["Base", "%d HP  ·  %.1f s of i-frames after a hit. Every fish starts with the same base stats; the weapon, the signature stat and the twist set them apart." % [roundi(s.base_hp), s.iframes]])
+	out.append(["Passive  ·  %s" % Traversal.title(fish_class), twist_text(fish_class, s)])
+	out.append(["Mobility (RB)  ·  %s" % Traversal.skill_title(fish_class), skill_text(fish_class, s)])
+	out.append(["Base", "%d HP  ·  %.1f s of i-frames after a hit. Every class starts with the same base stats; the weapon, the signature stat and the twist set them apart." % [roundi(s.base_hp), s.iframes]])
 	return out
 
 
-## What `family`'s twist does, with the numbers live from `s`.
-static func twist_text(family: FishCharacter.Family, s: UnnaturalSettings) -> String:
-	match family:
-		FishCharacter.Family.OCTANE:
+## What `fish_class`'s twist does, with the numbers live from `s`.
+static func twist_text(fish_class: FishCharacter.FishClass, s: UnnaturalSettings) -> String:
+	match fish_class:
+		FishCharacter.FishClass.SKIRMISHER:
 			return "Nimble: turns %d%% faster than the others, so it slips between zombies." % roundi((s.nimble_turn - 1.0) * 100.0)
-		FishCharacter.Family.DOMINUS:
+		FishCharacter.FishClass.HUNTER:
 			return "Frenzy: every kill adds +%d%% swim speed (up to +%d%%), held for %.0f s after the last kill, then it fades. Keep killing to keep it." % [
 					roundi(s.frenzy_per_kill * 100.0), roundi(s.frenzy_max * 100.0), s.frenzy_time]
-		FishCharacter.Family.PLANK:
+		FishCharacter.FishClass.GLIDER:
 			return "Glide: coasting keeps only %d%% of the usual drag, so one stroke carries it much further." % roundi(s.glide_drag * 100.0)
-		FishCharacter.Family.BREAKOUT:
+		FishCharacter.FishClass.LANCER:
 			return "Streamlined: swims %d%% faster than the others." % roundi(s.streamline_speed * 100.0)
-		FishCharacter.Family.HYBRID:
+		FishCharacter.FishClass.CHARMER:
 			return "Graceful: %.1f s more of untouchable time after every hit." % s.graceful_iframes
-		FishCharacter.Family.MERC:
+		FishCharacter.FishClass.BULWARK:
 			return "Armoured: takes only %d%% of the damage, but swims %d%% slower." % [roundi(s.armour_taken * 100.0), roundi((1.0 - s.armour_speed) * 100.0)]
-		FishCharacter.Family.LIONFISH:
+		FishCharacter.FishClass.SCORCHER:
 			return "Wake: Greek Fire burns up to +%d%% harder the closer you swim to battering speed." % roundi(s.wake_damage * 100.0)
-		FishCharacter.Family.MOON_JELLY:
+		FishCharacter.FishClass.DRIFTER:
 			return "Many Arms: %d more jelly%s in its Halo." % [s.arms_extra, "" if s.arms_extra == 1 else "s"]
-		FishCharacter.Family.MANTIS:
+		FishCharacter.FishClass.BRAWLER:
 			return "Hammer: its Snap's shockwave hits for %.0f damage within %.0f m." % [s.snap_damage, s.snap_radius]
-		FishCharacter.Family.WHALE_SHARK:
+		FishCharacter.FishClass.BREACHER:
 			return "Escort: holding still, it heals %.1f HP a second." % s.escort_regen
 	return ""
 
 
-## What `family`'s mobility skill (the boost button: RB, Shift) does, live from `s`.
-static func skill_text(family: FishCharacter.Family, s: UnnaturalSettings) -> String:
-	match family:
-		FishCharacter.Family.OCTANE:
+## What `fish_class`'s mobility skill (the boost button: RB, Shift) does, live from `s`.
+static func skill_text(fish_class: FishCharacter.FishClass, s: UnnaturalSettings) -> String:
+	match fish_class:
+		FishCharacter.FishClass.SKIRMISHER:
 			return "Wriggle: a burst of %.0f m/s sideways (the way you lean the stick, else backwards), untouchable for %.1f s. Ready again after %.1f s." % [s.wriggle_speed, s.wriggle_iframes, s.wriggle_cooldown]
-		FishCharacter.Family.DOMINUS:
+		FishCharacter.FishClass.HUNTER:
 			return "Fin Dash: charges ahead at %.0f m/s for %.2f s, untouchable, battering everything in the way for %.0f damage each. Ready again after %.1f s." % [s.fin_dash_speed, s.fin_dash_time, s.fin_damage, s.fin_cooldown]
-		FishCharacter.Family.PLANK:
+		FishCharacter.FishClass.GLIDER:
 			return "Surge: a stroke of %.0f m/s forward, and no drag at all for %.1f s. Ready again after %.1f s." % [s.surge_speed, s.surge_time, s.surge_cooldown]
-		FishCharacter.Family.BREAKOUT:
+		FishCharacter.FishClass.LANCER:
 			return "Dash: a burst of %.0f m/s along its nose, untouchable for %.1f s. Ready again after %.1f s." % [s.dash_speed, s.dash_iframes, s.dash_cooldown]
-		FishCharacter.Family.HYBRID:
+		FishCharacter.FishClass.CHARMER:
 			return "Leap: leaps %.0f m/s upward; at the top it splashes down for %.0f damage to every zombie within %.0f m. Ready again after %.1f s." % [s.leap_impulse, s.leap_damage, s.leap_radius, s.leap_cooldown]
-		FishCharacter.Family.MERC:
+		FishCharacter.FishClass.BULWARK:
 			return "Brace: for %.1f s it takes only %d%% of the damage (and swims %d%% slower). Ready again after %.1f s." % [s.brace_time, roundi(s.brace_taken * 100.0), roundi((1.0 - s.brace_speed) * 100.0), s.brace_cooldown]
-		FishCharacter.Family.LIONFISH:
+		FishCharacter.FishClass.SCORCHER:
 			return "Flare Dash: dashes %.0f m/s for %.2f s with its spines flared, %.0f damage to everything within %.0f m on the way. Ready again after %.1f s." % [s.flare_speed, s.flare_time, s.flare_damage, s.flare_radius, s.flare_cooldown]
-		FishCharacter.Family.MOON_JELLY:
+		FishCharacter.FishClass.DRIFTER:
 			return "Go Quiet: switches its stink off for up to %.0f s. Nothing fires, and zombies lose track of it. Hits end it; press again to end it early. Then %.1f s before the next." % [s.quiet_time, s.quiet_cooldown]
-		FishCharacter.Family.MANTIS:
+		FishCharacter.FishClass.BRAWLER:
 			return "Snap: lunges ahead at %.0f m/s and cracks a shockwave. Ready again after %.1f s." % [s.snap_speed, s.snap_cooldown]
-		FishCharacter.Family.WHALE_SHARK:
+		FishCharacter.FishClass.BREACHER:
 			return "Gulp: sucks every zombie in a %.0f m cone ahead in, hurting each for %.0f. Ready again after %.1f s." % [s.gulp_range, s.gulp_damage, s.gulp_cooldown]
 	return ""

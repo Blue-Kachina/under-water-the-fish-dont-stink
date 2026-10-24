@@ -247,7 +247,7 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 90.0, 1.0) var safe_ram_cone := 60.0
 
 @export_group("Attacks")
-## Each fish fires its own auto-attack (FishAttack.FOR_FAMILY); pick one here
+## Each fish fires its own auto-attack (FishAttack.FOR_CLASS); pick one here
 ## to give every fish that one instead (testing). Live.
 @export_enum("Own fish's", "Anemone Sting", "Ghost Bite", "Shock Lash", "Bill Thrust", "Bubble Volley", "Spine Burst",
 		"Greek Fire Trail", "Jellyfish Halo", "Depth Charges", "Remora Buddy", "Leviathan's Coil") var fish_attack := 0

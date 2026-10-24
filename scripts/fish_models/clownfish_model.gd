@@ -1,12 +1,12 @@
 class_name ClownfishModel
 extends RefCounted
-## Octane's clownfish (FishModel.build hands it here): skin m.skin of
-## FishCharacter.SKINS[FishCharacter.Family.OCTANE]. One smooth lofted body (a
+## The Skirmishers' clownfish (FishModel.build hands it here): species m.species of
+## FishCharacter.SPECIES[FishCharacter.FishClass.SKIRMISHER]. One smooth lofted body (a
 ## deep, blunt-headed oval narrowing to a thick tail stalk, an egg-shaped cross
 ## section narrower along the back) painted by clown_skin.gdshader, which bends
 ## into the tail (FishModel._bend_body); a notched dorsal fin (low spiny front,
 ## taller soft back), a rounded anal fin, pelvics, paddle pectorals on the swim
-## pivots and a rounded tail fan; real eyes set into the head. The skins share it
+## pivots and a rounded tail fan; real eyes set into the head. The species share it
 ## all and differ in colour, bands, fin edging and a few details (the maroon's
 ## cheek spine, the tomato's deeper body).
 
@@ -15,8 +15,8 @@ const SKIN_SHADER := preload("res://shaders/clown_skin.gdshader")
 ## Where the bands sit along the body (nose 0 to tail 1) at their top and bottom.
 const BAND_ALONG := Vector3(0.205, 0.565, 0.925)
 
-## Per skin, in FishCharacter.SKINS order. Sizes are of the body's length.
-const SKINS := [
+## Per species, in FishCharacter.SPECIES order. Sizes are of the body's length.
+const LOOKS := [
 	{  # Ocellaris: orange, three white bands thinly edged in black, black fin margins.
 		"body": Color("#f07a1e"), "back": 0.66, "belly": Color("#f8b066"), "belly_mix": 0.55,
 		"bands": Vector3(1.0, 1.0, 1.0), "band": Color("#fbfbf7"), "band_width": Vector3(0.036, 0.034, 0.016),
@@ -119,7 +119,7 @@ class Shape:
 
 
 static func build(m: FishModel) -> void:
-	var look: Dictionary = SKINS[clampi(m.skin, 0, SKINS.size() - 1)]
+	var look: Dictionary = LOOKS[clampi(m.species, 0, LOOKS.size() - 1)]
 	var w := m._size.x
 	var h := m._size.y
 	var l := m._size.z

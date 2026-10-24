@@ -444,7 +444,7 @@ func _update_hint() -> void:
 		_hint.text = "Start/Esc: pause, settings    F11: fullscreen"
 	elif nature_run and joined_player:
 		# A split-screen player who joined: their own few controls.
-		_hint.text = "D-pad left/right: change fish    D-pad down: skin    Hold D-pad up: scoreboard    Hold Back/View: leave"
+		_hint.text = "D-pad left/right: change class    D-pad down: species    Hold D-pad up: scoreboard    Hold Back/View: leave"
 	else:
 		_hint.text = "Start/Esc: pause, settings    R: %s    Right stick/IJKL: look around    Y: %s cam    %s%sF11: fullscreen" % [
 				"restart kickoff" if match_1v1 else ("restart match" if hunt_match else "reset"),

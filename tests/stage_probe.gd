@@ -54,7 +54,7 @@ func _run() -> void:
 	settings.boss_time = 12.0
 	settings.leviathan_enrage = 6.0
 	settings.leviathan_bolt_every = 0.5
-	fish.character = FishCharacter.Family.DOMINUS
+	fish.character = FishCharacter.FishClass.HUNTER
 	main.set_mode(main.UNNATURAL)
 	await _ticks(3)
 	main._match_card.play_requested.emit()

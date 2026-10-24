@@ -1,7 +1,7 @@
 class_name KoiModel
 extends RefCounted
-## Hybrid's koi (FishModel.build hands it here): a butterfly koi in skin m.skin
-## of FishCharacter.SKINS[FishCharacter.Family.HYBRID] (LOOKS, in that order).
+## The Charmers' koi (FishModel.build hands it here): a butterfly koi in species m.species
+## of FishCharacter.SPECIES[FishCharacter.FishClass.CHARMER] (LOOKS, in that order).
 ## One smooth carp body from its fleshy lips (a real open mouth) back to its
 ## tail stalk (_body_mesh), painted by koi_skin.gdshader with big overlapping
 ## scales; long, frilly, rippling fins (_fin, koi_fin.gdshader) and a big
@@ -44,7 +44,7 @@ const SCALE_ROWS := 26.0  # scales round the body
 const GILL := 0.2  # where the gill cover ends, along the body
 const BEND_FROM := 0.4  # where the body starts to bend into the tail
 
-## Each skin: the skin shader's variety and colours (albedo is the one a team
+## Each species: the skin shader's variety and colours (albedo is the one a team
 ## tint replaces), the barbels', the eyes', and the fins': pectorals, dorsal,
 ## the low fins (pelvics and anal) and the tail. A fin: root and edge colours,
 ## its rays, how see-through its edge is (alpha), a patch of `base` colour at
@@ -105,7 +105,7 @@ const LOOKS := [
 
 
 static func build(m: FishModel) -> void:
-	var look: Dictionary = LOOKS[clampi(m.skin, 0, LOOKS.size() - 1)]
+	var look: Dictionary = LOOKS[clampi(m.species, 0, LOOKS.size() - 1)]
 	var w := m._size.x
 	var h := m._size.y
 	var l := m._size.z

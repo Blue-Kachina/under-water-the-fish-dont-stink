@@ -1,7 +1,7 @@
 class_name BoxfishModel
 extends RefCounted
-## Merc's boxfish family (FishModel.build hands it here): skin m.skin of
-## FishCharacter.SKINS[FishCharacter.Family.MERC]. A rigid carapace of
+## The Bulwarks' boxfish (FishModel.build hands it here): species m.species of
+## FishCharacter.SPECIES[FishCharacter.FishClass.BULWARK]. A rigid carapace of
 ## hexagonal plates (box_skin.gdshader), one smooth mesh from the pursed mouth on
 ## the front of its face, over the box, down the rear of the shell and out along
 ## a short soft tail stalk that bends into the tail fan (FishModel._bend_body);
@@ -32,7 +32,7 @@ const LIPS: Array[Vector2] = [
 ]
 
 
-## Each skin's look and shape. Lengths are of the hitbox (h its height, l its
+## Each species' look and shape. Lengths are of the hitbox (h its height, l its
 ## length) unless marked m.
 static func _params(skin: int) -> Dictionary:
 	match skin:
@@ -83,7 +83,7 @@ static func _params(skin: int) -> Dictionary:
 
 
 static func build(m: FishModel) -> void:
-	var p := _params(m.skin)
+	var p := _params(m.species)
 	var g := _geometry(m, p)
 	var w := m._size.x
 	var h := m._size.y
@@ -138,7 +138,7 @@ static func build(m: FishModel) -> void:
 	var dorsal := m._membrane(inside, fins, _surface(g, fin_from, 0.0, 1.0) - Vector3(0.0, 0.012, 0.0), _surface(g, fin_to, 0.0, 1.0) - Vector3(0.0, 0.012, 0.0),
 			Vector3(0.0, 1.0, 0.8), [l * 0.06, l * 0.1, l * 0.11, l * 0.07], -0.35, 0.06)
 	dorsal.name = "Dorsal"
-	var anal := m._membrane(inside, clear if m.skin == 2 else fins, _surface(g, fin_from + l * 0.01, 1.0, 1.0) + Vector3(0.0, 0.012, 0.0),
+	var anal := m._membrane(inside, clear if m.species == 2 else fins, _surface(g, fin_from + l * 0.01, 1.0, 1.0) + Vector3(0.0, 0.012, 0.0),
 			_surface(g, fin_to + l * 0.01, 1.0, 1.0) + Vector3(0.0, 0.012, 0.0), Vector3(0.0, -1.0, 0.8),
 			[l * 0.05, l * 0.09, l * 0.1, l * 0.06], 0.35, 0.06)
 	anal.name = "Anal"

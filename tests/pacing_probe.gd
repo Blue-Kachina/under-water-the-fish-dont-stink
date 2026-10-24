@@ -47,7 +47,7 @@ func _run() -> void:
 	settings.shrine_tide_time = 1.0
 	settings.shrine_tide_wave = 0.5
 	settings.shrine_tide_count = 10
-	fish.character = FishCharacter.Family.DOMINUS
+	fish.character = FishCharacter.FishClass.HUNTER
 	main.set_mode(main.UNNATURAL)
 	await _ticks(3)
 	main._match_card.play_requested.emit()

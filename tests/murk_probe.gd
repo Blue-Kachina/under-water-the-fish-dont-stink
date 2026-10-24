@@ -159,8 +159,8 @@ func _run() -> void:
 	var full := 0
 	var far_tris := 0
 	for kind in horde.kinds:
-		var whole: Mesh = SchoolLook.meshes(kind.family)[0]
-		var cut: Mesh = SchoolLook.detail_meshes(kind.family, settings.lod_far_error)[0]
+		var whole: Mesh = SchoolLook.meshes(kind.fish_class)[0]
+		var cut: Mesh = SchoolLook.detail_meshes(kind.fish_class, settings.lod_far_error)[0]
 		for s in whole.get_surface_count():
 			full += (whole.surface_get_arrays(s)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
 		for s in cut.get_surface_count():
@@ -171,7 +171,7 @@ func _run() -> void:
 	settings.lod_mid_error = 0.05
 	horde._draw_horde(0.0)
 	var mid_mesh: Mesh = horde._looks[1].multimesh.mesh
-	check(mid_mesh == SchoolLook.detail_meshes(horde.kinds[0].family, 0.05)[0], "changing an error re-cuts the looks")
+	check(mid_mesh == SchoolLook.detail_meshes(horde.kinds[0].fish_class, 0.05)[0], "changing an error re-cuts the looks")
 	settings.lod_mid_error = 0.02
 	horde._draw_horde(0.0)
 	settings.murk_cull = 1.0

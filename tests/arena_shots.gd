@@ -66,12 +66,12 @@ func _run() -> void:
 	await _seconds(1.0)
 	await _shot("5_glass_from_side")
 
-	for family: FishCharacter.Family in FishCharacter.CARS:
-		main.set_character(family)
+	for fish_class: FishCharacter.FishClass in FishCharacter.CLASSES:
+		main.set_character(fish_class)
 		fish.set_spawn(Transform3D(Basis.IDENTITY, Vector3(0.0, 1.0, 30.0)))
 		fish.boost_amount = 70.0
 		await _seconds(0.6)
-		await _shot("6_boost_%s" % FishCharacter.CARS[family].key)
+		await _shot("6_boost_%s" % FishCharacter.CLASSES[fish_class].key)
 	get_tree().quit()
 
 

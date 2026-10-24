@@ -1,7 +1,7 @@
 class_name FishAttack
 extends Node3D
 ## A fish's weapon in Unnatural (planning_unnatural.md §5): every weapon is
-## one of these, the fish's own (FOR_FAMILY, or UnnaturalSettings.fish_attack
+## one of these, the fish's own (FOR_CLASS, or UnnaturalSettings.fish_attack
 ## for every fish) and any second one alike (AttackWeapon holds those). make()
 ## builds one of a kind.
 ##
@@ -25,17 +25,17 @@ signal fired
 
 enum Kind { OWN, STING, BITE, LASH, THRUST, BUBBLES, SPINES, FIRE, HALO, CHARGES, REMORA, COIL }
 ## Each fish's own.
-const FOR_FAMILY := {
-	FishCharacter.Family.OCTANE: Kind.STING,
-	FishCharacter.Family.DOMINUS: Kind.BITE,
-	FishCharacter.Family.PLANK: Kind.LASH,
-	FishCharacter.Family.BREAKOUT: Kind.THRUST,
-	FishCharacter.Family.HYBRID: Kind.BUBBLES,
-	FishCharacter.Family.MERC: Kind.SPINES,
-	FishCharacter.Family.LIONFISH: Kind.FIRE,
-	FishCharacter.Family.MOON_JELLY: Kind.HALO,
-	FishCharacter.Family.MANTIS: Kind.CHARGES,
-	FishCharacter.Family.WHALE_SHARK: Kind.REMORA,
+const FOR_CLASS := {
+	FishCharacter.FishClass.SKIRMISHER: Kind.STING,
+	FishCharacter.FishClass.HUNTER: Kind.BITE,
+	FishCharacter.FishClass.GLIDER: Kind.LASH,
+	FishCharacter.FishClass.LANCER: Kind.THRUST,
+	FishCharacter.FishClass.CHARMER: Kind.BUBBLES,
+	FishCharacter.FishClass.BULWARK: Kind.SPINES,
+	FishCharacter.FishClass.SCORCHER: Kind.FIRE,
+	FishCharacter.FishClass.DRIFTER: Kind.HALO,
+	FishCharacter.FishClass.BRAWLER: Kind.CHARGES,
+	FishCharacter.FishClass.BREACHER: Kind.REMORA,
 }
 ## Kind -> [name, hit source]. Held as a second weapon, its id is "attack_" +
 ## its source (Weapons.ATTACK_WEAPONS).
@@ -89,11 +89,11 @@ var struck := 0
 var _worn: Node3D
 
 
-## The attack for `family`, or `override` (a Kind, not OWN) for every fish.
-static func kind_for(family: FishCharacter.Family, override := Kind.OWN) -> Kind:
+## The attack for `fish_class`, or `override` (a Kind, not OWN) for every fish.
+static func kind_for(fish_class: FishCharacter.FishClass, override := Kind.OWN) -> Kind:
 	if override != Kind.OWN and INFO.has(override):
 		return override
-	return FOR_FAMILY.get(family, Kind.BITE)
+	return FOR_CLASS.get(fish_class, Kind.BITE)
 
 
 ## A new attack of `attack_kind` (set fish, horde, settings, run and on_hit, then add it).

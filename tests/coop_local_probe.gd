@@ -79,7 +79,7 @@ func _run() -> void:
 	check(School.view_cameras.size() == 4, "school detail follows all four cameras")
 	var second: PlayerSlot = local.slots[1]
 	check(second.fish.get_collision_exceptions().has(fish), "co-op fish pass through each other")
-	var was: FishCharacter.Family = second.fish.character
+	var was: FishCharacter.FishClass = second.fish.character
 	_press(PADS[0], JOY_BUTTON_DPAD_RIGHT)
 	await _ticks(2)
 	check(second.fish.character != was, "D-pad changes a joined player's fish")

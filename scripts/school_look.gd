@@ -16,43 +16,43 @@ const CENTRE := 0
 const RIGHT := 1
 const LEFT := 2
 
-## Family -> Array[Mesh], one per pose.
+## Class -> Array[Mesh], one per pose.
 static var _baked := {}
-## Family -> Array[ImporterMesh], one per pose: the bakes with their LODs.
+## Class -> Array[ImporterMesh], one per pose: the bakes with their LODs.
 static var _importers := {}
-## "family:error" -> Array[Mesh], one per pose (detail_meshes()).
+## "class:error" -> Array[Mesh], one per pose (detail_meshes()).
 static var _detailed := {}
 
 
-## The baked meshes for `family`, one per pose in POSES.
-static func meshes(family: FishCharacter.Family) -> Array:
-	if not _baked.has(family):
+## The baked meshes for `fish_class`, one per pose in POSES.
+static func meshes(fish_class: FishCharacter.FishClass) -> Array:
+	if not _baked.has(fish_class):
 		var baked := []
-		for importer: ImporterMesh in _importers_for(family):
+		for importer: ImporterMesh in _importers_for(fish_class):
 			baked.append(importer.get_mesh())
-		_baked[family] = baked
-	return _baked[family]
+		_baked[fish_class] = baked
+	return _baked[fish_class]
 
 
-## The baked meshes for `family` at a fixed detail, one per pose: each part at
+## The baked meshes for `fish_class` at a fixed detail, one per pose: each part at
 ## its coarsest LOD whose error is within `error` (a share of the part's size;
 ## 0: full detail). For a MultiMesh spread over a whole arena (the Horde),
 ## where Godot's own LOD, picked by the MultiMesh's bounds, never steps down.
-static func detail_meshes(family: FishCharacter.Family, error: float) -> Array:
+static func detail_meshes(fish_class: FishCharacter.FishClass, error: float) -> Array:
 	if error <= 0.0:
-		return meshes(family)
-	var key := "%d:%.4f" % [family, error]
+		return meshes(fish_class)
+	var key := "%d:%.4f" % [fish_class, error]
 	if not _detailed.has(key):
 		var built := []
-		for importer: ImporterMesh in _importers_for(family):
+		for importer: ImporterMesh in _importers_for(fish_class):
 			built.append(_at_detail(importer, error))
 		_detailed[key] = built
 	return _detailed[key]
 
 
-static func _importers_for(family: FishCharacter.Family) -> Array:
-	if not _importers.has(family):
-		var model := FishModel.build(family)
+static func _importers_for(fish_class: FishCharacter.FishClass) -> Array:
+	if not _importers.has(fish_class):
+		var model := FishModel.build(fish_class)
 		var baked := []
 		for swing: float in POSES:
 			if model.tail:
@@ -60,8 +60,8 @@ static func _importers_for(family: FishCharacter.Family) -> Array:
 				model.apply_bend()
 			baked.append(_bake(model))
 		model.free()
-		_importers[family] = baked
-	return _importers[family]
+		_importers[fish_class] = baked
+	return _importers[fish_class]
 
 
 ## `importer`'s mesh with each part at the fewest triangles within `error`,

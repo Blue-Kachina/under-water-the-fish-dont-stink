@@ -51,7 +51,7 @@ const OVER_TIME := 20.0
 const BOT_NAMES := ["Barracuda", "Snapper", "Grouper", "Kipper", "Wahoo", "Marlin", "Halibut", "Mackerel", "Pike", "Tarpon"]
 ## How long "GO!" shows after the countdown.
 const GO_TIME := 0.8
-const BOT_CHARACTER := FishCharacter.Family.OCTANE
+const BOT_CHARACTER := FishCharacter.FishClass.SKIRMISHER
 ## RL's kickoff spots for the team defending +Z (x, z in m) and whether the
 ## fish there faces the ball (the diagonals) or straight down the tank. The
 ## other team gets the same spot mirrored through the centre.

@@ -1238,7 +1238,7 @@ func _fit_detail() -> void:
 		var at := look % _per_set
 		var kind := at / (3 * BANDS)
 		var pose := (at / BANDS) % 3
-		_looks[look].multimesh.mesh = SchoolLook.detail_meshes(kinds[kind].family, errors[at % BANDS])[pose]
+		_looks[look].multimesh.mesh = SchoolLook.detail_meshes(kinds[kind].fish_class, errors[at % BANDS])[pose]
 
 
 ## The rot overlays, and the first set of looks.
@@ -1273,7 +1273,7 @@ func _add_set() -> void:
 	for k in kinds.size():
 		var meshes: Array[Array] = []
 		for band in BANDS:
-			meshes.append(SchoolLook.detail_meshes(kinds[k].family, _lod_errors[band]))
+			meshes.append(SchoolLook.detail_meshes(kinds[k].fish_class, _lod_errors[band]))
 		for pose in 3:
 			for band in BANDS:
 				var multimesh := MultiMesh.new()

@@ -52,7 +52,7 @@ func _run() -> void:
 	settings.twists = false
 	settings.base_hp = 100000.0
 	settings.shrine_count = 0
-	fish.character = FishCharacter.Family.DOMINUS
+	fish.character = FishCharacter.FishClass.HUNTER
 	main.set_mode(main.UNNATURAL)
 	await _ticks(3)
 	main._match_card.play_requested.emit()

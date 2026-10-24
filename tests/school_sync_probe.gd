@@ -37,8 +37,8 @@ func _run() -> void:
 	add_child(host)
 	add_child(guest)
 	var seed_value := 123457
-	host.setup(settings, Vector3(0, 10, 0), Vector3.FORWARD, FishCharacter.Family.OCTANE, seed_value)
-	guest.setup(settings, Vector3(0, 10, 0), Vector3.FORWARD, FishCharacter.Family.OCTANE, seed_value)
+	host.setup(settings, Vector3(0, 10, 0), Vector3.FORWARD, FishCharacter.FishClass.SKIRMISHER, seed_value)
+	guest.setup(settings, Vector3(0, 10, 0), Vector3.FORWARD, FishCharacter.FishClass.SKIRMISHER, seed_value)
 
 	print("built:")
 	var same := host.display_name == guest.display_name and host.fish_count() == guest.fish_count()

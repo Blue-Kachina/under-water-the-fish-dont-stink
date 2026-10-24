@@ -73,7 +73,7 @@ var rng := RandomNumberGenerator.new()
 ## here. Its fish still swim to their places here, from that leader.
 var follower := false
 var settings: NatureSettings
-var character := FishCharacter.Family.OCTANE
+var character := FishCharacter.FishClass.SKIRMISHER
 var display_name := ""
 ## The middle of where it roams.
 var home := Vector3.ZERO
@@ -137,7 +137,7 @@ func _ready() -> void:
 ## Puts the school at `at` heading along `heading`, with its fish in their places.
 ## Call once it's in the tree. `rng_seed` makes it the same school wherever it's
 ## built (negative: a random one).
-func setup(school_settings: NatureSettings, at: Vector3, heading: Vector3, kind: FishCharacter.Family, rng_seed := -1) -> void:
+func setup(school_settings: NatureSettings, at: Vector3, heading: Vector3, kind: FishCharacter.FishClass, rng_seed := -1) -> void:
 	settings = school_settings
 	character = kind
 	if rng_seed >= 0:

@@ -27,7 +27,7 @@ func _run(main: Node) -> void:
 	var side := Camera3D.new()
 	side.fov = 45.0
 	add_child(side)
-	for key: String in ["octane", "dominus", "plank", "breakout", "hybrid", "merc"]:
+	for key: String in ["skirmisher", "hunter", "glider", "lancer", "charmer", "bulwark"]:
 		fish.character = FishCharacter.from_key(key)
 		fish.set_spawn(Transform3D.IDENTITY)
 		await _frames(10)
@@ -84,7 +84,7 @@ func _run(main: Node) -> void:
 ## The real thing: striding at the peak for a while (the stream pouring, the
 ## tail growing), shot from the chase camera and from the side.
 func _live(main: Node, fish: FishController, chase: Camera3D, side: Camera3D) -> void:
-	fish.character = FishCharacter.Family.OCTANE
+	fish.character = FishCharacter.FishClass.SKIRMISHER
 	fish.set_spawn(Transform3D.IDENTITY)
 	await _frames(10)
 	var input := FishInput.new()

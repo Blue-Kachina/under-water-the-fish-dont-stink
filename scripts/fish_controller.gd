@@ -463,31 +463,31 @@ const TIME_EPSILON := 0.0001
 ## Which fish this is, one per Rocket League hitbox (FishCharacter): sets the
 ## hitbox, belly, centre of mass, wheels and model below to that car's. Picked
 ## in the tuning panel's Character row, not tuned like the rest.
-var character := FishCharacter.Family.OCTANE:
+var character := FishCharacter.FishClass.SKIRMISHER:
 	set(value):
 		character = value
-		_skin = 0  # each family has its own skins; set skin after (or set_look)
+		_species = 0  # each class has its own species; set species after (or set_look)
 		if not _setting_look:
 			_apply_character()
-## Which of the character's skins (FishCharacter.SKINS) its model wears: looks
-## only, the hitbox and moves are the family's. Back to 0 when the character
+## Which of the character's species (FishCharacter.SPECIES) its model wears: looks
+## only, the hitbox and moves are the class's. Back to 0 when the character
 ## changes, so set it after the character (set_look sets both, one rebuild).
-var skin: int:
+var species: int:
 	get:
-		return _skin
+		return _species
 	set(value):
-		_skin = clampi(value, 0, FishCharacter.skin_count(character) - 1)
+		_species = clampi(value, 0, FishCharacter.species_count(character) - 1)
 		_apply_character()
-var _skin := 0
+var _species := 0
 var _setting_look := false
 
 
-## Become `family` wearing its skin `with_skin`, rebuilding the model once.
-func set_look(family: FishCharacter.Family, with_skin: int) -> void:
+## Become `fish_class` wearing its species `with_species`, rebuilding the model once.
+func set_look(fish_class: FishCharacter.FishClass, with_species: int) -> void:
 	_setting_look = true
-	character = family
+	character = fish_class
 	_setting_look = false
-	skin = with_skin
+	species = with_species
 ## A box, like Rocket League's car hitboxes: flat on the floor, flat on top to
 ## carry the ball. Set by the character (Octane: 120.5 x 86.7 x 38.7 uu, 1 uu =
 ## 1 cm). The fish's model is built to fill it.
@@ -713,7 +713,7 @@ var _fin_left: Node3D
 var _fin_right: Node3D
 ## The character's wheels (FishCharacter.wheels): front left, front right, back
 ## left, back right.
-var _wheels: Array[Dictionary] = FishCharacter.wheels(FishCharacter.Family.OCTANE)
+var _wheels: Array[Dictionary] = FishCharacter.wheels(FishCharacter.FishClass.SKIRMISHER)
 @onready var _bubbles: CPUParticles3D = $Bubbles
 @onready var _collision: CollisionShape3D = $Collision
 var _hitbox_view := MeshInstance3D.new()
@@ -770,7 +770,7 @@ func _apply_character() -> void:
 	if _visual:
 		remove_child(_visual)
 		_visual.queue_free()
-	_visual = FishModel.build(character, _skin)
+	_visual = FishModel.build(character, _species)
 	add_child(_visual)
 	_tail = _visual.tail
 	_fin_left = _visual.fin_left

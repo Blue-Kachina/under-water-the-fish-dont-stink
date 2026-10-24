@@ -32,13 +32,13 @@ func _ready() -> void:
 	name = "DrownedShark"
 	_charge_left = settings.shark_charge_every
 	_call_left = settings.shark_call_every * 0.5
-	_model = FishModel.build(FishCharacter.Family.DOMINUS)
+	_model = FishModel.build(FishCharacter.FishClass.HUNTER)
 	_model.scale = Vector3.ONE * settings.shark_size
 	add_child(_model)
 	if _model.has_method("set_body_color"):
 		_model.call("set_body_color", ROT)
 	# Already in metres: x across, y up, z nose to tail.
-	var hitbox := FishCharacter.hitbox_size(FishCharacter.Family.DOMINUS)
+	var hitbox := FishCharacter.hitbox_size(FishCharacter.FishClass.HUNTER)
 	_length = hitbox.z * settings.shark_size
 	var half_width := hitbox.x * 0.5 * settings.shark_size
 	var half_height := hitbox.y * 0.5 * settings.shark_size

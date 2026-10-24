@@ -1,7 +1,7 @@
 class_name SwordfishModel
 extends RefCounted
-## Breakout's billfish (FishModel.build hands it here), in skin m.skin of
-## FishCharacter.SKINS[FishCharacter.Family.BREAKOUT]: one smooth lofted body
+## The Lancers' billfish (FishModel.build hands it here), in species m.species of
+## FishCharacter.SPECIES[FishCharacter.FishClass.LANCER]: one smooth lofted body
 ## from the tip of its bill to its keeled tail stalk (sword_skin.gdshader), a
 ## short lower jaw, stiff dark fins (sword_fin.gdshader) and a deeply forked
 ## crescent tail on the swim pivot. The rear of the body bends into the tail
@@ -12,7 +12,7 @@ extends RefCounted
 const SKIN := preload("res://shaders/sword_skin.gdshader")
 const FIN := preload("res://shaders/sword_fin.gdshader")
 
-## Each skin's look. Fin outlines are (along the body, height) pairs: along is 0
+## Each species' look. Fin outlines are (along the body, height) pairs: along is 0
 ## at the bill's base to 1 at the tail stalk's end, height is in the body's half
 ## heights above its back (below its belly for the anal fin).
 const LOOKS: Array[Dictionary] = [
@@ -137,7 +137,7 @@ class Shape:
 
 
 static func build(m: FishModel) -> void:
-	var look: Dictionary = LOOKS[clampi(m.skin, 0, LOOKS.size() - 1)]
+	var look: Dictionary = LOOKS[clampi(m.species, 0, LOOKS.size() - 1)]
 	var l := m._size.z
 	var shape := Shape.new()
 	shape.ends = Vector2(-l * 0.5, l * 0.415)

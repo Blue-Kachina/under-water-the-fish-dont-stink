@@ -76,7 +76,7 @@ static func apply_preset(level: int, settings: UnnaturalSettings) -> void:
 
 ## The kind the dummies are (appended to the horde's kinds).
 static func dummy() -> EnemyKind:
-	var kind := EnemyKind.make("dummy", "Dummy", FishCharacter.Family.OCTANE, 1.0, 100.0, 0.0, 0.0, 0.0,
+	var kind := EnemyKind.make("dummy", "Dummy", FishCharacter.FishClass.SKIRMISHER, 1.0, 100.0, 0.0, 0.0, 0.0,
 			EnemyKind.Behaviour.CHASE, 999.0, 0.0, Color(0.3, 0.42, 0.55))
 	kind.accel = 6.0
 	return kind

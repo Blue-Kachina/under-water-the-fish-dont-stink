@@ -35,7 +35,7 @@ func _run() -> void:
 	settings.enemy_damage_scale = 0.0
 	settings.chest_count = 0
 	settings.twists = true
-	fish.character = FishCharacter.Family.LIONFISH
+	fish.character = FishCharacter.FishClass.SCORCHER
 	main.set_mode(main.UNNATURAL)
 	await _ticks(3)
 	main._match_card.play_requested.emit()
@@ -44,31 +44,31 @@ func _run() -> void:
 	horde = run.horde
 
 	print("starting weapons:")
-	var expected := {FishCharacter.Family.LIONFISH: FishAttack.Kind.FIRE, FishCharacter.Family.MOON_JELLY: FishAttack.Kind.HALO,
-			FishCharacter.Family.MANTIS: FishAttack.Kind.CHARGES, FishCharacter.Family.WHALE_SHARK: FishAttack.Kind.REMORA}
-	for family: FishCharacter.Family in expected:
-		await _be(family)
-		var name: String = FishCharacter.CARS[family].fish
+	var expected := {FishCharacter.FishClass.SCORCHER: FishAttack.Kind.FIRE, FishCharacter.FishClass.DRIFTER: FishAttack.Kind.HALO,
+			FishCharacter.FishClass.BRAWLER: FishAttack.Kind.CHARGES, FishCharacter.FishClass.BREACHER: FishAttack.Kind.REMORA}
+	for fish_class: FishCharacter.FishClass in expected:
+		await _be(fish_class)
+		var name: String = FishCharacter.display_name(fish_class)
 		var loadout := run.loadout_of(fish)
-		check(run.attack_of(fish).kind == expected[family], "%s's own attack is its %s (a FishAttack)" % [name, FishAttack.title(expected[family])])
+		check(run.attack_of(fish).kind == expected[fish_class], "%s's own attack is its %s (a FishAttack)" % [name, FishAttack.title(expected[fish_class])])
 		check(loadout.weapons == [Weapons.ATTACK] and run.powerups_of(fish).list().is_empty(),
 				"%s starts with its attack alone (%s)" % [name, loadout.weapons])
 		check(loadout.weapons.size() < settings.weapon_slots, "%s has a free weapon slot" % name)
-		var model := FishModel.build(family)
+		var model := FishModel.build(fish_class)
 		check(model.tail != null and model.fin_left != null and model.fin_right != null and model.get_child_count() > 3, "%s has a model with swim pivots" % name)
 		model.free()
-		check(FishDetails.sections(family).size() == 5 and Traversal.title(family) != "" and (FishDetails.twist_text(family, settings) as String) != "", "%s has details and a twist" % name)
+		check(FishDetails.sections(fish_class).size() == 5 and Traversal.title(fish_class) != "" and (FishDetails.twist_text(fish_class, settings) as String) != "", "%s has details and a twist" % name)
 		var was := loadout.earned_level(Weapons.ATTACK)
 		run.take_card(fish, {"kind": "weapon", "weapon": Weapons.ATTACK, "gains": {}})
 		check(loadout.earned_level(Weapons.ATTACK) == was + 1 and run.attack_of(fish).level == was + 1, "its card upgrades the weapon")
-		var as_second := FishAttack.weapon_id_of(expected[family])
-		check(as_second in Weapons.card_pool(FishAttack.Kind.BITE) and as_second not in Weapons.card_pool(expected[family]),
+		var as_second := FishAttack.weapon_id_of(expected[fish_class])
+		check(as_second in Weapons.card_pool(FishAttack.Kind.BITE) and as_second not in Weapons.card_pool(expected[fish_class]),
 				"other fish can take it as a second weapon; it can't")
-	await _be(FishCharacter.Family.PLANK)
+	await _be(FishCharacter.FishClass.GLIDER)
 	check(run.loadout_of(fish).weapons == [Weapons.ATTACK] and run.attack_of(fish).kind == FishAttack.Kind.LASH, "another fish: its own attack")
 
 	print("passives and skills:")
-	await _be(FishCharacter.Family.LIONFISH)
+	await _be(FishCharacter.FishClass.SCORCHER)
 	var twist := run.twist_of(fish)
 	fish.linear_velocity = Vector3.ZERO
 	check(is_equal_approx(twist.damage_factor("greek_fire"), 1.0) and twist.damage_factor("bite") == 1.0, "Lionfish, Wake: no bonus at rest, none for other weapons")
@@ -82,7 +82,7 @@ func _run() -> void:
 	await _ticks(30)
 	check(run.stats_of(fish).by_source.get("flare", 0.0) > 0.0, "and burns what it passes")
 
-	await _be(FishCharacter.Family.MOON_JELLY)
+	await _be(FishCharacter.FishClass.DRIFTER)
 	var halo := run.attack_of(fish) as JellyfishHalo
 	check(halo.count() == settings_jellies() + settings.arms_extra, "Moon Jelly, Many Arms: %d jellies" % halo.count())
 	twist = run.twist_of(fish)
@@ -98,7 +98,7 @@ func _run() -> void:
 	run.hurt(fish, 5.0)
 	check(not run.is_quiet(fish), "a hit ends it")
 
-	await _be(FishCharacter.Family.MANTIS)
+	await _be(FishCharacter.FishClass.BRAWLER)
 	fish.freeze = false
 	var target := horde.spawn(1, Vector3(3, 0, 0))
 	await _ticks(4)
@@ -109,7 +109,7 @@ func _run() -> void:
 			"and shocks the zombie nearby")
 	check(not snap.mobility(), "then a cooldown")
 
-	await _be(FishCharacter.Family.WHALE_SHARK)
+	await _be(FishCharacter.FishClass.BREACHER)
 	fish.freeze = false
 	var gulped := horde.spawn(1, Vector3(0, 0, -6))
 	await _ticks(4)
@@ -133,9 +133,9 @@ func settings_jellies() -> int:
 	return PowerupSettings.shared().jelly_count
 
 
-func _be(family: FishCharacter.Family) -> void:
+func _be(fish_class: FishCharacter.FishClass) -> void:
 	horde.clear()
-	fish.character = family
+	fish.character = fish_class
 	run.twist_of(fish).reset()
 	fish.freeze = false
 	fish.revive(Transform3D(Basis.looking_at(Vector3.FORWARD), Vector3.ZERO))

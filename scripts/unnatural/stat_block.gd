@@ -35,16 +35,16 @@ const STATS := {
 }
 ## Each fish's signature stat (+1 step every level).
 const SIGNATURE := {
-	FishCharacter.Family.DOMINUS: "damage",
-	FishCharacter.Family.OCTANE: "size",
-	FishCharacter.Family.BREAKOUT: "projectile_speed",
-	FishCharacter.Family.HYBRID: "luck",
-	FishCharacter.Family.MERC: "armour",
-	FishCharacter.Family.PLANK: "attack_speed",
-	FishCharacter.Family.LIONFISH: "duration",
-	FishCharacter.Family.MOON_JELLY: "size",
-	FishCharacter.Family.MANTIS: "knockback",
-	FishCharacter.Family.WHALE_SHARK: "pearl_chance",
+	FishCharacter.FishClass.HUNTER: "damage",
+	FishCharacter.FishClass.SKIRMISHER: "size",
+	FishCharacter.FishClass.LANCER: "projectile_speed",
+	FishCharacter.FishClass.CHARMER: "luck",
+	FishCharacter.FishClass.BULWARK: "armour",
+	FishCharacter.FishClass.GLIDER: "attack_speed",
+	FishCharacter.FishClass.SCORCHER: "duration",
+	FishCharacter.FishClass.DRIFTER: "size",
+	FishCharacter.FishClass.BRAWLER: "knockback",
+	FishCharacter.FishClass.BREACHER: "pearl_chance",
 }
 
 var values := {}
@@ -106,8 +106,8 @@ static func pool(attack: FishAttack = null) -> Array[String]:
 	return ids
 
 
-static func signature(family: FishCharacter.Family) -> String:
-	return SIGNATURE.get(family, "damage")
+static func signature(fish_class: FishCharacter.FishClass) -> String:
+	return SIGNATURE.get(fish_class, "damage")
 
 
 static func _number(x: float) -> String:

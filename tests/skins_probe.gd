@@ -1,15 +1,15 @@
 extends Node
-## Every playable fish in every skin (FishCharacter.SKINS) builds a model the
+## Every playable fish in every species (FishCharacter.SPECIES) builds a model the
 ## game can use: the swim pivots, a Body, a team tint, a swim that runs, a tail
 ## that stays on its body as it wags (FishModel._bend_body), a triangle count
 ## fit to draw up close, and a school/horde bake (SchoolLook).
-##   Godot_console.exe --headless --path . res://tests/skins_probe.tscn
-## `-- --family=<key>` checks one family only.
+##   Godot_console.exe --headless --path . res://tests/species_probe.tscn
+## `-- --class=<key>` checks one class only.
 
 ## Most triangles a model may have (its parts all together).
 const MAX_TRIANGLES := 40000
-## Families that needn't bend into a tail (no tail stalk to bend).
-const NO_BEND := [FishCharacter.Family.MOON_JELLY, FishCharacter.Family.PLANK]
+## Classes that needn't bend into a tail (no tail stalk to bend).
+const NO_BEND := [FishCharacter.FishClass.DRIFTER, FishCharacter.FishClass.GLIDER]
 
 var failures := 0
 
@@ -23,23 +23,23 @@ func check(ok: bool, what: String) -> void:
 func _ready() -> void:
 	var only := ""
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--family="):
-			only = arg.trim_prefix("--family=")
-	for family: FishCharacter.Family in FishCharacter.SKINS:
-		if only != "" and FishCharacter.CARS[family].key != only:
+		if arg.begins_with("--class="):
+			only = arg.trim_prefix("--class=")
+	for fish_class: FishCharacter.FishClass in FishCharacter.SPECIES:
+		if only != "" and FishCharacter.CLASSES[fish_class].key != only:
 			continue
-		for skin in FishCharacter.skin_count(family):
-			_check_model(family, skin)
-	print("skins_probe: %s (%d failures)" % ["PASS" if failures == 0 else "FAIL", failures])
+		for species in FishCharacter.species_count(fish_class):
+			_check_model(fish_class, species)
+	print("species_probe: %s (%d failures)" % ["PASS" if failures == 0 else "FAIL", failures])
 	get_tree().quit(1 if failures > 0 else 0)
 
 
-func _check_model(family: FishCharacter.Family, skin: int) -> void:
-	var name := "%s / %s" % [FishCharacter.display_name(family), FishCharacter.skin_name(family, skin)]
+func _check_model(fish_class: FishCharacter.FishClass, species: int) -> void:
+	var name := "%s / %s" % [FishCharacter.display_name(fish_class), FishCharacter.species_name(fish_class, species)]
 	print(name + ":")
-	var model := FishModel.build(family, skin)
+	var model := FishModel.build(fish_class, species)
 	add_child(model)
-	check(model.skin == skin, "wears skin %d" % skin)
+	check(model.species == species, "wears species %d" % species)
 	check(model.tail != null and model.fin_left != null and model.fin_right != null, "has its swim pivots")
 	check(model.find_child("Body", true, false) is GeometryInstance3D, "has a Body")
 	var triangles := _triangles(model)
@@ -51,7 +51,7 @@ func _check_model(family: FishCharacter.Family, skin: int) -> void:
 	for i in 30:
 		model.tail.rotation = Vector3(0.0, 0.8 * sin(i * 0.3), 0.0)
 		model.react(1.0 / 60.0, Vector3(0.0, 0.0, -15.0))
-	if not family in NO_BEND:
+	if not fish_class in NO_BEND:
 		check(model._bend_span.y > model._bend_span.x, "bends into its tail")
 	if model._bend_span.y > model._bend_span.x:
 		model.tail.rotation = Vector3(0.0, 0.8, 0.0)

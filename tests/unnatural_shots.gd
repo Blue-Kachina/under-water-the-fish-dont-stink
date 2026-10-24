@@ -36,7 +36,7 @@ func _run() -> void:
 	await _frames(10)
 	var run: UnnaturalRun = main.unnatural_run
 	var horde := run.horde
-	fish.character = FishCharacter.Family.DOMINUS
+	fish.character = FishCharacter.FishClass.HUNTER
 	run.start()
 	await _frames(20)
 	await _shot("arena")

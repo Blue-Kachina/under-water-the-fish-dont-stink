@@ -1,7 +1,7 @@
 class_name WhaleSharkModel
 extends RefCounted
-## The baby whale shark (FishModel.build hands it here): skin m.skin of
-## FishCharacter.SKINS[FishCharacter.Family.WHALE_SHARK].
+## The Breachers' baby whale shark (FishModel.build hands it here): species m.species of
+## FishCharacter.SPECIES[FishCharacter.FishClass.BREACHER].
 ##
 ## One smooth lofted body (_body_mesh): superelliptic slices, wide and low at
 ## the front for a whale shark's flat head (a basking shark's conical snout),
@@ -18,7 +18,7 @@ const ROWS := 100
 const HALF := 52
 const AROUND := HALF * 2
 
-## Shared by the whale shark skins: a broad flat head with a blunt front, the
+## Shared by the whale shark species: a broad flat head with a blunt front, the
 ## back highest over the first dorsal fin, a flat belly. Tables run nose 0 to
 ## tail 1 (FishModel._sample): half width (of the widest), and the top and
 ## bottom (of half the hitbox's height).
@@ -39,7 +39,7 @@ const WHALE_SHAPE := {
 	"tail_len": 1.15, "tail_angles": [1.0, 0.72, 0.12, -0.45, -0.72], "tail_lengths": [1.0, 0.68, 0.22, 0.42, 0.55],
 }
 
-## Each skin (FishCharacter.SKINS order): its colours and pattern, and any
+## Each species (FishCharacter.SPECIES order): its colours and pattern, and any
 ## shape it changes from WHALE_SHAPE.
 const LOOKS := [
 	{  # Whale shark, Indo-Pacific classic
@@ -88,7 +88,7 @@ const LOOKS := [
 
 
 static func build(m: FishModel) -> void:
-	var look := _look(m.skin)
+	var look := _look(m.species)
 	var w := m._size.x
 	var h := m._size.y
 	var l := m._size.z

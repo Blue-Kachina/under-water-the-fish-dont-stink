@@ -54,7 +54,7 @@ func _run() -> void:
 	add_child(main)
 	fish = main.get_node("Fish")
 	await _ticks(3)
-	fish.character = FishCharacter.Family.DOMINUS
+	fish.character = FishCharacter.FishClass.HUNTER
 	main.set_mode(main.TEST_TANK)
 	await _ticks(3)
 	main.play_match()

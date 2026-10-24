@@ -52,7 +52,7 @@ var run: NatureRun
 ## The Unnatural run in the session (instead of `run`), and its messages.
 var urun: UnnaturalRun
 var unnatural_net := UnnaturalNet.new()
-## pid -> {"pid", "peer", "name", "character", "skin" (its key), "index"}.
+## pid -> {"pid", "peer", "name", "character", "species" (its key), "index"}.
 var roster := {}
 ## The last status line (for the menu).
 var status := "Offline"
@@ -313,8 +313,8 @@ func _unhook() -> void:
 
 # --- Players ---------------------------------------------------------------
 
-## Our machine's players, as sent: [{"pid", "name", "character", "skin"}]
-## ("skin": the skin's key, FishCharacter.SKINS).
+## Our machine's players, as sent: [{"pid", "name", "character", "species"}]
+## ("species": the species' key, FishCharacter.SPECIES).
 func _local_players() -> Array:
 	if main == null:
 		return []
@@ -327,14 +327,14 @@ func _local_players() -> Array:
 ## How `fish` (player `pid`) is sent in the roster.
 static func player_entry(pid: int, fish: FishController) -> Dictionary:
 	return {"pid": pid, "name": fish.display_name, "character": int(fish.character),
-			"skin": FishCharacter.skin_key(fish.character, fish.skin)}
+			"species": FishCharacter.species_key(fish.character, fish.species)}
 
 
-## The skin a roster entry's fish wears (its first if the entry has none: an
+## The species a roster entry's fish wears (its first if the entry has none: an
 ## older build's).
-static func entry_skin(entry: Dictionary) -> int:
-	var family: FishCharacter.Family = int(entry.get("character", 0)) as FishCharacter.Family
-	return FishCharacter.skin_from_key(family, str(entry.get("skin", "")))
+static func entry_species(entry: Dictionary) -> int:
+	var fish_class: FishCharacter.FishClass = int(entry.get("character", 0)) as FishCharacter.FishClass
+	return FishCharacter.species_from_key(fish_class, str(entry.get("species", "")))
 
 
 static func _pid(peer: int, uid: int) -> int:
@@ -369,7 +369,7 @@ func _add_to_roster(entry: Dictionary, peer: int) -> void:
 	if not roster.has(pid):
 		_next_index += 1
 	roster[pid] = {"pid": pid, "peer": peer, "name": entry.name, "character": entry.character,
-			"skin": str(entry.get("skin", "")), "index": index}
+			"species": str(entry.get("species", "")), "index": index}
 
 
 ## Our players changed (one joined or left the split screen, or picked another fish).
@@ -413,7 +413,7 @@ func _sync_puppets() -> void:
 			net.fish = FISH_SCENE.instantiate()
 			net.fish.name = "Remote%d" % pid
 			_remote[pid] = net
-			net.fish.set_look(entry.character, entry_skin(entry))
+			net.fish.set_look(entry.character, entry_species(entry))
 			net.fish.display_name = entry.name
 			var game := _game_run()
 			(game if game else main).add_child(net.fish)
@@ -421,9 +421,9 @@ func _sync_puppets() -> void:
 			net.fish.visible = false  # until its first snapshot
 			if game:
 				game.add_player(net.fish)
-		var skin := entry_skin(entry)
-		if net.fish.character != entry.character or net.fish.skin != skin:
-			net.fish.set_look(entry.character, skin)
+		var species := entry_species(entry)
+		if net.fish.character != entry.character or net.fish.species != species:
+			net.fish.set_look(entry.character, species)
 		net.fish.display_name = entry.name
 		net.fish.set_meta("coop_index", entry.index)
 

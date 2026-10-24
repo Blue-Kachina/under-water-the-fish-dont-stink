@@ -1,6 +1,6 @@
 # Inventory — Unnatural
 
-Every playable fish, weapon, tome, powerup and bonus in Unnatural (the survivors mode), with their stats.
+Every playable class, weapon, tome, powerup and bonus in Unnatural (the survivors mode), with their stats.
 
 - **Last synced with code:** 2026-10-24
 - **Values are defaults.** Almost every number here is a tuning-panel setting (`UnnaturalSettings`, `PowerupSettings`), so a preset can change it. If this file and the code disagree, the code is right; fix this file.
@@ -8,15 +8,15 @@ Every playable fish, weapon, tome, powerup and bonus in Unnatural (the survivors
 
 | What | File |
 |---|---|
-| Fish (families, hitbox car, skins) | `scripts/fish_character.gd` (`CARS`, `SKINS`) |
-| Fish details text (twists, skills) | `scripts/unnatural/fish_details.gd` |
-| Weapons (every one a `FishAttack`) | `scripts/unnatural/attacks/*.gd`, `fish_attack.gd` (`FOR_FAMILY`, `INFO`) |
+| Classes (role names, RL hitbox, species) | `scripts/fish_character.gd` (`CLASSES`, `SPECIES`) |
+| Class details text (twists, skills) | `scripts/unnatural/fish_details.gd` |
+| Weapons (every one a `FishAttack`) | `scripts/unnatural/attacks/*.gd`, `fish_attack.gd` (`FOR_CLASS`, `INFO`) |
 | Weapons (facets, milestones) | `scripts/unnatural/weapons.gd` |
 | Tomes | `scripts/unnatural/tomes.gd` |
 | Stats (steps, signature stats) | `scripts/unnatural/stat_block.gd` |
 | Powerups (name, rarity, blurb) | `scripts/unnatural/powerups/powerup.gd` (`INFO`) |
 | Powerup numbers | `scripts/unnatural/powerups/powerup_settings.gd` |
-| Run / fish / attack / rarity numbers | `scripts/unnatural/unnatural_settings.gd` |
+| Run / class / attack / rarity numbers | `scripts/unnatural/unnatural_settings.gd` |
 | Rarity | `scripts/unnatural/rarity.gd` |
 
 ---
@@ -64,7 +64,7 @@ Each card rolls its own rarity. Weight = base × (1 + luck × 1.0)^tier, so Luck
 
 **Weapon facet steps:** "pct" and "add" facets gain step × size. "count" facets gain max(round(step × size), 1).
 
-### Player base (every fish is the same here)
+### Player base (every class is the same here)
 
 | Stat | Value |
 |---|---|
@@ -106,26 +106,27 @@ Every stat starts at 0 and is a bonus. Percent stats are shares (0.1 = +10%); th
 
 ---
 
-## 3. Playable fish
+## 3. Playable classes
 
-Every fish has the same base stats. They differ in their starting weapon, their **signature stat** (+1 step every level, free), a passive **twist**, and a **mobility skill** on the boost button (RB / Shift).
+A **class** is a group of fish that play the same way; its **species** change only the look. Every class has the same base stats. They differ in their starting weapon, their **signature stat** (+1 step every level, free), a passive **twist**, and a **mobility skill** on the boost button (RB / Shift).
 
-| Fish | Family (hitbox) | Starting weapon | Signature stat (per level) | Passive twist | Mobility skill |
+| Class (enum, RL hitbox) | Species | Starting weapon | Signature stat (per level) | Passive twist | Mobility skill |
 |---|---|---|---|---|---|
-| **Clownfish** | OCTANE (Octane) | Anemone Sting | Size +10% | **Nimble:** turns 1.4× as sharply (+40%) | **Wriggle:** 16 m/s burst sideways (where the stick leans, else backwards), 0.3 s untouchable. Cooldown 2.0 s |
-| **Shark** | DOMINUS (Dominus) | Ghost Bite | Damage +10% | **Frenzy:** +4% swim speed per kill (max +50%), held 3 s after the last kill, then fades | **Fin Dash:** charges at 45 m/s for 0.45 s, untouchable, batters everything in the way; 90 dmg to each zombie within 3 m. Cooldown 3.0 s |
-| **String Ray** | PLANK (Plank) | Shock Lash | Attack Speed +8% | **Glide:** keeps only 30% of the drag when coasting | **Surge:** a 22 m/s stroke forward, no drag for 1.5 s. Cooldown 4.0 s |
-| **Swordfish** | BREAKOUT (Breakout) | Bill Thrust | Projectile Speed +10% | **Streamlined:** swims +10% faster | **Dash:** a 14 m/s burst along its nose, 0.3 s untouchable. Cooldown 2.5 s |
-| **Butterfly Koi** | HYBRID (Hybrid) | Bubble Volley | Luck +0.1 | **Graceful:** +0.5 s of i-frames after every hit (1.2 s total) | **Leap:** leaps up at 12 m/s; at the top it splashes down for 30 dmg within 7 m. Cooldown 2.5 s |
-| **Boxfish** | MERC (Merc) | Spine Burst | Armour +1 | **Armoured:** takes 70% of damage, swims at 88% speed | **Brace:** for 2.5 s takes 25% of damage, swims at 70% speed. Cooldown 8.0 s |
-| **Lionfish** | LIONFISH (Octane's box) | Greek Fire Trail | Duration +10% | **Wake:** Greek Fire burns up to +60% harder the nearer it swims to battering speed | **Flare Dash:** dashes at 30 m/s for 0.35 s; 60 dmg to everything within 4 m on the way. Cooldown 3.5 s |
-| **Moon Jelly** | MOON_JELLY (Hybrid's box) | Jellyfish Halo | Size +10% | **Many Arms:** +1 jelly in its Halo | **Go Quiet:** switches its stink off for up to 8 s: nothing fires and zombies lose track of it. Being hurt ends it, or press again to end it early. Cooldown 6.0 s |
-| **Mantis Shrimp** | MANTIS (Dominus's box) | Depth Charges | Knockback +15% | **Hammer:** the Snap's shockwave hits for 70 dmg within 6 m | **Snap:** lunges at 18 m/s and cracks a shockwave (see Hammer). Cooldown 2.0 s |
-| **Baby Whale Shark** | WHALE_SHARK (Plank's box) | Remora Buddy | Pearl Chance +15% | **Escort:** heals 4 HP/s while holding still (under 3 m/s) | **Gulp:** pulls in every zombie in a 14 m cone ahead (25 m/s) and hits each for 25. Cooldown 5.0 s |
+| **Skirmishers** (SKIRMISHER, Octane) | Clownfish: Ocellaris, Black Percula, Tomato, Gold-stripe Maroon | Anemone Sting | Size +10% | **Nimble:** turns 1.4× as sharply (+40%) | **Wriggle:** 16 m/s burst sideways (where the stick leans, else backwards), 0.3 s untouchable. Cooldown 2.0 s |
+| **Hunters** (HUNTER, Dominus) | Sharks: Great White, Shortfin Mako, Blacktip Reef, Tiger, Hammerhead | Ghost Bite | Damage +10% | **Frenzy:** +4% swim speed per kill (max +50%), held 3 s after the last kill, then fades | **Fin Dash:** charges at 45 m/s for 0.45 s, untouchable, batters everything in the way; 90 dmg to each zombie within 3 m. Cooldown 3.0 s |
+| **Gliders** (GLIDER, Plank) | Rays: Manta, Spotted Eagle Ray, Southern Stingray, Blue-spotted Ribbontail | Shock Lash | Attack Speed +8% | **Glide:** keeps only 30% of the drag when coasting | **Surge:** a 22 m/s stroke forward, no drag for 1.5 s. Cooldown 4.0 s |
+| **Lancers** (LANCER, Breakout) | Billfish: Broadbill Swordfish, Blue Marlin, Sailfish, Striped Marlin | Bill Thrust | Projectile Speed +10% | **Streamlined:** swims +10% faster | **Dash:** a 14 m/s burst along its nose, 0.3 s untouchable. Cooldown 2.5 s |
+| **Charmers** (CHARMER, Hybrid) | Butterfly koi: Kohaku, Showa, Yamabuki Ogon, Asagi | Bubble Volley | Luck +0.1 | **Graceful:** +0.5 s of i-frames after every hit (1.2 s total) | **Leap:** leaps up at 12 m/s; at the top it splashes down for 30 dmg within 7 m. Cooldown 2.5 s |
+| **Bulwarks** (BULWARK, Merc) | Boxfish: Yellow Boxfish, Longhorn Cowfish, Spotted Boxfish, Scrawled Cowfish | Spine Burst | Armour +1 | **Armoured:** takes 70% of damage, swims at 88% speed | **Brace:** for 2.5 s takes 25% of damage, swims at 70% speed. Cooldown 8.0 s |
+| **Scorchers** (SCORCHER, Octane) | Lionfish: Red, Clearfin, Fuzzy Dwarf, Spotfin | Greek Fire Trail | Duration +10% | **Wake:** Greek Fire burns up to +60% harder the nearer it swims to battering speed | **Flare Dash:** dashes at 30 m/s for 0.35 s; 60 dmg to everything within 4 m on the way. Cooldown 3.5 s |
+| **Drifters** (DRIFTER, Hybrid) | Jellies: Moon Jelly, Pacific Sea Nettle, Lion's Mane, Purple-striped Jelly | Jellyfish Halo | Size +10% | **Many Arms:** +1 jelly in its Halo | **Go Quiet:** switches its stink off for up to 8 s: nothing fires and zombies lose track of it. Being hurt ends it, or press again to end it early. Cooldown 6.0 s |
+| **Brawlers** (BRAWLER, Dominus) | Mantis shrimp: Peacock, Zebra, Purple-spot, Pink-eared | Depth Charges | Knockback +15% | **Hammer:** the Snap's shockwave hits for 70 dmg within 6 m | **Snap:** lunges at 18 m/s and cracks a shockwave (see Hammer). Cooldown 2.0 s |
+| **Breachers** (BREACHER, Plank) | Baby whale sharks: Whale Shark, Deep Charcoal, Juvenile, Basking Shark | Remora Buddy | Pearl Chance +15% | **Escort:** heals 4 HP/s while holding still (under 3 m/s) | **Gulp:** pulls in every zombie in a 14 m cone ahead (25 m/s) and hits each for 25. Cooldown 5.0 s |
 
-- Every fish starts with its own weapon (a `FishAttack`, `FishAttack.FOR_FAMILY`) in slot 1, as the `attack` weapon.
-- Skins: each family has several real species or colour morphs (`FishCharacter.SKINS`). They change only the look, never stats.
-- The twist switch is `UnnaturalSettings.twists`. Off, every fish swims the same.
+- Every class starts with its own weapon (a `FishAttack`, `FishAttack.FOR_CLASS`) in slot 1, as the `attack` weapon.
+- Species: each class has several real species or colour morphs (`FishCharacter.SPECIES`). They change only the look, never stats.
+- The RL hitbox is the Rocket League box the class uses (RL replays name it; later classes share one of the first six). Saves and clips from before classes still load: the old keys (`octane`, `mantis`, `whale_shark`...) are aliases.
+- The twist switch is `UnnaturalSettings.twists`. Off, every class swims the same.
 
 ---
 
@@ -133,7 +134,7 @@ Every fish has the same base stats. They differ in their starting weapon, their 
 
 Weapons level up from level-up cards (they never come from chests) and go up to Lv 20. Each card raises one or more **facets**, chosen at random (how many depends on rarity, see §1). The steps below are what one common step adds. A fish's starting weapon takes one of its 2 slots.
 
-**Every weapon is a `FishAttack`, and every weapon can be any fish's second weapon.** A fish's own is the `attack` weapon. Held as a second weapon (an `AttackWeapon`), its id is `attack_` + its hit source (`attack_bite`, `attack_greek_fire`...). Level-up cards offer all of §4a and §4b (`Weapons.card_pool`), except the weapon the fish already holds. Leviathan's Coil is boss-only and never appears on a card.
+**Every weapon is a `FishAttack`, and every weapon can be any class's second weapon.** A class's own is the `attack` weapon. Held as a second weapon (an `AttackWeapon`), its id is `attack_` + its hit source (`attack_bite`, `attack_greek_fire`...). Level-up cards offer all of §4a and §4b (`Weapons.card_pool`), except the weapon the fish already holds. Leviathan's Coil is boss-only and never appears on a card.
 
 The split below is about how a weapon works, not who can get it. **Fired** weapons (4a) go off on a cooldown and share one set of facets. **Steady** weapons (4b) work all the time on their own timers, and each has its own facets.
 
@@ -141,14 +142,14 @@ The split below is about how a weapon works, not who can get it. **Fired** weapo
 
 Shared facet steps (`PowerupSettings`): Damage +20%, Rate +12%, Size +12%, Knockback +30%, Count +1, Speed +15%.
 
-| Weapon (second-weapon id) | Fish | Base damage | Cooldown | Proc | Base numbers | Facets |
+| Weapon (second-weapon id) | Class | Base damage | Cooldown | Proc | Base numbers | Facets |
 |---|---|---|---|---|---|---|
-| **Anemone Sting** (`attack_sting`) | Clownfish | 9 | 0.9 s | 0.6 | A pulse 6.5 m round the fish (always at least 1.4× the bow wave's reach). Hits everything inside. Only fires when a zombie is close. | Damage, Attack rate, Pulse size, Knockback |
-| **Ghost Bite** (`attack_bite`) | Shark | 26 | 0.9 s | 1.0 | Jaws 8 m long, 4.5 m half-width (always at least 1.6× the bow wave). Aims at the nearest zombie within 110° of the nose. | Damage, Bite rate, Jaw size, Knockback |
-| **Shock Lash** (`attack_lash`) | String Ray | 47 | 0.8 s | 1.0 | Whips the nearest zombie within 14 m. It arcs on to 1 more (+1 per Quantity) within 8 m of the last, each arc doing 70%. | Damage, Lash rate, Lash reach, Arcs (count) |
-| **Bill Thrust** (`attack_thrust`) | Swordfish | 34 | 1.0 s | 1.0 | A spear at 45 m/s that flies 40 m with a 0.7 m hit radius and pierces 6. Aims within 60° of the nose. Extra spears fan 8° apart. | Damage, Thrust rate, Spears (count), Spear speed |
-| **Bubble Volley** (`attack_bubbles`) | Butterfly Koi | 9 per pop | 1.2 s | 0.6 | 4 homing bubbles (+Quantity) at 18 m/s, turn rate 6/s, 2.5 s life, 30 m range. Each pops on its first touch with a 2 m splash. | Damage, Volley rate, Bubbles (count), Bubble speed |
-| **Spine Burst** (`attack_spines`) | Boxfish | 32 | 1.4 s | 0.4 | 18 spines all round (+4 per Quantity) when a zombie is within 12 m. 30 m/s, pierce 2. | Damage, Burst rate, Spine rings (count), Spine range |
+| **Anemone Sting** (`attack_sting`) | Skirmishers | 9 | 0.9 s | 0.6 | A pulse 6.5 m round the fish (always at least 1.4× the bow wave's reach). Hits everything inside. Only fires when a zombie is close. | Damage, Attack rate, Pulse size, Knockback |
+| **Ghost Bite** (`attack_bite`) | Hunters | 26 | 0.9 s | 1.0 | Jaws 8 m long, 4.5 m half-width (always at least 1.6× the bow wave). Aims at the nearest zombie within 110° of the nose. | Damage, Bite rate, Jaw size, Knockback |
+| **Shock Lash** (`attack_lash`) | Gliders | 47 | 0.8 s | 1.0 | Whips the nearest zombie within 14 m. It arcs on to 1 more (+1 per Quantity) within 8 m of the last, each arc doing 70%. | Damage, Lash rate, Lash reach, Arcs (count) |
+| **Bill Thrust** (`attack_thrust`) | Lancers | 34 | 1.0 s | 1.0 | A spear at 45 m/s that flies 40 m with a 0.7 m hit radius and pierces 6. Aims within 60° of the nose. Extra spears fan 8° apart. | Damage, Thrust rate, Spears (count), Spear speed |
+| **Bubble Volley** (`attack_bubbles`) | Charmers | 9 per pop | 1.2 s | 0.6 | 4 homing bubbles (+Quantity) at 18 m/s, turn rate 6/s, 2.5 s life, 30 m range. Each pops on its first touch with a 2 m splash. | Damage, Volley rate, Bubbles (count), Bubble speed |
+| **Spine Burst** (`attack_spines`) | Bulwarks | 32 | 1.4 s | 0.4 | 18 spines all round (+4 per Quantity) when a zombie is within 12 m. 30 m/s, pierce 2. | Damage, Burst rate, Spine rings (count), Spine range |
 
 **Milestones (Lv 5 / 10 / 15 / 20):**
 
@@ -163,12 +164,12 @@ Shared facet steps (`PowerupSettings`): Damage +20%, Rate +12%, Size +12%, Knock
 
 ### 4b. Steady weapons
 
-| Weapon (second-weapon id) | Fish | Base numbers | Proc | Facets (common step) |
+| Weapon (second-weapon id) | Class | Base numbers | Proc | Facets (common step) |
 |---|---|---|---|---|
-| **Greek Fire Trail** (`attack_greek_fire`) | Lionfish | Drops a burning patch every 1.6 m swum. Each patch is 1.6 m in radius, lasts 2.0 s (× Duration) and burns for 40 dmg/s. At most 60 patches out. | 0 | Burn damage +25%, Patch life +0.4 s, Patch size +10%, Denser trail +12%, Max patches +5 |
-| **Jellyfish Halo** (`attack_jellyfish_halo`) | Moon Jelly | 2 jellies orbit 3.2 m out at 0.5 turns/s. Each stings for 35 every 0.25 s on touch (1.2 m radius). | 0.1 | Jellies +1, Sting damage +25%, Orbit size +12%, Orbit speed +15%, Sting rate +15% |
-| **Depth Charges** (`attack_depth_charges`) | Mantis Shrimp | Every 3 s it drops 1 mine (+1 per Mines per drop, +1 per Quantity). Each is lobbed over 0.35 s at one of the zombies nearest the tail within 6 m (× Size), else fanned out behind. A mine arms after 0.5 s and blows when a zombie comes within 3 m (× Size), or after 10 s × Duration: 24 dmg in a 5 m blast. Attack Speed counts 2× toward its drop rate. At most 30 mines out (the oldest go). | 0.5 | Blast damage +20%, Blast size +15%, Drop rate +20%, Mines per drop +1, Arming speed +30% |
-| **Remora Buddy** (`attack_remora_buddy`) | Baby Whale Shark | 1 remora nips the nearest zombie within 7 m every 1.5 s for 55. | 0.5 | Remoras +1, Bite damage +25%, Bite rate +15%, Reach +15% |
+| **Greek Fire Trail** (`attack_greek_fire`) | Scorchers | Drops a burning patch every 1.6 m swum. Each patch is 1.6 m in radius, lasts 2.0 s (× Duration) and burns for 40 dmg/s. At most 60 patches out. | 0 | Burn damage +25%, Patch life +0.4 s, Patch size +10%, Denser trail +12%, Max patches +5 |
+| **Jellyfish Halo** (`attack_jellyfish_halo`) | Drifters | 2 jellies orbit 3.2 m out at 0.5 turns/s. Each stings for 35 every 0.25 s on touch (1.2 m radius). | 0.1 | Jellies +1, Sting damage +25%, Orbit size +12%, Orbit speed +15%, Sting rate +15% |
+| **Depth Charges** (`attack_depth_charges`) | Brawlers | Every 3 s it drops 1 mine (+1 per Mines per drop, +1 per Quantity). Each is lobbed over 0.35 s at one of the zombies nearest the tail within 6 m (× Size), else fanned out behind. A mine arms after 0.5 s and blows when a zombie comes within 3 m (× Size), or after 10 s × Duration: 24 dmg in a 5 m blast. Attack Speed counts 2× toward its drop rate. At most 30 mines out (the oldest go). | 0.5 | Blast damage +20%, Blast size +15%, Drop rate +20%, Mines per drop +1, Arming speed +30% |
+| **Remora Buddy** (`attack_remora_buddy`) | Breachers | 1 remora nips the nearest zombie within 7 m every 1.5 s for 55. | 0.5 | Remoras +1, Bite damage +25%, Bite rate +15%, Reach +15% |
 | **Leviathan's Coil** (`attack_leviathans_coil`) | — (boss only, from the Blood Leviathan; `coil_arrive_level` 5) | 6 coils trail the fish 1.4 m apart. Each hurts what it touches (0.9 m radius) for 55 every 0.25 s. | 0.15 | Coils +3, Coil damage +25%, Coil size +15%, Hit rate +15% |
 
 **Milestones (Lv 5 / 10 / 15 / 20):**

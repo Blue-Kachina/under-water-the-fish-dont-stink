@@ -92,7 +92,7 @@ func _run() -> void:
 	print("burst:")
 	var loose := School.new()
 	run.add_child(loose)
-	loose.setup(settings, fish.global_position + Vector3(0, 40, 0), Vector3.FORWARD, FishCharacter.Family.OCTANE)
+	loose.setup(settings, fish.global_position + Vector3(0, 40, 0), Vector3.FORWARD, FishCharacter.FishClass.SKIRMISHER)
 	await _ticks(120)
 	var middle := 0
 	var best := INF

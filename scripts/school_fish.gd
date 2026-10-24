@@ -17,7 +17,7 @@ var model: FishModel
 var _size := 1.0
 
 
-func _init(character: FishCharacter.Family) -> void:
+func _init(character: FishCharacter.FishClass) -> void:
 	model = FishModel.build(character)
 	add_child(model)
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF  # placed every frame

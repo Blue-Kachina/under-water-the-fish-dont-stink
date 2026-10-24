@@ -1,7 +1,7 @@
 class_name SharkModel
 extends RefCounted
-## Dominus's shark (FishModel.build hands it here): skin m.skin of
-## FishCharacter.SKINS[FishCharacter.Family.DOMINUS]. One smooth body lofted
+## The Hunters' shark (FishModel.build hands it here): species m.species of
+## FishCharacter.SPECIES[FishCharacter.FishClass.HUNTER]. One smooth body lofted
 ## from its snout to its tail stalk (_body_mesh: slices whose width, height,
 ## squareness and keels the species sets; a hammerhead's flat wide head is part
 ## of it), painted by shark_skin.gdshader; solid stiff fins with an airfoil's
@@ -18,7 +18,7 @@ const FIN_CAUDAL := 2.0
 const FIN_SMALL := 3.0
 const FIN_LOWER := 4.0
 
-## Each skin's species. Body: `semi` its widest half width (of the hitbox's
+## Each species' look. Body: `semi` its widest half width (of the hitbox's
 ## width) and half height (of its height); `widest` where along it (nose 0 to
 ## tail stalk 1), `nose` the snout (toward 0.35 blunt, 1 a needle), `snout_flat`
 ## how flat the head is, `snout_lift` how high the snout sits (so the mouth is
@@ -100,7 +100,7 @@ const HAMMER_END := 0.23
 
 
 static func build(m: FishModel) -> void:
-	var sp: Dictionary = SPECIES[clampi(m.skin, 0, SPECIES.size() - 1)]
+	var sp: Dictionary = SPECIES[clampi(m.species, 0, SPECIES.size() - 1)]
 	var w := m._size.x
 	var h := m._size.y
 	var l := m._size.z

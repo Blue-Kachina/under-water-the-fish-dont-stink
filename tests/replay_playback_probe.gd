@@ -108,9 +108,9 @@ func _check_playing() -> void:
 	var expected: Vector3 = s.position + Basis(s.rotation) * replay.data.players[0].hitbox_offset
 	check(car.global_position.is_equal_approx(expected), "ghost sits at its hitbox centre: %s" % car.global_position)
 	check((car.get_node("Visual") as FishModel).body_color() == AquariumArena.TEAM_COLORS[0], "team 0's ghost wears its team colour")
-	var family := FishCharacter.from_key(replay.data.players[0].hitbox_family)
-	check(car.get_node("Visual").scale.is_equal_approx(replay.data.players[0].hitbox_size / FishCharacter.hitbox_size(family)), "ghost sized to its hitbox")
-	check(replay.cars[1].get_node("Visual").family == FishCharacter.from_key(replay.data.players[1].hitbox_family),
+	var fish_class := FishCharacter.from_key(replay.data.players[0].hitbox_family)
+	check(car.get_node("Visual").scale.is_equal_approx(replay.data.players[0].hitbox_size / FishCharacter.hitbox_size(fish_class)), "ghost sized to its hitbox")
+	check(replay.cars[1].get_node("Visual").fish_class == FishCharacter.from_key(replay.data.players[1].hitbox_family),
 			"each ghost is its car's fish (%s, %s)" % [replay.data.players[0].hitbox_family, replay.data.players[1].hitbox_family])
 
 

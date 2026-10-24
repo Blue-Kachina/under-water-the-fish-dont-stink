@@ -40,7 +40,7 @@ func _run() -> void:
 	settings.enemy_damage_scale = 0.0
 	settings.chest_count = 0
 	settings.twists = false
-	fish.character = FishCharacter.Family.PLANK
+	fish.character = FishCharacter.FishClass.GLIDER
 	main.set_mode(main.UNNATURAL)
 	await _ticks(3)
 	main._match_card.play_requested.emit()
@@ -50,13 +50,13 @@ func _run() -> void:
 
 	print("each fish its own:")
 	check(run.attack_of(fish) is ShockLash, "the String Ray lashes")
-	var expected := {FishCharacter.Family.OCTANE: AnemoneSting, FishCharacter.Family.DOMINUS: GhostBite,
-			FishCharacter.Family.BREAKOUT: BillThrust, FishCharacter.Family.HYBRID: BubbleVolley, FishCharacter.Family.MERC: SpineBurst,
-			FishCharacter.Family.LIONFISH: GreekFire, FishCharacter.Family.MOON_JELLY: JellyfishHalo, FishCharacter.Family.MANTIS: DepthCharges,
-			FishCharacter.Family.WHALE_SHARK: RemoraBuddy}
-	for family: FishCharacter.Family in expected:
-		var made := FishAttack.make(FishAttack.kind_for(family))
-		check(made.get_script() == expected[family], "%s: %s" % [FishCharacter.CARS[family].fish, FishAttack.title(made.kind)])
+	var expected := {FishCharacter.FishClass.SKIRMISHER: AnemoneSting, FishCharacter.FishClass.HUNTER: GhostBite,
+			FishCharacter.FishClass.LANCER: BillThrust, FishCharacter.FishClass.CHARMER: BubbleVolley, FishCharacter.FishClass.BULWARK: SpineBurst,
+			FishCharacter.FishClass.SCORCHER: GreekFire, FishCharacter.FishClass.DRIFTER: JellyfishHalo, FishCharacter.FishClass.BRAWLER: DepthCharges,
+			FishCharacter.FishClass.BREACHER: RemoraBuddy}
+	for fish_class: FishCharacter.FishClass in expected:
+		var made := FishAttack.make(FishAttack.kind_for(fish_class))
+		check(made.get_script() == expected[fish_class], "%s: %s" % [FishCharacter.display_name(fish_class), FishAttack.title(made.kind)])
 		made.free()
 	settings.fish_attack = FishAttack.Kind.SPINES
 	await _ticks(2)
@@ -135,24 +135,24 @@ func _run() -> void:
 	settings.thrust_damage = 0.0
 	settings.bubble_damage = 0.0
 	settings.spine_damage = 0.0
-	await _be(FishCharacter.Family.OCTANE)
+	await _be(FishCharacter.FishClass.SKIRMISHER)
 	check(is_equal_approx(fish.turn_scale, settings.nimble_turn), "Clownfish, Nimble: turns x%.2f" % fish.turn_scale)
-	await _be(FishCharacter.Family.PLANK)
+	await _be(FishCharacter.FishClass.GLIDER)
 	check(is_equal_approx(fish.drag_scale, settings.glide_drag) and is_equal_approx(fish.turn_scale, 1.0), "String Ray, Glide: drag x%.2f" % fish.drag_scale)
-	await _be(FishCharacter.Family.DOMINUS)
+	await _be(FishCharacter.FishClass.HUNTER)
 	var twist := run.twist_of(fish)
 	for n in 3:
 		twist.on_kill()
 	await _ticks(2)
 	check(absf(fish.speed_scale - (1.0 + 3.0 * settings.frenzy_per_kill)) < 0.01 and is_equal_approx(fish.drag_scale, 1.0),
 			"Shark, Frenzy: 3 kills, swim x%.2f" % fish.speed_scale)
-	await _be(FishCharacter.Family.MERC)
+	await _be(FishCharacter.FishClass.BULWARK)
 	var taken: float = run.stats_of(fish).taken
 	run.hurt(fish, 20.0)
 	check(is_equal_approx(run.stats_of(fish).taken - taken, 20.0 * settings.armour_taken) and is_equal_approx(fish.speed_scale, settings.armour_speed),
 			"Boxfish, Armoured: took %.0f of 20, swims x%.2f" % [run.stats_of(fish).taken - taken, fish.speed_scale])
 
-	await _be(FishCharacter.Family.BREAKOUT)
+	await _be(FishCharacter.FishClass.LANCER)
 	fish.freeze = false
 	run.health_of(fish).iframes_left = 0.0
 	run.twist_of(fish).mobility()
@@ -160,7 +160,7 @@ func _run() -> void:
 	check(run.twist_of(fish).dashes == 1 and fish.linear_velocity.dot(Vector3.FORWARD) > settings.dash_speed * 0.5
 			and run.health_of(fish).iframes_left > 0.0, "Swordfish, Dash: the mobility button bursts on (%.1f m/s), untouchable" % fish.linear_velocity.dot(Vector3.FORWARD))
 
-	await _be(FishCharacter.Family.HYBRID)
+	await _be(FishCharacter.FishClass.CHARMER)
 	fish.freeze = false
 	var splashed := horde.spawn(1, Vector3(3, 0, 0))
 	var leap := run.twist_of(fish)
@@ -192,10 +192,10 @@ func _use(kind: FishAttack.Kind) -> FishAttack:
 	return attack
 
 
-## Plays as `family` now, parked.
-func _be(family: FishCharacter.Family) -> void:
+## Plays as `fish_class` now, parked.
+func _be(fish_class: FishCharacter.FishClass) -> void:
 	horde.clear()
-	fish.character = family
+	fish.character = fish_class
 	run.twist_of(fish).reset()
 	await _park(Vector3.ZERO, Vector3.FORWARD)
 	await _ticks(3)

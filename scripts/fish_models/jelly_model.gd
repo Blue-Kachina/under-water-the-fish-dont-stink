@@ -1,7 +1,7 @@
 class_name JellyModel
 extends RefCounted
-## The moon jelly family (FishModel.build hands it here): skin m.skin of
-## FishCharacter.SKINS[FishCharacter.Family.MOON_JELLY].
+## The Drifters' moon jelly (FishModel.build hands it here): species m.species of
+## FishCharacter.SPECIES[FishCharacter.FishClass.DRIFTER].
 ##
 ## A glassy bell fills the hitbox, its apex at the nose (-Z) and its open,
 ## scalloped rim toward the back; frilly oral arms trail out of its mouth under
@@ -32,9 +32,9 @@ const ORGAN := preload("res://shaders/jelly_organ.gdshader")
 ## Godot's front faces wind clockwise, seen from the front.
 const CLOCKWISE := true
 
-## Per skin (FishCharacter.SKINS order). Colours are hex; lengths are of the
+## Per species (FishCharacter.SPECIES order). Colours are hex; lengths are of the
 ## hitbox's length unless they say m.
-const SKINS := [
+const LOOKS := [
 	{  # Moon jelly (Aurelia aurita): clear milky bell, four lilac horseshoe
 		# gonads, radial canals, a fine fringe on a scalloped rim, short frilly arms.
 		"own": "cfe4f4", "centre": "e8f2fb", "edge": "d2e6f5", "rim": "f4faff", "glow": "bfe0ff",
@@ -107,7 +107,7 @@ const OUTER_LAST := 0
 
 
 static func build(m: FishModel) -> void:
-	var k: Dictionary = SKINS[clampi(m.skin, 0, SKINS.size() - 1)]
+	var k: Dictionary = LOOKS[clampi(m.species, 0, LOOKS.size() - 1)]
 	var g := _geometry(m, k)
 	var own := Color.html(k["own"])
 	m._body_material = m._material(own, 0.1, 0.4)
@@ -161,7 +161,7 @@ static func build(m: FishModel) -> void:
 		tentacle_material.set_shader_parameter("pivot", Vector3(0.0, 0.0, mouth))
 		var tentacles := MeshInstance3D.new()
 		tentacles.name = "Tentacles"
-		tentacles.mesh = _tentacles_mesh(g, k, m.skin)
+		tentacles.mesh = _tentacles_mesh(g, k, m.species)
 		tentacles.material_override = tentacle_material
 		tentacles.extra_cull_margin = 0.5
 		m.add_child(tentacles)

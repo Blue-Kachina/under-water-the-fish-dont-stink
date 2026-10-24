@@ -32,29 +32,29 @@ extends RefCounted
 
 ## Passive twist titles.
 const NAMES := {
-	FishCharacter.Family.OCTANE: "Nimble",
-	FishCharacter.Family.DOMINUS: "Frenzy",
-	FishCharacter.Family.PLANK: "Glide",
-	FishCharacter.Family.BREAKOUT: "Streamlined",
-	FishCharacter.Family.HYBRID: "Graceful",
-	FishCharacter.Family.MERC: "Armoured",
-	FishCharacter.Family.LIONFISH: "Wake",
-	FishCharacter.Family.MOON_JELLY: "Many Arms",
-	FishCharacter.Family.MANTIS: "Hammer",
-	FishCharacter.Family.WHALE_SHARK: "Escort",
+	FishCharacter.FishClass.SKIRMISHER: "Nimble",
+	FishCharacter.FishClass.HUNTER: "Frenzy",
+	FishCharacter.FishClass.GLIDER: "Glide",
+	FishCharacter.FishClass.LANCER: "Streamlined",
+	FishCharacter.FishClass.CHARMER: "Graceful",
+	FishCharacter.FishClass.BULWARK: "Armoured",
+	FishCharacter.FishClass.SCORCHER: "Wake",
+	FishCharacter.FishClass.DRIFTER: "Many Arms",
+	FishCharacter.FishClass.BRAWLER: "Hammer",
+	FishCharacter.FishClass.BREACHER: "Escort",
 }
 ## Mobility skill titles.
 const SKILLS := {
-	FishCharacter.Family.OCTANE: "Wriggle",
-	FishCharacter.Family.DOMINUS: "Fin Dash",
-	FishCharacter.Family.PLANK: "Surge",
-	FishCharacter.Family.BREAKOUT: "Dash",
-	FishCharacter.Family.HYBRID: "Leap",
-	FishCharacter.Family.MERC: "Brace",
-	FishCharacter.Family.LIONFISH: "Flare Dash",
-	FishCharacter.Family.MOON_JELLY: "Go Quiet",
-	FishCharacter.Family.MANTIS: "Snap",
-	FishCharacter.Family.WHALE_SHARK: "Gulp",
+	FishCharacter.FishClass.SKIRMISHER: "Wriggle",
+	FishCharacter.FishClass.HUNTER: "Fin Dash",
+	FishCharacter.FishClass.GLIDER: "Surge",
+	FishCharacter.FishClass.LANCER: "Dash",
+	FishCharacter.FishClass.CHARMER: "Leap",
+	FishCharacter.FishClass.BULWARK: "Brace",
+	FishCharacter.FishClass.SCORCHER: "Flare Dash",
+	FishCharacter.FishClass.DRIFTER: "Go Quiet",
+	FishCharacter.FishClass.BRAWLER: "Snap",
+	FishCharacter.FishClass.BREACHER: "Gulp",
 }
 ## A leap splashes once its climb has slowed to this share of its push, or after LEAP_MAX s.
 const LEAP_TOP := 0.35
@@ -123,37 +123,37 @@ func reset() -> void:
 	_stop_loop()
 
 
-func family() -> FishCharacter.Family:
+func fish_class() -> FishCharacter.FishClass:
 	return fish.character
 
 
 ## Whether `twist`'s fish is this one, with twists on.
-func is_on(twist: FishCharacter.Family) -> bool:
-	return settings.twists and family() == twist
+func is_on(twist: FishCharacter.FishClass) -> bool:
+	return settings.twists and fish_class() == twist
 
 
-static func title(of: FishCharacter.Family) -> String:
+static func title(of: FishCharacter.FishClass) -> String:
 	return NAMES.get(of, "")
 
 
-static func skill_title(of: FishCharacter.Family) -> String:
+static func skill_title(of: FishCharacter.FishClass) -> String:
 	return SKILLS.get(of, "")
 
 
 ## A multiplier on swim speed: the frenzy, or the Boxfish's armour (and brace).
 func speed_factor() -> float:
-	if is_on(FishCharacter.Family.DOMINUS):
+	if is_on(FishCharacter.FishClass.HUNTER):
 		return 1.0 + frenzy
-	if is_on(FishCharacter.Family.MERC):
+	if is_on(FishCharacter.FishClass.BULWARK):
 		return settings.armour_speed * (settings.brace_speed if _brace_left > 0.0 else 1.0)
-	if is_on(FishCharacter.Family.BREAKOUT):
+	if is_on(FishCharacter.FishClass.LANCER):
 		return 1.0 + settings.streamline_speed
 	return 1.0
 
 
 ## A multiplier on damage taken.
 func taken_factor() -> float:
-	if is_on(FishCharacter.Family.MERC):
+	if is_on(FishCharacter.FishClass.BULWARK):
 		return settings.armour_taken * (settings.brace_taken if _brace_left > 0.0 else 1.0)
 	return 1.0
 
@@ -161,7 +161,7 @@ func taken_factor() -> float:
 ## A multiplier on `source`'s damage from the twist: the Lionfish's wake
 ## burns harder the faster it swims.
 func damage_factor(source: String) -> float:
-	if source == "greek_fire" and is_on(FishCharacter.Family.LIONFISH) and settings.wake_damage > 0.0:
+	if source == "greek_fire" and is_on(FishCharacter.FishClass.SCORCHER) and settings.wake_damage > 0.0:
 		var top := maxf(fish.nature_batter_speed, 0.1)
 		return 1.0 + settings.wake_damage * clampf(fish.speed / top, 0.0, 1.0)
 	return 1.0
@@ -169,15 +169,15 @@ func damage_factor(source: String) -> float:
 
 ## How many more jellies the Moon Jelly's Halo has.
 func halo_bonus() -> int:
-	return settings.arms_extra if is_on(FishCharacter.Family.MOON_JELLY) else 0
+	return settings.arms_extra if is_on(FishCharacter.FishClass.DRIFTER) else 0
 
 
 func update(delta: float) -> void:
-	fish.turn_scale = settings.nimble_turn if is_on(FishCharacter.Family.OCTANE) else 1.0
+	fish.turn_scale = settings.nimble_turn if is_on(FishCharacter.FishClass.SKIRMISHER) else 1.0
 	_surge_left = maxf(_surge_left - delta, 0.0)
 	_brace_left = maxf(_brace_left - delta, 0.0)
-	fish.drag_scale = 0.0 if _surge_left > 0.0 else (settings.glide_drag if is_on(FishCharacter.Family.PLANK) else 1.0)
-	if is_on(FishCharacter.Family.WHALE_SHARK) and settings.escort_regen > 0.0 and fish.speed <= settings.chest_still_speed:
+	fish.drag_scale = 0.0 if _surge_left > 0.0 else (settings.glide_drag if is_on(FishCharacter.FishClass.GLIDER) else 1.0)
+	if is_on(FishCharacter.FishClass.BREACHER) and settings.escort_regen > 0.0 and fish.speed <= settings.chest_still_speed:
 		var health := run.health_of(fish)
 		if health and not health.down:
 			health.heal(settings.escort_regen * delta)
@@ -214,22 +214,22 @@ func mobility() -> bool:
 	if _cool > 0.0 or _dash_left > 0.0:
 		return false
 	var nose := -fish.global_basis.z
-	match family():
-		FishCharacter.Family.DOMINUS:
+	match fish_class():
+		FishCharacter.FishClass.HUNTER:
 			_start_dash("fin", settings.fin_dash_time, settings.fin_dash_speed, settings.fin_cooldown, nose)
 			fin_dashes += 1
-		FishCharacter.Family.LIONFISH:
+		FishCharacter.FishClass.SCORCHER:
 			_start_dash("flare", settings.flare_time, settings.flare_speed, settings.flare_cooldown, nose)
 			flares += 1
 			Explosion.spawn(run.ocean, fish.global_position, Color(1.0, 0.5, 0.2), settings.flare_radius, 0.0, 0.3)
-		FishCharacter.Family.BREAKOUT:
+		FishCharacter.FishClass.LANCER:
 			if settings.dash_speed <= 0.0:
 				return false
 			dashes += 1
 			_cool_for(settings.dash_cooldown)
 			fish.apply_push(nose * settings.dash_speed)
 			_shield(settings.dash_iframes)
-		FishCharacter.Family.OCTANE:
+		FishCharacter.FishClass.SKIRMISHER:
 			wriggles += 1
 			_cool_for(settings.wriggle_cooldown)
 			var lean := fish._player_input().strength("stick_right") - fish._player_input().strength("stick_left")
@@ -237,31 +237,31 @@ func mobility() -> bool:
 			fish.apply_push(side * settings.wriggle_speed)
 			_shield(settings.wriggle_iframes)
 			PowerupFx.ring(run, fish.global_position, 1.2, Color(1.0, 0.6, 0.2), side, 0.25)
-		FishCharacter.Family.PLANK:
+		FishCharacter.FishClass.GLIDER:
 			surges += 1
 			_cool_for(settings.surge_cooldown)
 			_surge_left = settings.surge_time
 			fish.apply_push(nose * settings.surge_speed)
 			PowerupFx.ring(run, fish.global_position, 1.6, Color(0.7, 0.85, 1.0), nose, 0.3)
-		FishCharacter.Family.MERC:
+		FishCharacter.FishClass.BULWARK:
 			braces += 1
 			_cool_for(settings.brace_cooldown)
 			_brace_left = settings.brace_time
 			PowerupFx.ring(run, fish.global_position, 1.8, Color(1.0, 0.85, 0.2), nose, 0.3)
-		FishCharacter.Family.HYBRID:
+		FishCharacter.FishClass.CHARMER:
 			if settings.leap_impulse <= 0.0 or _leap_age >= 0.0:
 				return false
 			leaps += 1
 			_leap_age = 0.0
 			_cool_for(settings.leap_cooldown)
 			fish.apply_push(Vector3.UP * settings.leap_impulse)
-		FishCharacter.Family.MANTIS:
+		FishCharacter.FishClass.BRAWLER:
 			if settings.snap_damage <= 0.0 and settings.snap_speed <= 0.0:
 				return false
 			_snap(nose)
-		FishCharacter.Family.WHALE_SHARK:
+		FishCharacter.FishClass.BREACHER:
 			_gulp(nose)
-		FishCharacter.Family.MOON_JELLY:
+		FishCharacter.FishClass.DRIFTER:
 			quiets += 1
 			quiet = true
 			_quiet_left = settings.quiet_time
@@ -274,7 +274,7 @@ func mobility() -> bool:
 ## How the skill's doing, for the HUD: its title, whether it's on now, and
 ## seconds until it's ready again (0: ready).
 func skill_title_now() -> String:
-	return skill_title(family())
+	return skill_title(fish_class())
 
 
 func skill_active() -> bool:
@@ -292,7 +292,7 @@ func skill_fill() -> float:
 
 ## `fish` killed a zombie.
 func on_kill() -> void:
-	if not is_on(FishCharacter.Family.DOMINUS):
+	if not is_on(FishCharacter.FishClass.HUNTER):
 		return
 	frenzy = minf(frenzy + settings.frenzy_per_kill, settings.frenzy_max)
 	frenzy_held = settings.frenzy_time
@@ -393,4 +393,4 @@ func _gulp(nose: Vector3) -> void:
 
 ## More i-frames after a hit (s): the Koi's grace.
 func iframe_bonus() -> float:
-	return settings.graceful_iframes if is_on(FishCharacter.Family.HYBRID) else 0.0
+	return settings.graceful_iframes if is_on(FishCharacter.FishClass.CHARMER) else 0.0

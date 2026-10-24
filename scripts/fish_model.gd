@@ -1,9 +1,9 @@
 class_name FishModel
 extends Node3D
-## A playable fish's look (one per FishCharacter, in one of its skins), made to
+## A playable fish's look (one per FishCharacter, in one of its species), made to
 ## fill its character's hitbox at scale 1: width x height x length, centred on
 ## the hitbox centre, nose toward -Z. The body fills the box, so what you see is
-## what the ball meets; fins and tails may poke out of it a little. Each family
+## what the ball meets; fins and tails may poke out of it a little. Each class
 ## builds its own in scripts/fish_models/ from the helpers here: lofted bodies,
 ## fin membranes, lifelike eyes, and the bend that keeps the tail on the body
 ## (_bend_body).
@@ -20,9 +20,9 @@ const FIN_MEMBRANE := preload("res://shaders/fin_membrane.gdshader")
 const STRIDE_OVERLAY := preload("res://shaders/stride_overlay.gdshader")
 const FISH_EYE := preload("res://shaders/fish_eye.gdshader")
 
-var family := FishCharacter.Family.OCTANE
-## Which of the family's skins it wears (FishCharacter.SKINS).
-var skin := 0
+var fish_class := FishCharacter.FishClass.SKIRMISHER
+## Which of the class's species it wears (FishCharacter.SPECIES).
+var species := 0
 var tail: Node3D
 var fin_left: Node3D
 var fin_right: Node3D
@@ -104,32 +104,32 @@ var _riders: Array[Node3D] = []
 var _rider_rest: Array[Transform3D] = []
 
 
-static func build(character: FishCharacter.Family, skin := 0) -> FishModel:
+static func build(character: FishCharacter.FishClass, species := 0) -> FishModel:
 	var model := FishModel.new()
 	model.name = "Visual"
-	model.family = character
-	model.skin = clampi(skin, 0, FishCharacter.skin_count(character) - 1)
+	model.fish_class = character
+	model.species = clampi(species, 0, FishCharacter.species_count(character) - 1)
 	model._size = FishCharacter.hitbox_size(character)
 	match character:
-		FishCharacter.Family.OCTANE:
+		FishCharacter.FishClass.SKIRMISHER:
 			ClownfishModel.build(model)
-		FishCharacter.Family.DOMINUS:
+		FishCharacter.FishClass.HUNTER:
 			SharkModel.build(model)
-		FishCharacter.Family.PLANK:
+		FishCharacter.FishClass.GLIDER:
 			RayModel.build(model)
-		FishCharacter.Family.BREAKOUT:
+		FishCharacter.FishClass.LANCER:
 			SwordfishModel.build(model)
-		FishCharacter.Family.HYBRID:
+		FishCharacter.FishClass.CHARMER:
 			KoiModel.build(model)
-		FishCharacter.Family.MERC:
+		FishCharacter.FishClass.BULWARK:
 			BoxfishModel.build(model)
-		FishCharacter.Family.LIONFISH:
+		FishCharacter.FishClass.SCORCHER:
 			LionfishModel.build(model)
-		FishCharacter.Family.MOON_JELLY:
+		FishCharacter.FishClass.DRIFTER:
 			JellyModel.build(model)
-		FishCharacter.Family.MANTIS:
+		FishCharacter.FishClass.BRAWLER:
 			MantisModel.build(model)
-		FishCharacter.Family.WHALE_SHARK:
+		FishCharacter.FishClass.BREACHER:
 			WhaleSharkModel.build(model)
 	return model
 
