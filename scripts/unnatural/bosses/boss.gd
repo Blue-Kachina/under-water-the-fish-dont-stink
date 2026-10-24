@@ -98,6 +98,12 @@ func take(amount: float, by: FishController, _source: String) -> void:
 		_die(by)
 
 
+## Hurt by `amount` on its proxy `index` (which part of it was hit: the
+## Lamprey's gills, a Whale Fall's hagfish). Most bosses don't mind which.
+func take_part(_index: int, amount: float, by: FishController, source: String) -> void:
+	take(amount, by, source)
+
+
 ## The player it goes after: the nearest one who's up (null: none).
 func target() -> FishController:
 	var best: FishController = null

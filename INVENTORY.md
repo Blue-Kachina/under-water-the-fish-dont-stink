@@ -341,8 +341,18 @@ Drops are timed as well as rolled: after a drop of a kind, that kind waits its "
 | Boss | Reward |
 |---|---|
 | **Drowned Shark** (mini-boss, 5:00) | A chest, 80 XP, 25 pearls |
-| **Blood Leviathan** (boss, 10:00) | Leviathan's Coil (boss weapon); the whirlpool: the next stage, or on the run's last stage the win |
+| **Final boss** (10:00): the King of Herrings, or one of its alternates (40%: each equally likely) | Leviathan's Coil (boss weapon, for now, from every final boss); the whirlpool: the next stage, or on the run's last stage the win |
 | Shrine of the Deep (each, this stage) | One more boss chest (legendary pick) from every boss beaten |
+
+### Final bosses (`scripts/unnatural/bosses/`): all share the Blood Leviathan settings (hp 90,000 × co-op, speed 15, enrage at 2 min), circle then spit (from 2/3 hp) then fury (under 1/3)
+
+| Boss | Body | Its own moves |
+|---|---|---|
+| **The King of Herrings** (default) | A 109 m rotting giant oarfish: torn silver ribbon, peeling skin and flayed wounds, a crimson dorsal fin its whole length, a crest of blood-red filaments, milky eyes, a gaping toothed jaw, lampreys feeding on it | Spits shards of its rotting scales |
+| **The Gulper Mother** | A 92 m gulper eel: a pouch of a mouth on thin jaws, needle teeth, a stretched glowing belly showing the zombies it swallowed, a whip tail with a glowing lure | Every 7 s gulps the zombies within 20 m of its mouth (up to 40), each healing 0.3% of its hp; spits bile and vomits 12 zombies; in fury, swallows a player it reaches |
+| **The Whale Fall** | A 45 m dead blue whale on its side, chest torn open to the ribs, with 5 giant hagfish (22 m) coming out of its eye sockets, chest, a wound and its blowhole | Each hagfish lunges (3.5 s) at a player within reach; spitting, they spray slime (5 a touch, slows); they hold 60% of its hp, each dying on its own; the carcass takes 25% damage while any lives; in fury they tear loose and hunt |
+| **The Lamprey Queen** | An 88 m sea lamprey: a disc of hooked teeth in five rings round a rasping tongue, seven gill holes a side, her brood clamped to her flanks | Every 8 s one of her brood drops off as 6 zombies; spitting, her gills pulse out blood clouds (8 a touch); her gills take 2× damage; in fury, latches onto a player it reaches |
+| Grabbed (Gulper, Lamprey) | | Held at the mouth for up to 3 s, drained 10 every 0.75 s; 3 strides break free |
 
 ### Shrines (P5, `shrine.gd`): 4 per stage, one of each, Jump over one to use it
 

@@ -247,7 +247,7 @@ func _on_boss_arrived(boss: Boss) -> void:
 	var parts := PackedInt32Array()
 	for index in boss.parts:
 		parts.append(run.horde.net_id_of(index))
-	var kind := "miniboss" if boss is DrownedShark else "boss"
+	var kind := "miniboss" if boss is DrownedShark else (boss as BloodLeviathan).net_kind()
 	_send_all("_boss_new", [kind, boss.boss_id, parts, boss.hp, boss.max_hp, boss.global_position], true)
 	if boss.has_signal(&"spat"):
 		boss.connect(&"spat", func(from: Vector3, directions: PackedVector3Array) -> void:
@@ -333,7 +333,7 @@ func world() -> Dictionary:
 			var parts := PackedInt32Array()
 			for index in boss.parts:
 				parts.append(run.horde.net_id_of(index))
-			bosses.append(["miniboss" if boss is DrownedShark else "boss", boss.boss_id, parts, boss.hp, boss.max_hp,
+			bosses.append(["miniboss" if boss is DrownedShark else (boss as BloodLeviathan).net_kind(), boss.boss_id, parts, boss.hp, boss.max_hp,
 					boss.global_position, boss.net_state()])
 	return {"mode": "unnatural", "zombies": zombies, "chests": chests, "drops": drops, "pearls": pearls, "frozen": run.horde.frozen_left,
 			"bosses": bosses, "elapsed": run.elapsed, "stage": run.stage, "stage_started": run.stage_started, "deep": run.deep,

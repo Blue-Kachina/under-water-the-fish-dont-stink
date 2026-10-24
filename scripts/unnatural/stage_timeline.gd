@@ -18,7 +18,7 @@ const EVENTS := {
 	"miniboss": ["miniboss_time", "THE DROWNED SHARK RISES", "MINI-BOSS"],
 	"stampede": ["stampede_time", "STAMPEDE", "A BAIT BALL OF THE DEAD"],
 	"tide": ["tide_time", "THE TIDE TURNS", "A WALL OF ZOMBIES"],
-	"boss": ["boss_time", "THE BLOOD LEVIATHAN WAKES", "BEAT IT TO END THE NIGHT"],
+	"boss": ["boss_time", "SOMETHING VAST RISES", "THE FINAL BOSS  ·  BEAT IT TO END THE NIGHT"],
 }
 
 var settings: UnnaturalSettings

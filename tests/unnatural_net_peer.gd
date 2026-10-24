@@ -176,6 +176,24 @@ func _host() -> void:
 		check(run.current_boss() == null, "we beat it")
 		await _phase("boss_down", {"chests": run.chests.size(), "kinds": _kinds(run)})
 
+	print("host: a final boss (the Whale Fall)")
+	var whale := UnnaturalRun.make_final_boss("whale") as WhaleFallBoss
+	run._add_boss(whale, fish.global_position + Vector3(0.0, 0.0, -50.0), 50000.0)
+	await _seconds(1.0)
+	await _phase("final", {"id": whale.boss_id, "kind": whale.net_kind(), "parts": whale.parts.size()})
+	var hag: WhaleFallBoss.Hagfish = whale.hagfish[0]
+	run.hit(hag.parts[0], hag.hp + 10.0, fish, "probe")
+	check(not hag.alive, "we killed its first hagfish")
+	await _seconds(1.5)
+	await _phase("final_hagfish", {"id": whale.boss_id})
+	whale.take(whale.hp + 1.0, fish, "probe")
+	await _seconds(3.0)
+	await _phase("final_down", {})
+	if is_instance_valid(run.whirlpool):
+		run.whirlpool.queue_free()
+	run.whirlpool = null
+	run.cleared_at = -1.0
+
 	print("host: down and revive")
 	await _phase("go_down", {})
 	await _seconds(0.5)
@@ -293,6 +311,22 @@ func _guest() -> void:
 				if boss:
 					check(boss.global_position.distance_to(data.at) < 4.0 and is_equal_approx(boss.hp, data.hp),
 							"where the host has it (%.1f m off), its health the host's" % boss.global_position.distance_to(data.at))
+			"final":
+				var final := run.boss_by_id(data.id) as BloodLeviathan
+				check(final != null and final.puppet and final.net_kind() == data.kind, "a puppet of the host's %s is here" % data.kind)
+				if final:
+					check(final.parts.size() == data.parts, "with the host's %d proxies" % data.parts)
+			"final_hagfish":
+				var final := run.boss_by_id(data.id) as WhaleFallBoss
+				await _wait(func() -> bool: return final != null and not final.hagfish[0].alive, 3.0)
+				check(final != null and not final.hagfish[0].alive and final.hagfish[1].alive, "the host killed its first hagfish: dead here too, the rest alive")
+			"final_down":
+				await _wait(func() -> bool: return run.current_boss() == null, 4.0)
+				check(run.current_boss() == null and is_instance_valid(run.whirlpool), "the host beat it: gone here too, the whirlpool open")
+				if is_instance_valid(run.whirlpool):
+					run.whirlpool.queue_free()
+				run.whirlpool = null
+				run.cleared_at = -1.0
 			"boss_down":
 				await _wait(func() -> bool: return run.current_boss() == null, 3.0)
 				check(run.current_boss() == null, "the host beat it: gone here too")

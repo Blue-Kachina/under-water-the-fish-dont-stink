@@ -72,6 +72,8 @@ var _stats := StatsPanel.new()
 var _over_age := -1.0
 var _cam_note := Label.new()
 var _hurt_material := ShaderMaterial.new()
+## The final boss's name, for the splash when it falls.
+var _final_title := "THE FINAL BOSS"
 var _beat_phase := 0.0
 
 
@@ -202,10 +204,22 @@ func _ready() -> void:
 			if boss is DrownedShark:
 				_splash.play("DROWNED SHARK BEATEN", "MINI-BOSS DOWN", "%s  ·  IT DROPPED A BOSS CHEST" % (by.display_name.to_upper() if is_instance_valid(by) and by.display_name else "SURVIVORS"),
 						TreasureChest.STEEL, 2.4))
-		run.boss_enraged.connect(func(_boss: Boss) -> void:
-			_splash.play("THE LEVIATHAN ENRAGES", "NO TIME LIMIT", "AND THE DEAD KEEP COMING", HP_COLOR, 2.4))
+		run.boss_arrived.connect(func(boss: Boss) -> void:
+			var final := boss as BloodLeviathan
+			if final == null:
+				return
+			_final_title = final.title
+			_splash.play(final.title, "FINAL BOSS", final.boss_line(), HP_COLOR, 3.0)
+			final.held_changed.connect(func(held: FishController, on: bool) -> void:
+				if held == fish:
+					if on:
+						_note("STRIDE  ·  STRIDE  ·  STRIDE TO BREAK FREE", HP_COLOR)
+					else:
+						_cam_note.modulate.a = 0.0))
+		run.boss_enraged.connect(func(boss: Boss) -> void:
+			_splash.play("%s ENRAGES" % boss.title.trim_prefix("THE "), "NO TIME LIMIT", "AND THE DEAD KEEP COMING", HP_COLOR, 2.4))
 		run.whirlpool_opened.connect(func(_at: Vector3) -> void:
-			_splash.play("THE LEVIATHAN FALLS", "A WHIRLPOOL OPENS", ("FISH ON  ·  ENTER IT WHEN YOU'RE READY" if run.is_last_stage() else "ENTER IT FOR STAGE %d" % (run.stage + 1)),
+			_splash.play("%s FALLS" % _final_title, "A WHIRLPOOL OPENS", ("FISH ON  ·  ENTER IT WHEN YOU'RE READY" if run.is_last_stage() else "ENTER IT FOR STAGE %d" % (run.stage + 1)),
 					TreasureChest.GOLD, 3.0))
 		run.stage_completed.connect(func() -> void:
 			_over_age = 0.0
@@ -302,6 +316,9 @@ func _process(delta: float) -> void:
 	elif is_instance_valid(fish) and run.shrine_near(fish):
 		var shrine := run.shrine_near(fish)
 		_note(_shrine_prompt(shrine), shrine.tint())
+	var holder := run.current_boss() as BloodLeviathan
+	if holder and holder.held == fish:
+		_note("STRIDE  ·  STRIDE  ·  STRIDE TO BREAK FREE", HP_COLOR)  # held while it holds you
 	_clock.text = _time_text(run.elapsed) if run.stage <= 1 else "STAGE %d  ·  %s" % [run.stage, _time_text(run.stage_time())]
 	_kills.text = "%d KILLS" % run.kills
 	_clock.visible = not _cards.is_open()  # the cards' heading is there

@@ -32,6 +32,7 @@ is a **Fish Fry**. Teams are team colours / team 0, 1. "Demo" is only for Rocket
 below). Phase 9 isn't started.** Pick **Unnatural** or **Test Tank** in the mode list.
 **The Playability pass's P3 (feel and readability) is built (2026-10-23): see "P3 as built".**
 **P4 (choice tools and limiters) and P5 (pacing) are built (2026-10-23): see "P4 and P5 as built".**
+**The four final bosses are built (2026-10-24): see "The final bosses".**
 Next is the user's play-test of P4 and P5, then P6 (meta-progression).
 
 ### Handoff (2026-10-18, balance pass 1): start here
@@ -1178,6 +1179,56 @@ after entering it, which the next stage now frees.
 - Elite modifier colours and numbers; whether 60% is too many.
 - Stage 2's jump (×1.8 hp, +3 difficulty, ×1.3 damage) and whether Standard should be 3 stages.
 - Short's 0.6 time scale.
+
+### The final bosses (2026-10-24)
+From the design canvas (https://claude.ai/artifact/RrKHErvEDG9Ya1WRPrLw2b): the user asked for all
+four. The King of Herrings replaces the old Blood Leviathan's look; the other three are
+alternates that come in its place by `alternate_boss_chance` (0.4, each equally likely).
+UNNATURAL > Stage & Bosses > **Final Bosses** has the pick (`final_boss`: Random, or one forced,
+for testing) and each alternate's numbers. They all still drop Leviathan's Coil: the user chose
+to do the new boss drops in a later pass.
+
+**How the models are made (seamless, like the fish):** each body is built straight in a rest
+pose as ONE mesh, body, fins, filaments and teeth merged (`BossMesh`: lofts with optional bumps
+for folds and pleats, membranes, tubes, curved teeth), and a vertex shader bends it along the
+boss's swim path (`shaders/spine_bend.gdshaderinc`): 48 spine points with rotation-minimising
+frames (`SpineRig`, fed from the head's trail, or a hagfish's rope through a Catmull-Rom curve).
+Each skin is painted in its shader from the rest shape (`boss_oarfish`, `boss_gulper`,
+`boss_lamprey`, `boss_hagfish`, `boss_whale`). Eyes, lampreys and the lure ride the spine.
+
+| Boss | Class | Model | Moves |
+|---|---|---|---|
+| **The King of Herrings** | `BloodLeviathan` (the base) | 109 m giant oarfish: wet silver with oblique streaks, peeling skin, three flayed wounds showing ribs, lamprey bite scars; a torn crimson fin the whole back, rippling; a crest of 11 filaments streaming 19 m; pelvic "oars"; milky eyes; a gaping lower jaw and needle teeth; 7 lampreys feeding on it | As before (circle, spit, fury); its bolts are rotting scale shards |
+| **The Gulper Mother** | `GulperBoss` | 92 m gulper eel: a sagging pouch of a mouth (folds, raw throat inside) on three jaw rods with needle teeth, opening with `gape`; beady eyes at the snout; a stretched belly lit from within with the swallowed pressing out (more as it fills); velvet black with photophores; a whip tail and a glowing lure (a light) | Gulps every `gulper_every` s (heals); spits bile and vomits `gulper_vomit` zombies; in fury swallows a player |
+| **The Whale Fall** | `WhaleFallBoss` | A 45 m blue whale carcass on its side (not bent: it drifts as one piece), throat pleats and bloat in the geometry, skin sloughing to blubber, real holes (eye sockets, the torn chest showing ribs and spine, a wound, the blowhole) with meat inside; 5 hagfish (22 m), each a rope from its hole: blind wrinkled heads, barbels, tooth combs, slime pores, a finned paddle tail | Hagfish lunge, spray slime (slows); each has its own hp share; the carcass is armoured while any live; in fury they tear loose |
+| **The Lamprey Queen** | `LampreyBoss` | 88 m sea lamprey: a concave disc with five rings of hooked teeth, a papillae fringe and a rasping tongue; seven ragged gill slits a side glowing as she breathes; marbled olive skin; two dorsal fins and a tail fin; 9 of her brood clamped on | Brood drops off as zombies; gills pulse blood clouds; gills are weak points (×`gill_bonus`); in fury latches on |
+
+- **Grabbing** (`BloodLeviathan.hold()`): a player at the Gulper's or the Lamprey's mouth during
+  a charge or fury is held for `final_hold_time`, drained `final_hold_damage` every 0.75 s, until
+  they stride `final_hold_strides` times. The HUD says to stride. Online, only players on the
+  host's machine can be grabbed; a guest's player takes the contact damage instead.
+- **Run changes:** `Boss.take_part(index, …)` (which part was hit) routes the Lamprey's gills
+  and the hagfish. `UnnaturalRun.pick_final_boss()` / `make_final_boss(kind)`. The boss warning is
+  generic ("SOMETHING VAST RISES"); its name splashes when it comes, and its enrage and fall
+  splashes use its name. Slime clouds slow (`BurstCloud.slows`).
+- **Online:** each boss has a `net_kind()` ("boss", "gulper", "whale", "lamprey") the guests build
+  their puppet from; the Whale Fall's net mode carries which hagfish live.
+- **Probes:** new `final_boss_probe` (the pick, every boss's body and proxies, hits and phases,
+  the gulp, the grab and breaking free, the gills, the brood, the hagfish and the armour, fury,
+  the whirlpool and chest). `unnatural_net_peer` gained a Whale Fall round (the guest's puppet,
+  its proxies, a hagfish's death). `feel_probe`'s camera check now allows for the Size stat.
+- **Screenshots:** `tests/boss_shots.tscn` (windowed): `-- --boss=king|gulper|whale|lamprey|all
+  --out=DIR`, each boss laid along an S-curve and shot from the side, the head, the front, above
+  and through the murk.
+- **Also changed (2026-10-24, before the bosses):** elites are `elite_size` 2.2× (a setting; was
+  1.6). Leviathan's Coil got a minor fix only (see "After the first look").
+
+**Open for the user's play-test:**
+- The models' look in play: scale against the fish, the skins under the blood moon, the Gulper's
+  pouch (the least convincing of the four in screenshots), the hagfish wrinkles.
+- The alternates' numbers (gulp healing, hagfish share, carcass armour, gill bonus, the grab).
+- The boss drops: each concept had its own (Blood Crest, Gulper's Lure, Hagfish Brood, Lamprey
+  Brood), not built yet.
 
 ## Existing pieces to reuse
 | Piece | Where | Use in Unnatural |

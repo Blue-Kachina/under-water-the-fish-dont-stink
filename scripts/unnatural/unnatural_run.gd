@@ -1014,7 +1014,7 @@ func _hit(index: int, amount: float, by: FishController, source: String, push: V
 	var boss := boss_at(index)
 	last_hit_dealt = amount if horde.is_immortal(index) and not boss else minf(amount, boss.hp if boss else horde.enemy_hp(index))
 	if boss:
-		boss.take(amount, by, source)
+		boss.take_part(index, amount, by, source)
 	else:
 		horde.damage(index, amount, source, by, push)
 	zombie_hit.emit(index, amount, by, source, chain)
@@ -1110,7 +1110,7 @@ func _hit_area(targets: PackedInt32Array, amount: float, by: FishController, sou
 			shove = (away.normalized() if away.length_squared() > 0.0001 else Vector3.UP) * push * knock
 		last_hit_dealt = dealt if horde.is_immortal(index) and not boss else minf(dealt, boss.hp if boss else horde.enemy_hp(index))
 		if boss:
-			boss.take(dealt, by, source)
+			boss.take_part(index, dealt, by, source)
 		else:
 			horde.damage(index, dealt, source, by, shove)
 		zombie_hit.emit(index, dealt, by, source, chain)
@@ -1141,7 +1141,7 @@ func apply_claimed_hit(index: int, amount: float, by: FishController, source: St
 	var boss := boss_at(index)
 	last_hit_dealt = amount if horde.is_immortal(index) and not boss else minf(amount, boss.hp if boss else horde.enemy_hp(index))
 	if boss:
-		boss.take(amount, by, source)
+		boss.take_part(index, amount, by, source)
 	else:
 		horde.damage(index, amount, source, by)
 	zombie_hit.emit(index, amount, by, source, [])
@@ -1244,6 +1244,9 @@ func rammed(fish: FishController, index: int) -> bool:
 func _touch_clouds(fish: FishController) -> void:
 	for cloud in _clouds:
 		if is_instance_valid(cloud) and cloud.contains(fish.global_position, PLAYER_RADIUS):
+			if cloud.slows:
+				_chill[fish] = maxf(_chill.get(fish, 0.0), 1.2)  # slime: it slows as well as stings
+				fish.speed_scale = _swim_scale(fish)
 			var amount := settings.burst_damage if cloud.damage < 0.0 else cloud.damage
 			hurt(fish, amount * settings.enemy_damage_scale * stage_damage(), -1, cloud.cause)
 			return
@@ -1560,7 +1563,7 @@ func _start_event(event: String) -> void:
 			_add_boss(DrownedShark.new(), spawn_point(around[0]), settings.shark_hp * crowd)
 		"boss":
 			_clean_up(around)
-			_add_boss(BloodLeviathan.new(), spawn_point(around[0]), settings.leviathan_hp * crowd)
+			_add_boss(make_final_boss(pick_final_boss()), spawn_point(around[0]), settings.leviathan_hp * crowd)
 
 
 ## Swarm event `event`'s wave `wave` round the players up (`around`): each
@@ -1659,10 +1662,34 @@ func _add_boss(boss: Boss, at: Vector3, boss_hp: float, id := 0) -> void:
 	boss_arrived.emit(boss)
 
 
+## Which final boss comes this stage ("boss": the King of Herrings, or an
+## alternate by alternate_boss_chance; final_boss picks one for testing).
+func pick_final_boss() -> String:
+	var picked := ["", "boss", "gulper", "whale", "lamprey"]
+	if settings.final_boss > 0 and settings.final_boss < picked.size():
+		return picked[settings.final_boss]
+	if rng.randf() < settings.alternate_boss_chance:
+		return ["gulper", "whale", "lamprey"][rng.randi_range(0, 2)]
+	return "boss"
+
+
+## A final boss of `kind` ("boss" or "king": the King of Herrings; "gulper",
+## "whale", "lamprey": its alternates), not yet added.
+static func make_final_boss(kind: String) -> BloodLeviathan:
+	match kind:
+		"gulper":
+			return GulperBoss.new()
+		"whale":
+			return WhaleFallBoss.new()
+		"lamprey":
+			return LampreyBoss.new()
+	return BloodLeviathan.new()
+
+
 ## A guest's puppet of the host's boss `id` (`kind`: "miniboss", "boss"), its
 ## body the host's proxies `part_ids`.
 func add_puppet_boss(kind: String, id: int, part_ids: PackedInt32Array, boss_hp: float, boss_max: float, at: Vector3) -> Boss:
-	var boss: Boss = DrownedShark.new() if kind == "miniboss" else BloodLeviathan.new()
+	var boss: Boss = DrownedShark.new() if kind == "miniboss" else make_final_boss(kind)
 	boss.puppet = true
 	boss.part_ids = part_ids
 	_add_boss(boss, at, boss_max, id)
@@ -2876,13 +2903,14 @@ func _affix_death(index: int, at: Vector3) -> void:
 
 
 ## A cloud that hurts the players in it (BurstCloud): a fire patch or a shock.
-func _hazard(at: Vector3, radius: float, lifetime: float, damage: float, color: Color, cause: String) -> BurstCloud:
+func _hazard(at: Vector3, radius: float, lifetime: float, damage: float, color: Color, cause: String, slows := false) -> BurstCloud:
 	var cloud := BurstCloud.new()
 	cloud.name = "Hazard"
 	cloud.radius = radius
 	cloud.lifetime = lifetime
 	cloud.damage = damage
 	cloud.color = color
+	cloud.slows = slows
 	cloud.cause = cause
 	cloud.position = at
 	add_child(cloud)

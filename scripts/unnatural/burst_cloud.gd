@@ -19,6 +19,8 @@ var color := COLOR
 var cause := "a burst cloud"
 ## Seconds before it can hurt (lifetime counts from when it does).
 var delay := 0.0
+## Whether it slows a player in it too (a hagfish's slime: UnnaturalRun chills them).
+var slows := false
 
 var _material := StandardMaterial3D.new()
 var _ball := MeshInstance3D.new()

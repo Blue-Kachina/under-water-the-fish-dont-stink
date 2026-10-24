@@ -576,6 +576,51 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 3600.0, 5.0, "or_greater") var leviathan_enrage := 120.0
 @export_range(1.0, 5.0, 0.05, "or_greater") var enrage_scale := 1.5
 
+@export_group("Final Bosses")
+## Which final boss comes: the King of Herrings (a giant rotting oarfish), or
+## one of its alternates, by alternate_boss_chance (each equally likely):
+## the Gulper Mother, the Whale Fall, the Lamprey Queen. Pick one to always get
+## it (testing). They share the Blood Leviathan group's hp, speed and timings.
+@export_enum("Random", "King of Herrings", "Gulper Mother", "Whale Fall", "Lamprey Queen") var final_boss := 0
+@export_range(0.0, 1.0, 0.05) var alternate_boss_chance := 0.4
+## The Gulper and the Lamprey grab a player whose fish touches their mouth as
+## they charge: held there, drained final_hold_damage every 0.75 s, until they
+## stride final_hold_strides times or final_hold_time s pass.
+@export_range(0.5, 20.0, 0.25, "or_greater") var final_hold_time := 3.0
+@export_range(0.0, 200.0, 1.0, "or_greater") var final_hold_damage := 10.0
+@export_range(1, 20, 1, "or_greater") var final_hold_strides := 3
+## The Gulper Mother: every gulper_every s it opens wide and draws in the zombies
+## within gulper_range m of its mouth (gulper_pull m/s), swallowing up to gulper_max,
+## each healing it gulper_heal of its max hp. Spitting, it vomits gulper_vomit
+## zombies at you as well as its bile.
+@export_range(1.0, 60.0, 0.5, "or_greater") var gulper_every := 7.0
+@export_range(2.0, 80.0, 1.0, "or_greater") var gulper_range := 20.0
+@export_range(0.0, 100.0, 1.0, "or_greater") var gulper_pull := 24.0
+@export_range(0.0, 0.05, 0.0005, "or_greater") var gulper_heal := 0.003
+@export_range(0, 500, 5, "or_greater") var gulper_max := 40
+@export_range(0, 200, 1, "or_greater") var gulper_vomit := 12
+## The Whale Fall: a dead whale hagfish_count giant hagfish (hagfish_length m)
+## have eaten hollow. Each lunges at a player within hagfish_reach m of where it
+## comes out every hagfish_lunge_every s, and spits slime (slime_damage a touch,
+## slowing you, for slime_time s). They hold hagfish_share of its hp between
+## them; the carcass takes carcass_armour of the damage until they're all dead.
+## In fury they tear free and hunt.
+@export_range(1, 8, 1, "or_greater") var hagfish_count := 5
+@export_range(5.0, 80.0, 1.0, "or_greater") var hagfish_length := 22.0
+@export_range(5.0, 100.0, 1.0, "or_greater") var hagfish_reach := 30.0
+@export_range(0.5, 30.0, 0.25, "or_greater") var hagfish_lunge_every := 3.5
+@export_range(0.0, 1.0, 0.05) var hagfish_share := 0.6
+@export_range(0.0, 1.0, 0.05) var carcass_armour := 0.25
+@export_range(0.0, 200.0, 1.0, "or_greater") var slime_damage := 5.0
+@export_range(0.5, 20.0, 0.25, "or_greater") var slime_time := 4.0
+## The Lamprey Queen: every brood_every s one of her brood drops off as
+## brood_count zombies; hits on her gill holes do gill_bonus times the damage;
+## spitting, her gills pulse out blood clouds (blood_cloud_damage a touch).
+@export_range(1.0, 60.0, 0.5, "or_greater") var brood_every := 8.0
+@export_range(0, 50, 1, "or_greater") var brood_count := 6
+@export_range(1.0, 10.0, 0.1, "or_greater") var gill_bonus := 2.0
+@export_range(0.0, 200.0, 1.0, "or_greater") var blood_cloud_damage := 8.0
+
 @export_group("Levels")
 ## XP to the next level: xp_base * level ^ xp_curve.
 @export_range(1.0, 1000.0, 1.0, "or_greater") var xp_base := 5.0
