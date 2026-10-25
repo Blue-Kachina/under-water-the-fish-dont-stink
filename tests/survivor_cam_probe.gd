@@ -1,7 +1,9 @@
 extends Node
 ## Unnatural's survivor cam modes (FollowCamera.free_cam, UNNATURAL > Camera):
-## the follow cam turns with the fish, but holds its direction while accelerate
-## or reverse is held; the ball cam button swaps to the free cam, which the
+## the follow cam turns with the fish: in its Hold style it holds its direction
+## while accelerate or reverse is held; in Settle it lags the fish's turns,
+## within camera_settle_max_angle, and swings behind once it swims straight
+## (accelerating or not), and a stride's sweep barely moves it; the ball cam button swaps to the free cam, which the
 ## fish's turning leaves alone, the right stick turns (within its pitch limit),
 ## and stays where it's put; the panel's camera_mode sets the mode again.
 ##   Godot_console.exe --headless --path . res://tests/survivor_cam_probe.tscn
@@ -33,7 +35,7 @@ func _run() -> void:
 	settings.stage_events = false
 	settings.chest_count = 0
 	settings.camera_mode = 0
-	settings.camera_hold_on_throttle = true
+	settings.camera_follow = 1  # Hold
 	settings.free_cam_follow = 0.0
 	settings.free_cam_invert_y = false
 	main.set_mode(main.UNNATURAL)
@@ -78,13 +80,30 @@ func _run() -> void:
 	for i in 60:
 		camera._turn_behind({"linear_velocity": Vector3(12, 0, 0)}, Vector3.LEFT, settings.camera_swing_rate, 1.0 / 60.0)
 	check(_flat(camera._heading).dot(Vector3.LEFT) > 0.95, "coasting sideways, it settles behind the nose, not the drift")
-	settings.camera_hold_on_throttle = false
+	settings.camera_follow = 2  # Always
 	Input.action_press("thrust_forward")
 	_face(0.0)
 	await _seconds(2.5)
 	Input.action_release("thrust_forward")
-	check(_flat(camera._heading).dot(_flat(-fish.global_basis.z)) > 0.95, "with hold_on_throttle off, it turns while accelerating")
-	settings.camera_hold_on_throttle = true
+	check(_flat(camera._heading).dot(_flat(-fish.global_basis.z)) > 0.95, "Always: it turns while accelerating")
+
+	print("settle:")
+	settings.camera_follow = 0  # Settle
+	await _seconds(1.0)
+	Input.action_press("thrust_forward")
+	var turn := deg_to_rad(120.0)
+	var worst := await _turn_for(0.6, func(t: float) -> float: return turn * t)
+	var off := _off_angle()
+	check(off > 25.0, "turning, it lags behind the turn so it shows (%.0f deg off)" % off)
+	worst = maxf(worst, await _turn_for(3.0, func(t: float) -> float: return turn * (t + 0.6)))
+	check(worst < settings.camera_settle_max_angle + 3.0, "a long turn never gets more than camera_settle_max_angle off (%.0f deg at most)" % worst)
+	await _seconds(2.0)
+	check(_off_angle() < 10.0, "turning stopped, it swings in behind while still accelerating (%.0f deg off)" % _off_angle())
+	var base := _yaw(-fish.global_basis.z)
+	var wobble := await _turn_for(3.0, func(t: float) -> float: return base + deg_to_rad(20.0) * sin(TAU * 1.5 * t), true)
+	check(wobble < 10.0, "a stride's 20 deg sweep each way barely moves it (%.1f deg at most)" % wobble)
+	Input.action_release("thrust_forward")
+	settings.camera_follow = 1
 
 	print("swap:")
 	var swaps: Array[bool] = []
@@ -158,6 +177,35 @@ func _face(yaw: float) -> void:
 	fish.angular_velocity = Vector3.ZERO
 	fish.global_basis = Basis(Vector3.UP, yaw)
 	fish.reset_physics_interpolation()
+
+
+## Turns the (frozen) fish to `yaw_at.call(elapsed)` every frame for `seconds`.
+## Returns the most the camera's heading got off the fish's nose (degrees), or
+## with `from_start` off its heading at the start.
+func _turn_for(seconds: float, yaw_at: Callable, from_start := false) -> float:
+	var start := _yaw(camera._heading)
+	var elapsed := 0.0
+	var most := 0.0
+	while elapsed < seconds:
+		elapsed += await _frame()
+		_face(yaw_at.call(elapsed))
+		var off := absf(rad_to_deg(wrapf(_yaw(camera._heading) - start, -PI, PI))) if from_start else _off_angle()
+		most = maxf(most, off)
+	return most
+
+
+func _frame() -> float:
+	await get_tree().process_frame
+	return get_process_delta_time()
+
+
+func _yaw(v: Vector3) -> float:
+	return atan2(-v.x, -v.z)
+
+
+## How far the camera's heading is off the fish's nose (degrees).
+func _off_angle() -> float:
+	return absf(rad_to_deg(wrapf(_yaw(-fish.global_basis.z) - _yaw(camera._heading), -PI, PI)))
 
 
 func _flat(v: Vector3) -> Vector3:

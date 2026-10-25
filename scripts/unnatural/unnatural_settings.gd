@@ -92,11 +92,31 @@ static func shared() -> UnnaturalSettings:
 ## Follow turns with the way the fish swims. Free turns only with the right
 ## stick, and stays where it's put.
 @export_enum("Follow", "Free") var camera_mode := 0
-## Follow cam: hold its direction while accelerate, reverse or boost is held, and
-## swing round behind the fish once they're let go, this quickly (1/s). Off: it
-## always turns, at camera_turn_rate.
-@export var camera_hold_on_throttle := true
+## Follow cam's style. Settle: follows slowly while the fish turns, so you see
+## it turn, and swings round behind it once it swims straight (camera_settle_*).
+## Hold: holds its direction while accelerate, reverse or boost is held, and
+## swings round behind once they're let go (camera_swing_rate). Always: always
+## turns, at camera_turn_rate.
+@export_enum("Settle", "Hold on throttle", "Always") var camera_follow := 0
+## Hold: how quickly it swings round behind the fish once accelerate, reverse
+## and boost are let go (1/s).
 @export_range(0.2, 30.0, 0.1, "or_greater") var camera_swing_rate := 4.0
+## Settle: how quickly it swings round behind the fish swimming straight, and
+## while it's turning (1/s; 0: holds still while turning).
+@export_range(0.1, 30.0, 0.1, "or_greater") var camera_settle_rate := 3.0
+@export_range(0.0, 30.0, 0.05, "or_greater") var camera_settle_turning_rate := 0.5
+## Settle: the fish's turn rate that counts as fully turning (degrees/s; lower
+## and gentle curves count as turns too).
+@export_range(5.0, 720.0, 5.0, "or_greater") var camera_settle_turn := 90.0
+## Settle: how long the fish's turning is averaged over (s), so a stride's
+## sweep one way and back cancels out; longer is calmer but slower to notice a turn.
+@export_range(0.0, 3.0, 0.05, "or_greater") var camera_settle_smoothing := 0.3
+## Settle: how long its swing round behind takes to build up once a turn ends
+## (s; 0: at once).
+@export_range(0.0, 5.0, 0.05, "or_greater") var camera_settle_delay := 0.4
+## Settle: how far the fish can turn off to the side before the camera turns
+## with it (degrees; 180: any way, even facing you).
+@export_range(10.0, 180.0, 1.0) var camera_settle_max_angle := 75.0
 ## Free cam: how fast the right stick turns it at full tilt (degrees/s), how
 ## far it can look up or down (degrees), and how quickly it drifts round
 ## behind the way the fish swims (1/s; 0: never, it stays where it's put).

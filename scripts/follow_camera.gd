@@ -15,9 +15,13 @@ extends Camera3D
 ## (heading_climb), and sits extra_distance further back,
 ## extra_height higher and extra_angle more tilted than the tuned view.
 ## The survivor cam has two modes, swapped with the ball cam button:
-## - follow cam: turns round behind the fish's nose, but while hold_on_throttle
-##   it holds its direction as long as accelerate or reverse is held, then
-##   swings back round behind it (swing_rate) once they're let go;
+## - follow cam: turns round behind the fish's nose, in one of three styles
+##   (follow_style): settle (FOLLOW_SETTLE) follows slowly while the fish is
+##   turning, so you see it turn, and swings round behind it once it swims
+##   straight (settle_rate), never letting it get more than settle_max_angle
+##   off to the side; hold (FOLLOW_HOLD) holds its direction as long as
+##   accelerate or reverse is held, then swings back round behind it
+##   (swing_rate) once they're let go; always (FOLLOW_ALWAYS) turns at heading_rate;
 ## - free cam (free_cam): only the right stick turns it, and it stays where
 ##   it's put (free_follow_rate can still drift it round behind the fish).
 ##
@@ -82,10 +86,29 @@ var extra_height := 0.0
 var extra_angle := 0.0
 ## The survivor cam's modes (see the class description).
 var free_cam := false
-var hold_on_throttle := true
-## Follow cam: how quickly it swings round behind the fish once accelerate and
+const FOLLOW_SETTLE := 0
+const FOLLOW_HOLD := 1
+const FOLLOW_ALWAYS := 2
+var follow_style := FOLLOW_SETTLE
+## Hold: how quickly it swings round behind the fish once accelerate and
 ## reverse are let go (1/s).
 var swing_rate := 4.0
+## Settle: how quickly it swings round behind the fish swimming straight, and
+## while it turns (1/s); the turn rate that counts as fully turning (rad/s);
+## how long the fish's turning is averaged over, so stride sweeps cancel out
+## (s); how long its catch-up takes to build once a turn ends (s); and how far
+## the fish can get off to the side before it's turned with it (rad; PI: any).
+var settle_rate := 3.0
+var settle_turning_rate := 0.5
+var settle_turn_full := 1.6
+var settle_smoothing := 0.3
+var settle_delay := 0.4
+var settle_max_angle := 1.3
+## Settle: the fish's smoothed yaw rate (rad/s), last frame's yaw (NAN: none
+## yet), and how steady it's been (0 turning .. 1 straight, ramped in).
+var _settle_turn := 0.0
+var _settle_yaw := NAN
+var _settle := 1.0
 ## Free cam: the right stick's turn rate at full tilt (rad/s), how far it can
 ## look up or down (rad), and its drift round to the way the fish swims (1/s).
 var free_turn_speed := 2.6
@@ -211,6 +234,9 @@ func snap() -> void:
 		_up = xform.basis.y
 	_rotation = Basis.looking_at(forward, _up).get_rotation_quaternion()
 	_heading = forward
+	_settle_yaw = NAN
+	_settle_turn = 0.0
+	_settle = 1.0
 	_spin = Vector3.ZERO
 	_lag = Vector3.ZERO
 	_lag_speed = Vector3.ZERO
@@ -397,21 +423,61 @@ func _process(delta: float) -> void:
 
 
 ## Where the chase view faces: the fish's nose, or while steady_heading the
-## way it swims, smoothed, its climb damped (follow cam; held while the fish
-## is driven, with hold_on_throttle), or where the right stick puts it (free cam).
+## way it swims, smoothed, its climb damped (follow cam, in its follow_style),
+## or where the right stick puts it (free cam).
 func _chase_forward(subject: Variant, fish_xform: Transform3D, delta: float) -> Vector3:
 	var facing := -fish_xform.basis.z
 	if not steady_heading:
 		return facing
+	if free_cam or follow_style != FOLLOW_SETTLE:
+		_settle_yaw = NAN  # so coming back to it doesn't read the gap as a turn
 	if free_cam:
 		if free_follow_rate > 0.0:
 			_turn_behind(subject, facing, free_follow_rate, delta)
 		return _free_heading(delta)
-	if not hold_on_throttle:
-		_turn_behind(subject, facing, heading_rate, delta)
-	elif not _throttle_held():
-		_turn_behind(subject, facing, swing_rate, delta)  # let go: swing round behind it
+	match follow_style:
+		FOLLOW_SETTLE:
+			_turn_behind(subject, facing, _settle_follow_rate(facing, delta), delta)
+			_keep_within(facing, settle_max_angle)
+		FOLLOW_HOLD:
+			if not _throttle_held():
+				_turn_behind(subject, facing, swing_rate, delta)  # let go: swing round behind it
+		_:
+			_turn_behind(subject, facing, heading_rate, delta)
 	return _heading
+
+
+## Settle: how quickly the follow cam turns this frame. The fish's yaw rate,
+## averaged over settle_smoothing (signed, so a stride's sweep one way and back
+## cancels out), says how hard it's turning: turning, it follows at
+## settle_turning_rate, so the turn shows; once the fish swims straight it
+## builds up to settle_rate over settle_delay, so it doesn't lurch round.
+func _settle_follow_rate(facing: Vector3, delta: float) -> float:
+	var flat := Vector3(facing.x, 0.0, facing.z)
+	if flat.length_squared() > 0.0001 and delta > 0.0:
+		var yaw := atan2(-flat.x, -flat.z)
+		if not is_nan(_settle_yaw):
+			var yaw_rate := clampf(wrapf(yaw - _settle_yaw, -PI, PI) / delta, -20.0, 20.0)
+			_settle_turn = lerpf(_settle_turn, yaw_rate, 1.0 - exp(-delta / maxf(settle_smoothing, 0.001)))
+		_settle_yaw = yaw
+	var steady := 1.0 - clampf(absf(_settle_turn) / maxf(settle_turn_full, 0.01), 0.0, 1.0)
+	if steady < _settle or settle_delay <= 0.0:
+		_settle = steady  # a turn slows it at once (the view's own spring smooths that)
+	else:
+		_settle = move_toward(_settle, steady, delta / settle_delay)
+	return lerpf(settle_turning_rate, settle_rate, smoothstep(0.0, 1.0, _settle))
+
+
+## Turns _heading's yaw just far enough that the fish's nose is no more than
+## `max_angle` (rad) to either side of it.
+func _keep_within(facing: Vector3, max_angle: float) -> void:
+	var flat := Vector3(facing.x, 0.0, facing.z)
+	var now_flat := Vector3(_heading.x, 0.0, _heading.z)
+	if max_angle >= PI or flat.length_squared() < 0.0001 or now_flat.length_squared() < 1e-8:
+		return
+	var off := wrapf(atan2(-flat.x, -flat.z) - atan2(-now_flat.x, -now_flat.z), -PI, PI)
+	if absf(off) > max_angle:
+		_heading = _heading.rotated(Vector3.UP, off - signf(off) * max_angle)
 
 
 ## Turns _heading round behind the fish's nose (where it faces, not where it's
