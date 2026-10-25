@@ -86,6 +86,10 @@ func proc() -> float:
 	return PROC
 
 
+func size_weight() -> float:
+	return settings.sting_size_weight if settings else 1.0
+
+
 ## The pulse's radius (m): sting_radius, or more if the bow wave reaches further.
 func radius() -> float:
 	return maxf(settings.sting_radius, GhostBite.bow_reach(fish) * settings.sting_over_bow) * size_scale

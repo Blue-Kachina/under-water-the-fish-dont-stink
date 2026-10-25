@@ -378,6 +378,9 @@ static func shared() -> UnnaturalSettings:
 ## ...never less than this times the bow wave's full reach (it's melee: it
 ## must out-reach ramming).
 @export_range(1.0, 5.0, 0.05, "or_greater") var sting_over_bow := 1.4
+## How much of the Size bonus the pulse gets (1: all; 0.5: +40% Size makes it
+## 20% wider). It hits everything inside, so size is worth more to it.
+@export_range(0.0, 2.0, 0.05, "or_greater") var sting_size_weight := 0.5
 
 @export_group("Shock Lash")
 ## The String Ray's: its tail whips the nearest zombie within lash_range (m),
@@ -389,6 +392,9 @@ static func shared() -> UnnaturalSettings:
 @export_range(0, 20, 1, "or_greater") var lash_arcs := 1
 @export_range(0.0, 50.0, 0.5, "or_greater") var lash_arc_range := 8.0
 @export_range(0.0, 2.0, 0.05, "or_greater") var lash_arc_share := 0.7
+## How much of the Size bonus the lash and its arcs get (1: all; 0.5: +40%
+## Size reaches 20% further).
+@export_range(0.0, 2.0, 0.05, "or_greater") var lash_size_weight := 0.5
 
 @export_group("Bill Thrust")
 ## The Swordfish's: a spear of light shot ahead (at the nearest zombie within

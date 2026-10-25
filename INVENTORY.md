@@ -102,7 +102,7 @@ Every stat starts at 0 and is a bonus. Percent stats are shares (0.1 = +10%); th
 | `pearl_chance` | Pearl Chance | +15% | % | yes | Pearls | — |
 | `luck` | Luck | +0.1 | flat | yes | Fortune | Lucky Sand Dollar (+0.1) |
 
-**What the global stats scale on weapons:** Attack Speed → fire/drop/tick rate (2× for Purple Haze's scatter rate, `haze_speed_weight`). Quantity → spears, bubbles, spine rings, lash arcs, punch follow-up gloves, haze bombs per scatter, Halo jellies. Size → every weapon's reach, radius, blast or hit size (every weapon, plus the area powerups such as Electric Eel, Torpedo, Tsunami Heart). Duration → Greek Fire patch life, Purple Haze cloud life, Anglerfish Lure, Ink Sac. Damage → every hit (applied in `UnnaturalRun.hit()`).
+**What the global stats scale on weapons:** Attack Speed → fire/drop/tick rate (2× for Purple Haze's scatter rate, `haze_speed_weight`). Quantity → spears, bubbles, spine rings, lash arcs, punch follow-up gloves, haze bombs per scatter, Halo jellies. Size → every weapon's reach, radius, blast or hit size (every weapon, plus the area powerups such as Electric Eel, Torpedo, Tsunami Heart; Anemone Sting and Shock Lash get only half of the bonus, `sting_size_weight` / `lash_size_weight` 0.5). Duration → Greek Fire patch life, Purple Haze cloud life, Anglerfish Lure, Ink Sac. Damage → every hit (applied in `UnnaturalRun.hit()`).
 
 ---
 

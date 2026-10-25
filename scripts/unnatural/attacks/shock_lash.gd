@@ -37,6 +37,10 @@ func uses_stat(id: String) -> bool:
 	return id == "quantity"
 
 
+func size_weight() -> float:
+	return settings.lash_size_weight if settings else 1.0
+
+
 ## How far the tail reaches (m): lash_range, never less than the bow wave's
 ## full reach times the bite's margin (it's a whip: it must out-reach ramming).
 func reach() -> float:

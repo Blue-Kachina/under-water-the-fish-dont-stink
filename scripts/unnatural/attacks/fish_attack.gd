@@ -185,6 +185,12 @@ func own_facets() -> bool:
 	return false
 
 
+## How much of its Size bonus (Size times its size facet) it gets: 1 all of
+## it, 0.5 half (+40% Size makes it 20% bigger).
+func size_weight() -> float:
+	return 1.0
+
+
 ## Whether its uses count as attacks (Poseidon's Trident counts them). The
 ## steady weapons have none: the Trident strikes on its own timer for them.
 func counts_uses() -> bool:
@@ -230,6 +236,7 @@ func configure(block: StatBlock, held: Dictionary, at_level: int) -> void:
 		knock_scale = 1.0 + facet("knock")
 		extra_projectiles = floori(block.value("quantity") + 0.0001) + facet_count("count")
 		projectile_speed = (1.0 + block.value("projectile_speed")) * (1.0 + facet("speed"))
+	size_scale = maxf(1.0 + (size_scale - 1.0) * size_weight(), 0.1)
 	milestones = settings.milestones_at(at_level) if settings else 0
 	if at_level != level:
 		level = at_level
