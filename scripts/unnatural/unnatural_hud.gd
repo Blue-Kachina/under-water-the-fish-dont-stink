@@ -186,6 +186,9 @@ func _ready() -> void:
 			_splash.play("STAGE %d" % stage, "DEEPER INTO THE NIGHT", ("THE LAST STAGE" if stages > 0 and stage >= stages else "THE DEAD COME HARDER"),
 					TreasureChest.GOLD, 2.8))
 		run.shrine_used.connect(_show_shrine)
+		run.rift_woken.connect(func(by: FishController) -> void:
+			var who := "YOU" if by == fish else (by.display_name.to_upper() if is_instance_valid(by) and by.display_name else "SOMEONE")
+			_note("%s WENT DOWN THE CREVICE  ·  SOMETHING WAKES" % who, Minimap.RIFT_COLOR))
 		run.offer_cancelled.connect(func(for_fish: FishController) -> void:
 			if for_fish == fish and not run.is_picking(fish):
 				_cards.close())
@@ -330,6 +333,8 @@ func _process(delta: float) -> void:
 	elif is_instance_valid(fish) and run.shrine_near(fish):
 		var shrine := run.shrine_near(fish)
 		_note(_shrine_prompt(shrine), shrine.tint())
+	elif is_instance_valid(fish) and run.rift_near(fish):
+		_note("A CREVICE  ·  IT GOES DOWN A LONG WAY  ·  RED LIGHT BELOW  ·  DIVE IN TO WAKE THE FINAL BOSS", Minimap.RIFT_COLOR)  # held while you're near
 	var holder := run.current_boss() as BloodLeviathan
 	if holder and holder.held == fish:
 		_note("STRIDE  ·  STRIDE  ·  STRIDE TO BREAK FREE", HP_COLOR)  # held while it holds you

@@ -7,6 +7,7 @@ extends Control
 ## - players: an arrow each, in their fish's colour, the way they face (you
 ##   outlined in white; a cross while down);
 ## - bosses: a skull (the mini-boss smaller), pinned to the rim when out of range;
+## - the boss rift (BossRift): a big red skull, always shown (pinned to the rim);
 ## - elites: a red dot;
 ## - the zombie swarms: soft red clouds, from the Horde's survey (a coarse
 ##   count per arena cell, redone minimap_rate times a second and shared by
@@ -34,6 +35,8 @@ const CLOUD_CELL := 4.0
 const MARGIN := Vector2(18.0, 48.0)
 const ELITE_COLOR := Color(1.0, 0.2, 0.15)
 const BONE := Color(0.92, 0.88, 0.8)
+## The boss rift's skull.
+const RIFT_COLOR := Color(1.0, 0.16, 0.1)
 const SIDES := 48
 ## The compass ring's width (px) round the map, and its letters.
 const BEZEL := 15.0
@@ -213,6 +216,25 @@ static func draw_skull(canvas: CanvasItem, spot: Vector2, radius: float) -> void
 	canvas.draw_circle(spot + Vector2(radius * 0.35, -radius * 0.15), radius * 0.24, Color(0.6, 0.0, 0.0))
 
 
+## The boss rift: a big red skull on a dark disc, ringed red, slowly pulsing.
+static func draw_rift(canvas: CanvasItem, spot: Vector2, radius: float) -> void:
+	var beat := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 260.0)
+	canvas.draw_circle(spot, radius + 3.5 + beat * 2.0, Color(RIFT_COLOR, 0.25 + 0.2 * beat))
+	canvas.draw_circle(spot, radius + 2.0, Color(BroadcastUI.INK, 0.95))
+	canvas.draw_arc(spot, radius + 1.0, 0.0, TAU, 24, RIFT_COLOR, 1.5, true)
+	var r := radius * 0.92
+	canvas.draw_circle(spot + Vector2(0.0, -r * 0.15), r * 0.85, RIFT_COLOR)
+	canvas.draw_rect(Rect2(spot + Vector2(-r * 0.5, r * 0.25), Vector2(r, r * 0.6)), RIFT_COLOR)
+	var socket := Color(0.12, 0.0, 0.0)
+	canvas.draw_circle(spot + Vector2(-r * 0.35, -r * 0.15), r * 0.26, socket)
+	canvas.draw_circle(spot + Vector2(r * 0.35, -r * 0.15), r * 0.26, socket)
+	canvas.draw_colored_polygon(PackedVector2Array([spot + Vector2(0.0, r * 0.12), spot + Vector2(-r * 0.12, r * 0.38),
+			spot + Vector2(r * 0.12, r * 0.38)]), socket)
+	for n in 3:
+		var x := (n - 1) * r * 0.3
+		canvas.draw_line(spot + Vector2(x, r * 0.55), spot + Vector2(x, r * 0.85), socket, maxf(r * 0.1, 1.0))
+
+
 ## A player's arrow pointing `ahead` (unit, on the canvas), in `color`.
 static func draw_arrow(canvas: CanvasItem, spot: Vector2, ahead: Vector2, color: Color, outline: Color, length: float) -> void:
 	var side := Vector2(-ahead.y, ahead.x)
@@ -303,6 +325,8 @@ class Marks extends Control:
 			Minimap.draw_skull(self, map.to_rim(spot, 9.0), 9.0 if boss is BloodLeviathan else 6.5)
 		if is_instance_valid(run.whirlpool):
 			Minimap.draw_whirlpool(self, map.to_rim(map.to_map(run.whirlpool.global_position), 9.0), 8.0)
+		if is_instance_valid(run.rift) and not run.rift.spent:
+			Minimap.draw_rift(self, map.to_rim(map.to_map(run.rift.global_position), 14.0), 10.0)
 		for fish in run.players:
 			if is_instance_valid(fish) and fish != me:
 				_draw_player(run, fish, false)

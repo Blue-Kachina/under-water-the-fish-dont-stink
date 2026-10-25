@@ -194,6 +194,30 @@ func _host() -> void:
 	run.whirlpool = null
 	run.cleared_at = -1.0
 
+	print("host: the boss rift")
+	run.timeline.pending.append({"id": "boss", "time": 1e6, "warned": true})  # (stage_events are off here)
+	var rift_at := fish.global_position + Vector3(30.0, 0.0, 0.0)
+	rift_at.y = run.centre.y + settings.arena_floor
+	var rift := run.add_rift(rift_at, 0.7)
+	await _seconds(0.5)
+	await _phase("rift", {"at": rift.global_position, "yaw": rift.rotation.y})
+	await _wait(func() -> bool: return rift.woken, 5.0)
+	check(rift.woken and rift.spent, "the guest went down the rift: woken here")
+	var risen := run.current_boss() as BloodLeviathan
+	check(risen != null and not run.timeline.is_pending("boss"), "...and the final boss came")
+	check(risen != null and risen.global_position.distance_to(rift.global_position) < settings.rift_boss_rise + 6.0,
+			"...rising out of the rift")
+	await _seconds(1.0)
+	await _phase("rift_boss", {"id": risen.boss_id if risen else -1})
+	if risen:
+		risen.take(risen.hp + 1.0, fish, "probe")
+	await _seconds(3.0)
+	await _phase("final_down", {})
+	if is_instance_valid(run.whirlpool):
+		run.whirlpool.queue_free()
+	run.whirlpool = null
+	run.cleared_at = -1.0
+
 	print("host: down and revive")
 	await _phase("go_down", {})
 	await _seconds(0.5)
@@ -327,6 +351,28 @@ func _guest() -> void:
 					run.whirlpool.queue_free()
 				run.whirlpool = null
 				run.cleared_at = -1.0
+			"rift":
+				await _wait(func() -> bool: return is_instance_valid(run.rift), 3.0)
+				check(is_instance_valid(run.rift) and run.rift.global_position.is_equal_approx(data.at) and is_equal_approx(run.rift.rotation.y, data.yaw),
+						"the host's rift is here, where it has it")
+				if is_instance_valid(run.rift):
+					run.timeline.pending.append({"id": "boss", "time": 1e6, "warned": true})
+					for n in 10:
+						if run.is_picking(fish):
+							run.pick(fish, 0)  # the boss's chest's cards: they'd keep us out
+							await _ticks(2)
+					for n in 20:
+						if not run.can_wake_rift():
+							break
+						fish.global_position = run.rift.global_position + Vector3(0.2, 2.5, 0.0)
+						fish.linear_velocity = Vector3(0.0, -3.0, 0.0)
+						await _ticks(1)
+					check(run.rift.woken and not run.timeline.is_pending("boss"), "we went down it: woken here, the boss's time come")
+					await _ticks(6)
+					check(run.rift.distance_to(fish.global_position) > settings.rift_throw_distance * 0.6, "it spat us out")
+			"rift_boss":
+				await _wait(func() -> bool: return run.boss_by_id(data.id) != null, 3.0)
+				check(run.boss_by_id(data.id) != null, "the boss that rose out of it is here too")
 			"boss_down":
 				await _wait(func() -> bool: return run.current_boss() == null, 3.0)
 				check(run.current_boss() == null, "the host beat it: gone here too")

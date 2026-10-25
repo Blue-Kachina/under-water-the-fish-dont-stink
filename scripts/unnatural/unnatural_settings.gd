@@ -658,6 +658,31 @@ static func shared() -> UnnaturalSettings:
 ## shrine_pearls_bonus more spill out of it.
 @export_range(0, 500, 1, "or_greater") var shrine_pearls_bonus := 10
 
+@export_group("Boss Rift")
+## The boss rift (BossRift): one random spot on each stage's seabed, rubble
+## over a deep crevice glowing red, on every player's minimap and compass
+## from the start. Swim down into it (within rift_pad m of its mouth and
+## rift_dive_height m of the sand, heading down faster than rift_dive_speed
+## m/s) and the final boss comes now, rising out of it rift_boss_rise m up.
+## Off: no rift (the final boss comes on its time only).
+@export var rift := true
+## At least this far from the start (m), and rift_shrine_gap from any shrine.
+@export_range(0.0, 300.0, 5.0, "or_greater") var rift_min_start := 45.0
+@export_range(0.0, 200.0, 5.0, "or_greater") var rift_shrine_gap := 30.0
+@export_range(0.0, 10.0, 0.25, "or_greater") var rift_pad := 0.75
+@export_range(0.5, 20.0, 0.25, "or_greater") var rift_dive_height := 3.5
+@export_range(0.0, 10.0, 0.1, "or_greater") var rift_dive_speed := 0.3
+## Within this (m along the sand) the HUD says what it is.
+@export_range(0.0, 100.0, 1.0, "or_greater") var rift_hint_range := 9.0
+## The fish it spits out lands rift_throw_distance m away (and
+## rift_throw_height m up), flung on at rift_throw_speed m/s.
+@export_range(0.0, 100.0, 1.0, "or_greater") var rift_throw_distance := 16.0
+@export_range(0.0, 60.0, 0.5, "or_greater") var rift_throw_height := 7.0
+@export_range(0.0, 100.0, 1.0, "or_greater") var rift_throw_speed := 18.0
+@export_range(0.0, 60.0, 0.5, "or_greater") var rift_boss_rise := 6.0
+## Its red light's strength (x).
+@export_range(0.0, 5.0, 0.05, "or_greater") var rift_glow := 1.0
+
 @export_group("Elite Modifiers")
 ## Elites (P5, RoR2 style): an elite has elite_modifier_chance of a modifier,
 ## each glowing its own colour, and drops chests modifier_chest_scale x as often

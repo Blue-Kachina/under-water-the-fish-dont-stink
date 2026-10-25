@@ -91,6 +91,8 @@ func hook(game_run: UnnaturalRun) -> void:
 		run.shrine_placed.connect(func(shrine: Shrine) -> void: _send_all("_shrine", [shrine.global_position, shrine.kind], true))
 		run.shrine_activated.connect(func(shrine: Shrine, fish: FishController) -> void:
 			_send_all("_shrine_on", [shrine.index, _pid(fish)], true))
+		run.rift_placed.connect(func(rift: BossRift) -> void: _send_all("_rift", [rift.global_position, rift.rotation.y], true))
+		run.rift_woken.connect(func(fish: FishController) -> void: _send_all("_rift_on", [_pid(fish)], true))
 	else:
 		run.hit_claimed.connect(_on_hit_claimed)
 		run.pearl_claimed.connect(_on_pearl_claimed)
@@ -101,6 +103,7 @@ func hook(game_run: UnnaturalRun) -> void:
 		run.whirlpool_claimed.connect(_on_whirlpool_claimed)
 		run.pickup_claimed.connect(_on_pickup_claimed)
 		run.shrine_claimed.connect(func(index: int, by: FishController) -> void: _send_host("_claim_shrine", [index, _pid(by)], true))
+		run.rift_claimed.connect(func(by: FishController) -> void: _send_host("_claim_rift", [_pid(by)], true))
 	run.player_down.connect(_on_down.bind(true))
 	run.player_revived.connect(_on_down.bind(false))
 
@@ -327,6 +330,10 @@ func world() -> Dictionary:
 	for shrine in run.shrines:
 		if is_instance_valid(shrine):
 			shrines.append([shrine.global_position, shrine.kind, shrine.spent, shrine.tide_active, shrine.tide_held])
+	# The boss rift: where, its turn, spent and woken ([]: none).
+	var rift := []
+	if is_instance_valid(run.rift):
+		rift = [run.rift.global_position, run.rift.rotation.y, run.rift.spent, run.rift.woken]
 	var bosses := []
 	for boss in run.bosses:
 		if is_instance_valid(boss) and not boss.dying:
@@ -337,7 +344,7 @@ func world() -> Dictionary:
 					boss.global_position, boss.net_state()])
 	return {"mode": "unnatural", "zombies": zombies, "chests": chests, "drops": drops, "pearls": pearls, "frozen": run.horde.frozen_left,
 			"bosses": bosses, "elapsed": run.elapsed, "stage": run.stage, "stage_started": run.stage_started, "deep": run.deep,
-			"shrines": shrines,
+			"shrines": shrines, "rift": rift,
 			"level": run.levels.level, "xp": run.levels.xp, "kills": run.kills, "over": run.is_over, "won": run.stage_complete}
 
 
@@ -356,6 +363,14 @@ func apply_world(state: Dictionary) -> void:
 		shrine.spent = entry[2]
 		shrine.tide_active = entry[3]
 		shrine.tide_held = entry[4]
+	run._place_rift()  # (a guest's: clears it, for the host's below)
+	var rift: Array = state.get("rift", [])
+	if not rift.is_empty():
+		run.add_rift(rift[0], rift[1])
+		run.rift.spent = rift[2]
+		run.rift.woken = rift[3]
+		if rift[3]:
+			run.timeline.drop("boss")  # it came early: no late warning here
 	_spawn_all(state.zombies)
 	for entry: Array in state.chests:
 		var chest := run.add_chest(entry[0], entry[1], entry[2], (entry[5] if entry.size() > 5 else 0) as TreasureChest.Kind, entry[6] if entry.size() > 6 else "")
@@ -620,3 +635,25 @@ func _shrine_on(index: int, pid: int) -> void:
 func _claim_shrine(index: int, pid: int) -> void:
 	if is_host() and index >= 0 and index < run.shrines.size():
 		run.activate_shrine(run.shrines[index], coop.fish_of(pid))  # (shrine_activated tells everyone)
+
+
+# --- The boss rift ----------------------------------------------------------
+
+@rpc("authority", "call_remote", "reliable")
+func _rift(at: Vector3, yaw: float) -> void:
+	if _guest_run():
+		run.add_rift(at, yaw)
+
+
+## The host's rift was woken (by `pid`): the final boss comes here too.
+@rpc("authority", "call_remote", "reliable")
+func _rift_on(pid: int) -> void:
+	if _guest_run():
+		run.wake_rift(coop.fish_of(pid), false)
+
+
+## A guest's player went down the rift: the host wakes it for everyone.
+@rpc("any_peer", "call_remote", "reliable")
+func _claim_rift(pid: int) -> void:
+	if is_host():
+		run.wake_rift(coop.fish_of(pid))  # (rift_woken tells everyone)

@@ -95,7 +95,7 @@ const TABS := {
 			["Survivor", ["Player", "Batteries", "Levels", "Weapons and Tomes", "Pearls"]],
 			["Limits", ["Limits", "Choices"]],
 			["Attacks", ["Attacks", "Ghost Bite", "Anemone Sting", "Shock Lash", "Bill Thrust", "Bubble Volley", "Spine Burst", "Cavitation Punch"]],
-			["Stage & Bosses", ["Stage", "Run", "Drowned Shark", "Blood Leviathan", "Final Bosses"]],
+			["Stage & Bosses", ["Stage", "Run", "Drowned Shark", "Blood Leviathan", "Final Bosses", "Boss Rift"]],
 			["Pacing", ["Shrines", "Elite Modifiers"]],
 			["Loot", ["Chests", "Drops", "Rarity"]],
 			["Test Tank", ["Test Tank"]],

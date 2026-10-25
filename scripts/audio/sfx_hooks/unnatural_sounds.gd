@@ -91,6 +91,7 @@ func _ready() -> void:
 	run.stage_warned.connect(_on_stage_warned)
 	run.stage_event.connect(_on_stage_event)
 	run.boss_arrived.connect(_on_boss_arrived)
+	run.rift_woken.connect(func(_fish: FishController) -> void: _play_if("unnatural/rift_woken"))
 	run.boss_enraged.connect(func(_boss: Boss) -> void: Sfx.play("boss/enraged"))
 	run.boss_defeated.connect(func(_boss: Boss, _by: FishController) -> void: Sfx.play("boss/defeated"))
 	run.stage_completed.connect(func() -> void:

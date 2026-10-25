@@ -143,6 +143,12 @@ signal shrine_placed(shrine: Shrine)
 signal shrine_claimed(index: int, by: FishController)
 signal shrine_activated(shrine: Shrine, by: FishController)
 signal shrine_used(shrine: Shrine, by: FishController, result: String)
+## The boss rift: placed (the host's, for the guests); woken by `by` going in
+## (on every machine; the final boss comes now); a guest's player went in
+## (the host wakes it for everyone).
+signal rift_placed(rift: BossRift)
+signal rift_woken(by: FishController)
+signal rift_claimed(by: FishController)
 ## A player's rerolls, skips or banishes changed (P4).
 signal choices_changed(fish: FishController)
 
@@ -303,6 +309,8 @@ var stage_started := 0.0
 ## Shrines of the Deep set off this stage, and the stage's shrines.
 var deep := 0
 var shrines: Array[Shrine] = []
+## The stage's boss rift (null: none).
+var rift: BossRift
 ## A beaten shrine's pearls' ids: this minus stage x 1000, shrine x 50, the pearl's number.
 const SHRINE_PEARL := 1900000000
 ## A chest's `item` that makes it free (a Tide won).
@@ -439,6 +447,7 @@ func start() -> void:
 	_last_rotation = PackedByteArray()
 	_rotate_kinds()
 	timeline.reset()
+	_place_rift()
 	stage_complete = false
 	enraged = false
 	levels.reset()
@@ -903,6 +912,7 @@ func _physics_process(delta: float) -> void:
 		_open_chests(fish, delta)
 		_try_whirlpool(fish)
 		_try_shrine(fish)
+		_try_rift(fish)
 		_batter_zombies(fish)
 		if not tank or settings.tank_contact:
 			_touch_zombies(fish)
@@ -1574,6 +1584,8 @@ func _start_event(event: String) -> void:
 			(_powerups[fish] as Powerups).on_stage_event(event)
 	if event in SWARM_EVENTS:
 		swarm = {"id": event, "left": settings.swarm_event_time, "next": settings.swarm_wave_every, "wave": 0}
+	if event == "boss" and is_instance_valid(rift):
+		rift.spent = true  # it's come: woken or on time, the rift goes cold
 	if not authority:
 		return  # the host makes it happen; its zombies and bosses come over the network
 	var around := PackedVector3Array()
@@ -1590,7 +1602,10 @@ func _start_event(event: String) -> void:
 			_add_boss(DrownedShark.new(), spawn_point(around[0]), settings.shark_hp * crowd)
 		"boss":
 			_clean_up(around)
-			_add_boss(make_final_boss(pick_final_boss()), spawn_point(around[0]), settings.leviathan_hp * crowd)
+			var at := spawn_point(around[0])
+			if is_instance_valid(rift) and rift.woken:
+				at = rift.global_position + Vector3.UP * settings.rift_boss_rise  # it rises out of the rift
+			_add_boss(make_final_boss(pick_final_boss()), at, settings.leviathan_hp * crowd)
 
 
 ## Swarm event `event`'s wave `wave` round the players up (`around`): each
@@ -2676,6 +2691,7 @@ func next_stage() -> void:
 	_build_seabed()
 	_bury_chests()
 	_place_shrines()
+	_place_rift()
 	if is_instance_valid(blood_moon):
 		blood_moon.strength = settings.blood_moon * (1.0 + 0.15 * (stage - 1))
 	var spawn: Transform3D = ocean.spawn_transform()
@@ -2922,6 +2938,124 @@ func running_tide() -> Shrine:
 		if is_instance_valid(shrine) and shrine.tide_active:
 			return shrine
 	return null
+
+
+# --- The boss rift ----------------------------------------------------------
+
+## The stage's boss rift (BossRift), when its final boss is still to come: a
+## random spot on the seabed at least rift_min_start from the start, off the
+## ruins and rift_shrine_gap from every shrine (the host's; guests get it sent,
+## rift_placed).
+func _place_rift() -> void:
+	if is_instance_valid(rift):
+		rift.queue_free()
+	rift = null
+	if test_tank or not authority or not settings.rift or not settings.stage_events or settings.boss_time <= 0.0:
+		return
+	var reach := settings.arena_radius * 0.8
+	var spot := Vector2.ZERO
+	for attempt in 32:
+		spot = Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf_range(0.05, 1.0)) * reach
+		var clear := spot.length() >= minf(settings.rift_min_start, reach * 0.8)
+		if is_instance_valid(seabed):
+			for ruin in seabed.cluster_spots:
+				if Vector2(ruin.x, ruin.z).distance_to(spot) < 20.0:
+					clear = false
+		for shrine in shrines:
+			if is_instance_valid(shrine) and Vector2(shrine.position.x - centre.x, shrine.position.z - centre.z).distance_to(spot) < settings.rift_shrine_gap:
+				clear = false
+		if clear:
+			break
+	add_rift(centre + Vector3(spot.x, settings.arena_floor, spot.y), rng.randf() * TAU)
+
+
+## The boss rift at `at`, turned `yaw` (on every machine: the host's own, or the one it sent).
+func add_rift(at: Vector3, yaw: float) -> BossRift:
+	if is_instance_valid(rift):
+		rift.queue_free()
+	rift = BossRift.new()
+	rift.name = "BossRift"
+	rift.glow = settings.rift_glow
+	rift.position = at
+	rift.rotation.y = yaw
+	add_child(rift)
+	if is_instance_valid(seabed):
+		seabed.clear_around(rift.global_position, maxf(settings.scenery_clearing, BossRift.MOUTH.x + 4.0))
+	if authority:
+		rift_placed.emit(rift)
+	return rift
+
+
+## Whether the rift can still be woken (the final boss still to come).
+func can_wake_rift() -> bool:
+	return is_instance_valid(rift) and not rift.spent and not is_over and not tank and timeline.is_pending("boss")
+
+
+## The rift, when `fish` is close enough to see what it is (null: not).
+func rift_near(fish: FishController) -> BossRift:
+	if not is_instance_valid(fish) or not can_wake_rift() or not is_up(fish):
+		return null
+	return rift if rift.distance_to(fish.global_position) <= settings.rift_hint_range else null
+
+
+## A local player diving down into the rift wakes it.
+func _try_rift(fish: FishController) -> void:
+	if not can_wake_rift() or is_picking(fish):
+		return
+	if not rift.is_inside(fish.global_position, settings.rift_pad, settings.rift_dive_height):
+		return
+	if fish.linear_velocity.y > -settings.rift_dive_speed:
+		return  # only going down into it, not swimming low over it
+	wake_rift(fish)
+
+
+## `fish` went down the rift: it spits them out (a local player's fish lands
+## rift_throw_distance away, flung on), and the final boss comes now, rising
+## out of it. On every machine; a guest's own goes to the host (rift_claimed),
+## which wakes it for everyone (`claim` false: the host's word, nothing to send back).
+func wake_rift(fish: FishController, claim := true) -> void:
+	if not can_wake_rift():
+		return
+	rift.woken = true
+	rift.spent = true
+	rift.erupt()
+	if is_instance_valid(fish) and not fish.puppet and players.has(fish):
+		_spit_out(fish)
+	if is_instance_valid(fish):
+		stats_of(fish)["rifts"] = stats_of(fish).get("rifts", 0) + 1
+	timeline.trigger("boss")
+	rift_woken.emit(fish)
+	if claim and not authority:
+		rift_claimed.emit(fish)
+
+
+## The rift throws `fish` back out: rift_throw_distance m away along the sand
+## (back the way it came in, or toward the middle at the arena's edge),
+## rift_throw_height m up, flung on at rift_throw_speed m/s.
+func _spit_out(fish: FishController) -> void:
+	var from := rift.global_position
+	var away := Vector3(fish.global_position.x - from.x, 0.0, fish.global_position.z - from.z)
+	if away.length_squared() < 0.01:
+		away = -fish.global_basis.z
+		away.y = 0.0
+	away = away.normalized() if away.length_squared() > 0.0001 else Vector3.FORWARD
+	var land := from + away * settings.rift_throw_distance
+	var flat := Vector2(land.x - centre.x, land.z - centre.z)
+	if flat.length() > settings.arena_radius - 5.0:
+		away = Vector3(centre.x - from.x, 0.0, centre.z - from.z).normalized()
+		land = from + away * settings.rift_throw_distance
+	land.y = clampf(from.y + settings.rift_throw_height, centre.y + settings.arena_floor + 2.0, centre.y + settings.arena_ceiling - 1.0)
+	fish.revive(Transform3D(Basis.looking_at(away, Vector3.UP), land))
+	_fling(fish, (away + Vector3.UP * 0.45).normalized() * settings.rift_throw_speed)
+	_announce_teleport([fish])
+
+
+## A push for `fish` once its move has landed (a reset clears pushes).
+func _fling(fish: FishController, push: Vector3) -> void:
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	if is_instance_valid(fish):
+		fish.apply_push(push)
 
 
 # --- Elite modifiers (P5) -------------------------------------------------

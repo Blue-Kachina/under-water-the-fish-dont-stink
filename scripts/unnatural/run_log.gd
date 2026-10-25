@@ -125,7 +125,7 @@ func finish(outcome: String) -> void:
 			"fish": FishCharacter.FishClass.keys()[fish.character] if fish.character < FishCharacter.FishClass.size() else str(fish.character),
 			"kills": stats.kills, "battered": stats.battered, "damage": snappedf(stats.damage, 0.1),
 			"by_source": _rounded(stats.by_source), "taken": snappedf(stats.taken, 0.1), "pearls": stats.pearls,
-			"chests": stats.get("chests", 0), "bosses": stats.get("bosses", 0), "down": died, "shrines": stats.get("shrines", 0),
+			"chests": stats.get("chests", 0), "bosses": stats.get("bosses", 0), "down": died, "shrines": stats.get("shrines", 0), "rifts": stats.get("rifts", 0),
 			"rerolls": stats.get("rerolls", 0), "skips": stats.get("skips", 0), "banished": stats.get("banished", []),
 			"build": _build(fish),
 		})

@@ -66,6 +66,34 @@ func hushed(elapsed: float) -> bool:
 	return false
 
 
+## Whether event `id` is still to come.
+func is_pending(id: String) -> bool:
+	for event in pending:
+		if event.id == id:
+			return true
+	return false
+
+
+## Event `id` starts now, ahead of its time (the boss rift), with no warning.
+## False if it isn't still to come.
+func trigger(id: String) -> bool:
+	if not drop(id):
+		return false
+	fired.append(id)
+	started.emit(id)
+	return true
+
+
+## Event `id` won't come (it already has, early, on the host). False if it
+## wasn't still to come.
+func drop(id: String) -> bool:
+	for n in pending.size():
+		if pending[n].id == id:
+			pending.remove_at(n)
+			return true
+	return false
+
+
 ## Announces and starts what's due at `elapsed`.
 func update(elapsed: float) -> void:
 	while not pending.is_empty():
