@@ -117,6 +117,11 @@ static func shared() -> UnnaturalSettings:
 ## Settle: how far the fish can turn off to the side before the camera turns
 ## with it (degrees; 180: any way, even facing you).
 @export_range(10.0, 180.0, 1.0) var camera_settle_max_angle := 75.0
+## Settle: how quickly it swings round behind the fish once accelerate, reverse
+## and boost are let go, turning or not (1/s; 0: no faster than swimming), and
+## how long that takes to come in (s).
+@export_range(0.0, 30.0, 0.1, "or_greater") var camera_settle_coast_rate := 6.0
+@export_range(0.0, 2.0, 0.05, "or_greater") var camera_settle_coast_ease := 0.15
 ## Free cam: how fast the right stick turns it at full tilt (degrees/s), how
 ## far it can look up or down (degrees), and how quickly it drifts round
 ## behind the way the fish swims (1/s; 0: never, it stays where it's put).

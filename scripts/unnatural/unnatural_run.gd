@@ -542,6 +542,8 @@ static func steady_camera(camera: Node, on: bool, from: UnnaturalSettings, pull 
 	camera.set("settle_smoothing", from.camera_settle_smoothing)
 	camera.set("settle_delay", from.camera_settle_delay)
 	camera.set("settle_max_angle", deg_to_rad(from.camera_settle_max_angle))
+	camera.set("settle_coast_rate", from.camera_settle_coast_rate)
+	camera.set("settle_coast_ease", from.camera_settle_coast_ease)
 	camera.set("free_turn_speed", deg_to_rad(from.free_cam_speed))
 	camera.set("free_pitch_limit", deg_to_rad(from.free_cam_pitch))
 	camera.set("free_follow_rate", from.free_cam_follow)

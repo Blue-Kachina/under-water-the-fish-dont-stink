@@ -3,7 +3,7 @@ extends Node
 ## the follow cam turns with the fish: in its Hold style it holds its direction
 ## while accelerate or reverse is held; in Settle it lags the fish's turns,
 ## within camera_settle_max_angle, and swings behind once it swims straight
-## (accelerating or not), and a stride's sweep barely moves it; the ball cam button swaps to the free cam, which the
+## (accelerating or not), faster once it's let go, and a stride's sweep barely moves it; the ball cam button swaps to the free cam, which the
 ## fish's turning leaves alone, the right stick turns (within its pitch limit),
 ## and stays where it's put; the panel's camera_mode sets the mode again.
 ##   Godot_console.exe --headless --path . res://tests/survivor_cam_probe.tscn
@@ -102,6 +102,10 @@ func _run() -> void:
 	var base := _yaw(-fish.global_basis.z)
 	var wobble := await _turn_for(3.0, func(t: float) -> float: return base + deg_to_rad(20.0) * sin(TAU * 1.5 * t), true)
 	check(wobble < 10.0, "a stride's 20 deg sweep each way barely moves it (%.1f deg at most)" % wobble)
+	# The same turn, then let go mid-turn: it swings in faster than holding on.
+	var held := await _settle_after_turn(true)
+	var let_go := await _settle_after_turn(false)
+	check(let_go < held - 10.0, "let go of accelerate mid-turn, it swings in faster (%.0f deg off after 0.4 s, %.0f holding on)" % [let_go, held])
 	Input.action_release("thrust_forward")
 	settings.camera_follow = 1
 
@@ -192,6 +196,20 @@ func _turn_for(seconds: float, yaw_at: Callable, from_start := false) -> float:
 		var off := absf(rad_to_deg(wrapf(_yaw(camera._heading) - start, -PI, PI))) if from_start else _off_angle()
 		most = maxf(most, off)
 	return most
+
+
+## Settle: turns the fish 60 deg, stops, holding accelerate or letting it go,
+## and returns how far off it still is 0.4 s later (degrees).
+func _settle_after_turn(hold: bool) -> float:
+	_face(0.0)
+	camera.snap()
+	Input.action_press("thrust_forward")
+	await _turn_for(0.5, func(t: float) -> float: return deg_to_rad(120.0) * t)
+	if not hold:
+		Input.action_release("thrust_forward")
+	await _turn_for(0.4, func(_t: float) -> float: return deg_to_rad(60.0))
+	Input.action_press("thrust_forward")
+	return _off_angle()
 
 
 func _frame() -> float:

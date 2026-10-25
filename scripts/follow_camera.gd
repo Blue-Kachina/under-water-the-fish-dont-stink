@@ -18,8 +18,9 @@ extends Camera3D
 ## - follow cam: turns round behind the fish's nose, in one of three styles
 ##   (follow_style): settle (FOLLOW_SETTLE) follows slowly while the fish is
 ##   turning, so you see it turn, and swings round behind it once it swims
-##   straight (settle_rate), never letting it get more than settle_max_angle
-##   off to the side; hold (FOLLOW_HOLD) holds its direction as long as
+##   straight (settle_rate), or faster as soon as accelerate, reverse and
+##   boost are let go (settle_coast_rate), never letting it get more than
+##   settle_max_angle off to the side; hold (FOLLOW_HOLD) holds its direction as long as
 ##   accelerate or reverse is held, then swings back round behind it
 ##   (swing_rate) once they're let go; always (FOLLOW_ALWAYS) turns at heading_rate;
 ## - free cam (free_cam): only the right stick turns it, and it stays where
@@ -104,11 +105,18 @@ var settle_turn_full := 1.6
 var settle_smoothing := 0.3
 var settle_delay := 0.4
 var settle_max_angle := 1.3
+## Settle: how quickly it swings round behind while accelerate, reverse and
+## boost are let go (1/s; 0: no faster than swimming), and how long that takes
+## to come in once they are (s).
+var settle_coast_rate := 6.0
+var settle_coast_ease := 0.15
 ## Settle: the fish's smoothed yaw rate (rad/s), last frame's yaw (NAN: none
 ## yet), and how steady it's been (0 turning .. 1 straight, ramped in).
 var _settle_turn := 0.0
 var _settle_yaw := NAN
 var _settle := 1.0
+## Settle: how far its coasting swing has come in (0 driven .. 1 let go).
+var _coast := 0.0
 ## Free cam: the right stick's turn rate at full tilt (rad/s), how far it can
 ## look up or down (rad), and its drift round to the way the fish swims (1/s).
 var free_turn_speed := 2.6
@@ -237,6 +245,7 @@ func snap() -> void:
 	_settle_yaw = NAN
 	_settle_turn = 0.0
 	_settle = 1.0
+	_coast = 0.0
 	_spin = Vector3.ZERO
 	_lag = Vector3.ZERO
 	_lag_speed = Vector3.ZERO
@@ -452,6 +461,8 @@ func _chase_forward(subject: Variant, fish_xform: Transform3D, delta: float) -> 
 ## cancels out), says how hard it's turning: turning, it follows at
 ## settle_turning_rate, so the turn shows; once the fish swims straight it
 ## builds up to settle_rate over settle_delay, so it doesn't lurch round.
+## Let go of accelerate, reverse and boost, it swings round at
+## settle_coast_rate instead (if that's faster), eased in over settle_coast_ease.
 func _settle_follow_rate(facing: Vector3, delta: float) -> float:
 	var flat := Vector3(facing.x, 0.0, facing.z)
 	if flat.length_squared() > 0.0001 and delta > 0.0:
@@ -465,7 +476,13 @@ func _settle_follow_rate(facing: Vector3, delta: float) -> float:
 		_settle = steady  # a turn slows it at once (the view's own spring smooths that)
 	else:
 		_settle = move_toward(_settle, steady, delta / settle_delay)
-	return lerpf(settle_turning_rate, settle_rate, smoothstep(0.0, 1.0, _settle))
+	var coasting := 0.0 if _throttle_held() else 1.0
+	if settle_coast_ease <= 0.0 or coasting < _coast:
+		_coast = coasting  # driving again: back to the settle at once
+	else:
+		_coast = move_toward(_coast, coasting, delta / settle_coast_ease)
+	var rate := lerpf(settle_turning_rate, settle_rate, smoothstep(0.0, 1.0, _settle))
+	return lerpf(rate, maxf(rate, settle_coast_rate), smoothstep(0.0, 1.0, _coast))
 
 
 ## Turns _heading's yaw just far enough that the fish's nose is no more than

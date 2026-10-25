@@ -731,6 +731,8 @@ const DOCS := {
 	"unnatural/camera_height": "Further back, higher and tilted further down than the tuned chase view (m, m, degrees), to see the horde around you.",
 	"unnatural/camera_mode": "Which survivor cam each player starts with; the ball cam button swaps them. Follow turns with the way the fish swims. Free turns only with the right stick, and stays where it\'s put.",
 	"unnatural/camera_pull_rate": "The survivor cam pulls back as the horde thickens round you: up to camera_crowd_pull m further once camera_crowd_full zombies are within camera_crowd_range m; and camera_size_pull m per +100% of the Size stat, so big builds still fit. It eases there at camera_pull_rate (1/s).",
+	"unnatural/camera_settle_coast_ease": "Settle: how quickly it swings round behind the fish once accelerate, reverse and boost are let go, turning or not (1/s; 0: no faster than swimming), and how long that takes to come in (s).",
+	"unnatural/camera_settle_coast_rate": "Settle: how quickly it swings round behind the fish once accelerate, reverse and boost are let go, turning or not (1/s; 0: no faster than swimming), and how long that takes to come in (s).",
 	"unnatural/camera_settle_delay": "Settle: how long its swing round behind takes to build up once a turn ends (s; 0: at once).",
 	"unnatural/camera_settle_max_angle": "Settle: how far the fish can turn off to the side before the camera turns with it (degrees; 180: any way, even facing you).",
 	"unnatural/camera_settle_rate": "Settle: how quickly it swings round behind the fish swimming straight, and while it\'s turning (1/s; 0: holds still while turning).",
