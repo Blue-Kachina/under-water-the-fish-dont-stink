@@ -192,6 +192,8 @@ func _process(real_delta: float) -> void:
 		_tail.scale = Vector3.ONE * maxf(fx[ReplayData.FX_TAIL_SCALE], 0.01)
 	else:
 		var wag := sin(_swim_phase) * lerpf(0.15, 0.45, effort)
+		if _visual != null and _visual.trails_tail:
+			wag = 0.0  # a jelly's arms hang behind, they don't wag
 		var flukes := _visual != null and _visual.fluke  # a whale's flukes beat up and down
 		_tail.rotation.y = (0.0 if flukes else wag) - input_stick.x * 0.6 * slide
 		_tail.rotation.x = wag if flukes else 0.0

@@ -15,10 +15,13 @@ extends RefCounted
 ##   ruffled, twisting membrane ribbons (jelly_strand.gdshader).
 ## - Tentacles: thin tubes off the margin, evenly, in its notches or in
 ##   clusters (jelly_strand.gdshader).
-## The bell pulses with the swim (or with each stride, Gait.Visual.BELL_PULSE,
-## when the whole model also leans from upright as it swims, FishModel.bell_lean);
-## arms and tentacles sway in waves and bend
-## round after the tail pivot's swing (Sway feeds them the swing each frame).
+## The bell pulses (BellPulse, jelly_pulse.gdshaderinc): a quick power stroke
+## shuts it into a tall dome, a slower recovery stroke spreads it into a flat
+## umbrella, its margin lagging and rippling. Strides drive it under
+## Gait.Visual.BELL_PULSE (when the whole model also leans from upright as it
+## swims, FishModel.bell_lean); else it beats with the swim. Arms and tentacles
+## sway in waves and bend round after the tail pivot's swing (Sway feeds them
+## the swing each frame), which only trails after the body (trails_tail).
 ## The fin pivots are empty: a jelly has no fins.
 ##
 ## Transparency: every part is see-through, so they're drawn in a fixed order
@@ -122,13 +125,13 @@ static func build(m: FishModel) -> void:
 	body.name = "Body"
 	body.mesh = _bell_mesh(g, false)
 	body.material_override = outer_material
-	body.extra_cull_margin = 0.1
+	body.extra_cull_margin = 0.3
 	m.add_child(body)
 	var inner := MeshInstance3D.new()
 	inner.name = "Subumbrella"
 	inner.mesh = _bell_mesh(g, true)
 	inner.material_override = _bell_material(m, k, g, true)
-	inner.extra_cull_margin = 0.1
+	inner.extra_cull_margin = 0.3
 	m.add_child(inner)
 	var gonads := MeshInstance3D.new()
 	gonads.name = "Gonads"
@@ -169,7 +172,10 @@ static func build(m: FishModel) -> void:
 		m.add_child(tentacles)
 		sway.materials.append(tentacle_material)
 	m.add_child(sway)
-	# Every part pulses with the bell: with each stride under Gait.Visual.BELL_PULSE.
+	# Every part pulses with the bell (BellPulse): strides drive it under
+	# Gait.Visual.BELL_PULSE. The arms trail behind, never beating like a tail.
+	m.bell = BellPulse.new()
+	m.trails_tail = true
 	for node in m.find_children("*", "MeshInstance3D", true, false):
 		var material := (node as MeshInstance3D).material_override as ShaderMaterial
 		if material and material.shader in [BELL, BELL_INNER, ORGAN, STRAND] and not m._bell_pulses.has(material):

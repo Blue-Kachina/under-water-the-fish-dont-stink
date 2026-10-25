@@ -73,9 +73,8 @@ void vertex() {
 	v.x += sin(wave) * reach;
 	v.y += cos(wave * 0.83 + seed * 4.0) * reach * 0.7;
 	if (pulsing) {
-		float c = jelly_contraction();
-		v = jelly_pulse(v, c);
-		root = jelly_pulse(root, c);
+		v = jelly_pulse(v);
+		root = jelly_pulse(root);
 	}
 	float k = smoothstep(bend_from, 1.0, s);
 	mat3 bend = turn(swing.x * swing_share * k, swing.y * swing_share * k);

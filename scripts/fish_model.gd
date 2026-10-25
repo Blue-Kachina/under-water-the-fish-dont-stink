@@ -117,9 +117,20 @@ var _body_waves: Array[ShaderMaterial] = []
 ## Gait.Visual.BELL_PULSE (the jellies): how far the bell leans from upright
 ## toward the nose (rad, FishController.bell_lean), or -1 when it doesn't (the
 ## model lies nose-first as built). Set before react(), which tilts the model
-## with it; the jelly's shaders in `_bell_pulses` squeeze with each stride.
+## with it, and strides drive the bell (BellPulse.step_strides, from
+## `stride_phase`, `stride_peak`, `stride_fade` and `bell_gait`, which the fish
+## sets). Otherwise the bell beats on its own with the swim (step_free).
 var bell_lean := -1.0
+var stride_phase := -1.0
+var stride_peak := 0.3
+var stride_fade := 0.5
+var bell_gait: Gait
+## The jelly's bell (JellyModel), and its shaders, which take its shape.
+var bell: BellPulse
 var _bell_pulses: Array[ShaderMaterial] = []
+## Whether the tail pivot's parts trail after the body as it turns and drifts
+## (the jelly's oral arms) rather than beating with strides (FishController).
+var trails_tail := false
 
 
 static func build(character: FishCharacter.FishClass, species := 0) -> FishModel:
@@ -283,6 +294,29 @@ func _tint(color: Color) -> void:
 		skin.set_shader_parameter("albedo", color)
 
 
+## The jelly's bell (BellPulse): strides drive it under Gait.Visual.BELL_PULSE,
+## else it beats with the swim, quicker as it goes faster (`effort`). Its
+## shaders take the shape.
+func _pulse_bell(delta: float, effort: float) -> void:
+	if bell == null:
+		return
+	var squeeze := 1.0
+	var flatten := 1.0
+	if bell_lean >= 0.0 and bell_gait != null:
+		bell.step_strides(delta, stride_phase, stride_peak, stride_fade, bell_gait)
+		squeeze = bell_gait.bell_squeeze
+		flatten = bell_gait.bell_flatten
+	else:
+		bell.step_free(delta, lerpf(0.4, 0.9, effort), effort)
+	for material in _bell_pulses:
+		material.set_shader_parameter("bell_crown", bell.crown)
+		material.set_shader_parameter("bell_margin", bell.margin)
+		material.set_shader_parameter("bell_ripple", bell.ripple)
+		material.set_shader_parameter("bell_ripple_phase", bell.ripple_phase)
+		material.set_shader_parameter("bell_squeeze", squeeze)
+		material.set_shader_parameter("bell_flatten", flatten)
+
+
 ## The swim wave: fins and skins ripple, harder and quicker with speed. The
 ## ray's wings also follow the fin pivots (their roll lifts the tips, their turn
 ## sweeps them back) and beat with strides, it banks into turns, and its tail
@@ -295,8 +329,7 @@ func _swim(delta: float, velocity: Vector3) -> void:
 		material.set_shader_parameter("effort", effort)
 	for material in _body_waves:
 		material.set_shader_parameter("stride", stride_power)
-	for material in _bell_pulses:
-		material.set_shader_parameter("stride_pulse", stride_power if bell_lean >= 0.0 else -1.0)
+	_pulse_bell(delta, effort)
 	_follow_flaps()
 	if _skin == null or delta <= 0.0:
 		return

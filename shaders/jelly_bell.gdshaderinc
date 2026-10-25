@@ -39,7 +39,8 @@ varying vec3 rest;
 
 void vertex() {
 	rest = VERTEX;
-	VERTEX = jelly_pulse(VERTEX, jelly_contraction());
+	NORMAL = jelly_pulse_normal(VERTEX, NORMAL);
+	VERTEX = jelly_pulse(VERTEX);
 }
 
 // 1 on a line `width` wide (in `d`'s units) at d = 0, antialiased.

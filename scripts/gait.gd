@@ -32,9 +32,15 @@ enum SurfaceMode { NONE }
 ## FLAP: the side flaps (fin pivots) beat down with the push and lift back up.
 ## FLUKE: the tail beats up and down (the body bends in its vertical plane),
 ## opposite to the stroke's kick, whichever way the stick swept.
-## BELL_PULSE: the bell squeezes with each stride's push and relaxes as it
-## fades, and the model leans with the bell's axis (PushAxis.BELL).
+## BELL_PULSE: strides contract and expand the bell (BellPulse, bell_rhythm),
+## the tail pivot (oral arms) trailing rather than beating, and the model leans
+## with the bell's axis (PushAxis.BELL).
 enum Visual { TAIL_BEND, FLAP, FLUKE, BELL_PULSE }
+## Bell pulse only: how strides drive the bell (BellPulse). ALTERNATE: strides
+## take turns, one the power stroke (a quick contraction), the next the
+## recovery stroke (a slower expansion). EACH_STRIDE: every stride is a whole
+## pulse, contracting by its peak and re-opening as it fades.
+enum BellRhythm { ALTERNATE, EACH_STRIDE }
 
 ## Which way a stride's side kick and the body's bend go. Lateral: away from
 ## the stick's sweep, as fish swim. Flap: up, as a wingbeat lifts. Vertical: up
@@ -60,7 +66,8 @@ enum Visual { TAIL_BEND, FLAP, FLUKE, BELL_PULSE }
 @export var surface_mode := SurfaceMode.NONE
 ## The model's animation for each stride. Tail bend: the tail sweeps across and
 ## back. Flap: the side flaps beat down with the push. Fluke: the tail beats up
-## and down. Bell pulse: the bell squeezes with each push and leans as it swims.
+## and down. Bell pulse: the bell contracts and expands with strides (no tail
+## beat) and leans as it swims.
 @export var visual := Visual.TAIL_BEND
 ## Bell push only: how far the bell leans from upright toward the nose when
 ## swimming flat out (degrees). 90: level, nose-first; 0: always upright.
@@ -70,6 +77,22 @@ enum Visual { TAIL_BEND, FLAP, FLUKE, BELL_PULSE }
 @export_range(0.5, 40.0, 0.5, "or_greater") var bell_full_speed := 6.0
 ## Bell push only: how quickly the bell leans to where it's heading (1/s).
 @export_range(0.1, 30.0, 0.1, "or_greater") var bell_lean_rate := 4.0
+## Bell pulse only: how strides drive the bell. Alternate: one stride contracts
+## it (power stroke), the next expands it (recovery stroke). Each stride: every
+## stride contracts it and lets it re-open.
+@export var bell_rhythm := BellRhythm.ALTERNATE
+## Bell pulse only: how hard the power stroke squeezes the bell into a tall,
+## narrow dome. 0: it doesn't contract.
+@export_range(0.0, 3.0, 0.05, "or_greater") var bell_squeeze := 1.0
+## Bell pulse only: how wide and flat the recovery stroke spreads the bell,
+## its rim flaring out like an umbrella. 0: it doesn't open past its rest shape.
+@export_range(0.0, 3.0, 0.05, "or_greater") var bell_flatten := 1.0
+## Bell pulse only: how much the bell's margin lags its crown and ripples, so
+## the edge bends rather than the whole bell scaling. 0: the bell moves as one.
+@export_range(0.0, 3.0, 0.05, "or_greater") var bell_ripple := 1.0
+## Bell pulse only: how long the bell takes to relax open on its own after a
+## power stroke that no recovery stroke follows (s).
+@export_range(0.1, 5.0, 0.05, "or_greater") var bell_recovery_time := 0.9
 
 
 ## Whether this gait changes nothing (today's fish).

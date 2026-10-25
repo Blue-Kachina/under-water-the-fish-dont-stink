@@ -723,6 +723,7 @@ var bell_lean := 0.0
 ## animation moves.
 var _visual: FishModel
 var _tail: Node3D
+var _arm_trail := Vector2.ZERO  # _trail_tail: (pitch, yaw), rad
 var _fin_left: Node3D
 var _fin_right: Node3D
 ## The character's wheels (FishCharacter.wheels): front left, front right, back
@@ -2131,6 +2132,19 @@ func _apply_physics_material() -> void:
 	physics_material_override.friction = 0.0 if driving else wall_friction
 
 
+## FishModel.trails_tail (the jelly's oral arms): the tail pivot doesn't beat
+## with strides; it swings back after the body as it turns and drifts sideways,
+## and eases back to hanging straight behind. Slowly, so the quick back-and-forth
+## of steering through side-to-side strides doesn't wag it.
+func _trail_tail(delta: float) -> void:
+	var frame := _tail.get_parent_node_3d().global_basis.orthonormalized().inverse()
+	var spin := frame * angular_velocity
+	var drift := frame * linear_velocity
+	var target := Vector2(clampf(-spin.x * 0.12 + drift.y * 0.04, -0.5, 0.5), clampf(-spin.y * 0.12 - drift.x * 0.04, -0.5, 0.5))
+	_arm_trail = _arm_trail.lerp(target, 1.0 - exp(-2.0 * delta))
+	_tail.rotation = Vector3(_arm_trail.x, _arm_trail.y, 0.0)
+
+
 ## Placeholder animation: driven by movement state, never the other way round.
 func _process(delta: float) -> void:
 	if puppet:
@@ -2168,6 +2182,8 @@ func _process(delta: float) -> void:
 		else:
 			_tail.rotation.y = sin(_swim_phase) * lerpf(0.15, 0.45, effort) + tail_kick - input_stick.x * 0.5 * stroking
 			_tail.rotation.x = input_stick.y * 0.5 * stroking
+	if _visual.trails_tail:
+		_trail_tail(delta)
 	_fin_left.rotation.y = lerpf(_fin_left.rotation.y, 0.9 * slide, 1.0 - exp(-15.0 * delta))
 	_fin_right.rotation.y = -_fin_left.rotation.y
 
@@ -2188,6 +2204,10 @@ func _process(delta: float) -> void:
 	_visual.stride_swing = swishy.tail_swing if striding else Vector2.ZERO
 	_visual.stride_power = swishy.power if striding else 0.0
 	_visual.bell_lean = bell_lean if gait.visual == Gait.Visual.BELL_PULSE else -1.0
+	_visual.bell_gait = gait
+	_visual.stride_phase = swishy.phase if striding else -1.0
+	_visual.stride_peak = swishy.peak_time()
+	_visual.stride_fade = swishy.fade_time()
 	_visual.react(delta, linear_velocity)
 	var cue := swishy.cue() if swim_style == SwimStyle.EXTRA_SWISHY else Vector3.ZERO
 	_visual.set_stride_cue(cue.x, cue.y, cue.z)
