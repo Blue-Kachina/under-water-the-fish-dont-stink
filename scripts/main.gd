@@ -12,8 +12,9 @@ extends Node3D
 ## Match modes (MATCH_MODES) start on a card (MatchCard) with the fish sitting
 ## out; its Play starts the match (play_match). Nature, Hunt and Unnatural play on Nature's
 ## tuning (NATURE_PRESET), and leaving them puts the tuning from before back.
-## The Obstacle Course plays like Unnatural: its tuning, and its survivor cam
-## (UnnaturalSettings' camera, Y swapping follow and free cam).
+## The Obstacle Course plays like Unnatural: its tuning, its survivor cam
+## (UnnaturalSettings' camera, Y swapping follow and free cam) and each fish's
+## traversal, the mobility skill on the boost button (CourseSkill).
 ## Changes made to the tuning while in them are kept for the next time (until
 ## the game closes).
 ##
@@ -129,8 +130,9 @@ var _local: LocalCoop
 var _tuning_before_nature := {}
 ## Nature's tuning as it was when last left, changes included (empty: not yet).
 var _nature_tuning := {}
-## The Obstacle Course's survivor cam is on.
+## The Obstacle Course's survivor cam is on, and its traversal (null: not on the course).
 var _course_cam := false
+var _course_skill: CourseSkill
 ## Shown in a match mode until Play starts the match.
 var _match_card: MatchCard
 var _environment: Node3D
@@ -740,13 +742,22 @@ func _use_nature_tuning(on: bool) -> void:
 		_tuning_before_nature = {}
 
 
-## The Obstacle Course's camera: Unnatural's survivor cam (on), or the usual one back (off).
+## The Obstacle Course as Unnatural plays: its survivor cam and the fish's
+## traversal (on), or the usual camera and swimming back (off).
 func _use_course_cam(on: bool) -> void:
 	if on == _course_cam:
 		return
 	_course_cam = on
 	if on:
 		_camera.ball_cam = false
+		_course_skill = CourseSkill.new()
+		_course_skill.name = "CourseSkill"
+		_course_skill.fish = _fish
+		add_child(_course_skill)
+	elif _course_skill:
+		remove_child(_course_skill)  # now: it gives the fish its own swimming back on leaving
+		_course_skill.queue_free()
+		_course_skill = null
 	UnnaturalRun.steady_camera(_camera, on, UnnaturalSettings.shared())
 	_hud.survivor_cam = on
 	_camera.snap()

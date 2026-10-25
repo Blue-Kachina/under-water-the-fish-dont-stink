@@ -35,6 +35,9 @@ extends RefCounted
 ## - Sea Hare, Flutter: three big flaps carry it up and forward over the pack,
 ##   dropping a Purple Haze cloud where it took off.
 ## UnnaturalRun owns one per local player and calls update() every tick.
+## Away from a run (`run` null: the Obstacle Course's CourseSkill) the skills
+## still move the fish and show their effects, but there's nothing to hit,
+## shield or heal.
 
 ## Passive twist titles.
 const NAMES := {
@@ -69,9 +72,12 @@ const LEAP_TOP := 0.35
 const LEAP_MAX := 1.2
 const FIN_COLOR := Color(0.55, 0.75, 0.85)
 
+## Null away from a run.
 var run: UnnaturalRun
 var fish: FishController
 var settings: UnnaturalSettings
+## Where the skills' effects go: the run, else the node given.
+var host: Node
 ## The Shark's frenzy now (a share of swim speed), and how long it's held still.
 var frenzy := 0.0
 var frenzy_held := 0.0
@@ -125,10 +131,11 @@ var _coated := {}
 var _clock := 0.0
 
 
-func _init(owner: UnnaturalRun, of: FishController) -> void:
+func _init(owner: UnnaturalRun, of: FishController, effects_in: Node = null) -> void:
 	run = owner
 	fish = of
-	settings = owner.settings
+	settings = owner.settings if owner else UnnaturalSettings.shared()
+	host = owner if owner else effects_in
 
 
 ## Gives the fish its own swimming back.
@@ -216,7 +223,7 @@ func update(delta: float) -> void:
 	_surge_left = maxf(_surge_left - delta, 0.0)
 	_brace_left = maxf(_brace_left - delta, 0.0)
 	fish.drag_scale = 0.0 if _surge_left > 0.0 or _recoil_left > 0.0 else (settings.glide_drag if is_on(FishCharacter.FishClass.GLIDER) else 1.0)
-	if is_on(FishCharacter.FishClass.BREACHER) and settings.escort_regen > 0.0 and fish.speed <= settings.chest_still_speed:
+	if run and is_on(FishCharacter.FishClass.BREACHER) and settings.escort_regen > 0.0 and fish.speed <= settings.chest_still_speed:
 		var health := run.health_of(fish)
 		if health and not health.down:
 			health.heal(settings.escort_regen * delta)
@@ -240,7 +247,7 @@ func update(delta: float) -> void:
 		_fling_step(delta)
 	_clock += delta
 	_tick_spare(delta)
-	if is_on(FishCharacter.FishClass.ALCHEMIST):
+	if run and is_on(FishCharacter.FishClass.ALCHEMIST):
 		_coat_touching()
 	if _flaps_left > 0:
 		_flap_wait -= delta
@@ -257,7 +264,7 @@ func update(delta: float) -> void:
 
 ## The mobility skill's button was pressed: use it, if it's ready. Whether it went off.
 func mobility() -> bool:
-	if not settings.twists or not run.is_up(fish) or run.is_picking(fish):
+	if not settings.twists or (run and (not run.is_up(fish) or run.is_picking(fish))):
 		return false
 	if quiet:
 		_end_quiet()  # pressing again brings the stink back
@@ -272,7 +279,7 @@ func mobility() -> bool:
 		FishCharacter.FishClass.SCORCHER:
 			_start_dash("flare", settings.flare_time, settings.flare_speed, settings.flare_cooldown, nose)
 			flares += 1
-			Explosion.spawn(run.ocean, fish.global_position, Color(1.0, 0.5, 0.2), settings.flare_radius, 0.0, 0.3)
+			Explosion.spawn(run.ocean if run else host, fish.global_position, Color(1.0, 0.5, 0.2), settings.flare_radius, 0.0, 0.3)
 		FishCharacter.FishClass.LANCER:
 			if settings.dash_speed <= 0.0:
 				return false
@@ -287,18 +294,18 @@ func mobility() -> bool:
 			var side := fish.global_basis.x * signf(lean) if absf(lean) > 0.25 else nose.rotated(Vector3.UP, PI)
 			fish.apply_push(side * settings.wriggle_speed)
 			_shield(settings.wriggle_iframes)
-			PowerupFx.ring(run, fish.global_position, 1.2, Color(1.0, 0.6, 0.2), side, 0.25)
+			PowerupFx.ring(host, fish.global_position, 1.2, Color(1.0, 0.6, 0.2), side, 0.25)
 		FishCharacter.FishClass.GLIDER:
 			surges += 1
 			_cool_for(settings.surge_cooldown)
 			_surge_left = settings.surge_time
 			fish.apply_push(nose * settings.surge_speed)
-			PowerupFx.ring(run, fish.global_position, 1.6, Color(0.7, 0.85, 1.0), nose, 0.3)
+			PowerupFx.ring(host, fish.global_position, 1.6, Color(0.7, 0.85, 1.0), nose, 0.3)
 		FishCharacter.FishClass.BULWARK:
 			braces += 1
 			_cool_for(settings.brace_cooldown)
 			_brace_left = settings.brace_time
-			PowerupFx.ring(run, fish.global_position, 1.8, Color(1.0, 0.85, 0.2), nose, 0.3)
+			PowerupFx.ring(host, fish.global_position, 1.8, Color(1.0, 0.85, 0.2), nose, 0.3)
 		FishCharacter.FishClass.CHARMER:
 			if settings.leap_impulse <= 0.0 or _leap_age >= 0.0:
 				return false
@@ -316,7 +323,7 @@ func mobility() -> bool:
 			quiets += 1
 			quiet = true
 			_quiet_left = settings.quiet_time
-			PowerupFx.ring(run, fish.global_position, 2.0, Color(0.8, 0.7, 1.0), Vector3.UP, 0.5)
+			PowerupFx.ring(host, fish.global_position, 2.0, Color(0.8, 0.7, 1.0), Vector3.UP, 0.5)
 		_:
 			return false
 	return true
@@ -362,6 +369,8 @@ func _cool_for(seconds: float) -> void:
 
 
 func _shield(seconds: float) -> void:
+	if run == null:
+		return
 	var health := run.health_of(fish)
 	if health and seconds > 0.0:
 		health.shield(seconds)
@@ -370,7 +379,7 @@ func _shield(seconds: float) -> void:
 func _end_quiet() -> void:
 	quiet = false
 	_cool_for(settings.quiet_cooldown)
-	PowerupFx.ring(run, fish.global_position, 1.4, Color(0.8, 0.7, 1.0), Vector3.UP, 0.3)
+	PowerupFx.ring(host, fish.global_position, 1.4, Color(0.8, 0.7, 1.0), Vector3.UP, 0.3)
 
 
 ## A charge: `speed` along `heading` for `time` s, untouchable, hurting what it passes.
@@ -382,7 +391,7 @@ func _start_dash(kind: String, time: float, speed: float, cooldown: float, headi
 	_cool_for(cooldown)
 	fish.apply_push(heading * maxf(speed - fish.linear_velocity.dot(heading), 0.0))
 	_shield(time + 0.1)
-	PowerupFx.ring(run, fish.global_position, 1.5, FIN_COLOR if kind == "fin" else Color(1.0, 0.5, 0.2), heading, 0.3)
+	PowerupFx.ring(host, fish.global_position, 1.5, FIN_COLOR if kind == "fin" else Color(1.0, 0.5, 0.2), heading, 0.3)
 	_stop_loop()
 	Sfx.play_at("pw/drowned_fin_dash", fish.global_position)
 	_dash_loop = Sfx.start_loop("pw/drowned_fin_charge_loop")
@@ -395,6 +404,8 @@ func _stop_loop() -> void:
 
 
 func _dash_step() -> void:
+	if run == null:
+		return
 	var radius := settings.fin_radius if _dash_kind == "fin" else settings.flare_radius
 	var damage := settings.fin_damage if _dash_kind == "fin" else settings.flare_damage
 	var source := "fin_dash" if _dash_kind == "fin" else "flare"
@@ -411,7 +422,9 @@ func _splash() -> void:
 		return
 	splashes += 1
 	var at := fish.global_position
-	Explosion.spawn(run.ocean, at, Color(0.7, 0.95, 1.0), settings.leap_radius, 0.0, 0.3)
+	Explosion.spawn(run.ocean if run else host, at, Color(0.7, 0.95, 1.0), settings.leap_radius, 0.0, 0.3)
+	if run == null:
+		return
 	for i in run.horde.query_sphere(at, settings.leap_radius):
 		var away := run.horde.enemy_position(i) - at
 		run.hit(i, settings.leap_damage, fish, "splash", away.normalized() if away.length_squared() > 0.0001 else Vector3.UP)
@@ -430,7 +443,7 @@ func _recoil() -> void:
 	var short := settings.recoil_speed - fish.linear_velocity.dot(_recoil_heading)
 	if short > 0.0:
 		fish.apply_push(_recoil_heading * short)
-	PowerupFx.ring(run, fish.global_position, 1.4, CavitationPunch.BUBBLE_COLOR, _recoil_heading, 0.25)
+	PowerupFx.ring(host, fish.global_position, 1.4, CavitationPunch.BUBBLE_COLOR, _recoil_heading, 0.25)
 
 
 ## The way the Recoil Dash throws the fish (unit): the way the stick leans
@@ -447,6 +460,8 @@ func recoil_heading() -> Vector3:
 ## The punch the Recoil Dash throws: the fish's own Cavitation Punch, else a
 ## second one it holds, else a spare at its stats (the panel gave it another attack).
 func punch_for_recoil() -> CavitationPunch:
+	if run == null:
+		return null
 	var own := run.attack_of(fish) as CavitationPunch
 	if own:
 		return own
@@ -524,7 +539,9 @@ func _gulp(nose: Vector3) -> void:
 	gulps += 1
 	_cool_for(settings.gulp_cooldown)
 	var mouth := fish.global_position + nose * 1.2
-	PowerupFx.ring(run, mouth + nose * settings.gulp_range * 0.5, settings.gulp_range * 0.5, Color(0.5, 0.75, 0.95), -nose, 0.35)
+	PowerupFx.ring(host, mouth + nose * settings.gulp_range * 0.5, settings.gulp_range * 0.5, Color(0.5, 0.75, 0.95), -nose, 0.35)
+	if run == null:
+		return
 	for i in run.horde.query_sphere(fish.global_position, settings.gulp_range):
 		var offset := run.horde.enemy_position(i) - fish.global_position
 		if offset.length_squared() < 0.0001 or offset.normalized().dot(nose) < 0.5:
@@ -576,12 +593,14 @@ func _flap() -> void:
 	var ahead := flat.normalized() if flat.length_squared() > 0.0001 else Vector3.FORWARD
 	var heading := (ahead * (1.0 - settings.flutter_lift) + Vector3.UP * settings.flutter_lift).normalized()
 	fish.apply_push(heading * settings.flutter_speed)
-	PowerupFx.ring(run, fish.global_position, 1.3, PurpleHaze.COLOR, Vector3.UP, 0.25)
+	PowerupFx.ring(host, fish.global_position, 1.3, PurpleHaze.COLOR, Vector3.UP, 0.25)
 
 
 ## The Purple Haze Flutter drops its cloud with: the fish's own, else one it
 ## holds, else a spare at its stats (the panel gave it another attack).
 func haze_for_flutter() -> PurpleHaze:
+	if run == null:
+		return null
 	var own := run.attack_of(fish) as PurpleHaze
 	if own:
 		return own

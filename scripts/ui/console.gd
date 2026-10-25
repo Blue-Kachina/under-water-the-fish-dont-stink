@@ -11,8 +11,8 @@ extends CanvasLayer
 ## local players just get no input).
 ##
 ## It watches for the Konami code (KonamiCode) from a controller (the D-pad or
-## the left stick, B, A) or the keyboard (the arrow keys, B, A): the strip
-## under the line lights up as it's entered. Entering it sets
+## the left stick, B, A) or the keyboard (the arrow keys, B, A), with nothing
+## on screen until it's in (a line in the log). Entering it sets
 ## UISettings.konami_entered: the Replays button on the home screen, and SELECT
 ## in the mode picker showing the hidden modes.
 
@@ -24,12 +24,10 @@ const HEIGHT := 0.42  # of the screen
 ## The left stick counts as a D-pad press past PUSH, and again once it's back under REST.
 const STICK_PUSH := 0.6
 const STICK_REST := 0.3
-const GLYPHS := {"up": "↑", "down": "↓", "left": "←", "right": "→", "b": "B", "a": "A"}
 
 var _root: Control
 var _log: Label
 var _line: Label
-var _konami_strip: HBoxContainer
 var _lines: PackedStringArray = []
 var _typed := ""
 var _konami := KonamiCode.new()
@@ -92,13 +90,6 @@ func _ready() -> void:
 	_line.add_theme_color_override("font_color", UITheme.INK)
 	column.add_child(_line)
 
-	_konami_strip = HBoxContainer.new()
-	_konami_strip.add_theme_constant_override("separation", roundi(6.0 * s))
-	column.add_child(_konami_strip)
-	for token: String in KonamiCode.CODE:
-		var glyph := UITheme.label(GLYPHS.get(token, token), "display", 16.0, UITheme.MUTED, s, 700)
-		_konami_strip.add_child(glyph)
-
 	print_line("No commands yet.")
 	_refresh_line()
 
@@ -122,7 +113,6 @@ func open() -> void:
 	if not NetSession.is_online():
 		get_tree().paused = true
 	_refresh_line()
-	_refresh_konami()
 	opened.emit()
 
 
@@ -258,7 +248,6 @@ func _feed_konami(token: String) -> void:
 			UISettings.set_value("konami_entered", true)
 			print_line("Konami code entered: the Replays button is on the home screen, and SELECT in the mode picker shows the hidden modes.")
 		Sfx.play("ui/mode_chosen")
-	_refresh_konami()
 
 
 func _submit() -> void:
@@ -274,13 +263,6 @@ func _submit() -> void:
 func _refresh_line() -> void:
 	if _line:
 		_line.text = "> " + _typed + ("_" if fmod(_blink, 1.0) < 0.55 else " ")
-
-
-## The strip under the line: the code's presses so far lit.
-func _refresh_konami() -> void:
-	var done := _konami.progress()
-	for i in _konami_strip.get_child_count():
-		(_konami_strip.get_child(i) as Label).add_theme_color_override("font_color", UITheme.AQUA if i < done else Color(UITheme.MUTED, 0.45))
 
 
 ## Every action's bindings off the InputMap (kept to give back), and the held ones let go.

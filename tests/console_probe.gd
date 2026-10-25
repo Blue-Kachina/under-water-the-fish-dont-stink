@@ -168,9 +168,38 @@ func _run() -> void:
 	check(camera.steady_heading, "the survivor cam (steady heading)")
 	check(camera.extra_distance == UnnaturalSettings.shared().camera_distance, "at Unnatural's camera distance")
 	check(not fish.boost_enabled and fish.swim_strokes, "Unnatural's tuning: strides, no boost")
+	var skill: CourseSkill = main._course_skill
+	check(skill != null and skill.twist != null and skill.twist.run == null, "the course's traversal, with no run")
+	fish.character = FishCharacter.FishClass.LANCER
+	fish.set_spawn(main._environment.spawn_transform())
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	check(skill._button.visible and skill._button.title == "DASH", "the skill button shows the Swordfish's Dash (%s)" % skill._button.title)
+	var before := fish.linear_velocity.length()
+	Input.action_press("boost")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	Input.action_release("boost")
+	check(skill.twist.dashes == 1 and skill.twist.skill_wait() > 0.0, "the boost button dashes, then it cools down")
+	check(fish.linear_velocity.length() > before + 5.0, "and the dash throws the fish ahead (%.1f -> %.1f m/s)" % [before, fish.linear_velocity.length()])
+	var errors := []
+	for fish_class: FishCharacter.FishClass in FishCharacter.CLASSES:
+		fish.character = fish_class
+		skill.twist.reset()
+		var went := skill.twist.mobility()
+		for i in 30:
+			await get_tree().physics_frame
+		if Traversal.skill_title(fish_class) != "" and not went:
+			errors.append(Traversal.skill_title(fish_class))
+	check(errors.is_empty(), "every fish's skill goes off on the course, nothing to hit (didn't: %s)" % [errors])
+	fish.character = FishCharacter.FishClass.SKIRMISHER
+	await get_tree().physics_frame
+	check(fish.turn_scale > 1.0 or UnnaturalSettings.shared().nimble_turn <= 1.0, "the Clownfish's Nimble twist turns sharper")
 	main.set_mode(main.FREE_PLAY, false)
 	await _frames(3)
 	check(not camera.steady_heading and fish.boost_enabled, "Free Play: the usual camera and tuning back")
+	check(main._course_skill == null and not is_instance_valid(skill) or skill.is_queued_for_deletion(), "the course's traversal gone")
+	check(fish.turn_scale == 1.0 and fish.drag_scale == 1.0 and fish.speed_scale == 1.0, "and the fish's own swimming back")
 
 	for key: String in _saved:
 		UISettings.set_value(key, _saved[key])
