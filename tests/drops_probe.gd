@@ -248,14 +248,17 @@ func _run() -> void:
 	Input.action_press("show_scoreboard")
 	await _frames(3)
 	var hud: UnnaturalHud = main._unnatural_hud
-	check(hud._summary.visible and hud._summary.shown_player() == fish, "the summary opens on your own run")
-	hud._summary.flip(1)
-	check(hud._summary.shown_player() == null, "flicking on turns to the scoreboard (solo)")
-	hud._summary.flip(1)
-	check(hud._summary.shown_player() == fish, "and back round to you")
+	check(hud._summary.visible and not hud._summary.summary_shown(), "mid-run it's the scoreboard alone")
 	Input.action_release("show_scoreboard")
 	await _frames(3)
 	check(not hud._summary.visible, "and goes with it")
+	hud._over_age = UnnaturalHud.OVER_SPLASH
+	await _frames(3)
+	check(hud._summary.visible and hud._summary.shown_player() == fish, "once it's over: the scoreboard stays, with your summary beside it")
+	hud._summary.flip(1)
+	check(hud._summary.shown_player() == fish, "solo, flicking stays on you")
+	hud._over_age = -1.0
+	await _frames(3)
 	print("FAILURES: %d" % failures if failures else "ALL PASS")
 	get_tree().quit(1 if failures else 0)
 

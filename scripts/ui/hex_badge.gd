@@ -89,6 +89,9 @@ const GLYPHS := {
 	"mode_obstacle_course": "M5 21V3.5l10 3.8-10 3.8M13 16a4 4 0 1 0 8 0a4 4 0 1 0-8 0",
 	"mode_test_tank": "M4 12a8 8 0 1 0 16 0a8 8 0 1 0-16 0M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0",
 	"mode_replays": "M3.5 12a8.5 8.5 0 1 0 2.5-6M3 3.5V8h4.5M10 8.5l5.5 3.5-5.5 3.5z",
+	# The home screen's Class details: a class's passive twist and its mobility skill.
+	"detail_passive": "M6 18C6 10.5 9.5 7 16.5 7M14 4.5 16.5 7 14 9.5M15 13a2 2 0 1 0 4 0a2 2 0 1 0-4 0",
+	"detail_skill": "M4 15Q7.5 8 11 12.5Q14.5 17 19 10M16 9l3.2 1 .5-3.3M3 20h4M9 20h3",
 }
 
 ## A badge's outline, by what it holds (Card Type Variations, E): a weapon's

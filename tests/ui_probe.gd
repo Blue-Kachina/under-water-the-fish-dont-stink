@@ -6,6 +6,9 @@ extends Node
 ##   Play opens the mode picker with the last mode played featured and every
 ##   other mode once; X shows a mode's rules; a pick starts the mode straight
 ##   away (no card) and closes the home screen; B closes the picker.
+## - Class details (Y): a panel over the menu, the fish still in view; the
+##   menu can't be reached under it, LB/RB still change the fish; it fits
+##   every class; B closes it.
 ## - The settings: right into a section's options, left/right step a value
 ##   (held, it repeats), Y puts it back, LB/RB change section, B goes back a
 ##   column then closes; Game's Fish row changes the fish; options a target
@@ -102,6 +105,7 @@ func _check_home() -> void:
 	check(fish.character != before and home._play.has_focus(), "D-pad right: the next fish, focus stays on Play")
 	await _stick(JOY_AXIS_LEFT_X, -1.0)
 	check(fish.character == before, "stick left: back to the first")
+	await _check_details(home)
 
 	await _button(JOY_BUTTON_A)
 	var picker: ModePicker = home._picker
@@ -498,6 +502,38 @@ func _trigger(axis: JoyAxis) -> void:
 		Input.parse_input_event(event)
 		Input.flush_buffered_events()
 		await _frames(3)
+
+
+func _check_details(home: HomeScreen) -> void:
+	var focus := get_viewport().gui_get_focus_owner()
+	await _button(JOY_BUTTON_Y)
+	check(home._details.visible and not home._hints.visible, "Y: the Class details panel (the menu's hints hidden)")
+	var panel := home._details.get_child(1) as Control
+	var rect := panel.get_global_rect()
+	check(rect.encloses(home._menu.get_global_rect()), "the panel covers the menu")
+	check(not rect.intersects(home._showcase.get_global_rect()) and not rect.intersects(home._fish_name.get_global_rect()),
+			"the fish and its name stay in view")
+	await _button(JOY_BUTTON_DPAD_DOWN)
+	check(get_viewport().gui_get_focus_owner() == focus, "D-pad down: the menu doesn't move under it")
+	await _button(JOY_BUTTON_A)
+	check(not home._picker.visible and home._details.visible, "A: nothing under it pressed")
+	var before: FishCharacter.FishClass = fish.character
+	await _button(JOY_BUTTON_RIGHT_SHOULDER)
+	await _frames(2)
+	check(fish.character != before and home._details.visible and _details_say(home, FishCharacter.display_name(fish.character)),
+			"RB: the next fish, the panel up and showing it")
+	fish.character = before
+	await _button(JOY_BUTTON_B)
+	check(not home._details.visible and home._hints.visible and home.is_open(), "B: closes the panel, not the home screen")
+	home._show_fish(before)
+
+
+## Whether the details panel shows `text` in a label somewhere.
+func _details_say(home: HomeScreen, text: String) -> bool:
+	for node in home._details_body.find_children("*", "Label", true, false):
+		if (node as Label).text == text:
+			return true
+	return false
 
 
 func _key(key: Key) -> void:

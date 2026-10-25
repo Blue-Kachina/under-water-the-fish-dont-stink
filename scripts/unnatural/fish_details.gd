@@ -1,10 +1,11 @@
 class_name FishDetails
 extends RefCounted
-## What the fish picker's Details panel says about a fish: its starting attack,
-## the stat it grows by itself every level, its passive twist and its mobility skill (a passive
-## nobody would otherwise find). Built from the live tables and settings
-## (FishAttack, StatBlock, Traversal, UnnaturalSettings), so tweaking a twist's
-## numbers changes what's shown here (refining_weaponry.md §2.15).
+## What the home screen's Class details panel says about a fish: its starting
+## attack, the stat it grows by itself every level, its passive twist and its
+## mobility skill (a passive nobody would otherwise find). Built from the live
+## tables and settings (FishAttack, StatBlock, Traversal, UnnaturalSettings), so
+## tweaking a twist's numbers changes what's shown here (refining_weaponry.md §2.15).
+## The headline numbers are kept out of the sentences (the panel shows them big).
 
 ## Each attack's one-line description (its numbers are in the Weapons tables).
 const BLURBS := {
@@ -16,79 +17,131 @@ const BLURBS := {
 	FishAttack.Kind.SPINES: "A ring of spines fired out all round when zombies crowd in. Pierces two.",
 	FishAttack.Kind.FIRE: "Swimming leaves a trail of burning patches that scorch every zombie that crosses them. The faster you swim, the more you burn.",
 	FishAttack.Kind.HALO: "Jellyfish orbit you and sting whatever comes close. A slow, steady shield of damage.",
-	FishAttack.Kind.HAZE: "Ink bombs lob at the thickest pack near you, wherever it is, and burst into purple clouds that hurt and slow everything inside for a few seconds. A near miss still pays: the pack drifts in.",
+	FishAttack.Kind.HAZE: "Ink bombs lob at the thickest pack near you and burst into purple clouds that hurt and slow everything inside. A near miss still pays: the pack drifts in.",
 	FishAttack.Kind.REMORA: "Remoras ride along and nip the nearest zombie in turn. Steady, safe damage.",
-	FishAttack.Kind.PUNCH: "A boxing glove punches the zombie in front, hard enough to knock it back, then the bubble it leaves collapses and hits again round it. Short range: get close.",
+	FishAttack.Kind.PUNCH: "A boxing glove knocks back the zombie in front, then the bubble it leaves collapses and hits again round it.",
+}
+## Each attack's two short tags (the chips under its blurb).
+const TAGS := {
+	FishAttack.Kind.STING: ["Hits all in range", "Close range"],
+	FishAttack.Kind.BITE: ["Single target", "Hits hard"],
+	FishAttack.Kind.LASH: ["Chains on", "Fast"],
+	FishAttack.Kind.THRUST: ["Pierces", "Aims ahead"],
+	FishAttack.Kind.BUBBLES: ["Homing", "Splash"],
+	FishAttack.Kind.SPINES: ["All round", "Pierces two"],
+	FishAttack.Kind.FIRE: ["Burning trail", "Faster burns more"],
+	FishAttack.Kind.HALO: ["Orbits you", "Steady"],
+	FishAttack.Kind.HAZE: ["Lobbed", "Slows"],
+	FishAttack.Kind.REMORA: ["Companions", "Safe"],
+	FishAttack.Kind.PUNCH: ["Knockback", "Short range"],
 }
 
 
-## The panel's text for `fish_class`: an Array of [heading, body] pairs.
-static func sections(fish_class: FishCharacter.FishClass) -> Array:
+## The panel's facts for `fish_class`, live from the settings:
+## weapon_id (its glyph), weapon, blurb, tags; signature_id, signature,
+## signature_amount ("+10%"); passive, passive_text,
+## passive_stat ([value, label], or [] for none); skill, skill_text,
+## skill_stats ([[value, label], ...]); hp, iframes.
+static func details(fish_class: FishCharacter.FishClass) -> Dictionary:
 	var s := UnnaturalSettings.shared()
 	var attack_kind := FishAttack.kind_for(fish_class)
 	var signature := StatBlock.signature(fish_class)
-	var out := []
-	out.append(["Starting weapon  ·  %s" % FishAttack.title(attack_kind), BLURBS.get(attack_kind, "")])
-	out.append(["Grows by itself  ·  %s" % StatBlock.title(signature),
-			"Every level up gives %s, on top of the cards you pick." % StatBlock.describe(signature, StatBlock.signature_amount(fish_class, s.signature_steps, s))])
-	out.append(["Passive  ·  %s" % Traversal.title(fish_class), twist_text(fish_class, s)])
-	out.append(["Mobility (RB)  ·  %s" % Traversal.skill_title(fish_class), skill_text(fish_class, s)])
-	out.append(["Base", "%d HP  ·  %.1f s of i-frames after a hit. Every class starts with the same base stats; the weapon, the signature stat and the twist set them apart." % [roundi(s.base_hp), s.iframes]])
-	return out
+	var passive_info := passive(fish_class, s)
+	var skill_info := skill(fish_class, s)
+	return {
+		"weapon_id": FishAttack.weapon_id_of(attack_kind),
+		"weapon": FishAttack.title(attack_kind),
+		"blurb": BLURBS.get(attack_kind, ""),
+		"tags": TAGS.get(attack_kind, []),
+		"signature_id": signature,
+		"signature": StatBlock.title(signature),
+		"signature_amount": StatBlock.amount_text(signature, StatBlock.signature_amount(fish_class, s.signature_steps, s)),
+		"passive": Traversal.title(fish_class),
+		"passive_text": passive_info[0],
+		"passive_stat": passive_info[1],
+		"skill": Traversal.skill_title(fish_class),
+		"skill_text": skill_info[0],
+		"skill_stats": skill_info[1],
+		"hp": roundi(s.base_hp),
+		"iframes": s.iframes,
+	}
 
 
-## What `fish_class`'s twist does, with the numbers live from `s`.
-static func twist_text(fish_class: FishCharacter.FishClass, s: UnnaturalSettings) -> String:
+## What `fish_class`'s twist does: [sentence, [headline value, its label] or []].
+static func passive(fish_class: FishCharacter.FishClass, s: UnnaturalSettings) -> Array:
 	match fish_class:
 		FishCharacter.FishClass.SKIRMISHER:
-			return "Nimble: turns %d%% faster than the others, so it slips between zombies." % roundi((s.nimble_turn - 1.0) * 100.0)
+			return ["Turns faster than the others, so it slips between zombies.", [_pct(s.nimble_turn - 1.0, true), "turn speed"]]
 		FishCharacter.FishClass.HUNTER:
-			return "Frenzy: every kill adds +%d%% swim speed (up to +%d%%), held for %.0f s after the last kill, then it fades. Keep killing to keep it." % [
-					roundi(s.frenzy_per_kill * 100.0), roundi(s.frenzy_max * 100.0), s.frenzy_time]
+			return ["Every kill adds swim speed (up to %s), held for %.0f s after the last kill, then it fades. Keep killing to keep it." % [
+					_pct(s.frenzy_max, true), s.frenzy_time], [_pct(s.frenzy_per_kill, true), "speed a kill"]]
 		FishCharacter.FishClass.GLIDER:
-			return "Glide: coasting keeps only %d%% of the usual drag, so one stroke carries it much further." % roundi(s.glide_drag * 100.0)
+			return ["Coasting keeps only part of the usual drag, so one stroke carries it much further.", [_pct(s.glide_drag), "drag coasting"]]
 		FishCharacter.FishClass.LANCER:
-			return "Streamlined: swims %d%% faster than the others." % roundi(s.streamline_speed * 100.0)
+			return ["Swims faster than the others.", [_pct(s.streamline_speed, true), "swim speed"]]
 		FishCharacter.FishClass.CHARMER:
-			return "Graceful: %.1f s more of untouchable time after every hit." % s.graceful_iframes
+			return ["More untouchable time after every hit.", ["+%.1f s" % s.graceful_iframes, "i-frames"]]
 		FishCharacter.FishClass.BULWARK:
-			return "Armoured: takes only %d%% of the damage, but swims %d%% slower." % [roundi(s.armour_taken * 100.0), roundi((1.0 - s.armour_speed) * 100.0)]
+			return ["Takes far less damage, but swims %s slower." % _pct(1.0 - s.armour_speed), [_pct(s.armour_taken), "damage taken"]]
 		FishCharacter.FishClass.SCORCHER:
-			return "Wake: Greek Fire burns up to +%d%% harder the closer you swim to battering speed." % roundi(s.wake_damage * 100.0)
+			return ["Greek Fire burns harder the closer you swim to battering speed.", [_pct(s.wake_damage, true), "fire, at most"]]
 		FishCharacter.FishClass.DRIFTER:
-			return "Many Arms: %d more jelly%s in its Halo." % [s.arms_extra, "" if s.arms_extra == 1 else "s"]
+			return ["More jellies orbit in its Halo.", ["+%d" % s.arms_extra, "jelly" if s.arms_extra == 1 else "jellies"]]
 		FishCharacter.FishClass.BRAWLER:
-			return "Heavy Hitter: a zombie your punches knock back flies into the others, hurting up to %d of them for %d%% of the punch." % [s.heavy_max, roundi(s.heavy_share * 100.0)]
+			return ["A zombie your punches knock back flies into the others, hurting up to %d of them." % s.heavy_max, [_pct(s.heavy_share), "of the punch"]]
 		FishCharacter.FishClass.BREACHER:
-			return "Escort: holding still, it heals %.1f HP a second." % s.escort_regen
+			return ["Holding still, it heals.", ["%.1f" % s.escort_regen, "HP a second"]]
 		FishCharacter.FishClass.ALCHEMIST:
-			return "Unpalatable: a zombie that touches you is coated for %.0f s: slowed %d%%, and Purple Haze hurts it %d%% more." % [s.coat_time, roundi(s.coat_slow * 100.0), roundi(s.coat_bonus * 100.0)]
-	return ""
+			return ["A zombie that touches you is coated for %.0f s: slowed %s, and Purple Haze hurts it more." % [s.coat_time, _pct(s.coat_slow)],
+					[_pct(s.coat_bonus, true), "Haze damage"]]
+	return ["", []]
 
 
-## What `fish_class`'s mobility skill (the boost button: RB, Shift) does, live from `s`.
-static func skill_text(fish_class: FishCharacter.FishClass, s: UnnaturalSettings) -> String:
+## What `fish_class`'s mobility skill (the boost button: RB, Shift) does:
+## [sentence, [[value, label], ...]].
+static func skill(fish_class: FishCharacter.FishClass, s: UnnaturalSettings) -> Array:
+	var cooldown := func(seconds: float) -> Array: return ["%.1f s" % seconds, "cooldown"]
 	match fish_class:
 		FishCharacter.FishClass.SKIRMISHER:
-			return "Wriggle: a burst of %.0f m/s sideways (the way you lean the stick, else backwards), untouchable for %.1f s. Ready again after %.1f s." % [s.wriggle_speed, s.wriggle_iframes, s.wriggle_cooldown]
+			return ["A burst sideways, the way you lean the stick (else backwards).",
+					[_speed(s.wriggle_speed, "burst"), ["%.1f s" % s.wriggle_iframes, "untouchable"], cooldown.call(s.wriggle_cooldown)]]
 		FishCharacter.FishClass.HUNTER:
-			return "Fin Dash: charges ahead at %.0f m/s for %.2f s, untouchable, battering everything in the way for %.0f damage each. Ready again after %.1f s." % [s.fin_dash_speed, s.fin_dash_time, s.fin_damage, s.fin_cooldown]
+			return ["Charges ahead for %.2f s, untouchable, battering everything in the way." % s.fin_dash_time,
+					[_speed(s.fin_dash_speed, "charge"), ["%.0f" % s.fin_damage, "damage each"], cooldown.call(s.fin_cooldown)]]
 		FishCharacter.FishClass.GLIDER:
-			return "Surge: a stroke of %.0f m/s forward, and no drag at all for %.1f s. Ready again after %.1f s." % [s.surge_speed, s.surge_time, s.surge_cooldown]
+			return ["A stroke forward, then no drag at all for %.1f s." % s.surge_time,
+					[_speed(s.surge_speed, "stroke"), cooldown.call(s.surge_cooldown)]]
 		FishCharacter.FishClass.LANCER:
-			return "Dash: a burst of %.0f m/s along its nose, untouchable for %.1f s. Ready again after %.1f s." % [s.dash_speed, s.dash_iframes, s.dash_cooldown]
+			return ["A burst along its nose.",
+					[_speed(s.dash_speed, "burst"), ["%.1f s" % s.dash_iframes, "untouchable"], cooldown.call(s.dash_cooldown)]]
 		FishCharacter.FishClass.CHARMER:
-			return "Leap: leaps %.0f m/s upward; at the top it splashes down for %.0f damage to every zombie within %.0f m. Ready again after %.1f s." % [s.leap_impulse, s.leap_damage, s.leap_radius, s.leap_cooldown]
+			return ["Leaps upward; at the top it splashes down on every zombie within %.0f m." % s.leap_radius,
+					[_speed(s.leap_impulse, "leap"), ["%.0f" % s.leap_damage, "splash damage"], cooldown.call(s.leap_cooldown)]]
 		FishCharacter.FishClass.BULWARK:
-			return "Brace: for %.1f s it takes only %d%% of the damage (and swims %d%% slower). Ready again after %.1f s." % [s.brace_time, roundi(s.brace_taken * 100.0), roundi((1.0 - s.brace_speed) * 100.0), s.brace_cooldown]
+			return ["Braces for a hit: takes far less damage, and swims %s slower meanwhile." % _pct(1.0 - s.brace_speed),
+					[[_pct(s.brace_taken), "damage taken"], ["%.1f s" % s.brace_time, "lasts"], cooldown.call(s.brace_cooldown)]]
 		FishCharacter.FishClass.SCORCHER:
-			return "Flare Dash: dashes %.0f m/s for %.2f s with its spines flared, %.0f damage to everything within %.0f m on the way. Ready again after %.1f s." % [s.flare_speed, s.flare_time, s.flare_damage, s.flare_radius, s.flare_cooldown]
+			return ["Dashes for %.2f s with its spines flared, hurting everything within %.0f m on the way." % [s.flare_time, s.flare_radius],
+					[_speed(s.flare_speed, "dash"), ["%.0f" % s.flare_damage, "damage"], cooldown.call(s.flare_cooldown)]]
 		FishCharacter.FishClass.DRIFTER:
-			return "Go Quiet: switches its stink off for up to %.0f s. Nothing fires, and zombies lose track of it. Hits end it; press again to end it early. Then %.1f s before the next." % [s.quiet_time, s.quiet_cooldown]
+			return ["Switches its stink off: nothing fires, and zombies lose track of it. Hits end it; press again to end it early.",
+					[["%.0f s" % s.quiet_time, "at most"], cooldown.call(s.quiet_cooldown)]]
 		FishCharacter.FishClass.BRAWLER:
-			return "Recoil Dash: throws a full Cavitation Punch one way and the recoil throws you %.0f m/s the other, untouchable for %.1f s. You go the way you lean the stick (else backwards), so by default it punches what's ahead and shoots you back out of the crowd. Ready again after %.1f s." % [s.recoil_speed, s.recoil_iframes, s.recoil_cooldown]
+			return ["A full Cavitation Punch one way; the recoil throws you the other, the way you lean the stick (else backwards).",
+					[_speed(s.recoil_speed, "recoil"), ["%.1f s" % s.recoil_iframes, "untouchable"], cooldown.call(s.recoil_cooldown)]]
 		FishCharacter.FishClass.BREACHER:
-			return "Gulp: sucks every zombie in a %.0f m cone ahead in, hurting each for %.0f. Ready again after %.1f s." % [s.gulp_range, s.gulp_damage, s.gulp_cooldown]
+			return ["Sucks in every zombie in a cone ahead, hurting each.",
+					[["%.0f m" % s.gulp_range, "reach"], ["%.0f" % s.gulp_damage, "damage each"], cooldown.call(s.gulp_cooldown)]]
 		FishCharacter.FishClass.ALCHEMIST:
-			return "Flutter: %d big flaps carry you up and forward over the pack, and a Purple Haze cloud bursts where you took off. Ready again after %.1f s." % [s.flutter_flaps, s.flutter_cooldown]
-	return ""
+			return ["Big flaps carry you up and forward over the pack, and a Purple Haze cloud bursts where you took off.",
+					[["%d" % s.flutter_flaps, "flaps"], cooldown.call(s.flutter_cooldown)]]
+	return ["", []]
+
+
+## `fraction` as a whole percentage ("40%", or "+40%" with `signed`).
+static func _pct(fraction: float, signed := false) -> String:
+	return ("+" if signed else "") + "%d%%" % roundi(fraction * 100.0)
+
+
+static func _speed(metres_a_second: float, label: String) -> Array:
+	return ["%.0f m/s" % metres_a_second, label]

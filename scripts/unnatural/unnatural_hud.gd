@@ -11,9 +11,10 @@ extends CanvasLayer
 ## - the mobility skill's button at the bottom (SkillButton), over the stroke
 ##   rhythm meter (the main HUD's StrideMeter); no controls line;
 ## - a splash for each level-up, and when the run's over;
-## - the run summary (RunSummary): held on D-pad up / B, and up by itself once
-##   everyone's down. R starts again. A player's summary (loadout, stats and
-##   damage contribution) or the scoreboard; the right stick flicks through.
+## - the results (RunSummary): the scoreboard held on D-pad up / B; once
+##   everyone's down it stays up by itself, with a summary side panel (a
+##   player's loadout, stats and damage contribution; scrolls; in co-op the
+##   right stick flicks between players). R starts again.
 ## - the minimap (Minimap) in the bottom-right.
 ## With show_director on, the director's live numbers sit under the clock. In
 ## the Test Tank a DPS readout (TestTank's numbers) sits on the right.
@@ -397,13 +398,14 @@ func _update_hurt(delta: float) -> void:
 		_hurt_material.set_shader_parameter("aspect", view.x / maxf(view.y, 1.0))
 
 
-## The run summary: held on show_scoreboard, and up by itself once the run's
-## over (after its splash).
+## The results: the scoreboard alone while show_scoreboard's held; once the
+## run's over (after its splash) it stays up, with the summary side panel.
 func _update_board() -> void:
 	var input: PlayerInput = fish.input_source if fish and fish.input_source else PlayerInput.everyone()
-	var shown := (input.pressed("show_scoreboard") or _over_age >= OVER_SPLASH) and is_instance_valid(fish)
-	if shown and not _summary.visible:
-		_summary.open(input)
+	var over := _over_age >= OVER_SPLASH
+	var shown := (input.pressed("show_scoreboard") or over) and is_instance_valid(fish)
+	if shown and (not _summary.visible or _summary.summary_shown() != over):
+		_summary.open(input, over)
 	elif not shown and _summary.visible:
 		_summary.visible = false
 

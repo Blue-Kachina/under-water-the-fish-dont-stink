@@ -290,6 +290,8 @@ func _wire_unnatural(slot: PlayerSlot) -> void:
 		slot.camera.get_parent().add_child(hud)
 	if slot.mode_hud is UnnaturalHud:
 		(slot.mode_hud as UnnaturalHud).player_camera = slot.camera  # its follow / free cam note
+	if slot.index > 0 and is_instance_valid(slot.hud):
+		slot.hud.survivor_cam = true  # no controls line, as for the first player
 
 
 func _unwire(slot: PlayerSlot) -> void:
@@ -302,6 +304,8 @@ func _unwire(slot: PlayerSlot) -> void:
 		if slot.index > 0 and is_instance_valid(slot.mode_hud):
 			slot.mode_hud.queue_free()
 		slot.mode_hud = null
+		if slot.index > 0 and is_instance_valid(slot.hud):
+			slot.hud.survivor_cam = false
 		return
 	camera.ball = null
 	camera.hold_opens_wheel = false

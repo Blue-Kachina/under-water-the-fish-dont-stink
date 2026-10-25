@@ -58,7 +58,10 @@ func _run() -> void:
 		var model := FishModel.build(fish_class)
 		check(model.tail != null and model.fin_left != null and model.fin_right != null and model.get_child_count() > 3, "%s has a model with swim pivots" % name)
 		model.free()
-		check(FishDetails.sections(fish_class).size() == 5 and Traversal.title(fish_class) != "" and (FishDetails.twist_text(fish_class, settings) as String) != "", "%s has details and a twist" % name)
+		var details := FishDetails.details(fish_class)
+		check(Traversal.title(fish_class) != "" and (details.passive_text as String) != "" and (details.skill_text as String) != "" \
+				and not (details.skill_stats as Array).is_empty() and HexBadge.has_glyph(details.weapon_id),
+				"%s has details, a twist and a skill" % name)
 		var was := loadout.earned_level(Weapons.ATTACK)
 		run.take_card(fish, {"kind": "weapon", "weapon": Weapons.ATTACK, "gains": {}})
 		check(loadout.earned_level(Weapons.ATTACK) == was + 1 and run.attack_of(fish).level == was + 1, "its card upgrades the weapon")

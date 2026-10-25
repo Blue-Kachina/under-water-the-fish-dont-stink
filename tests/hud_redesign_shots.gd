@@ -88,11 +88,30 @@ func _run() -> void:
 	await _shot("2_dash_cooling")
 	Input.action_press("show_scoreboard")
 	await _seconds(0.3)
-	await _shot("3_summary")
-	main._unnatural_hud._summary.flip(1)
-	await _seconds(0.2)
-	await _shot("4_scoreboard")
+	await _shot("3_scoreboard_held")
 	Input.action_release("show_scoreboard")
+	var hud: UnnaturalHud = main._unnatural_hud
+	hud._over_age = UnnaturalHud.OVER_SPLASH
+	await _seconds(0.3)
+	await _shot("4_run_over")
+	hud._summary.scroll = 1.0e6  # to the bottom
+	await _seconds(0.2)
+	await _shot("4b_run_over_scrolled")
+	hud._over_age = -1.0
+	# Co-op: a second player joins (split-screen), then the run's over.
+	_press(11, LocalCoop.JOIN_BUTTON)
+	await _seconds(1.0)
+	for view_hud: UnnaturalHud in _huds():
+		view_hud._over_age = UnnaturalHud.OVER_SPLASH
+	await _seconds(0.3)
+	await _shot("4c_run_over_coop")
+	for view_hud: UnnaturalHud in _huds():
+		view_hud._summary.scroll = 1.0e6
+	await _seconds(0.2)
+	await _shot("4d_run_over_coop_scrolled")
+	for view_hud: UnnaturalHud in _huds():
+		view_hud._summary.flip(1)
+		view_hud._over_age = -1.0
 	await _seconds(0.2)
 	var sheet := IconSheet.new()
 	sheet.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -122,6 +141,21 @@ class IconSheet extends Control:
 			HudIcons.draw_mate(self, Vector2(960, y), s * 0.6, Color(1.0, 0.6, 0.24))
 			HudIcons.draw_pearl(self, Vector2(1080, y), s)
 			HudIcons.draw_heart(self, Vector2(1200, y), s, UnnaturalHud.HP_COLOR)
+
+
+## Every Unnatural HUD in the tree (one per view in split-screen).
+func _huds() -> Array:
+	return main.find_children("*", "UnnaturalHud", true, false)
+
+
+func _press(pad: int, button: JoyButton) -> void:
+	for pressed: bool in [true, false]:
+		var event := InputEventJoypadButton.new()
+		event.device = pad
+		event.button_index = button
+		event.pressed = pressed
+		Input.parse_input_event(event)
+		Input.flush_buffered_events()
 
 
 func _shot(shot_name: String) -> void:
