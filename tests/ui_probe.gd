@@ -38,7 +38,13 @@ func check(ok: bool, what: String) -> void:
 func _run() -> void:
 	await _frames(5)
 	_check_glyphs()
+	# Every mode in the picker, the hidden ones too (put back after: it saves to this PC).
+	var hidden_before := [UISettings.konami_entered, UISettings.show_hidden_modes]
+	UISettings.set_value("konami_entered", true)
+	UISettings.set_value("show_hidden_modes", true)
 	await _check_home()
+	UISettings.set_value("konami_entered", hidden_before[0])
+	UISettings.set_value("show_hidden_modes", hidden_before[1])
 	await _check_settings()
 	UISettings.set_value("show_debug_tweaks", false)  # back as it was (it saves to this PC)
 	_check_cards()

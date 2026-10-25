@@ -9,6 +9,10 @@ extends Control
 ##
 ## Each tile's title, pitch line, icon and colours come from main.gd's
 ## MODE_TILES, so the featured tile can show any mode.
+##
+## Fish Sticks and the Test Tank (HIDDEN) don't show unless
+## UISettings.show_hidden_modes is on, which SELECT (or F2) toggles here once
+## the Konami code's been entered (UISettings.konami_entered).
 
 signal chosen(mode: String)
 signal closed
@@ -16,6 +20,8 @@ signal closed
 ## The big modes, in order; the featured one comes out of here (or MORE).
 const PRIMARY := ["Unnatural", "Fish Sticks", "Hunt", "Nature", "Obstacle Course"]
 const MORE := ["Test Tank"]  # (Free Swim is retired: refining_weaponry.md §2.8)
+## Modes left out unless shown (SELECT, after the Konami code).
+const HIDDEN := ["Fish Sticks", "Test Tank"]
 ## Fish Sticks is one tile for the ball modes; choosing it asks which: its variants
 ## (main.gd mode ids).
 const FISH_STICKS := "Fish Sticks"
@@ -33,6 +39,12 @@ var _panel: Control
 var _featured: Tile
 var _grid: Array[Tile] = []
 var _more: Array[Tile] = []
+var _more_label: Label
+var _hints: ControllerHints
+## A single tile's width; the last one played and the mode picker's own
+## (open() again when SELECT shows or hides the hidden modes).
+var _column := 0.0
+var _featured_mode := ""
 var _close: Button
 var _rules: PanelContainer
 var _rules_dim: ColorRect
@@ -97,6 +109,7 @@ func _ready() -> void:
 	var top := 106.0 * s
 	var gap := 16.0 * s
 	var column := ((PANEL_SIZE.x * s - pad * 2.0) - gap * 3.0) / 4.0
+	_column = column
 	var row := 168.0 * s
 	_featured = Tile.new()
 	_featured.big = true
@@ -113,9 +126,9 @@ func _ready() -> void:
 		_grid.append(tile)
 
 	var more_top := top + row * 2.0 + gap * 2.0 + 8.0 * s
-	var more_label := UITheme.label("More", "caps", 12.0, UITheme.MUTED, s, 700)
-	more_label.position = Vector2(pad, more_top + 16.0 * s)
-	_panel.add_child(more_label)
+	_more_label = UITheme.label("More", "caps", 12.0, UITheme.MUTED, s, 700)
+	_more_label.position = Vector2(pad, more_top + 16.0 * s)
+	_panel.add_child(_more_label)
 	var more_width := (PANEL_SIZE.x * s - pad * 2.0 - 90.0 * s - gap * 3.0) / 4.0
 	for i in 4:
 		var tile := Tile.new()
@@ -130,12 +143,11 @@ func _ready() -> void:
 			if tile.mode:
 				_choose(tile.mode))
 
-	var hints := ControllerHints.new()
-	hints.s = s
-	hints.hints = [["A", "Play"], ["X", "Mode rules"], ["B", "Back"]]
-	hints.position = Vector2(pad, PANEL_SIZE.y * s - 50.0 * s)
-	hints.size = Vector2(PANEL_SIZE.x * s - pad * 2.0, 30.0 * s)
-	_panel.add_child(hints)
+	_hints = ControllerHints.new()
+	_hints.s = s
+	_hints.position = Vector2(pad, PANEL_SIZE.y * s - 50.0 * s)
+	_hints.size = Vector2(PANEL_SIZE.x * s - pad * 2.0, 30.0 * s)
+	_panel.add_child(_hints)
 
 	# X: the focused mode's rules, over the wall (dimmed).
 	_rules_dim = ColorRect.new()
@@ -196,20 +208,27 @@ func _ready() -> void:
 func open(tiles: Dictionary, featured: String, rules_for: Callable) -> void:
 	_tiles = tiles
 	_rules_for = rules_for
+	_featured_mode = featured
 	if featured in FISH_STICKS_MODES:
 		featured = FISH_STICKS
-	if not tiles.has(featured):
+	if not tiles.has(featured) or not is_shown(featured):
 		featured = PRIMARY[0]
-	var singles: Array = PRIMARY.filter(func(mode: String) -> bool: return mode != featured)
-	var more: Array = MORE.filter(func(mode: String) -> bool: return mode != featured)
+	var singles: Array = PRIMARY.filter(func(mode: String) -> bool: return mode != featured and is_shown(mode))
+	var more: Array = MORE.filter(func(mode: String) -> bool: return mode != featured and is_shown(mode))
 	while singles.size() > 4:
 		more.push_front(singles.pop_back())
 	_featured.show_mode(featured, tiles.get(featured, {}))
 	for i in _grid.size():
 		_grid[i].show_mode(singles[i] if i < singles.size() else "", tiles.get(singles[i], {}) if i < singles.size() else {})
+	# Three singles (Fish Sticks hidden): the bottom one takes the row.
+	_grid[3].visible = singles.size() > 3
+	_grid[2].size.x = _column if _grid[3].visible else _grid[3].position.x + _column - _grid[2].position.x
 	for i in _more.size():
 		_more[i].show_mode(more[i] if i < more.size() else "", tiles.get(more[i], {}) if i < more.size() else {})
 		_more[i].visible = i < more.size()
+	_more_label.visible = not more.is_empty()
+	_hints.hints = [["A", "Play"], ["X", "Mode rules"]] + ([["SELECT", "Hidden modes"]] if UISettings.konami_entered else []) + [["B", "Back"]]
+	_hints.queue_redraw()
 	_rules.visible = false
 	_variants.visible = false
 	_rules_dim.visible = false
@@ -231,7 +250,7 @@ func _link() -> void:
 	var top_left := _grid[0]
 	var top_right := _grid[1]
 	var bottom_left := _grid[2]
-	var bottom_right := _grid[3]
+	var bottom_right := _grid[3] if _grid[3].visible else bottom_left
 	_neighbours(_featured, _featured, top_left, _close, more[0] if not more.is_empty() else _featured)
 	_neighbours(top_left, _featured, top_right, _close, bottom_left)
 	_neighbours(top_right, top_left, top_right, _close, bottom_right)
@@ -282,6 +301,31 @@ func _above(tile: Tile) -> Control:
 	if middle < _featured.position.x + _featured.size.x:
 		return _featured
 	return _grid[2] if middle < _grid[3].position.x else _grid[3]
+
+
+## Whether `mode` is in the picker (the hidden ones only once shown).
+static func is_shown(mode: String) -> bool:
+	return mode not in HIDDEN or (UISettings.konami_entered and UISettings.show_hidden_modes)
+
+
+## SELECT: the hidden modes shown or hidden (the Konami code first), focus
+## staying on the mode it was on if that's still there.
+func _toggle_hidden() -> void:
+	if not UISettings.konami_entered:
+		return
+	var focus := get_viewport().gui_get_focus_owner()
+	var was: String = (focus as Tile).mode if focus is Tile else ""
+	UISettings.set_value("show_hidden_modes", not UISettings.show_hidden_modes)
+	Sfx.play("ui/toggle_on" if UISettings.show_hidden_modes else "ui/toggle_off")
+	open(_tiles, _featured_mode, _rules_for)
+	for tile: Tile in [_featured] + _grid + _more:
+		if tile.visible and tile.mode == was and was != "":
+			tile.grab_focus.call_deferred()
+
+
+## SELECT on a pad, F2 on the keyboard (as in the settings).
+static func _is_select(event: InputEvent) -> bool:
+	return (event is InputEventJoypadButton and event.is_pressed() and (event as InputEventJoypadButton).button_index == JOY_BUTTON_BACK) 			or (event is InputEventKey and event.is_pressed() and not event.is_echo() and (event as InputEventKey).keycode == KEY_F2)
 
 
 ## Plays `mode`; Fish Sticks first asks which of its two, and Unnatural how
@@ -431,6 +475,8 @@ func _input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("ui_cancel"):
 		_cancel()
+	elif _is_select(event) and UISettings.konami_entered:
+		_toggle_hidden()
 	elif event.is_action_pressed("ui_rules"):
 		var focus := get_viewport().gui_get_focus_owner()
 		if focus is Tile and (focus as Tile).mode:

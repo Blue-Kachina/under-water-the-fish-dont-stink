@@ -12,6 +12,8 @@ extends Node3D
 ## Match modes (MATCH_MODES) start on a card (MatchCard) with the fish sitting
 ## out; its Play starts the match (play_match). Nature, Hunt and Unnatural play on Nature's
 ## tuning (NATURE_PRESET), and leaving them puts the tuning from before back.
+## The Obstacle Course plays like Unnatural: its tuning, and its survivor cam
+## (UnnaturalSettings' camera, Y swapping follow and free cam).
 ## Changes made to the tuning while in them are kept for the next time (until
 ## the game closes).
 ##
@@ -50,7 +52,7 @@ const MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, NATURE, HUNT, UNNATURAL, TEST_T
 ## Modes played as a match, which wait on a card for Play.
 const MATCH_MODES := [ONE_V_ONE, NATURE, HUNT, UNNATURAL, TEST_TANK]
 ## Modes played on Nature's tuning.
-const NATURE_MODES := [NATURE, HUNT, UNNATURAL, TEST_TANK]
+const NATURE_MODES := [NATURE, HUNT, UNNATURAL, TEST_TANK, OBSTACLE_COURSE]
 ## Nature's tuning: Extra Swishy strides, no boost.
 const NATURE_PRESET := "res://presets/nature.cfg"
 ## Mode -> the environment it's played in.
@@ -127,6 +129,8 @@ var _local: LocalCoop
 var _tuning_before_nature := {}
 ## Nature's tuning as it was when last left, changes included (empty: not yet).
 var _nature_tuning := {}
+## The Obstacle Course's survivor cam is on.
+var _course_cam := false
 ## Shown in a match mode until Play starts the match.
 var _match_card: MatchCard
 var _environment: Node3D
@@ -367,6 +371,8 @@ func _process(_delta: float) -> void:
 	if unnatural_run:
 		for slot in _local.slots:
 			UnnaturalRun.steady_camera(slot.camera, true, unnatural_run.settings, unnatural_run.camera_pull_of(slot.fish))  # live from the panel
+	elif _course_cam:
+		UnnaturalRun.steady_camera(_camera, true, UnnaturalSettings.shared())  # live from the panel
 
 
 ## R or the pause menu's reset: a 1v1 back to a kickoff, otherwise the fish
@@ -680,6 +686,7 @@ func _apply_mode() -> void:
 	if current_mode not in [NATURE, UNNATURAL] and _local:
 		_local.drop_extras()  # split-screen co-op is Nature's and Unnatural's
 	_use_nature_tuning(current_mode in NATURE_MODES)
+	_use_course_cam(current_mode == OBSTACLE_COURSE)
 	var wanted: bool = current_mode in MATCH_MODES and current_environment == MODE_ENVIRONMENTS[current_mode]
 	if wanted:
 		# From one match mode straight to another in the same water (Nature to Hunt):
@@ -731,6 +738,18 @@ func _use_nature_tuning(on: bool) -> void:
 		_nature_tuning = _panel.tuning_snapshot()
 		_panel.restore_tuning(_tuning_before_nature)
 		_tuning_before_nature = {}
+
+
+## The Obstacle Course's camera: Unnatural's survivor cam (on), or the usual one back (off).
+func _use_course_cam(on: bool) -> void:
+	if on == _course_cam:
+		return
+	_course_cam = on
+	if on:
+		_camera.ball_cam = false
+	UnnaturalRun.steady_camera(_camera, on, UnnaturalSettings.shared())
+	_hud.survivor_cam = on
+	_camera.snap()
 
 
 func _start_match() -> void:

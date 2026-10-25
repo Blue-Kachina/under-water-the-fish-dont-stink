@@ -21,12 +21,18 @@ var fullscreen := true
 ## Shown on the scoreboard and when you score.
 var player_name := DEFAULT_NAME
 
-## Set once the Konami code has been entered on the home screen: the Replays button shows from then on.
-var replays_unlocked := false
+## Set once the Konami code has been entered (in the console, or on the home
+## screen): the Replays button shows from then on, and SELECT in the mode
+## picker can show the hidden modes.
+var konami_entered := false
+## The mode picker shows the hidden modes (Fish Sticks, the Test Tank). SELECT
+## toggles it there, once the Konami code's been entered.
+var show_hidden_modes := false
 ## Shows the tuning options that aren't for everyday use (SELECT toggles it in Settings).
 var show_debug_tweaks := false
 
-const KEYS := ["show_stats", "show_input_overlay", "goal_replays", "fullscreen", "player_name", "replays_unlocked", "show_debug_tweaks"]
+const KEYS := ["show_stats", "show_input_overlay", "goal_replays", "fullscreen", "player_name", "konami_entered", "show_hidden_modes",
+		"show_debug_tweaks"]
 
 
 func _ready() -> void:
@@ -34,6 +40,8 @@ func _ready() -> void:
 	if settings.load(SETTINGS_PATH) == OK:
 		for key: String in KEYS:
 			set(key, settings.get_value(SECTION, key, get(key)))
+		if settings.get_value(SECTION, "replays_unlocked", false):
+			konami_entered = true  # saved before the Konami code did more than the Replays button
 	if player_name.strip_edges().is_empty():
 		player_name = DEFAULT_NAME
 	fullscreen = true  # every start, whatever it was left on

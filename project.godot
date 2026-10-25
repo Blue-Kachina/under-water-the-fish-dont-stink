@@ -20,6 +20,7 @@ Controls="*res://scripts/controls.gd"
 UISettings="*res://scripts/ui_settings.gd"
 NetSession="*res://scripts/net/net_session.gd"
 Sfx="*res://scripts/audio/sfx.gd"
+Console="*res://scripts/ui/console.gd"
 
 [display]
 

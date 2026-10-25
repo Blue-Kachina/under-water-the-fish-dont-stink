@@ -1,8 +1,9 @@
 class_name KonamiCode
 extends RefCounted
-## The Konami code, watched on the home screen: Up Up Down Down Left Right Left
+## The Konami code, watched in the console (Console) and on the home screen: Up Up Down Down Left Right Left
 ## Right B A (then B A SELECT START in the original; those can follow, or be
-## left off). It reveals the Replays button (refining_weaponry.md §2.7).
+## left off). It reveals the Replays button (refining_weaponry.md §2.7) and lets
+## SELECT show the mode picker's hidden modes (UISettings.konami_entered).
 ##
 ## Feed it each press as a token ("up", "down", "left", "right", "b", "a",
 ## "select", "start"). It keeps a rolling window, so a slip just means starting
@@ -45,14 +46,15 @@ func claims(token: String) -> bool:
 	return at >= CODE.size() - 2 and token == CODE[at]
 
 
-## The token a button press means, or "" (B and A: the pad's face buttons or the
+## The token a button press means, or "" (B and A: on a pad, Nintendo's B and A:
+## the bottom face button is B and the right one A, so Xbox's A then B; or the
 ## B and A keys; SELECT and START: the pad's Back and Start).
 static func token_of(event: InputEvent) -> String:
 	if event is InputEventJoypadButton and event.is_pressed():
 		match (event as InputEventJoypadButton).button_index:
-			JOY_BUTTON_B:
-				return "b"
 			JOY_BUTTON_A:
+				return "b"
+			JOY_BUTTON_B:
 				return "a"
 			JOY_BUTTON_BACK:
 				return "select"

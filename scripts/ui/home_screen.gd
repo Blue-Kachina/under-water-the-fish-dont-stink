@@ -241,7 +241,9 @@ func _ready() -> void:
 	_root.add_child(_picker)
 	UISettings.changed.connect(func(key: String) -> void:
 		if key == "player_name":
-			_refresh_chip())
+			_refresh_chip()
+		elif key == "konami_entered":
+			_show_replays_button())
 
 
 func _enter_tree() -> void:
@@ -717,17 +719,17 @@ func _feed_konami(token: String) -> void:
 		_unlock_replays()
 
 
-## The Konami code was entered: the Replays button shows from now on (and is remembered).
+## The Konami code was entered: the Replays button shows from now on (and is
+## remembered). The console takes it too, without the menu moving meanwhile.
 func _unlock_replays() -> void:
-	if UISettings.replays_unlocked:
+	if UISettings.konami_entered:
 		return
-	UISettings.set_value("replays_unlocked", true)
-	_show_replays_button()
+	UISettings.set_value("konami_entered", true)  # which shows the Replays button
 	Sfx.play("ui/mode_chosen")
 
 
 func _show_replays_button() -> void:
-	if _replays_button != null or not UISettings.replays_unlocked:
+	if _replays_button != null or not UISettings.konami_entered:
 		return
 	_replays_button = _menu_button("Replays", func() -> void: replays_requested.emit())
 	_menu.move_child(_replays_button, _menu.get_child_count() - 3)  # above Settings and Quit
