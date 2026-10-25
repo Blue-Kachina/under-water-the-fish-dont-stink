@@ -20,29 +20,13 @@ func on_removed() -> void:
 func make_worn() -> Node3D:
 	var ribbon := Node3D.new()
 	ribbon.name = "Bow"
-	ribbon.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.05, -fish.hitbox_length * 0.2)
+	ribbon.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.08, -fish.hitbox_length * 0.2)
 	var satin := StandardMaterial3D.new()
 	satin.albedo_color = Powerup.color(id)
 	satin.roughness = 0.35
+	satin.cull_mode = BaseMaterial3D.CULL_DISABLED
 	satin.emission_enabled = true
 	satin.emission = Powerup.color(id)
 	satin.emission_energy_multiplier = 0.35
-	for side: float in [-1.0, 1.0]:
-		var loop := MeshInstance3D.new()
-		var sphere := SphereMesh.new()
-		sphere.radius = 0.12
-		sphere.height = 0.24
-		sphere.material = satin
-		loop.mesh = sphere
-		loop.scale = Vector3(1.4, 0.8, 0.5)
-		loop.position = Vector3(side * 0.15, 0.04, 0.0)
-		loop.rotation.z = side * 0.4
-		ribbon.add_child(loop)
-	var knot := MeshInstance3D.new()
-	var bead := SphereMesh.new()
-	bead.radius = 0.06
-	bead.height = 0.12
-	bead.material = satin
-	knot.mesh = bead
-	ribbon.add_child(knot)
+	ribbon.add_child(worn_mesh(WornKit.bow(), satin, Vector3.ZERO))
 	return ribbon

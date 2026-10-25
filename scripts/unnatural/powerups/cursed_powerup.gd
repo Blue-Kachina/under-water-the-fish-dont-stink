@@ -84,55 +84,29 @@ func make_worn() -> Node3D:
 	var glow := worn_material(1.6)
 	match id:
 		"blood_moon_shard":
-			# A red crystal standing on the back.
-			var shard := CylinderMesh.new()
-			shard.top_radius = 0.0
-			shard.bottom_radius = 0.09
-			shard.height = 0.35
-			shard.radial_segments = 3
-			shard.rings = 1
-			look.add_child(worn_mesh(shard, glow, Vector3(0.0, fish.hitbox_height * 0.5 + 0.15, 0.05), Vector3(0.0, 0.0, 0.2)))
+			# Red crystals standing on the back.
+			glow.roughness = 0.1
+			look.add_child(worn_mesh(WornKit.crystals(4, 0.35, 0.05, 7), glow, Vector3(0.0, fish.hitbox_height * 0.5, 0.05)))
 		"glass_coral":
-			# Pale branching twigs over the back.
+			# Pale branching coral over the back.
 			glow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			glow.albedo_color = Color(color(id), 0.6)
-			for n in 4:
-				var twig := CylinderMesh.new()
-				twig.top_radius = 0.01
-				twig.bottom_radius = 0.025
-				twig.height = 0.22
-				twig.radial_segments = 5
-				twig.rings = 1
-				var lean := (n - 1.5) * 0.35
-				look.add_child(worn_mesh(twig, glow, Vector3(lean * 0.12, fish.hitbox_height * 0.5 + 0.1, (n % 2) * 0.1), Vector3(0.0, 0.0, lean)))
+			var coral := worn_mesh(ReefKit.mesh("staghorn", 1), glow, Vector3(0.0, fish.hitbox_height * 0.5, 0.05))
+			coral.scale = Vector3.ONE * 0.25
+			look.add_child(coral)
 		"sirens_song":
 			# A little conch held up like a horn.
-			var conch := CylinderMesh.new()
-			conch.top_radius = 0.07
-			conch.bottom_radius = 0.0
-			conch.height = 0.22
-			conch.radial_segments = 8
-			conch.rings = 1
-			look.add_child(worn_mesh(conch, glow, Vector3(fish.hitbox_width * 0.5, fish.hitbox_height * 0.3, -0.05), Vector3(0.0, 0.0, -0.9)))
+			look.add_child(worn_mesh(WornKit.conch(0.24), glow, Vector3(fish.hitbox_width * 0.5, fish.hitbox_height * 0.3, -0.05), Vector3(0.0, 0.0, -0.9)))
 		"abyssal_hunger":
 			# A dark ring of teeth round the mouth.
 			var dark := worn_material(0.6)
 			dark.albedo_color = Color(0.12, 0.02, 0.05)
-			var jaw := TorusMesh.new()
-			jaw.inner_radius = maxf(fish.hitbox_width, fish.hitbox_height) * 0.32
-			jaw.outer_radius = jaw.inner_radius + 0.05
-			jaw.rings = 16
-			jaw.ring_segments = 5
-			look.add_child(worn_mesh(jaw, dark, Vector3(0.0, 0.0, -fish.hitbox_length * 0.45), Vector3(PI / 2.0, 0.0, 0.0)))
+			var jaw := maxf(fish.hitbox_width, fish.hitbox_height) * 0.34
+			look.add_child(worn_mesh(WornKit.toothed_ring(snappedf(jaw, 0.02)), dark, Vector3(0.0, 0.0, -fish.hitbox_length * 0.45)))
 		"sunken_idol":
-			# A small gold idol: a body and a round head.
-			var body := BoxMesh.new()
-			body.size = Vector3(0.1, 0.14, 0.08)
-			look.add_child(worn_mesh(body, glow, Vector3(0.0, fish.hitbox_height * 0.5 + 0.07, 0.15)))
-			var head := SphereMesh.new()
-			head.radius = 0.055
-			head.height = 0.11
-			head.radial_segments = 8
-			head.rings = 4
-			look.add_child(worn_mesh(head, glow, Vector3(0.0, fish.hitbox_height * 0.5 + 0.19, 0.15)))
+			# A small gold idol: a god on its plinth.
+			var idol := worn_mesh(GreekKit.cached("worn/idol", func() -> MeshKit: return GreekKit.statue("hades", 5), null), glow,
+					Vector3(0.0, fish.hitbox_height * 0.5, 0.15))
+			idol.scale = Vector3.ONE * 0.11
+			look.add_child(idol)
 	return look

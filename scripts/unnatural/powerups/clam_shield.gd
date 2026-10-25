@@ -40,15 +40,16 @@ func blocks_hit(_amount: float) -> bool:
 
 ## A flattened pink shell sitting on the back.
 func make_worn() -> Node3D:
-	var clam := MeshInstance3D.new()
+	var clam := Node3D.new()
 	clam.name = "Clam"
-	var shell := SphereMesh.new()
-	shell.radius = 0.2
-	shell.height = 0.2
-	shell.radial_segments = 12
-	shell.rings = 4
-	clam.mesh = shell
-	clam.material_override = worn_material(0.3)
-	clam.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.08, 0.0)
-	clam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	clam.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.02, 0.0)
+	var shell := worn_material(0.3)
+	shell.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# Two ridged halves, the top one a little open.
+	var half := ReefKit.mesh("clam", 0)
+	clam.add_child(worn_mesh(half, shell, Vector3.ZERO, Vector3.ZERO))
+	var lid := worn_mesh(half, shell, Vector3(0.0, 0.01, 0.0), Vector3(-0.35, 0.0, PI))
+	lid.scale = Vector3(1.0, 0.8, 1.0)
+	clam.add_child(lid)
+	clam.scale = Vector3.ONE * 1.3
 	return clam

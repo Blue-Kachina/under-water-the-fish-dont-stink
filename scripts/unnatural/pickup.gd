@@ -49,24 +49,14 @@ func _ready() -> void:
 	shine.emission_enabled = true
 	shine.emission = color
 	shine.emission_energy_multiplier = 1.6
+	# Modelled tokens (planning_environment.md, Phase 6, FxLooks).
+	shine.clearcoat_enabled = true
+	shine.rim_enabled = true
+	shine.rim = 0.5
 	match kind:
 		Kind.HEART:
-			# Two lobes and a point.
-			for side: float in [-1.0, 1.0]:
-				_token.add_child(_sphere(0.22, shine, Vector3(side * 0.16, 0.08, 0.0)))
-			var tip := _mesh(_cone(0.3, 0.4), shine, Vector3(0.0, -0.16, 0.0))
-			tip.rotation.z = PI
-			_token.add_child(tip)
+			_token.add_child(_mesh(FxLooks.heart(), shine, Vector3.ZERO))
 		Kind.MAGNET:
-			# A horseshoe: a half ring and two silver tips.
-			var ring := TorusMesh.new()
-			ring.inner_radius = 0.16
-			ring.outer_radius = 0.3
-			ring.rings = 16
-			ring.ring_segments = 8
-			var bend := _mesh(ring, shine, Vector3(0.0, 0.05, 0.0))
-			bend.rotation.x = PI / 2.0
-			_token.add_child(bend)
 			var silver := StandardMaterial3D.new()
 			silver.albedo_color = Color(0.85, 0.88, 0.92)
 			silver.metallic = 0.9
@@ -74,50 +64,36 @@ func _ready() -> void:
 			silver.emission_enabled = true
 			silver.emission = Color(0.8, 0.85, 1.0)
 			silver.emission_energy_multiplier = 0.6
-			for side: float in [-1.0, 1.0]:
-				_token.add_child(_mesh(_box(Vector3(0.14, 0.16, 0.14)), silver, Vector3(side * 0.23, -0.18, 0.0)))
+			var parts := FxLooks.magnet()
+			_token.add_child(_mesh(parts[0], shine, Vector3(0.0, 0.05, 0.0)))
+			_token.add_child(_mesh(parts[1], silver, Vector3(0.0, 0.05, 0.0)))
 		Kind.HOURGLASS:
-			# Two glass cones point to point, sand in them, caps top and bottom.
 			var glass := StandardMaterial3D.new()
-			glass.albedo_color = Color(color, 0.35)
+			glass.albedo_color = Color(color, 0.3)
 			glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			glass.roughness = 0.05
+			glass.rim_enabled = true
 			glass.emission_enabled = true
 			glass.emission = color
-			glass.emission_energy_multiplier = 1.2
-			var top := _mesh(_cone(0.2, 0.26), glass, Vector3(0.0, 0.13, 0.0))
-			top.rotation.z = PI
-			_token.add_child(top)
-			_token.add_child(_mesh(_cone(0.2, 0.26), glass, Vector3(0.0, -0.13, 0.0)))
+			glass.emission_energy_multiplier = 0.6
 			var sand := StandardMaterial3D.new()
 			sand.albedo_color = Color(1.0, 0.8, 0.4)
 			sand.emission_enabled = true
 			sand.emission = Color(1.0, 0.75, 0.3)
 			sand.emission_energy_multiplier = 1.0
-			_token.add_child(_mesh(_cone(0.12, 0.12), sand, Vector3(0.0, -0.2, 0.0)))
-			var wood := StandardMaterial3D.new()
-			wood.albedo_color = Color(0.45, 0.28, 0.12)
-			for y: float in [-0.29, 0.29]:
-				var cap := CylinderMesh.new()
-				cap.top_radius = 0.24
-				cap.bottom_radius = 0.24
-				cap.height = 0.05
-				cap.radial_segments = 12
-				_token.add_child(_mesh(cap, wood, Vector3(0.0, y, 0.0)))
+			var brass := StandardMaterial3D.new()
+			brass.albedo_color = Color(0.78, 0.6, 0.3)
+			brass.metallic = 0.9
+			brass.roughness = 0.3
+			brass.emission_enabled = true
+			brass.emission = Color(0.5, 0.35, 0.15)
+			brass.emission_energy_multiplier = 0.4
+			var parts := FxLooks.hourglass()
+			_token.add_child(_mesh(parts[2], sand, Vector3.ZERO))
+			_token.add_child(_mesh(parts[0], brass, Vector3.ZERO))
+			_token.add_child(_mesh(parts[1], glass, Vector3.ZERO))
 		Kind.LIGHTNING:
-			# A zigzag bolt: a slanted bar, a short kink across, a slanted bar
-			# and a point at the bottom.
-			var upper := _mesh(_box(Vector3(0.12, 0.34, 0.1)), shine, Vector3(0.06, 0.2, 0.0))
-			upper.rotation.z = -0.45
-			_token.add_child(upper)
-			var kink := _mesh(_box(Vector3(0.26, 0.1, 0.1)), shine, Vector3(0.0, 0.03, 0.0))
-			kink.rotation.z = 0.35
-			_token.add_child(kink)
-			var lower := _mesh(_box(Vector3(0.12, 0.3, 0.1)), shine, Vector3(-0.05, -0.13, 0.0))
-			lower.rotation.z = -0.45
-			_token.add_child(lower)
-			var point := _mesh(_cone(0.08, 0.16), shine, Vector3(-0.13, -0.32, 0.0))
-			point.rotation.z = PI - 0.45
-			_token.add_child(point)
+			_token.add_child(_mesh(FxLooks.bolt(), shine, Vector3.ZERO))
 	var light := OmniLight3D.new()
 	light.light_color = color
 	light.light_energy = 1.5
@@ -192,20 +168,6 @@ func _sphere(radius: float, material: Material, at: Vector3) -> MeshInstance3D:
 	sphere.rings = 6
 	return _mesh(sphere, material, at)
 
-
-func _cone(radius: float, height: float) -> CylinderMesh:
-	var cone := CylinderMesh.new()
-	cone.top_radius = 0.0
-	cone.bottom_radius = radius
-	cone.height = height
-	cone.radial_segments = 12
-	return cone
-
-
-func _box(size: Vector3) -> BoxMesh:
-	var box := BoxMesh.new()
-	box.size = size
-	return box
 
 
 func _mesh(mesh: Mesh, material: Material, at: Vector3) -> MeshInstance3D:

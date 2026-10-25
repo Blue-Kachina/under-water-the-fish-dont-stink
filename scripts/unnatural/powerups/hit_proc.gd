@@ -85,32 +85,20 @@ func make_worn() -> Node3D:
 	var skin := worn_material(0.6)
 	match id:
 		"sticky_anemone":
-			# A tuft of short tentacles on the head.
-			look.position = Vector3(0.0, fish.hitbox_height * 0.5, -fish.hitbox_length * 0.15)
-			for n in 7:
-				var strand := CylinderMesh.new()
-				strand.top_radius = 0.012
-				strand.bottom_radius = 0.025
-				strand.height = 0.16
-				strand.radial_segments = 5
-				var turn := n * TAU / 7.0
-				look.add_child(worn_mesh(strand, skin, Vector3(cos(turn), 1.0, sin(turn)) * 0.05, Vector3(sin(turn) * 0.5, 0.0, -cos(turn) * 0.5)))
+			# A little anemone on the head, its tentacles swaying.
+			look.position = Vector3(0.0, fish.hitbox_height * 0.5 - 0.02, -fish.hitbox_length * 0.15)
+			var tuft := worn_mesh(ReefKit.mesh("anemone", 1), ReefKit.material("anemone"), Vector3.ZERO)
+			tuft.scale = Vector3.ONE * 0.5
+			look.add_child(tuft)
 		"cold_seep":
 			# Frost crystals along the back.
 			look.position = Vector3(0.0, fish.hitbox_height * 0.45, 0.0)
+			skin.metallic = 0.2
+			skin.roughness = 0.1
 			for n in 3:
-				var crystal := PrismMesh.new()
-				crystal.size = Vector3(0.08, 0.16, 0.08)
-				look.add_child(worn_mesh(crystal, skin, Vector3(0.0, 0.05, (n - 1) * fish.hitbox_length * 0.18)))
+				look.add_child(worn_mesh(WornKit.crystals(3, 0.18, 0.03, n), skin, Vector3(0.0, 0.0, (n - 1) * fish.hitbox_length * 0.18)))
 		"krakens_grasp":
 			# A tentacle curling up off the side.
 			look.position = Vector3(fish.hitbox_width * 0.5, 0.0, fish.hitbox_length * 0.1)
-			for n in 6:
-				var bead := SphereMesh.new()
-				bead.radius = 0.06 - n * 0.007
-				bead.height = bead.radius * 2.0
-				bead.radial_segments = 8
-				bead.rings = 4
-				var t := n / 5.0
-				look.add_child(worn_mesh(bead, skin, Vector3(0.05 + sin(t * 2.5) * 0.12, t * 0.3, -cos(t * 2.5) * 0.08)))
+			look.add_child(worn_mesh(WornKit.tentacle(0.45, 0.06, 3.2), skin, Vector3.ZERO, Vector3(0.0, -PI / 2.0, 0.0)))
 	return look

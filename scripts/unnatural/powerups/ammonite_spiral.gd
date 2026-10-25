@@ -56,13 +56,6 @@ func _may_split() -> bool:
 func make_worn() -> Node3D:
 	var shell := Node3D.new()
 	shell.name = "Ammonite"
-	shell.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.06, fish.hitbox_length * 0.05)
-	var skin := worn_material(0.4)
-	for n in 3:
-		var turn := TorusMesh.new()
-		turn.inner_radius = 0.02 + n * 0.03
-		turn.outer_radius = 0.045 + n * 0.035
-		turn.rings = 14
-		turn.ring_segments = 6
-		shell.add_child(worn_mesh(turn, skin, Vector3(0.0, 0.0, n * 0.01), Vector3(PI * 0.5, 0.0, 0.0)))
+	shell.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.08, fish.hitbox_length * 0.05)
+	shell.add_child(worn_mesh(WornKit.spiral_shell(0.2), worn_material(0.4), Vector3.ZERO))
 	return shell

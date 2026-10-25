@@ -245,16 +245,14 @@ func _build_look() -> void:
 
 ## Its bolts are gobs of bile.
 func _bolt_mesh_look() -> Mesh:
-	var gob := SphereMesh.new()
-	gob.radius = 0.55
-	gob.height = 0.9
-	gob.radial_segments = 8
-	gob.rings = 4
+	var gob := FxLooks.gob(11).duplicate() as ArrayMesh
 	var glow := StandardMaterial3D.new()
 	glow.albedo_color = Color(0.5, 0.55, 0.15)
 	glow.roughness = 0.1
 	glow.emission_enabled = true
 	glow.emission = Color(0.6, 0.7, 0.1)
 	glow.emission_energy_multiplier = 1.0
-	gob.material = glow
+	glow.rim_enabled = true
+	glow.clearcoat_enabled = true
+	gob.surface_set_material(0, glow)
 	return gob

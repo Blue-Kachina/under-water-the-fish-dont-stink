@@ -29,12 +29,8 @@ func on_kill(_at: Vector3, _source: String) -> void:
 func make_worn() -> Node3D:
 	var rider := Node3D.new()
 	rider.name = "Lamprey"
-	var body := CapsuleMesh.new()
-	body.radius = 0.05
-	body.height = 0.7
-	body.radial_segments = 8
-	body.rings = 2
 	var skin := worn_material(0.3)
 	skin.albedo_color = Color(0.5, 0.45, 0.55)
-	rider.add_child(worn_mesh(body, skin, Vector3(fish.hitbox_width * 0.5, -fish.hitbox_height * 0.15, fish.hitbox_length * 0.2), Vector3(PI / 2.0, 0.0, 0.2)))
+	rider.add_child(worn_mesh(WornKit.fish_body(0.7, 0.1, 0.0, true), skin, Vector3(fish.hitbox_width * 0.5, -fish.hitbox_height * 0.15,
+			fish.hitbox_length * 0.2), Vector3(0.0, 0.0, PI / 2.0 + 0.2)))
 	return rider

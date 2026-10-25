@@ -261,7 +261,10 @@ var _extra_picks := {}
 var _level_extra := {}
 var _offers := {}
 var _offer_kind := {}
+## The chests each player is holding still to unlock (fish -> Array[TreasureChest]).
 var _opening := {}
+## Players who just took a chest's pick: their next unlocked chest in reach opens.
+var _chain := {}
 ## The chest each player last put back (fish -> chest): no battering it open again until they swim clear.
 var _backed_out := {}
 var _stride_hooks := {}
@@ -411,6 +414,7 @@ func start() -> void:
 	_extra_picks.clear()
 	_level_extra.clear()
 	_opening.clear()
+	_chain.clear()
 	_backed_out.clear()
 	_revive.clear()
 	_chill.clear()
@@ -719,6 +723,7 @@ func _leave(fish: FishController) -> void:
 	_chest_offer.erase(fish)
 	_opening.erase(fish)
 	_backed_out.erase(fish)
+	_chain.erase(fish)
 	_revive.erase(fish)
 	_level_extra.erase(fish)
 	_blocks.erase(fish)
@@ -761,6 +766,7 @@ func _reset_player(fish: FishController) -> void:
 	_chest_offer.erase(fish)
 	_opening.erase(fish)
 	_backed_out.erase(fish)
+	_chain.erase(fish)
 	var health: FishHealth = _health.get(fish)
 	if health:
 		health.reset(max_hp_of(fish))
@@ -2150,6 +2156,7 @@ func _commit_chest(fish: FishController) -> void:
 		return
 	info.committed = true
 	_chest_offer.erase(fish)
+	_chain[fish] = true
 	if _chest_rolls.has(info.chest):
 		(_chest_rolls[info.chest] as Dictionary).erase(fish)
 	_clear_chest(info.chest)
@@ -2400,11 +2407,17 @@ func _open_chests(fish: FishController, delta: float) -> void:
 				_bury_chest()
 	if _offers.has(fish):
 		return
+	# Just took a chest's pick: the next one unlocked in reach opens (E7).
+	if _chain.has(fish):
+		_chain.erase(fish)
+		if settings.chest_chain_open and open_unlocked(fish):
+			return
 	var at := fish.global_position
 	var nose := -fish.global_basis.z
 	var battering := fish.speed >= fish.nature_batter_speed * powerups_of(fish).batter_speed_share()
 	var still := fish.speed <= settings.chest_still_speed
-	var holding: TreasureChest = null
+	# Every chest in reach counts down together while you hold still (E7).
+	var holding: Array[TreasureChest] = []
 	var backed_out: TreasureChest = _backed_out.get(fish)
 	for chest in shut_chests_for(fish):
 		var middle := chest.global_position + Vector3.UP * TreasureChest.SIZE.y * 0.5
@@ -2422,18 +2435,22 @@ func _open_chests(fish: FishController, delta: float) -> void:
 			open_chest(chest, fish)
 			return
 		if still and gap <= settings.chest_reach and not chest.is_unlocked_for(fish):
-			holding = chest
-	if holding:
-		_opening[fish] = holding
-		holding.set_progress(fish, minf(holding.progress_of(fish) + delta / maxf(settings.chest_open_time, 0.01), 1.0))
-		if holding.is_unlocked_for(fish):
-			_opening.erase(fish)  # free to swim: it waits for a Jump
-			chest_unlocked.emit(holding, fish)
+			holding.append(chest)
+	var was: Array = _opening.get(fish, [])
+	for chest: TreasureChest in was:
+		if is_instance_valid(chest) and chest not in holding and not chest.is_unlocked_for(fish):
+			chest.set_progress(fish, 0.0)  # swum off before it unlocked: start again
+	var filling: Array[TreasureChest] = []
+	for chest in holding:
+		chest.set_progress(fish, minf(chest.progress_of(fish) + delta / maxf(settings.chest_open_time, 0.01), 1.0))
+		if chest.is_unlocked_for(fish):
+			chest_unlocked.emit(chest, fish)  # it waits for a Jump
+		else:
+			filling.append(chest)
+	if filling.is_empty():
+		_opening.erase(fish)  # free to swim
 	else:
-		var was: TreasureChest = _opening.get(fish)
-		_opening.erase(fish)
-		if is_instance_valid(was) and not was.is_unlocked_for(fish):
-			was.set_progress(fish, 0.0)
+		_opening[fish] = filling
 	var input: PlayerInput = fish.input_source if fish.input_source else PlayerInput.everyone()
 	if input.just_pressed("jump"):
 		open_unlocked(fish)
@@ -2480,6 +2497,7 @@ func open_chest(chest: TreasureChest, fish: FishController) -> void:
 		stats_of(fish)["paid_chests"] = stats_of(fish).get("paid_chests", 0) + 1
 	_opening.erase(fish)
 	_backed_out.erase(fish)
+	_chain.erase(fish)
 	stats_of(fish)["chests"] = stats_of(fish).get("chests", 0) + 1
 	chest_opened.emit(chest, fish)
 	if not authority:
@@ -2684,8 +2702,7 @@ func _build_seabed() -> void:
 	if not is_instance_valid(seabed) or seed_now == _seabed_seed:
 		return
 	_seabed_seed = seed_now
-	seabed.setup(settings.arena_radius, settings.seabed_rocks, settings.seabed_kelp, seed_now, settings.edge_rocks, settings.edge_kelp,
-			settings.arena_ceiling - settings.arena_floor + 5.0)
+	seabed.setup(settings, seed_now, settings.arena_ceiling - settings.arena_floor + 5.0)
 
 
 # --- Shrines (P5) ---------------------------------------------------------
@@ -2706,6 +2723,10 @@ func _place_shrines() -> void:
 		for attempt in 24:
 			spot = Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf_range(0.08, 1.0)) * settings.arena_radius * 0.8
 			var clear := spot.length() > 25.0
+			if is_instance_valid(seabed):
+				for ruin in seabed.cluster_spots:
+					if Vector2(ruin.x, ruin.z).distance_to(spot) < 25.0:
+						clear = false  # not on a ruin (planning_environment.md)
 			for other in placed:
 				if other.distance_to(spot) < settings.shrine_spacing:
 					clear = false
@@ -2726,6 +2747,8 @@ func add_shrine(kind: int, at: Vector3) -> Shrine:
 	shrine.position = at
 	add_child(shrine)
 	shrines.append(shrine)
+	if is_instance_valid(seabed):
+		seabed.clear_around(shrine.global_position, maxf(settings.scenery_clearing, Shrine.STEP_RADIUS + 3.0))
 	if authority:
 		shrine_placed.emit(shrine)
 	return shrine
@@ -2843,11 +2866,25 @@ func _draw_pearls_to_team() -> void:
 			pearl.drawn_by = best
 
 
+## Whether any player has come within shrine_reveal_range of `shrine` (0: every
+## shrine shows from the start). Once found, it's on the team's map and
+## compass for the rest of the stage (planning_environment.md, E4).
+func shrine_seen(shrine: Shrine) -> bool:
+	if settings.shrine_reveal_range <= 0.0:
+		return true
+	for fish in players:
+		if is_instance_valid(fish) and shrine.is_over(fish.global_position, settings.shrine_reveal_range):
+			return true
+	return false
+
+
 ## Running Tides: held while anyone who's up is in the ring (draining back at
 ## half speed while nobody is), a ring of zombies round it every
 ## shrine_tide_wave s (the host's), and won at shrine_tide_time: a free chest.
 func _update_shrines(delta: float) -> void:
 	for shrine in shrines:
+		if is_instance_valid(shrine) and not shrine.discovered:
+			shrine.discovered = shrine_seen(shrine)
 		if not is_instance_valid(shrine) or not shrine.tide_active:
 			continue
 		var holder: FishController = null

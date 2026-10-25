@@ -41,10 +41,7 @@ func make_worn() -> Node3D:
 	var skin := worn_material(2.5)
 	for side: float in [-1.0, 1.0]:
 		for n in 3:
-			var dot := SphereMesh.new()
-			dot.radius = 0.025
-			dot.height = 0.05
-			dot.radial_segments = 6
-			dot.rings = 3
-			spots.add_child(worn_mesh(dot, skin, Vector3(side * fish.hitbox_width * 0.5, 0.0, (n - 1) * fish.hitbox_length * 0.2)))
+			var spot := worn_mesh(WornKit.ball(0.025), skin, Vector3(side * fish.hitbox_width * 0.5, 0.0, (n - 1) * fish.hitbox_length * 0.2))
+			spot.scale = Vector3(0.6, 1.0, 1.0)  # flat on the skin
+			spots.add_child(spot)
 	return spots

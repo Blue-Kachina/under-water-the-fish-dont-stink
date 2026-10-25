@@ -52,20 +52,9 @@ func make_worn() -> Node3D:
 	heart.name = "Heart"
 	heart.position = Vector3(0.0, -fish.hitbox_height * 0.2, -fish.hitbox_length * 0.3)
 	var glow := worn_material(2.0)
-	var lobe := SphereMesh.new()
-	lobe.radius = 0.07
-	lobe.height = 0.14
-	lobe.radial_segments = 8
-	lobe.rings = 4
-	for side: float in [-1.0, 1.0]:
-		heart.add_child(worn_mesh(lobe, glow, Vector3(side * 0.055, 0.04, 0.0)))
-	var tip := CylinderMesh.new()
-	tip.top_radius = 0.1
-	tip.bottom_radius = 0.0
-	tip.height = 0.14
-	tip.radial_segments = 8
-	tip.rings = 1
-	heart.add_child(worn_mesh(tip, glow, Vector3(0.0, -0.04, 0.0)))
+	var shape := worn_mesh(FxLooks.heart(), glow, Vector3.ZERO)
+	shape.scale = Vector3.ONE * 0.4
+	heart.add_child(shape)
 	heart.ready.connect(func() -> void:
 		var beat := heart.create_tween().set_loops()
 		beat.tween_property(glow, "emission_energy_multiplier", 4.0, 0.1)
@@ -75,8 +64,9 @@ func make_worn() -> Node3D:
 	return heart
 
 
-## One wave: a curling wall of water rolling forward, hitting each zombie it
-## reaches once.
+## One wave: a curling wall of water rolling forward (its lip leading, -Z),
+## hitting each zombie it reaches once (planning_environment.md, Phase 6:
+## a breaking wave, foam at its lip, spray off it).
 class Wave extends Node3D:
 	var heart: TsunamiHeart
 	var heading := Vector3.FORWARD
@@ -85,31 +75,61 @@ class Wave extends Node3D:
 	var speed := 30.0
 	var _gone := 0.0
 	var _hit := {}
-	var _material := StandardMaterial3D.new()
+	var _material := ShaderMaterial.new()
 	var _wall := MeshInstance3D.new()
+	var _spray := CPUParticles3D.new()
+
+	## A breaking wave `width` m across: its back rising to a crest, the lip
+	## curling over in front, tapering at both ends. COLOR.r: how far round.
+	static func curl_mesh(across: float) -> ArrayMesh:
+		var tall := across * 0.32
+		var kit := MeshKit.new()
+		kit.surface(28, 30, func(u: float, v: float) -> Array:
+			var x := (u - 0.5) * across
+			var taper := pow(sin(u * PI), 0.6)
+			var z := 0.0
+			var y := 0.0
+			if v < 0.5:
+				var s := v / 0.5
+				z = lerpf(1.6, 0.0, s)
+				y = pow(sin(s * PI * 0.5), 1.3)
+			else:
+				var phi := (v - 0.5) / 0.5 * PI * 1.25
+				var r := 0.42 * (1.0 - 0.45 * phi / (PI * 1.25))
+				z = -sin(phi) * r
+				y = 0.58 + cos(phi) * r
+			return [Vector3(x, y * tall * taper, z * tall * taper), v, 0.0], false, false, false)
+		return kit.mesh()
 
 	func _ready() -> void:
-		_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
-		_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-		_material.albedo_color = Color(Powerup.color("tsunami_heart"), 0.6)
-		var curl := CylinderMesh.new()
-		curl.top_radius = 1.0
-		curl.bottom_radius = 1.0
-		curl.height = 1.0
-		curl.radial_segments = 16
-		curl.rings = 1
-		curl.cap_top = false
-		curl.cap_bottom = false
-		curl.material = _material
-		_wall.mesh = curl
-		# Lying across the way it goes: a half-pipe curl, `width` across.
-		_wall.rotation = Vector3(0.0, 0.0, PI / 2.0)
-		_wall.scale = Vector3(width * 0.25, width, width * 0.12)
+		_material.shader = preload("res://shaders/wave.gdshader")
+		var tint := Powerup.color("tsunami_heart")
+		_material.set_shader_parameter("color", Vector3(tint.r, tint.g, tint.b))
+		_wall.mesh = curl_mesh(width)
+		_wall.material_override = _material
+		_wall.position.y = -width * 0.16
 		_wall.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(_wall)
+		var drop := QuadMesh.new()
+		drop.size = Vector2.ONE * 0.22
+		var shine := FxKit.glow(Color(0.9, 0.97, 1.0, 0.7), FxKit.dot(), true)
+		shine.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		drop.material = shine
+		_spray.mesh = drop
+		_spray.amount = 40
+		_spray.lifetime = 0.6
+		_spray.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		_spray.emission_box_extents = Vector3(width * 0.4, 0.1, 0.1)
+		_spray.position = Vector3(0.0, width * 0.32 * 0.85 - width * 0.16, -width * 0.32 * 0.3)
+		_spray.direction = Vector3(0.0, 0.6, -1.0)
+		_spray.spread = 35.0
+		_spray.initial_velocity_min = 2.0
+		_spray.initial_velocity_max = 5.0
+		_spray.gravity = Vector3(0.0, -3.0, 0.0)
+		_spray.scale_amount_min = 0.5
+		_spray.scale_amount_max = 1.4
+		_spray.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_spray)
 
 	func _physics_process(delta: float) -> void:
 		if not is_instance_valid(heart) or not is_instance_valid(heart.run):
@@ -131,6 +151,6 @@ class Wave extends Node3D:
 			pushes.append(heading * 3.0)
 		run.hit_area(reached, heart.damage(), heart.fish, heart.id, Vector3.INF, 0.0, heart.settings.tsunami_proc, [heart.id], pushes)
 		var t := _gone / reach
-		_material.albedo_color.a = 0.6 * (1.0 - t)
+		_material.set_shader_parameter("fade", clampf((1.0 - t) * 1.6, 0.0, 1.0))
 		if _gone >= reach:
 			queue_free()

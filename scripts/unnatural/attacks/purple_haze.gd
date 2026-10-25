@@ -348,14 +348,12 @@ func make_worn() -> Node3D:
 	var satchel := Node3D.new()
 	satchel.name = "HazeSatchel"
 	satchel.position = Vector3(0.0, fish.hitbox_height * 0.45, fish.hitbox_length * 0.1)
-	var ball := SphereMesh.new()
-	ball.radius = 0.07
-	ball.height = 0.14
-	ball.radial_segments = 8
-	ball.rings = 4
 	var material := worn_material(0.8)
+	material.roughness = 0.15
+	material.clearcoat_enabled = true
 	for n in 3:
-		satchel.add_child(worn_mesh(ball, material, Vector3((n - 1) * 0.1, 0.0, (n % 2) * 0.06)))
+		satchel.add_child(worn_mesh(WornKit.ball(0.07), material, Vector3((n - 1) * 0.1, 0.0, (n % 2) * 0.06)))
+		satchel.add_child(worn_mesh(WornKit.tentacle(0.06, 0.008, 1.5), worn_material(0.1), Vector3((n - 1) * 0.1, 0.06, (n % 2) * 0.06)))
 	return satchel
 
 

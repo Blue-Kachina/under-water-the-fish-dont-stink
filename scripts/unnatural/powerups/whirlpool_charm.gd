@@ -51,13 +51,7 @@ func make_worn() -> Node3D:
 	var charm := Node3D.new()
 	charm.name = "WhirlpoolCharm"
 	charm.position = Vector3(0.0, -fish.hitbox_height * 0.4, -fish.hitbox_length * 0.2)
-	var skin := worn_material(0.6)
-	var shell := TorusMesh.new()
-	shell.inner_radius = 0.025
-	shell.outer_radius = 0.07
-	shell.rings = 12
-	shell.ring_segments = 6
-	charm.add_child(worn_mesh(shell, skin, Vector3.ZERO, Vector3(PI * 0.5, 0.0, 0.0)))
+	charm.add_child(worn_mesh(WornKit.spiral_shell(0.14), worn_material(0.6), Vector3.ZERO, Vector3(0.0, PI / 2.0, 0.0)))
 	return charm
 
 
@@ -72,35 +66,31 @@ class Vortex extends Node3D:
 	var tint := Color.WHITE
 	var _age := 0.0
 	var _tick := 0.0
-	var _rings: Array[MeshInstance3D] = []
-	var _material: StandardMaterial3D
+	var _funnel := MeshInstance3D.new()
+	var _material := ShaderMaterial.new()
 
+	## A small whirlpool funnel (the way out's look, Whirlpool.funnel_mesh), squat
+	## and spinning fast (planning_environment.md, Phase 6).
 	func _ready() -> void:
-		_material = FxKit.glow(tint, FxKit.band())
-		for n in 3:
-			var ring := MeshInstance3D.new()
-			var torus := TorusMesh.new()
-			torus.inner_radius = radius * (0.25 + n * 0.25) - 0.15
-			torus.outer_radius = radius * (0.25 + n * 0.25) + 0.15
-			torus.rings = 24
-			torus.ring_segments = 4
-			ring.mesh = torus
-			ring.material_override = _material
-			ring.scale = Vector3(1.0, 0.2, 1.0)
-			ring.position = Vector3.UP * (n * 0.4 - 0.4)
-			ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			add_child(ring)
-			_rings.append(ring)
+		var tall := radius * 0.9
+		_material.shader = preload("res://shaders/vortex.gdshader")
+		_material.set_shader_parameter("color", Vector3(tint.r, tint.g, tint.b))
+		_material.set_shader_parameter("tall", tall)
+		_material.set_shader_parameter("spin", 4.0)
+		_funnel.mesh = Whirlpool.funnel_mesh(tall, radius, radius * 0.12)
+		_funnel.material_override = _material
+		_funnel.position.y = -tall * 0.5
+		_funnel.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_funnel)
 
 	func _process(delta: float) -> void:
 		_age += delta
 		if _age >= life or not is_instance_valid(owner_charm) or owner_charm.run == null:
 			queue_free()
 			return
-		for n in _rings.size():
-			_rings[n].rotate_y(delta * (6.0 - n * 1.5))
+		_funnel.rotate_y(-delta * 3.0)
 		var fade := minf(minf(_age / 0.25, (life - _age) / 0.4), 1.0)
-		_material.albedo_color.a = 0.7 * fade
+		_material.set_shader_parameter("strength", fade)
 		var run := owner_charm.run
 		var centre := global_position
 		_tick -= delta

@@ -39,13 +39,8 @@ func make_worn() -> Node3D:
 	var coil := Node3D.new()
 	coil.name = "Eel"
 	var skin := worn_material(1.2)
-	for n in 2:
-		var turn := TorusMesh.new()
-		turn.inner_radius = maxf(fish.hitbox_width, fish.hitbox_height) * 0.5
-		turn.outer_radius = turn.inner_radius + 0.07
-		turn.rings = 20
-		turn.ring_segments = 6
-		coil.add_child(worn_mesh(turn, skin, Vector3(0.0, 0.0, (n - 0.5) * fish.hitbox_length * 0.3), Vector3(PI / 2.0, 0.0, 0.25 * (n * 2 - 1))))
+	var around := maxf(fish.hitbox_width, fish.hitbox_height) * 0.5 + 0.04
+	coil.add_child(worn_mesh(WornKit.eel(snappedf(around, 0.05), snappedf(fish.hitbox_length * 0.7, 0.1)), skin, Vector3.ZERO))
 	coil.ready.connect(func() -> void:
 		var hum := coil.create_tween().set_loops()
 		hum.tween_property(skin, "emission_energy_multiplier", 2.6, 0.08)

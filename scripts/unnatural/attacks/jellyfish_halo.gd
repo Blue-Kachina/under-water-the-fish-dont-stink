@@ -236,11 +236,6 @@ static func _jelly_mesh(tint: Color) -> ArrayMesh:
 
 ## A thin glowing ring over the head.
 func make_worn() -> Node3D:
-	var ring := TorusMesh.new()
-	ring.inner_radius = 0.14
-	ring.outer_radius = 0.17
-	ring.rings = 16
-	ring.ring_segments = 4
-	var halo := worn_mesh(ring, worn_material(1.5), Vector3(0.0, fish.hitbox_height * 0.5 + 0.2, -fish.hitbox_length * 0.15))
+	var halo := worn_mesh(WornKit.ring(0.155, 0.03), worn_material(1.5), Vector3(0.0, fish.hitbox_height * 0.5 + 0.2, -fish.hitbox_length * 0.15))
 	halo.name = "Halo"
 	return halo

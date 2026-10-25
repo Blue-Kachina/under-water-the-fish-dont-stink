@@ -171,24 +171,9 @@ func make_worn() -> Node3D:
 	brass.albedo_color = Color(0.55, 0.4, 0.15)
 	brass.metallic = 0.8
 	brass.roughness = 0.35
-	var cap := CylinderMesh.new()
-	cap.top_radius = 0.02
-	cap.bottom_radius = 0.09
-	cap.height = 0.08
-	cap.radial_segments = 8
-	lantern.add_child(worn_mesh(cap, brass, Vector3(0.0, 0.2, 0.0)))
-	var glass := CylinderMesh.new()
-	glass.top_radius = 0.07
-	glass.bottom_radius = 0.07
-	glass.height = 0.2
-	glass.radial_segments = 8
-	lantern.add_child(worn_mesh(glass, worn_material(2.2), Vector3(0.0, 0.07, 0.0)))
-	var base := CylinderMesh.new()
-	base.top_radius = 0.09
-	base.bottom_radius = 0.09
-	base.height = 0.04
-	base.radial_segments = 8
-	lantern.add_child(worn_mesh(base, brass, Vector3(0.0, -0.05, 0.0)))
+	var parts := WornKit.lantern()
+	lantern.add_child(worn_mesh(parts[0], brass, Vector3.ZERO))
+	lantern.add_child(worn_mesh(parts[1], worn_material(2.2), Vector3.ZERO))
 	var light := OmniLight3D.new()
 	light.light_color = tint()
 	light.light_energy = 0.8

@@ -17,14 +17,10 @@ func chest_ping_bonus() -> float:
 func make_worn() -> Node3D:
 	var map := MeshInstance3D.new()
 	map.name = "Map"
-	var scroll := CylinderMesh.new()
-	scroll.top_radius = 0.05
-	scroll.bottom_radius = 0.05
-	scroll.height = 0.3
-	scroll.radial_segments = 8
-	map.mesh = scroll
-	map.material_override = worn_material(0.3)
+	map.mesh = WornKit.scroll(0.3)
+	var paper := worn_material(0.3)
+	paper.albedo_color = Color(0.9, 0.8, 0.6)
+	map.material_override = paper
 	map.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.06, 0.0)
-	map.rotation = Vector3(0.0, 0.0, PI / 2.0)
 	map.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return map

@@ -50,12 +50,10 @@ func _trinket() -> Node3D:
 	var charm := Node3D.new()
 	charm.name = "Trinket"
 	charm.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.06, 0.0)
-	var gem := SphereMesh.new()
-	gem.radius = 0.07
-	gem.height = 0.14
-	gem.radial_segments = 8
-	gem.rings = 4
-	charm.add_child(worn_mesh(gem, worn_material(0.7), Vector3(0.0, 0.0, fish.hitbox_length * (posmod(hash(id), 5) - 2) * 0.1)))
+	var cut := worn_material(0.7)
+	cut.roughness = 0.08
+	cut.metallic = 0.3
+	charm.add_child(worn_mesh(WornKit.gem(0.07), cut, Vector3(0.0, 0.0, fish.hitbox_length * (posmod(hash(id), 5) - 2) * 0.1)))
 	return charm
 
 
@@ -70,12 +68,7 @@ func _barnacles() -> Node3D:
 	var dice := RandomNumberGenerator.new()
 	dice.seed = 1717
 	for n in 7:
-		var cone := CylinderMesh.new()
-		cone.top_radius = 0.025
-		cone.bottom_radius = dice.randf_range(0.05, 0.08)
-		cone.height = dice.randf_range(0.06, 0.11)
-		cone.radial_segments = 6
-		cone.rings = 1
+		var cone := WornKit.barnacle(snappedf(dice.randf_range(0.05, 0.08), 0.01), snappedf(dice.randf_range(0.06, 0.11), 0.01))
 		var at := Vector3(dice.randf_range(-0.12, 0.12), 0.0, dice.randf_range(-0.35, 0.35) * fish.hitbox_length)
 		plating.add_child(worn_mesh(cone, shell, at, Vector3(dice.randf_range(-0.3, 0.3), 0.0, dice.randf_range(-0.3, 0.3))))
 	return plating
@@ -85,16 +78,10 @@ func _barnacles() -> Node3D:
 func _shell() -> Node3D:
 	var home := Node3D.new()
 	home.name = "HermitShell"
-	home.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.08, fish.hitbox_length * 0.1)
+	home.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.02, fish.hitbox_length * 0.1)
 	var material := worn_material(0.25)
 	material.albedo_color = Color(0.92, 0.62, 0.48)
-	for n in 4:
-		var whorl := SphereMesh.new()
-		whorl.radius = 0.16 - n * 0.035
-		whorl.height = whorl.radius * 1.6
-		whorl.radial_segments = 10
-		whorl.rings = 5
-		home.add_child(worn_mesh(whorl, material, Vector3(0.0, n * 0.07, n * 0.05)))
+	home.add_child(worn_mesh(WornKit.cone_shell(0.32), material, Vector3.ZERO, Vector3(-1.1, 0.0, 0.0)))
 	return home
 
 
@@ -102,18 +89,11 @@ func _shell() -> Node3D:
 func _bubbles() -> Node3D:
 	var fizz := Node3D.new()
 	fizz.name = "Fizz"
-	var glass := worn_material(0.8)
-	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glass.albedo_color = Color(color(id), 0.55)
+	var glass := FxKit.rim(Color(color(id).lerp(Color.WHITE, 0.3), 0.8), 0.04, 0.7)
 	for side: float in [-1.0, 1.0]:
 		for n in 3:
-			var bubble := SphereMesh.new()
-			bubble.radius = 0.035 + n * 0.012
-			bubble.height = bubble.radius * 2.0
-			bubble.radial_segments = 8
-			bubble.rings = 4
 			var start := Vector3(side * fish.hitbox_width * 0.5, 0.0, -fish.hitbox_length * 0.2)
-			var part := worn_mesh(bubble, glass, start)
+			var part := worn_mesh(WornKit.ball(0.035 + n * 0.012), glass, start)
 			fizz.add_child(part)
 			part.ready.connect(func() -> void:
 				var rise := part.create_tween().set_loops()
@@ -127,29 +107,5 @@ func _seahorse() -> Node3D:
 	var rider := Node3D.new()
 	rider.name = "Seahorse"
 	rider.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.12, -fish.hitbox_length * 0.05)
-	var gold := worn_material(0.4)
-	var body := CapsuleMesh.new()
-	body.radius = 0.05
-	body.height = 0.24
-	body.radial_segments = 8
-	body.rings = 2
-	rider.add_child(worn_mesh(body, gold, Vector3.ZERO, Vector3(-0.3, 0.0, 0.0)))
-	var head := SphereMesh.new()
-	head.radius = 0.055
-	head.height = 0.11
-	head.radial_segments = 8
-	head.rings = 4
-	rider.add_child(worn_mesh(head, gold, Vector3(0.0, 0.13, -0.04)))
-	var snout := CylinderMesh.new()
-	snout.top_radius = 0.015
-	snout.bottom_radius = 0.02
-	snout.height = 0.09
-	snout.radial_segments = 6
-	rider.add_child(worn_mesh(snout, gold, Vector3(0.0, 0.13, -0.1), Vector3(PI / 2.0, 0.0, 0.0)))
-	var tail := TorusMesh.new()
-	tail.inner_radius = 0.02
-	tail.outer_radius = 0.05
-	tail.rings = 10
-	tail.ring_segments = 5
-	rider.add_child(worn_mesh(tail, gold, Vector3(0.0, -0.14, 0.03), Vector3(0.0, 0.0, PI / 2.0)))
+	rider.add_child(worn_mesh(WornKit.seahorse(0.3), worn_material(0.4), Vector3.ZERO))
 	return rider

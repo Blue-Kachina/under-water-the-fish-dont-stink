@@ -12,6 +12,7 @@ extends Node
 ## director keeps the horde at --count.
 ## --seconds=S how long to measure (default 4); --profile: each script's process times after.
 ## --no-sfx-hooks: without the sound hooks (SfxHooks), for comparing frame times.
+## --no-scenery: no reef, ruins, edge or shrines, for comparing frame times.
 ## --kinds=sardine,koi,...: the zombie kinds (EnemyKind ids) to spawn, the first
 ## two thirds, the rest spread over the others (default: the original five).
 
@@ -22,6 +23,7 @@ var count := 2000
 var spread := 100.0
 var apart := 30.0
 var seconds := 4.0
+var no_scenery := false
 var pearls := 0
 var powers := 0
 var profile := false
@@ -46,6 +48,8 @@ func _ready() -> void:
 			profile = true
 		elif arg == "--no-sfx-hooks":  # the same run with none of the sound nodes (planning_audio.md phase 3)
 			Sfx.hooks.queue_free()
+		elif arg == "--no-scenery":  # no reef, ruins or edge (planning_environment.md), for comparing frame times
+			no_scenery = true
 		elif arg.begins_with("--kinds="):
 			kind_ids.assign(arg.trim_prefix("--kinds=").split(","))
 		elif arg.begins_with("--seconds="):
@@ -61,6 +65,10 @@ func _ready() -> void:
 func _run(main: Node) -> void:
 	var settings := UnnaturalSettings.shared()
 	settings.spawning = false
+	if no_scenery:
+		for key: String in ["seabed_rocks", "seabed_kelp", "seagrass", "corals", "sponges", "anemones", "small_life", "ruin_rubble",
+				"ruin_clusters", "edge_rocks", "edge_kelp", "shrine_count"]:
+			settings.set(key, 0)
 	settings.stage_events = false
 	settings.chest_count = 0
 	settings.max_enemies = maxi(settings.max_enemies, count + 100)

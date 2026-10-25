@@ -41,13 +41,8 @@ func make_worn() -> Node3D:
 	var crown := Node3D.new()
 	crown.name = "Crown"
 	crown.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.02, -fish.hitbox_length * 0.15)
-	var skin := worn_material(0.7)
-	for n in 5:
-		var branch := CylinderMesh.new()
-		branch.top_radius = 0.01
-		branch.bottom_radius = 0.025
-		branch.height = 0.14
-		branch.radial_segments = 5
-		var turn := n * TAU / 5.0
-		crown.add_child(worn_mesh(branch, skin, Vector3(cos(turn) * 0.08, 0.07, sin(turn) * 0.08), Vector3(sin(turn) * 0.3, 0.0, -cos(turn) * 0.3)))
+	# A little branching coral crown.
+	var coral := worn_mesh(ReefKit.mesh("staghorn", 2), worn_material(0.7), Vector3.ZERO)
+	coral.scale = Vector3.ONE * 0.2
+	crown.add_child(coral)
 	return crown

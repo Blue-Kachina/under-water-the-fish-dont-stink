@@ -30,14 +30,41 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 200.0, 1.0, "or_greater") var edge_push := 30.0
 ## The blood moon's strength: the red in the fog and light (0: plain ocean).
 @export_range(0.0, 2.0, 0.05, "or_greater") var blood_moon := 1.0
-## Rocks and kelp on the seabed (how many of each).
-@export_range(0, 2000, 10, "or_greater") var seabed_rocks := 260
-@export_range(0, 4000, 10, "or_greater") var seabed_kelp := 600
 ## The arena's edge, so it reads from far off: tall rock outcrops and a thick
 ## band of tall kelp round it (and a faint red wall of light), from the seabed
 ## to the top of the depth band.
 @export_range(0, 1000, 5, "or_greater") var edge_rocks := 90
-@export_range(0, 8000, 10, "or_greater") var edge_kelp := 900
+@export_range(0, 8000, 10, "or_greater") var edge_kelp := 420
+
+@export_group("Seabed")
+## The living reef (planning_environment.md, Phase 5), all laid out from the
+## stage's seed: reef patches (corals, sponges, anemones) where a slow noise
+## says so, open sand and sea-grass meadows between them, a few kelp forests,
+## rocks, small life, and the ruins (Phase 4). The numbers are how many of
+## each across the arena; 0 switches one off.
+@export_range(0, 2000, 10, "or_greater") var seabed_rocks := 220
+## Giant kelp plants (about 8 m tall), in forests.
+@export_range(0, 3000, 10, "or_greater") var seabed_kelp := 320
+## Sea-grass clumps, in meadows.
+@export_range(0, 20000, 50, "or_greater") var seagrass := 2600
+## Corals (staghorn, brain, table and fan) and sponges (tube, barrel), in reef patches.
+@export_range(0, 10000, 10, "or_greater") var corals := 1400
+@export_range(0, 4000, 10, "or_greater") var sponges := 260
+@export_range(0, 4000, 10, "or_greater") var anemones := 420
+## Starfish, urchins and clams on the sand.
+@export_range(0, 4000, 10, "or_greater") var small_life := 500
+## How much of the floor is reef (0..1 of it, roughly).
+@export_range(0.0, 1.0, 0.05) var reef_cover := 0.35
+## Ruins (Phase 4): broken drums, capitals, blocks and pots scattered thinly,
+## thickening round ruin_clusters small temple ruins, which keep at least
+## ruin_spacing m apart and clear of the start.
+@export_range(0, 4000, 10, "or_greater") var ruin_rubble := 220
+@export_range(0, 20, 1, "or_greater") var ruin_clusters := 4
+@export_range(10.0, 200.0, 5.0, "or_greater") var ruin_spacing := 55.0
+## A clear circle round the start (m), and round each shrine.
+@export_range(0.0, 100.0, 1.0, "or_greater") var scenery_clearing := 12.0
+## How far scenery is drawn (m; 0: follow the murk, as the horde does).
+@export_range(0.0, 1000.0, 5.0, "or_greater") var scenery_draw_distance := 0.0
 
 @export_group("Murk")
 ## Murky water (planning_murk.md): the fog's density in the arena (0: the
@@ -83,6 +110,19 @@ static func shared() -> UnnaturalSettings:
 ## How often the swarm clouds are redrawn (per second).
 @export_range(1.0, 60.0, 1.0) var minimap_rate := 6.0
 @export_range(0.1, 1.0, 0.05) var minimap_opacity := 0.85
+
+@export_group("Compass")
+## A compass ring round the minimap: ticks every 15 degrees and N, E, S, W
+## (north is the arena's -Z), turning with the map.
+@export var compass_ring := true
+## A heading strip across the top of the view, under the XP bar: the same
+## ticks and letters, with markers for found shrines, bosses, the whirlpool,
+## teammates and your chests within chest_sense_range, each with its distance.
+@export var compass_strip := true
+## The strip's width (a share of the view's width) and how many degrees it spans.
+@export_range(0.1, 1.0, 0.01) var compass_width := 0.38
+@export_range(30.0, 360.0, 5.0) var compass_fov := 150.0
+@export_range(0.1, 1.0, 0.05) var compass_opacity := 0.9
 
 @export_group("Camera")
 ## The survivor cam: it follows the way the fish swims (smoothed), not its
@@ -590,6 +630,10 @@ static func shared() -> UnnaturalSettings:
 @export_range(0, 20, 1, "or_greater") var shrine_count := 4
 @export_range(0.0, 200.0, 5.0, "or_greater") var shrine_spacing := 60.0
 @export_range(1.0, 40.0, 0.5, "or_greater") var shrine_reach := 9.0
+## A shrine shows on the minimap and compass once a player has come within
+## this (m); it stays shown for the stage. From further off, only the murk
+## hides it. 0: every shrine shows from the start.
+@export_range(0.0, 500.0, 5.0, "or_greater") var shrine_reveal_range := 60.0
 ## Tide: hold its ring (shrine_tide_radius m) for shrine_tide_time s in all
 ## while the horde comes (a ring of shrine_tide_count zombies round it at the
 ## start and every shrine_tide_wave s); out of the ring the time drains back at
@@ -876,6 +920,9 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.5, 20.0, 0.1, "or_greater") var chest_reach := 8.0
 @export_range(0.0, 20.0, 0.1, "or_greater") var chest_still_speed := 3.0
 @export_range(0.0, 10.0, 0.1, "or_greater") var chest_open_time := 2.0
+## Every chest in reach counts down together. Once you take a chest's pick, the
+## next one unlocked and still in reach opens straight away (off: press Jump again).
+@export var chest_chain_open := true
 ## A chest offers this many powerups (different ones) to pick from.
 @export_range(1, 4, 1) var chest_choices := 3
 ## A buried chest's chance of being cursed (blood red): it offers cursed

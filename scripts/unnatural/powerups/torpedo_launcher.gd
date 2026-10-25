@@ -144,19 +144,10 @@ func make_worn() -> Node3D:
 	steel.metallic = 0.8
 	steel.roughness = 0.35
 	for side: float in [-1.0, 1.0]:
-		var tube := CylinderMesh.new()
-		tube.top_radius = 0.07
-		tube.bottom_radius = 0.07
-		tube.height = fish.hitbox_length * 0.5
-		tube.radial_segments = 10
 		var at := Vector3(side * (fish.hitbox_width * 0.5 + 0.04), fish.hitbox_height * 0.1, -fish.hitbox_length * 0.05)
-		rack.add_child(worn_mesh(tube, steel, at, Vector3(PI / 2.0, 0.0, 0.0)))
-		var muzzle := TorusMesh.new()
-		muzzle.inner_radius = 0.05
-		muzzle.outer_radius = 0.08
-		muzzle.rings = 12
-		muzzle.ring_segments = 6
-		rack.add_child(worn_mesh(muzzle, worn_material(1.8), at + Vector3(0.0, 0.0, -fish.hitbox_length * 0.25), Vector3(PI / 2.0, 0.0, 0.0)))
+		rack.add_child(worn_mesh(WornKit.barrel_tube(snappedf(fish.hitbox_length * 0.5, 0.05), 0.07), steel, at, Vector3(-PI / 2.0, 0.0, 0.0)))
+		rack.add_child(worn_mesh(WornKit.ring(0.07, 0.025), worn_material(1.8), at + Vector3(0.0, 0.0, -fish.hitbox_length * 0.25),
+				Vector3(PI / 2.0, 0.0, 0.0)))
 	return rack
 
 

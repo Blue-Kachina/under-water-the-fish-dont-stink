@@ -47,16 +47,6 @@ func make_worn() -> Node3D:
 	dish.name = "Sonar"
 	dish.position = Vector3(0.0, fish.hitbox_height * 0.5, -fish.hitbox_length * 0.2)
 	var skin := worn_material(0.8)
-	var stalk := CylinderMesh.new()
-	stalk.top_radius = 0.012
-	stalk.bottom_radius = 0.012
-	stalk.height = 0.14
-	stalk.radial_segments = 5
-	dish.add_child(worn_mesh(stalk, skin, Vector3(0.0, 0.07, 0.0)))
-	var bowl := CylinderMesh.new()
-	bowl.top_radius = 0.09
-	bowl.bottom_radius = 0.02
-	bowl.height = 0.05
-	bowl.radial_segments = 12
-	dish.add_child(worn_mesh(bowl, skin, Vector3(0.0, 0.16, -0.02), Vector3(-0.6, 0.0, 0.0)))
+	skin.cull_mode = BaseMaterial3D.CULL_DISABLED
+	dish.add_child(worn_mesh(WornKit.dish(), skin, Vector3.ZERO))
 	return dish

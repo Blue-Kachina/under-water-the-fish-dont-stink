@@ -52,13 +52,10 @@ func make_worn() -> Node3D:
 	swirl.name = "Riptide"
 	swirl.position = Vector3(0.0, 0.0, fish.hitbox_length * 0.45)
 	var skin := worn_material(0.5)
-	for n in 2:
-		var ring := TorusMesh.new()
-		ring.inner_radius = 0.12 + n * 0.06
-		ring.outer_radius = 0.14 + n * 0.06
-		ring.rings = 16
-		ring.ring_segments = 4
-		swirl.add_child(worn_mesh(ring, skin, Vector3(0.0, 0.0, n * 0.08), Vector3(PI * 0.5, 0.0, 0.0)))
+	# A spiral of water curling off the tail.
+	var curl := worn_mesh(WornKit.spiral_shell(0.4), skin, Vector3.ZERO, Vector3(0.0, PI / 2.0, 0.0))
+	curl.scale = Vector3(0.5, 1.0, 1.0)
+	swirl.add_child(curl)
 	return swirl
 
 

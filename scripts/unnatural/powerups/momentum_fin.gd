@@ -16,8 +16,8 @@ func make_worn() -> Node3D:
 	var streamers := Node3D.new()
 	streamers.name = "Streamers"
 	var skin := worn_material(0.8)
+	skin.cull_mode = BaseMaterial3D.CULL_DISABLED
 	for side: float in [-1.0, 1.0]:
-		var ribbon := BoxMesh.new()
-		ribbon.size = Vector3(0.04, 0.02, 0.8)
-		streamers.add_child(worn_mesh(ribbon, skin, Vector3(side * fish.hitbox_width * 0.5, 0.0, fish.hitbox_length * 0.5 + 0.3), Vector3(0.0, side * 0.15, 0.0)))
+		streamers.add_child(worn_mesh(WornKit.streamer(0.8, 0.06), skin, Vector3(side * fish.hitbox_width * 0.5, 0.0, fish.hitbox_length * 0.5 - 0.1),
+				Vector3(0.0, side * 0.15, 0.0)))
 	return streamers

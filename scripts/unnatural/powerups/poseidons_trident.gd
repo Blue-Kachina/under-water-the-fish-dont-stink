@@ -79,21 +79,8 @@ func make_worn() -> Node3D:
 	trident.name = "Trident"
 	trident.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.05, fish.hitbox_length * 0.1)
 	trident.rotation = Vector3(-1.2, 0.0, 0.0)
-	var skin := worn_material(1.0)
-	var shaft := CylinderMesh.new()
-	shaft.top_radius = 0.012
-	shaft.bottom_radius = 0.012
-	shaft.height = 0.45
-	shaft.radial_segments = 5
-	trident.add_child(worn_mesh(shaft, skin, Vector3.ZERO))
-	for side: float in [-1.0, 0.0, 1.0]:
-		var prong := CylinderMesh.new()
-		prong.top_radius = 0.0
-		prong.bottom_radius = 0.012
-		prong.height = 0.12
-		prong.radial_segments = 5
-		trident.add_child(worn_mesh(prong, skin, Vector3(side * 0.05, 0.28, 0.0)))
-	var bar := BoxMesh.new()
-	bar.size = Vector3(0.12, 0.015, 0.015)
-	trident.add_child(worn_mesh(bar, skin, Vector3(0.0, 0.22, 0.0)))
+	var piece := worn_mesh(GreekKit.cached("worn/trident", func() -> MeshKit: return GreekKit.trident(2.7, 3), null), worn_material(1.0),
+			Vector3(0.0, -0.22, 0.0))
+	piece.scale = Vector3(0.45, 0.19, 0.45)
+	trident.add_child(piece)
 	return trident

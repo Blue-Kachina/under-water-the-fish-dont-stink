@@ -299,11 +299,7 @@ func _add_rider(node: Node3D, at: Vector3, basis: Basis, sway := 0.0) -> void:
 
 ## The bolts' look: the King spits shards of its rotting scales.
 func _bolt_mesh_look() -> Mesh:
-	var flake := SphereMesh.new()
-	flake.radius = 0.5
-	flake.height = 0.3
-	flake.radial_segments = 8
-	flake.rings = 3
+	var flake := FxLooks.scale_shard().duplicate() as ArrayMesh  # its own material slot
 	var glow := StandardMaterial3D.new()
 	glow.albedo_color = Color(0.85, 0.85, 0.9)
 	glow.metallic = 0.9
@@ -311,7 +307,9 @@ func _bolt_mesh_look() -> Mesh:
 	glow.emission_enabled = true
 	glow.emission = Color(0.9, 0.25, 0.25)
 	glow.emission_energy_multiplier = 0.8
-	flake.material = glow
+	glow.rim_enabled = true
+	glow.cull_mode = BaseMaterial3D.CULL_DISABLED
+	flake.surface_set_material(0, glow)
 	return flake
 
 

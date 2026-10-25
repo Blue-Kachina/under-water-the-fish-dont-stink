@@ -248,16 +248,14 @@ func _build_look() -> void:
 
 ## Her bolts are clots of blood.
 func _bolt_mesh_look() -> Mesh:
-	var clot := SphereMesh.new()
-	clot.radius = 0.5
-	clot.height = 0.8
-	clot.radial_segments = 8
-	clot.rings = 4
+	var clot := FxLooks.gob(23).duplicate() as ArrayMesh
 	var glow := StandardMaterial3D.new()
 	glow.albedo_color = Color(0.45, 0.02, 0.03)
 	glow.roughness = 0.15
 	glow.emission_enabled = true
 	glow.emission = Color(0.9, 0.08, 0.05)
 	glow.emission_energy_multiplier = 1.2
-	clot.material = glow
+	glow.rim_enabled = true
+	glow.clearcoat_enabled = true
+	clot.surface_set_material(0, glow)
 	return clot

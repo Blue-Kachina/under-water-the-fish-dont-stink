@@ -60,11 +60,15 @@ static func view_mask(index: int) -> int:
 	return (0xFFFFF & ~PLAYER_LAYERS) | player_layer(index)
 
 
-static func _wood() -> StandardMaterial3D:
-	var wood := StandardMaterial3D.new()
-	wood.albedo_color = WOOD
-	wood.roughness = 0.8
-	return wood
+static var _wood_material: ShaderMaterial
+
+
+## Planked, waterlogged wood (planning_environment.md, Phase 6), shared.
+static func _wood() -> ShaderMaterial:
+	if _wood_material == null:
+		_wood_material = ShaderMaterial.new()
+		_wood_material.shader = preload("res://shaders/wood.gdshader")
+	return _wood_material
 
 
 ## Its trim and glow: gold, blood red or steel blue.
@@ -118,26 +122,26 @@ func _ready() -> void:
 	_set_layers(_shut, _shown)
 
 
-## The chest's body, bands and lid under `root`; returns the lid's hinge.
+## The chest under `root` (planning_environment.md, Phase 6, FxLooks): a
+## planked body, iron or gold bands, corner posts and studs, and a barrel lid
+## with its own bands and the lock plate; returns the lid's hinge.
 func _build(root: Node3D, glow: StandardMaterial3D) -> Node3D:
 	var wood := _wood()
-	var body := _box(Vector3(SIZE.x, SIZE.y * 0.6, SIZE.z), wood)
-	body.position.y = SIZE.y * 0.3
-	root.add_child(body)
-	for x: float in [-0.5, 0.5]:
-		var band := _box(Vector3(0.1, SIZE.y * 0.62, SIZE.z + 0.04), glow)
-		band.position = Vector3(x * SIZE.x * 0.7, SIZE.y * 0.3, 0.0)
-		root.add_child(band)
+	root.add_child(_part(FxLooks.chest_body(SIZE), wood))
+	root.add_child(_part(FxLooks.chest_trim(SIZE), glow))
 	var hinge := Node3D.new()
 	hinge.position = Vector3(0.0, SIZE.y * 0.6, -SIZE.z * 0.5)  # hinged at the back
 	root.add_child(hinge)
-	var lid := _box(Vector3(SIZE.x, SIZE.y * 0.35, SIZE.z), wood)
-	lid.position = Vector3(0.0, SIZE.y * 0.175, SIZE.z * 0.5)
-	hinge.add_child(lid)
-	var lock := _box(Vector3(0.22, 0.25, 0.08), glow)
-	lock.position = Vector3(0.0, 0.0, SIZE.z + 0.03)
-	hinge.add_child(lock)
+	hinge.add_child(_part(FxLooks.chest_lid(SIZE), wood))
+	hinge.add_child(_part(FxLooks.chest_lid_trim(SIZE), glow))
 	return hinge
+
+
+func _part(mesh: Mesh, material: Material) -> MeshInstance3D:
+	var part := MeshInstance3D.new()
+	part.mesh = mesh
+	part.material_override = material
+	return part
 
 
 func is_open_for(fish: FishController) -> bool:
@@ -257,11 +261,3 @@ static func _set_layers(node: Node, mask: int) -> void:
 	for child in node.get_children():
 		_set_layers(child, mask)
 
-
-func _box(size: Vector3, material: Material) -> MeshInstance3D:
-	var box := BoxMesh.new()
-	box.size = size
-	box.material = material
-	var mesh := MeshInstance3D.new()
-	mesh.mesh = box
-	return mesh

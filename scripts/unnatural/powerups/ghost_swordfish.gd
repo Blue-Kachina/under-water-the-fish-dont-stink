@@ -56,18 +56,7 @@ func make_worn() -> Node3D:
 	ghost.position = Vector3(fish.hitbox_width * 0.9, fish.hitbox_height * 0.3, 0.0)
 	var skin := FxKit.glow(color(id))
 	skin.albedo_color.a = 0.45
-	var body := CapsuleMesh.new()
-	body.radius = 0.07
-	body.height = 0.5
-	body.radial_segments = 8
-	body.rings = 3
-	ghost.add_child(worn_mesh(body, skin, Vector3.ZERO, Vector3(PI * 0.5, 0.0, 0.0)))
-	var bill := CylinderMesh.new()
-	bill.top_radius = 0.0
-	bill.bottom_radius = 0.02
-	bill.height = 0.3
-	bill.radial_segments = 5
-	ghost.add_child(worn_mesh(bill, skin, Vector3(0.0, 0.0, -0.38), Vector3(-PI * 0.5, 0.0, 0.0)))
+	ghost.add_child(worn_mesh(WornKit.fish_body(0.55, 0.15, 0.3), skin, Vector3.ZERO))
 	return ghost
 
 

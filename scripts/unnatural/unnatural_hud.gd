@@ -57,6 +57,7 @@ var low_level := 0.0
 
 var _bars := Bars.new()
 var _minimap := Minimap.new()
+var _compass := CompassStrip.new()
 var _clock := Label.new()
 var _kills := Label.new()
 var _skill := Label.new()
@@ -98,6 +99,8 @@ func _ready() -> void:
 	add_child(_bars)
 	_minimap.hud = self
 	add_child(_minimap)
+	_compass.hud = self
+	add_child(_compass)
 	for label: Label in [_clock, _kills, _director, _skill]:
 		label.anchor_left = 0.5
 		label.anchor_right = 0.5
@@ -235,6 +238,16 @@ func _ready() -> void:
 			_splash.hide_now())
 
 
+## Whether the cards are up (their heading takes the top of the view).
+func cards_up() -> bool:
+	return _cards.is_open()
+
+
+## How far the compass strip pushes down what sits under the XP bar (px).
+func top_push() -> float:
+	return _compass.push()
+
+
 ## Where the minimap sits on the view (an empty rect when it's hidden), so
 ## the edge marks keep off it.
 func minimap_rect() -> Rect2:
@@ -323,6 +336,10 @@ func _process(delta: float) -> void:
 	_clock.text = _time_text(run.elapsed) if run.stage <= 1 else "STAGE %d  ·  %s" % [run.stage, _time_text(run.stage_time())]
 	_kills.text = "%d KILLS" % run.kills
 	_clock.visible = not _cards.is_open()  # the cards' heading is there
+	var push := top_push()
+	_clock.offset_top = 22.0 + push
+	_kills.offset_top = 70.0 + push
+	_director.offset_top = 98.0 + push
 	_kills.visible = _clock.visible
 	_update_skill()
 	var next := run.timeline.next_event() if run.timeline and not run.tank else {}
@@ -665,7 +682,7 @@ class Bars extends Control:
 		if boss == null:
 			return
 		var width := minf(size.x * 0.5, 720.0)
-		var bar := Rect2((size.x - width) * 0.5, 128.0, width, 14.0)
+		var bar := Rect2((size.x - width) * 0.5, 128.0 + hud.top_push(), width, 14.0)
 		draw_rect(bar.grow(3.0), Color(BroadcastUI.INK, 0.85))
 		# What the last hits took, trailing behind (P3), then the hp left.
 		if boss != _boss_shown:

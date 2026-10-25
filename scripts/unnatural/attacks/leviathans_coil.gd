@@ -203,11 +203,8 @@ func _vertebra_mesh() -> ArrayMesh:
 
 ## A red band round the tail, where the coils start.
 func make_worn() -> Node3D:
-	var ring := TorusMesh.new()
-	ring.inner_radius = maxf(fish.hitbox_width, fish.hitbox_height) * 0.3
-	ring.outer_radius = ring.inner_radius + 0.06
-	ring.rings = 16
-	ring.ring_segments = 5
-	var band := worn_mesh(ring, worn_material(1.5), Vector3(0.0, 0.0, fish.hitbox_length * 0.35), Vector3(PI / 2.0, 0.0, 0.0))
+	var radius := maxf(fish.hitbox_width, fish.hitbox_height) * 0.3 + 0.03
+	var band := worn_mesh(WornKit.ring(snappedf(radius, 0.02), 0.06), worn_material(1.5), Vector3(0.0, 0.0, fish.hitbox_length * 0.35),
+			Vector3(PI / 2.0, 0.0, 0.0))
 	band.name = "CoilBand"
 	return band

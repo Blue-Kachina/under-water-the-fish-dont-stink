@@ -30,35 +30,24 @@ func make_worn() -> Node3D:
 	look.name = "Worn" + id.to_pascal_case()
 	match id:
 		"megalodon_tooth":
-			# A big white tooth on a cord under the chin.
+			# A big serrated tooth on a cord under the chin.
 			look.position = Vector3(0.0, -fish.hitbox_height * 0.45, -fish.hitbox_length * 0.3)
-			var tooth := PrismMesh.new()
-			tooth.size = Vector3(0.1, 0.16, 0.03)
-			look.add_child(worn_mesh(tooth, worn_material(0.4), Vector3.ZERO, Vector3(PI, 0.0, 0.0)))
+			var enamel := worn_material(0.4)
+			enamel.albedo_color = Color(0.95, 0.92, 0.85)
+			look.add_child(worn_mesh(WornKit.tooth(0.18), enamel, Vector3.ZERO))
+			look.add_child(worn_mesh(WornKit.ring(0.04, 0.008), worn_material(0.1), Vector3(0.0, 0.1, 0.0), Vector3(PI / 2.0, 0.0, 0.0)))
 		"moon_pearl":
 			# A glowing pearl on the forehead.
 			look.position = Vector3(0.0, fish.hitbox_height * 0.45, -fish.hitbox_length * 0.3)
-			var pearl := SphereMesh.new()
-			pearl.radius = 0.06
-			pearl.height = 0.12
-			pearl.radial_segments = 12
-			pearl.rings = 6
-			look.add_child(worn_mesh(pearl, worn_material(2.0), Vector3.ZERO))
+			var nacre := worn_material(2.0)
+			nacre.roughness = 0.1
+			nacre.clearcoat_enabled = true
+			look.add_child(worn_mesh(WornKit.ball(0.06), nacre, Vector3.ZERO))
 		"abyssal_engine":
-			# A churning engine on the back: a drum and its spinning ring.
+			# A churning engine on the back: a ribbed drum and its spinning ring.
 			look.position = Vector3(0.0, fish.hitbox_height * 0.5 + 0.06, fish.hitbox_length * 0.1)
-			var drum := CylinderMesh.new()
-			drum.top_radius = 0.07
-			drum.bottom_radius = 0.07
-			drum.height = 0.14
-			drum.radial_segments = 10
-			look.add_child(worn_mesh(drum, worn_material(0.3), Vector3.ZERO, Vector3(PI * 0.5, 0.0, 0.0)))
-			var ring := TorusMesh.new()
-			ring.inner_radius = 0.08
-			ring.outer_radius = 0.1
-			ring.rings = 16
-			ring.ring_segments = 4
-			var spin := worn_mesh(ring, worn_material(2.0), Vector3.ZERO, Vector3(PI * 0.5, 0.0, 0.0))
+			look.add_child(worn_mesh(WornKit.barrel_tube(0.14, 0.07), worn_material(0.3), Vector3.ZERO, Vector3(PI * 0.5, 0.0, 0.0)))
+			var spin := worn_mesh(WornKit.ring(0.09, 0.02), worn_material(2.0), Vector3.ZERO, Vector3(PI * 0.5, 0.0, 0.0))
 			look.add_child(spin)
 			look.ready.connect(func() -> void:
 				var turn := spin.create_tween().set_loops()

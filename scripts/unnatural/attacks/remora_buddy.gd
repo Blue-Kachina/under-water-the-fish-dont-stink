@@ -202,13 +202,9 @@ func make_worn() -> Node3D:
 	var skin := worn_material(0.35)
 	skin.albedo_color = Color(0.78, 0.82, 0.9)
 	var n := mini(count(), 8)
+	var body := WornKit.fish_body(0.55, 0.16, 0.0, true)
 	for k in n:
-		var body := CapsuleMesh.new()
-		body.radius = 0.09
-		body.height = 0.55
-		body.radial_segments = 8
-		body.rings = 2
 		var side := (k % 2) * 2.0 - 1.0 if n > 1 else 1.0
 		var at := Vector3(side * fish.hitbox_width * 0.5, -fish.hitbox_height * 0.3, (k / 2) * 0.4 - 0.15)
-		school.add_child(worn_mesh(body, skin, at, Vector3(PI / 2.0, 0.0, 0.0)))
+		school.add_child(worn_mesh(body, skin, at, Vector3(0.0, 0.0, -side * PI / 2.0)))
 	return school

@@ -36,12 +36,7 @@ func make_worn() -> Node3D:
 	var bone := StandardMaterial3D.new()
 	bone.albedo_color = Color(0.95, 0.88, 0.6)
 	bone.roughness = 0.5
-	var spike := CylinderMesh.new()
-	spike.top_radius = 0.0
-	spike.bottom_radius = 0.025
-	spike.height = 0.18
-	spike.radial_segments = 5
-	spike.rings = 1
+	var spike := WornKit.tentacle(0.2, 0.025, 0.4)  # a spine, curving a little
 	var half := Vector3(fish.hitbox_width, fish.hitbox_height, fish.hitbox_length) * 0.5
 	for ring in 3:
 		var z := (ring - 1) * half.z * 0.5
@@ -49,7 +44,7 @@ func make_worn() -> Node3D:
 			var a := k * TAU / 8.0 + ring * 0.4 + 0.2  # never straight down (no arc from up to down)
 			var out := Vector3(cos(a), sin(a), 0.0)
 			var at := Vector3(out.x * half.x, out.y * half.y, z)
-			var part := worn_mesh(spike, bone, at + out * 0.08)
+			var part := worn_mesh(spike, bone, at)
 			part.basis = Basis(Quaternion(Vector3.UP, out))
 			spines.add_child(part)
 	return spines

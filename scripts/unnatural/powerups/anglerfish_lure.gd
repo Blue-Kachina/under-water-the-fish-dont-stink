@@ -93,20 +93,10 @@ func make_worn() -> Node3D:
 	var stalk_material := StandardMaterial3D.new()
 	stalk_material.albedo_color = Color(0.3, 0.25, 0.22)
 	stalk_material.roughness = 0.7
-	var stalk := CylinderMesh.new()
-	stalk.top_radius = 0.012
-	stalk.bottom_radius = 0.025
-	stalk.height = 0.4
-	stalk.radial_segments = 6
-	stalk.rings = 1
-	rod.add_child(worn_mesh(stalk, stalk_material, Vector3(0.0, 0.17, -0.08), Vector3(-0.45, 0.0, 0.0)))
-	var bulb := SphereMesh.new()
-	bulb.radius = 0.07
-	bulb.height = 0.14
-	bulb.radial_segments = 8
-	bulb.rings = 4
+	# The stalk arches up and forward to the bulb.
+	rod.add_child(worn_mesh(WornKit.tentacle(0.45, 0.025, 1.1), stalk_material, Vector3.ZERO, Vector3(0.0, PI, 0.0)))
 	var glow := worn_material(3.0)
-	rod.add_child(worn_mesh(bulb, glow, Vector3(0.0, 0.36, -0.2)))
+	rod.add_child(worn_mesh(WornKit.ball(0.065), glow, Vector3(0.0, 0.36, -0.2)))
 	rod.ready.connect(func() -> void:
 		var pulse := rod.create_tween().set_loops()
 		pulse.tween_property(glow, "emission_energy_multiplier", 4.5, 0.5)

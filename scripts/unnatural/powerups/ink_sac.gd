@@ -38,13 +38,9 @@ func on_hurt(_amount: float, _from: int) -> void:
 func make_worn() -> Node3D:
 	var sac := MeshInstance3D.new()
 	sac.name = "InkSac"
-	var blob := SphereMesh.new()
-	blob.radius = 0.11
-	blob.height = 0.26
-	blob.radial_segments = 10
-	blob.rings = 5
-	sac.mesh = blob
+	sac.mesh = WornKit.ball(0.12)
 	sac.material_override = worn_material(0.25)
+	sac.scale = Vector3(0.85, 1.0, 1.25)  # a pouch, longer than deep
 	sac.position = Vector3(0.0, -fish.hitbox_height * 0.45, fish.hitbox_length * 0.05)
 	sac.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return sac

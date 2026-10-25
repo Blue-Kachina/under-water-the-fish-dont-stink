@@ -35,6 +35,9 @@ const MARGIN := Vector2(18.0, 48.0)
 const ELITE_COLOR := Color(1.0, 0.2, 0.15)
 const BONE := Color(0.92, 0.88, 0.8)
 const SIDES := 48
+## The compass ring's width (px) round the map, and its letters.
+const BEZEL := 15.0
+const CARDINALS := ["N", "E", "S", "W"]
 
 ## The swarms' texture, shared by every map, and the survey it shows.
 static var _cloud_texture: ImageTexture
@@ -85,7 +88,7 @@ func _process(_delta: float) -> void:
 	_marks.size = size
 	modulate.a = settings.minimap_opacity
 	_middle = size * 0.5
-	_radius = side * 0.5 - 3.0
+	_radius = side * 0.5 - (BEZEL if settings.compass_ring else 3.0)
 	# The middle and how far it reaches.
 	var reach := settings.minimap_range
 	_centre = hud.fish.global_position
@@ -141,6 +144,84 @@ func to_rim(spot: Vector2, inset: float) -> Vector2:
 
 func _draw() -> void:
 	draw_circle(_middle, _radius, Color(BroadcastUI.INK, 0.72))
+	if hud and is_instance_valid(hud.run) and hud.run.settings.compass_ring:
+		_draw_bezel()
+
+
+## The compass ring (planning_environment.md, E5): a band round the map with a
+## tick every 15 degrees (longer every 45) and N, E, S, W where they lie,
+## turning with the map. North is the arena's -Z.
+func _draw_bezel() -> void:
+	var outer := size.x * 0.5 - 1.0
+	var band := outer - _radius
+	if band < 2.0:
+		return  # not laid out yet
+	draw_circle(_middle, _radius + band * 0.5, Color(BroadcastUI.INK, 0.85), false, band, true)
+	draw_arc(_middle, outer, 0.0, TAU, SIDES * 2, Color(1, 1, 1, 0.25), 1.5, true)
+	for n in 24:
+		var bearing := TAU * n / 24.0
+		var way := turn(Vector2(sin(bearing), -cos(bearing)))
+		var major := n % 6 == 0
+		if major:
+			var letter: String = CARDINALS[n / 6]
+			var spot := _middle + way * (_radius + band * 0.5)
+			var tint := UITheme.CORAL if n == 0 else Color(1, 1, 1, 0.9)
+			BroadcastUI.text(self, Rect2(spot - Vector2(10.0, 8.0), Vector2(20.0, 16.0)), letter, maxi(roundi(band * 0.8), 8), tint,
+					HORIZONTAL_ALIGNMENT_CENTER, 800)
+			continue
+		var long := n % 3 == 0
+		var inner := _radius + band * (0.3 if long else 0.55)
+		draw_line(_middle + way * inner, _middle + way * (outer - band * 0.15), Color(1, 1, 1, 0.55 if long else 0.35), 1.5 if long else 1.0, true)
+
+
+## Icon painters, shared with the compass strip (CompassStrip).
+## A shrine (P5): a diamond in its colour, pulsing while its Tide runs.
+static func draw_shrine(canvas: CanvasItem, spot: Vector2, tint: Color, running: bool, scale := 1.0) -> void:
+	var r := (6.0 + (1.5 * sin(Time.get_ticks_msec() / 120.0) if running else 0.0)) * scale
+	var e := 2.0 * scale
+	canvas.draw_colored_polygon(PackedVector2Array([spot + Vector2(0.0, -r), spot + Vector2(r, 0.0), spot + Vector2(0.0, r),
+			spot + Vector2(-r, 0.0)]), Color(BroadcastUI.INK, 0.9))
+	canvas.draw_colored_polygon(PackedVector2Array([spot + Vector2(0.0, -r + e), spot + Vector2(r - e, 0.0), spot + Vector2(0.0, r - e),
+			spot + Vector2(-r + e, 0.0)]), tint)
+
+
+static func draw_chest(canvas: CanvasItem, spot: Vector2, tint: Color, scale := 1.0) -> void:
+	var box := Rect2(spot - Vector2(5.0, 4.0) * scale, Vector2(10.0, 8.0) * scale)
+	canvas.draw_rect(box.grow(1.5), Color(BroadcastUI.INK, 0.9))
+	canvas.draw_rect(box, tint)
+	canvas.draw_line(Vector2(box.position.x, box.get_center().y - scale), Vector2(box.end.x, box.get_center().y - scale),
+			Color(0.35, 0.2, 0.05), 1.0)
+
+
+## The way out: a pale spiral on a dark disc.
+static func draw_whirlpool(canvas: CanvasItem, spot: Vector2, radius: float) -> void:
+	var phase := Time.get_ticks_msec() / 900.0
+	canvas.draw_circle(spot, radius + 1.5, Color(BroadcastUI.INK, 0.9))
+	canvas.draw_circle(spot, radius, Color(0.1, 0.3, 0.45))
+	var points := PackedVector2Array()
+	for n in 24:
+		var t := n / 23.0
+		points.append(spot + Vector2.from_angle(phase + t * TAU * 1.5) * radius * 0.9 * t)
+	canvas.draw_polyline(points, Whirlpool.COLOR, 2.0, true)
+
+
+static func draw_skull(canvas: CanvasItem, spot: Vector2, radius: float) -> void:
+	canvas.draw_circle(spot, radius + 1.5, Color(BroadcastUI.INK, 0.9))
+	canvas.draw_circle(spot + Vector2(0.0, -radius * 0.15), radius * 0.85, BONE)
+	canvas.draw_rect(Rect2(spot + Vector2(-radius * 0.5, radius * 0.25), Vector2(radius, radius * 0.6)), BONE)
+	canvas.draw_circle(spot + Vector2(-radius * 0.35, -radius * 0.15), radius * 0.24, Color(0.6, 0.0, 0.0))
+	canvas.draw_circle(spot + Vector2(radius * 0.35, -radius * 0.15), radius * 0.24, Color(0.6, 0.0, 0.0))
+
+
+## A player's arrow pointing `ahead` (unit, on the canvas), in `color`.
+static func draw_arrow(canvas: CanvasItem, spot: Vector2, ahead: Vector2, color: Color, outline: Color, length: float) -> void:
+	var side := Vector2(-ahead.y, ahead.x)
+	var arrow := PackedVector2Array([spot + ahead * length, spot - ahead * length * 0.6 + side * length * 0.65,
+			spot - ahead * length * 0.25, spot - ahead * length * 0.6 - side * length * 0.65])
+	var ring := arrow.duplicate()
+	ring.append(arrow[0])
+	canvas.draw_colored_polygon(arrow, color)
+	canvas.draw_polyline(ring, outline, 1.5, true)
 
 
 ## The swarms' texture from the Horde's survey, when there's a new one.
@@ -204,12 +285,12 @@ class Marks extends Control:
 		for chest in run.shut_chests_for(me):
 			var spot := map.to_map(chest.global_position)
 			if map.on_map(spot, 5.0):
-				_draw_chest(spot, chest.tint())
+				Minimap.draw_chest(self, spot, chest.tint())
 		for shrine in run.shrines:
-			if is_instance_valid(shrine) and not shrine.spent:
+			if is_instance_valid(shrine) and not shrine.spent and shrine.discovered:
 				var spot := map.to_map(shrine.global_position)
 				if map.on_map(spot, 6.0):
-					_draw_shrine(spot, shrine.tint(), shrine.tide_active)
+					Minimap.draw_shrine(self, spot, shrine.tint(), shrine.tide_active)
 		if is_instance_valid(run.horde):
 			for at in run.horde.survey_elites:
 				var spot := map.to_map(at)
@@ -219,9 +300,9 @@ class Marks extends Control:
 			if not is_instance_valid(boss) or boss.dying:
 				continue
 			var spot := map.to_map(boss.global_position)
-			_draw_skull(map.to_rim(spot, 9.0), 9.0 if boss is BloodLeviathan else 6.5)
+			Minimap.draw_skull(self, map.to_rim(spot, 9.0), 9.0 if boss is BloodLeviathan else 6.5)
 		if is_instance_valid(run.whirlpool):
-			_draw_whirlpool(map.to_rim(map.to_map(run.whirlpool.global_position), 9.0), 8.0)
+			Minimap.draw_whirlpool(self, map.to_rim(map.to_map(run.whirlpool.global_position), 9.0), 8.0)
 		for fish in run.players:
 			if is_instance_valid(fish) and fish != me:
 				_draw_player(run, fish, false)
@@ -242,55 +323,15 @@ class Marks extends Control:
 			last = spot
 			last_in = inside
 
-	## A shrine (P5): a diamond in its colour, pulsing while its Tide runs.
-	func _draw_shrine(spot: Vector2, tint: Color, running: bool) -> void:
-		var r := 6.0 + (1.5 * sin(Time.get_ticks_msec() / 120.0) if running else 0.0)
-		var diamond := PackedVector2Array([spot + Vector2(0.0, -r), spot + Vector2(r, 0.0), spot + Vector2(0.0, r), spot + Vector2(-r, 0.0)])
-		draw_colored_polygon(diamond, Color(BroadcastUI.INK, 0.9))
-		draw_colored_polygon(PackedVector2Array([spot + Vector2(0.0, -r + 2.0), spot + Vector2(r - 2.0, 0.0), spot + Vector2(0.0, r - 2.0),
-				spot + Vector2(-r + 2.0, 0.0)]), tint)
-
-	func _draw_chest(spot: Vector2, tint: Color) -> void:
-		var box := Rect2(spot - Vector2(5.0, 4.0), Vector2(10.0, 8.0))
-		draw_rect(box.grow(1.5), Color(BroadcastUI.INK, 0.9))
-		draw_rect(box, tint)
-		draw_line(Vector2(box.position.x, box.get_center().y - 1.0), Vector2(box.end.x, box.get_center().y - 1.0), Color(0.35, 0.2, 0.05), 1.0)
-
-	## The way out: a pale spiral on a dark disc, pinned to the rim when it's out of range.
-	func _draw_whirlpool(spot: Vector2, radius: float) -> void:
-		var phase := Time.get_ticks_msec() / 900.0
-		draw_circle(spot, radius + 1.5, Color(BroadcastUI.INK, 0.9))
-		draw_circle(spot, radius, Color(0.1, 0.3, 0.45))
-		var points := PackedVector2Array()
-		for n in 24:
-			var t := n / 23.0
-			points.append(spot + Vector2.from_angle(phase + t * TAU * 1.5) * radius * 0.9 * t)
-		draw_polyline(points, Whirlpool.COLOR, 2.0, true)
-
-	func _draw_skull(spot: Vector2, radius: float) -> void:
-		draw_circle(spot, radius + 1.5, Color(BroadcastUI.INK, 0.9))
-		draw_circle(spot + Vector2(0.0, -radius * 0.15), radius * 0.85, Minimap.BONE)
-		draw_rect(Rect2(spot + Vector2(-radius * 0.5, radius * 0.25), Vector2(radius, radius * 0.6)), Minimap.BONE)
-		draw_circle(spot + Vector2(-radius * 0.35, -radius * 0.15), radius * 0.24, Color(0.6, 0.0, 0.0))
-		draw_circle(spot + Vector2(radius * 0.35, -radius * 0.15), radius * 0.24, Color(0.6, 0.0, 0.0))
-
 	func _draw_player(run: UnnaturalRun, fish: FishController, mine: bool) -> void:
 		var spot := map.to_map(fish.global_position)
 		if not map.on_map(spot, 6.0):
 			spot = map.to_rim(spot, 6.0)
 		var facing := Vector2(-fish.global_basis.z.x, -fish.global_basis.z.z)
 		var ahead := map.turn(facing.normalized()) if facing.length_squared() > 0.0001 else Vector2.UP
-		var side := Vector2(-ahead.y, ahead.x)
-		var length := 9.0 if mine else 7.5
-		var arrow := PackedVector2Array([spot + ahead * length, spot - ahead * length * 0.6 + side * length * 0.65,
-				spot - ahead * length * 0.25, spot - ahead * length * 0.6 - side * length * 0.65])
 		var color := fish.body_color()
 		color.a = 1.0
-		var outline := Color.WHITE if mine else Color(BroadcastUI.INK, 0.9)
-		var ring := arrow.duplicate()
-		ring.append(arrow[0])
-		draw_colored_polygon(arrow, color)
-		draw_polyline(ring, outline, 1.5, true)
+		Minimap.draw_arrow(self, spot, ahead, color, Color.WHITE if mine else Color(BroadcastUI.INK, 0.9), 9.0 if mine else 7.5)
 		var health := run.health_of(fish)
 		if health and health.down:
 			var x := 5.0

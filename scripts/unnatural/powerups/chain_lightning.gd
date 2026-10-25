@@ -114,26 +114,9 @@ func make_worn() -> Node3D:
 	copper.albedo_color = Color(0.72, 0.45, 0.2)
 	copper.metallic = 0.9
 	copper.roughness = 0.3
-	var rod := CylinderMesh.new()
-	rod.top_radius = 0.015
-	rod.bottom_radius = 0.02
-	rod.height = 0.4
-	rod.radial_segments = 6
-	coil.add_child(worn_mesh(rod, copper, Vector3(0.0, 0.2, 0.0)))
-	for n in 3:
-		var turn := TorusMesh.new()
-		turn.inner_radius = 0.035
-		turn.outer_radius = 0.055
-		turn.rings = 12
-		turn.ring_segments = 6
-		coil.add_child(worn_mesh(turn, copper, Vector3(0.0, 0.1 + n * 0.08, 0.0)))
-	var tip := SphereMesh.new()
-	tip.radius = 0.05
-	tip.height = 0.1
-	tip.radial_segments = 8
-	tip.rings = 4
+	coil.add_child(worn_mesh(WornKit.coil(0.4), copper, Vector3.ZERO))
 	var spark := worn_material(3.0)
-	coil.add_child(worn_mesh(tip, spark, Vector3(0.0, 0.42, 0.0)))
+	coil.add_child(worn_mesh(WornKit.ball(0.045), spark, Vector3(0.0, 0.42, 0.0)))
 	coil.ready.connect(func() -> void:
 		var crackle := coil.create_tween().set_loops()
 		crackle.tween_property(spark, "emission_energy_multiplier", 6.0, 0.05)
