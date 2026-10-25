@@ -1,15 +1,19 @@
 class_name UnnaturalHud
 extends CanvasLayer
-## Unnatural's HUD (planning_unnatural.md §11), over the player's view:
+## Unnatural's HUD (planning_unnatural.md §11; restyled by the HUD redesign,
+## 2026-10-25, in Barlow), over the player's view:
 ## - a health bar under their fish (it flashes red when hurt);
-## - the team's XP bar across the top (the controls hint and stride meter
-##   have the bottom), with the level;
-## - the stage clock (counting up) under it, with the kills under that;
+## - the top row: the team's level, its XP bar and count, and your pearls
+##   (Bars), with the compass strip (CompassStrip) under it;
+## - the stage clock (counting up) under that, with the kills under it;
+## - your loadout top-left, see-through: weapons, tomes and powerups, thin
+##   rims in their colours;
+## - the mobility skill's button at the bottom (SkillButton), over the stroke
+##   rhythm meter (the main HUD's StrideMeter); no controls line;
 ## - a splash for each level-up, and when the run's over;
-## - the results board (BroadcastUI.StatsBoard): held on D-pad up / B, and up
-##   by itself once everyone's down. R starts again. Under each name, that
-##   player's powerups as badges in their rarity's colour. Beside it, your own
-##   fish: its attack, level and hp, and every stat it has (StatsPanel).
+## - the run summary (RunSummary): held on D-pad up / B, and up by itself once
+##   everyone's down. R starts again. A player's summary (loadout, stats and
+##   damage contribution) or the scoreboard; the right stick flicks through.
 ## - the minimap (Minimap) in the bottom-right.
 ## With show_director on, the director's live numbers sit under the clock. In
 ## the Test Tank a DPS readout (TestTank's numbers) sits on the right.
@@ -21,10 +25,10 @@ extends CanvasLayer
 ##   brackets, threat arrows and drop pings (CombatMarkers), and the hurt
 ##   vignette: a red flush when hit and a heartbeat under low_hp_share of hp.
 
-const HP_COLOR := Color(0.9, 0.18, 0.2)
-const XP_COLOR := Color(0.55, 0.85, 1.0)
-const BOARD_COLOR := Color(0.55, 0.08, 0.1)
-const HEADINGS := ["KILLS", "DAMAGE", "ATTACK", "BATTERY", "BATTERED FISH", "PEARLS", "TOP KM/H"]
+const HP_COLOR := Color(1.0, 84 / 255.0, 104 / 255.0)
+const XP_COLOR := Color(70 / 255.0, 214 / 255.0, 1.0)
+## The level's gold, and the thin pale rim round the HUD's panels.
+const LEVEL_COLOR := Color(1.0, 201 / 255.0, 74 / 255.0)
 ## How long the run-over splash shows before the board comes up (s).
 const OVER_SPLASH := 2.5
 const HURT_SHADER := preload("res://shaders/hurt_vignette.gdshader")
@@ -60,16 +64,15 @@ var _minimap := Minimap.new()
 var _compass := CompassStrip.new()
 var _clock := Label.new()
 var _kills := Label.new()
-var _skill := Label.new()
+var _skill := SkillButton.new()
 var _director := Label.new()
 var _splash := BroadcastUI.Splash.new()
-var _board := BroadcastUI.StatsBoard.new()
+var _summary := RunSummary.new()
 var _hurt := ColorRect.new()
 ## The Lightning Bolt's white-gold flash.
 var _shock := ColorRect.new()
 var _cards := LevelUpCards.new()
 var _dps := DpsPanel.new()
-var _stats := StatsPanel.new()
 var _over_age := -1.0
 var _cam_note := Label.new()
 var _hurt_material := ShaderMaterial.new()
@@ -101,28 +104,31 @@ func _ready() -> void:
 	add_child(_minimap)
 	_compass.hud = self
 	add_child(_compass)
-	for label: Label in [_clock, _kills, _director, _skill]:
+	for label: Label in [_clock, _kills, _director]:
 		label.anchor_left = 0.5
 		label.anchor_right = 0.5
 		label.offset_left = -300.0
 		label.offset_right = 300.0
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.add_theme_font_override("font", BroadcastUI.font(800))
-		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+		label.add_theme_font_override("font", UITheme.condensed(700))
+		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
 		label.add_theme_constant_override("outline_size", 6)
 		add_child(label)
-	_clock.offset_top = 22.0
-	_clock.add_theme_font_size_override("font_size", 40)
-	_kills.offset_top = 70.0
+	_clock.offset_top = CompassStrip.BASE
+	_clock.add_theme_font_size_override("font_size", 42)
+	_kills.offset_top = CompassStrip.BASE + 48.0
 	_kills.add_theme_font_size_override("font_size", 20)
-	_kills.add_theme_color_override("font_color", Color(1.0, 0.75, 0.7))
-	_skill.anchor_top = 0.9
-	_skill.anchor_bottom = 0.9
-	_skill.offset_top = -24.0
-	_skill.offset_bottom = 24.0
-	_skill.add_theme_font_size_override("font_size", 22)
-	_director.offset_top = 98.0
+	_kills.add_theme_color_override("font_color", Color(1.0, 0.78, 0.74))
+	_skill.hud = self
+	_skill.anchor_left = 0.5
+	_skill.anchor_right = 0.5
+	_skill.anchor_top = 1.0
+	_skill.anchor_bottom = 1.0
+	_skill.offset_left = -SkillButton.SIZE.x * 0.5
+	_skill.offset_right = SkillButton.SIZE.x * 0.5
+	add_child(_skill)
+	_director.offset_top = CompassStrip.BASE + 76.0
 	_director.add_theme_font_size_override("font_size", 14)
 	_director.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
 	_cam_note.anchor_left = 0.5
@@ -133,7 +139,7 @@ func _ready() -> void:
 	_cam_note.offset_right = 300.0
 	_cam_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_cam_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_cam_note.add_theme_font_override("font", BroadcastUI.font(800))
+	_cam_note.add_theme_font_override("font", UITheme.condensed(700))
 	_cam_note.add_theme_font_size_override("font_size", 26)
 	_cam_note.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	_cam_note.add_theme_constant_override("outline_size", 6)
@@ -149,18 +155,11 @@ func _ready() -> void:
 	_dps.offset_top = 140.0
 	_dps.offset_bottom = 520.0
 	add_child(_dps)
-	_stats.hud = self
-	_stats.anchor_left = 1.0
-	_stats.anchor_right = 1.0
-	_stats.offset_left = -StatsPanel.WIDTH - 16.0
-	_stats.offset_right = -16.0
-	_stats.offset_top = 120.0
-	_stats.offset_bottom = 900.0
-	_stats.visible = false
-	add_child(_stats)
 	add_child(_cards)
-	add_child(_board)
-	_board.headings = HEADINGS
+	_summary.hud = self
+	_summary.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_summary.visible = false
+	add_child(_summary)
 	if run:
 		run.leveled_up.connect(func(level: int) -> void:
 			if run.settings.card_choices <= 0:
@@ -340,11 +339,11 @@ func _process(delta: float) -> void:
 		_note("STRIDE  ·  STRIDE  ·  STRIDE TO BREAK FREE", HP_COLOR)  # held while it holds you
 	_clock.text = _time_text(run.elapsed) if run.stage <= 1 else "STAGE %d  ·  %s" % [run.stage, _time_text(run.stage_time())]
 	_kills.text = "%d KILLS" % run.kills
-	_clock.visible = not _cards.is_open()  # the cards' heading is there
+	_clock.visible = not _cards.is_open() and not _summary.visible  # the cards' heading is there; the summary covers it
 	var push := top_push()
-	_clock.offset_top = 22.0 + push
-	_kills.offset_top = 70.0 + push
-	_director.offset_top = 98.0 + push
+	_clock.offset_top = CompassStrip.BASE + push
+	_kills.offset_top = CompassStrip.BASE + 48.0 + push
+	_director.offset_top = CompassStrip.BASE + 76.0 + push
 	_kills.visible = _clock.visible
 	_update_skill()
 	var next := run.timeline.next_event() if run.timeline and not run.tank else {}
@@ -398,42 +397,15 @@ func _update_hurt(delta: float) -> void:
 		_hurt_material.set_shader_parameter("aspect", view.x / maxf(view.y, 1.0))
 
 
+## The run summary: held on show_scoreboard, and up by itself once the run's
+## over (after its splash).
 func _update_board() -> void:
 	var input: PlayerInput = fish.input_source if fish and fish.input_source else PlayerInput.everyone()
-	_board.shown = input.pressed("show_scoreboard") or _over_age >= OVER_SPLASH
-	_stats.visible = _board.shown and is_instance_valid(fish)
-	if not _board.shown:
-		return
-	_stats.queue_redraw()
-	_board.title = ("STAGE COMPLETE" if run.stage_complete else "RUN OVER") if run.is_over else "RUN STATS"
-	var footer := "TIME  %s    ·    LEVEL  %d" % [_time_text(run.elapsed), run.levels.level]
-	if run.stage > 1 or run.settings.stages_in_run() != 1:
-		footer += "    ·    STAGE  %d%s" % [run.stage, "" if run.settings.stages_in_run() <= 0 else " / %d" % run.settings.stages_in_run()]
-	if run.is_over:
-		footer += "    ·    R: TRY AGAIN"
-	_board.footer = footer
-	var rows := []
-	for player: FishController in run.players:
-		if not is_instance_valid(player):
-			continue
-		var stats := run.stats_of(player)
-		var by: Dictionary = stats.by_source
-		var badges := []
-		var attack := run.attack_of(player)
-		var kind := attack.kind if attack else FishAttack.Kind.BITE
-		for entry: Array in run.powerups_of(player).list():
-			var id: String = entry[0]
-			if Powerup.is_weapon(id):
-				# As on the HUD: a diamond, gold (a boss's keeps its colour).
-				var tint := UITheme.rarity(Rarity.Tier.BOSS) if id in Weapons.BOSS_ONLY else UITheme.GOLD
-				badges.append([Weapons.glyph(id, kind), tint, HexBadge.Shape.DIAMOND])
-			else:
-				badges.append([id, UITheme.rarity(Powerup.tier(id)), HexBadge.Shape.HEX])
-		rows.append({"name": player.display_name if player.display_name else "Player", "focus": player == fish, "values": [
-			stats.kills, roundi(stats.damage), roundi(_attack_damage(by)), roundi(by.get("battery", 0.0)), stats.battered,
-			stats.pearls, roundi(stats.top_speed * 3.6)], "badges": badges})
-	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.values[0] > b.values[0])
-	_board.teams = [{"name": "Survivors" if rows.size() > 1 else "Survivor", "score": run.kills, "color": BOARD_COLOR, "rows": rows}]
+	var shown := (input.pressed("show_scoreboard") or _over_age >= OVER_SPLASH) and is_instance_valid(fish)
+	if shown and not _summary.visible:
+		_summary.open(input)
+	elif not shown and _summary.visible:
+		_summary.visible = false
 
 
 ## Damage by any fish's auto-attack (a player may have had more than one, via the panel).
@@ -447,6 +419,38 @@ static func _attack_damage(by: Dictionary) -> float:
 static func _time_text(seconds: float) -> String:
 	var whole := floori(seconds)
 	return "%d:%02d" % [whole / 60, whole % 60]
+
+
+## `value` with its thousands split by commas ("24,000").
+static func thousands(value: int) -> String:
+	var digits := str(absi(value))
+	var out := ""
+	while digits.length() > 3:
+		out = "," + digits.substr(digits.length() - 3) + out
+		digits = digits.substr(0, digits.length() - 3)
+	return ("-" if value < 0 else "") + digits + out
+
+
+## A big number as the results show it: 950, 12.4k, 1.20M.
+static func compact(value: float) -> String:
+	if value >= 1.0e6:
+		return "%.2fM" % (value / 1.0e6)
+	if value >= 1.0e3:
+		return "%.1fk" % (value / 1.0e3)
+	return str(roundi(value))
+
+
+## HUD text (Barlow Condensed, 600 or 700) with a soft dark outline, so it
+## reads over the water; vertically centred in `rect`, shrunk to fit its width.
+static func hud_text(canvas: CanvasItem, rect: Rect2, value: String, px: int, color: Color,
+		align := HORIZONTAL_ALIGNMENT_CENTER, weight := 700) -> void:
+	var font := UITheme.condensed(700 if weight >= 700 else 600)
+	while px > 6 and font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x > rect.size.x:
+		px -= 1
+	var baseline := rect.position.y + (rect.size.y + font.get_ascent(px) - font.get_descent(px)) / 2.0
+	var at := Vector2(rect.position.x, baseline)
+	canvas.draw_string_outline(font, at, value, align, rect.size.x, px, maxi(roundi(px / 5.0), 2), Color(0.0, 0.03, 0.06, 0.55 * color.a))
+	canvas.draw_string(font, at, value, align, rect.size.x, px, color)
 
 
 ## The Test Tank's DPS readout: each damage source's damage, DPS (recent
@@ -491,67 +495,6 @@ class DpsPanel extends Control:
 			x += width
 
 
-## Your own fish beside the results board: your fish and its attack, your
-## level and hp, and every stat you have (the signature marked). The
-## powerups are badges under each name on the board.
-class StatsPanel extends Control:
-	const WIDTH := 360.0
-	const ROW := 22.0
-
-	var hud: UnnaturalHud
-
-	func _ready() -> void:
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	func _draw() -> void:
-		var run := hud.run
-		var fish := hud.fish
-		if not is_instance_valid(run) or not is_instance_valid(fish) or run.health_of(fish) == null:
-			return
-		var lines := []  # [text, colour, size]
-		var attack := run.attack_of(fish)
-		lines.append(["%s  ·  %s" % [FishCharacter.display_name(fish.character).to_upper(),
-				FishAttack.title(attack.kind).to_upper() if attack else "?"], BroadcastUI.GOLD, 16])
-		var health := run.health_of(fish)
-		lines.append(["LEVEL %d    ·    HP %d / %d    ·    %d PEARLS" % [run.levels.level, roundi(health.hp), roundi(health.max_hp),
-				run.purse_of(fish)], Color.WHITE, 15])
-		lines.append(["", Color.WHITE, 8])
-		var loadout := run.loadout_of(fish)
-		var kind := attack.kind if attack else FishAttack.Kind.BITE
-		lines.append(["WEAPONS %d / %d" % [loadout.weapons.size(), run.settings.weapon_slots], Color(1, 1, 1, 0.6), 12])
-		for id in loadout.weapons:
-			lines.append(["%s  ·  LV %d" % [Weapons.title(id, kind), loadout.level(id)], Color.WHITE, 14])
-		lines.append(["TOMES %d / %d" % [loadout.tomes.size(), run.settings.tome_slots], Color(1, 1, 1, 0.6), 12])
-		for id in loadout.tomes:
-			lines.append(["%s  ·  LV %d" % [Tomes.title(id), loadout.tome_level(id)], Tomes.color(id), 14])
-		lines.append(["", Color.WHITE, 8])
-		lines.append(["STATS", Color(1, 1, 1, 0.6), 12])
-		var block := run.block_of(fish)
-		var signature := StatBlock.signature(fish.character)
-		var any := false
-		for id: String in StatBlock.STATS:
-			var value := block.value(id)
-			if absf(value) < 0.0001:
-				continue
-			any = true
-			lines.append([StatBlock.describe(id, StatBlock.shown(id, value)) + ("   (SIGNATURE)" if id == signature else ""),
-					BroadcastUI.GOLD if id == signature else Color.WHITE, 14])
-		if not any:
-			lines.append(["none yet", Color(1, 1, 1, 0.5), 14])
-		UnnaturalHud._add_damage_lines(lines, run.stats_of(fish))
-		var height := 0.0
-		for line: Array in lines:
-			height += ROW if line[2] > 8 else 8.0
-		draw_rect(Rect2(0.0, 0.0, WIDTH, height + 20.0), Color(BroadcastUI.INK, 0.85))
-		draw_rect(Rect2(0.0, 0.0, 4.0, height + 20.0), BroadcastUI.GOLD)
-		var y := 10.0
-		for line: Array in lines:
-			var tall: float = ROW if line[2] > 8 else 8.0
-			if line[0] != "":
-				BroadcastUI.text(self, Rect2(16.0, y, WIDTH - 28.0, tall), line[0], line[2], line[1], HORIZONTAL_ALIGNMENT_LEFT, 700)
-			y += tall
-
-
 ## What a hit's `source` is called on the results: an attack, a powerup, ramming...
 static func source_title(source: String) -> String:
 	for kind: FishAttack.Kind in FishAttack.INFO:
@@ -575,44 +518,31 @@ static func source_title(source: String) -> String:
 	return Powerup.title(source) if Powerup.ids().has(source) else source.capitalize()
 
 
-## The DAMAGE block: each source's damage, its share of the total and a bar,
-## biggest first (win or lose: how much each way of hurting them did).
-static func _add_damage_lines(lines: Array, stats: Dictionary) -> void:
-	var by: Dictionary = stats.by_source
-	var rows := []
-	var total := 0.0
-	for source: String in by:
-		rows.append([source, float(by[source])])
-		total += float(by[source])
-	if rows.is_empty():
-		return
-	rows.sort_custom(func(a: Array, b: Array) -> bool: return a[1] > b[1])
-	lines.append(["", Color.WHITE, 8])
-	lines.append(["DAMAGE  ·  %s TOTAL" % _compact(total), Color(1, 1, 1, 0.6), 12])
-	for k in mini(rows.size(), 10):
-		var share: float = float(rows[k][1]) / maxf(total, 1.0)
-		lines.append(["%s  ·  %s  ·  %d%%  %s" % [source_title(rows[k][0]), _compact(rows[k][1]), roundi(share * 100.0),
-				"|".repeat(maxi(roundi(share * 16.0), 1))], Powerup.color(rows[k][0]) if Powerup.ids().has(rows[k][0]) else Color.WHITE, 14])
-
-
-static func _compact(value: float) -> String:
-	return "%.1fk" % (value / 1000.0) if value >= 10000.0 else str(roundi(value))
-
-
-## The health bar under the fish and the XP bar along the top; the player's
-## powerups (with their stacks) down the left; a ping on each shut chest
-## within chest_sense_range (at the screen's edge if it's off screen), and a
-## ring filling round the fish while it opens one by holding still.
+## The top row (the team's level, its XP bar and count, your pearls); the
+## health bar under the fish; your loadout down the left; a ping on each shut
+## chest within chest_sense_range (at the screen's edge if it's off screen),
+## and a ring filling round the fish while it opens one by holding still.
+## Sizes are at the 1280×720 design's scale, times k().
 class Bars extends Control:
-	## A held powerup's badge and the gap between them, at the 1280×720 design's scale.
-	const BADGE := 30.0
-	const BADGE_GAP := 5.0
-	## The badges' ×N chips were drawn for 56 px badges; they shrink with them.
-	const CHIP_SCALE := BADGE / 56.0 * 1.15
+	## The top row's middle (px from the top) and its side margin.
+	const ROW_MIDDLE := 26.0
+	const MARGIN := 21.0
+	const XP_HEIGHT := 9.0
 	const HP_WIDTH := 96.0
-	const HP_HEIGHT := 9.0
-	const XP_HEIGHT := 10.0
-	const PEARL_COLOR := Color(0.85, 0.92, 1.0)
+	const HP_HEIGHT := 7.0
+	## The loadout panel: its top, padding, the label column's width, and each
+	## kind of badge's size (HexBadge's 100-unit box: a diamond spans all of it,
+	## a square 78%, a hexagon 80% across).
+	const PANEL_TOP := 56.0
+	const PANEL_PAD := 11.0
+	const LABEL_WIDTH := 50.0
+	const WEAPON_SIZE := 36.0
+	const TOME_SIZE := 44.0
+	const ITEM_SIZE := 36.0
+	const ITEM_GAP := 3.0
+	const ITEMS_PER_ROW := 6
+	const LABEL := Color(169 / 255.0, 195 / 255.0, 211 / 255.0)
+	const RIM := Color(150 / 255.0, 215 / 255.0, 1.0, 0.22)
 	const SLOT_EMPTY := Color(1, 1, 1, 0.22)
 
 	var hud: UnnaturalHud
@@ -627,23 +557,19 @@ class Bars extends Control:
 	func _process(_delta: float) -> void:
 		queue_redraw()
 
+	## How much bigger than the 1280×720 design this view shows the HUD.
+	func k() -> float:
+		return maxf(minf(size.x / UITheme.REF_SIZE.x, size.y / UITheme.REF_SIZE.y), 0.75)
+
 	func _draw() -> void:
 		var run := hud.run
 		if not is_instance_valid(run):
 			return
-		# XP: across the top, the level at its left.
-		var bar := Rect2(110.0, 10.0, size.x - 140.0, XP_HEIGHT)
-		draw_rect(bar.grow(2.0), Color(BroadcastUI.INK, 0.8))
-		draw_rect(Rect2(bar.position, Vector2(bar.size.x * run.levels.progress(), bar.size.y)), XP_COLOR)
-		BroadcastUI.text(self, Rect2(bar.position.x - 90.0, bar.position.y - 8.0, 80.0, 26.0), "LV %d" % run.levels.level, 20,
-				BroadcastUI.GOLD, HORIZONTAL_ALIGNMENT_RIGHT, 800)
+		var fish := hud.fish
+		_draw_top_row(run, fish)
 		_draw_boss(run)
 		_draw_downed(run)
-		var fish := hud.fish
 		if is_instance_valid(fish):
-			# The pearl purse, under the XP bar's right end (D23).
-			BroadcastUI.text(self, Rect2(bar.end.x - 180.0, bar.position.y + 14.0, 180.0, 22.0), "%d PEARLS" % run.purse_of(fish), 17,
-					PEARL_COLOR, HORIZONTAL_ALIGNMENT_RIGHT, 800)
 			_draw_powerups(run, fish)
 			_draw_chests(run, fish)
 		# Health: under the fish, where the camera sees it.
@@ -654,11 +580,66 @@ class Bars extends Control:
 		var at := camera.unproject_position(fish.global_position - camera.global_basis.y * 0.9)
 		var rect := Rect2(at.x - HP_WIDTH * 0.5, at.y + 18.0, HP_WIDTH, HP_HEIGHT)
 		_shown_hp = move_toward(_shown_hp, health.share(), get_process_delta_time() * 0.6)
-		draw_rect(rect.grow(2.0), Color(BroadcastUI.INK, 0.8))
-		draw_rect(Rect2(rect.position, Vector2(rect.size.x * _shown_hp, rect.size.y)), Color(1.0, 0.85, 0.8, 0.6))
-		draw_rect(Rect2(rect.position, Vector2(rect.size.x * health.share(), rect.size.y)), HP_COLOR)
-		BroadcastUI.text(self, Rect2(rect.position.x, rect.end.y + 2.0, rect.size.x, 16.0),
-				"%d / %d" % [ceili(health.hp), roundi(health.max_hp)], 12, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 700)
+		var r := HP_HEIGHT * 0.5
+		UITheme.draw_box(self, rect.grow(1.5), Color(UITheme.DEEP, 0.75), r + 1.5)
+		if _shown_hp > 0.0:
+			UITheme.draw_box(self, Rect2(rect.position, Vector2(maxf(rect.size.x * _shown_hp, HP_HEIGHT), rect.size.y)), Color(1.0, 0.85, 0.8, 0.55), r)
+		if health.share() > 0.0:
+			UITheme.draw_box(self, Rect2(rect.position, Vector2(maxf(rect.size.x * health.share(), HP_HEIGHT), rect.size.y)), HP_COLOR, r)
+		UnnaturalHud.hud_text(self, Rect2(rect.position.x - 20.0, rect.end.y + 2.0, rect.size.x + 40.0, 16.0),
+				"%d / %d" % [ceili(health.hp), roundi(health.max_hp)], 13, UITheme.INK, HORIZONTAL_ALIGNMENT_CENTER, 600)
+
+	## One row across the top: LV and the level (gold), the XP bar, the XP so
+	## far and needed, a divider, then a pearl and your purse.
+	func _draw_top_row(run: UnnaturalRun, fish: FishController) -> void:
+		var s := k()
+		var y := ROW_MIDDLE * s
+		var x := MARGIN * s
+		var bold := UITheme.condensed(700)
+		var semi := UITheme.condensed(600)
+		var small := roundi(12.0 * s)
+		var big := roundi(28.0 * s)
+		var level := str(run.levels.level)
+		var base := y + (bold.get_ascent(big) - bold.get_descent(big)) * 0.5
+		_outlined(semi, Vector2(x, base), "LV", small, LABEL)
+		x += semi.get_string_size("LV", HORIZONTAL_ALIGNMENT_LEFT, -1, small).x + 4.0 * s
+		_outlined(bold, Vector2(x, base), level, big, LEVEL_COLOR)
+		x += bold.get_string_size(level, HORIZONTAL_ALIGNMENT_LEFT, -1, big).x + 12.0 * s
+		var right := size.x - MARGIN * s
+		if is_instance_valid(fish):
+			var purse := UnnaturalHud.thousands(run.purse_of(fish))
+			var px := roundi(21.0 * s)
+			var width := bold.get_string_size(purse, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
+			_outlined(bold, Vector2(right - width, y + (bold.get_ascent(px) - bold.get_descent(px)) * 0.5), purse, px, UITheme.INK)
+			HudIcons.draw_pearl(self, Vector2(right - width - 5.0 * s - 10.0 * s, y), 22.0 * s)
+			right -= width + 5.0 * s + 20.0 * s + 11.0 * s
+			draw_line(Vector2(right, y - 9.0 * s), Vector2(right, y + 9.0 * s), RIM, 1.0)
+			right -= 11.0 * s
+		# The XP so far and needed, then "XP".
+		var need := run.levels.xp_to_next()
+		var count := "%s / %s" % [UnnaturalHud.thousands(floori(run.levels.xp)), UnnaturalHud.thousands(roundi(need))]
+		var count_px := roundi(14.0 * s)
+		var unit_px := roundi(11.0 * s)
+		var unit_width := semi.get_string_size("XP", HORIZONTAL_ALIGNMENT_LEFT, -1, unit_px).x
+		var count_width := semi.get_string_size(count, HORIZONTAL_ALIGNMENT_LEFT, -1, count_px).x
+		var count_base := y + (semi.get_ascent(count_px) - semi.get_descent(count_px)) * 0.5
+		_outlined(semi, Vector2(right - unit_width, count_base), "XP", unit_px, LABEL)
+		_outlined(semi, Vector2(right - unit_width - 4.0 * s - count_width, count_base), count, count_px, UITheme.INK_SOFT)
+		right -= unit_width + 4.0 * s + count_width + 10.0 * s
+		# The bar.
+		var bar := Rect2(x, y - XP_HEIGHT * s * 0.5, maxf(right - x, 20.0), XP_HEIGHT * s)
+		var r := bar.size.y * 0.5
+		UITheme.draw_box(self, bar, Color(UITheme.DEEP, 0.6), r, RIM, 1.0)
+		var filled := bar.size.x * run.levels.progress()
+		if filled > 0.5:
+			var fill := Rect2(bar.position, Vector2(maxf(filled, bar.size.y), bar.size.y))
+			UITheme.draw_box(self, fill.grow(2.0 * s), Color(XP_COLOR, 0.22), r + 2.0 * s)
+			UITheme.draw_box(self, fill, XP_COLOR, r)
+
+	## Text with a soft dark outline (the top row's), its baseline at `at`.
+	func _outlined(font: Font, at: Vector2, value: String, px: int, color: Color) -> void:
+		draw_string_outline(font, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, px, maxi(roundi(px / 5.0), 2), Color(0.0, 0.03, 0.06, 0.5))
+		draw_string(font, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, px, color)
 
 	## Co-op (D7): a marker over each downed player, its revive filling; and
 	## a line for this player while they're down.
@@ -671,95 +652,118 @@ class Bars extends Control:
 			if not is_instance_valid(player) or health == null or not health.down:
 				continue
 			if player == hud.fish:
-				BroadcastUI.text(self, Rect2(0.0, size.y * 0.62, size.x, 30.0), "YOU'RE DOWN  ·  A TEAMMATE CAN REVIVE YOU", 22, HP_COLOR,
-						HORIZONTAL_ALIGNMENT_CENTER, 800)
+				UnnaturalHud.hud_text(self, Rect2(0.0, size.y * 0.62, size.x, 30.0), "YOU'RE DOWN  ·  A TEAMMATE CAN REVIVE YOU", 24, HP_COLOR)
 			var at := player.global_position + Vector3.UP * 1.4
 			if camera.is_position_behind(at):
 				continue
 			var spot := camera.unproject_position(at)
-			draw_circle(spot, 20.0, Color(BroadcastUI.INK, 0.7))
+			draw_circle(spot, 20.0, Color(UITheme.DEEP, 0.7))
 			draw_arc(spot, 20.0, -PI / 2.0, -PI / 2.0 + TAU * run.revive_progress(player), 32, Color(0.5, 1.0, 0.6), 4.0)
-			BroadcastUI.text(self, Rect2(spot.x - 60.0, spot.y - 9.0, 120.0, 18.0), "DOWN", 13, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 800)
+			UnnaturalHud.hud_text(self, Rect2(spot.x - 60.0, spot.y - 9.0, 120.0, 18.0), "DOWN", 14, UITheme.INK)
 
-	## The boss out now: its name and health across the top, under the XP bar.
+	## The boss out now: its name and health across the top, under the clock.
 	func _draw_boss(run: UnnaturalRun) -> void:
 		var boss := run.current_boss()
 		if boss == null:
 			return
 		var width := minf(size.x * 0.5, 720.0)
-		var bar := Rect2((size.x - width) * 0.5, 128.0 + hud.top_push(), width, 14.0)
-		draw_rect(bar.grow(3.0), Color(BroadcastUI.INK, 0.85))
+		var bar := Rect2((size.x - width) * 0.5, 128.0 + hud.top_push(), width, 12.0)
+		var r := bar.size.y * 0.5
+		UITheme.draw_box(self, bar.grow(2.0), Color(UITheme.DEEP, 0.8), r + 2.0, RIM, 1.0)
 		# What the last hits took, trailing behind (P3), then the hp left.
 		if boss != _boss_shown:
 			_boss_shown = boss
 			_boss_trail = boss.share()
 		_boss_trail = maxf(move_toward(_boss_trail, boss.share(), get_process_delta_time() * 0.25), boss.share())
-		draw_rect(Rect2(bar.position, Vector2(bar.size.x * _boss_trail, bar.size.y)), Color(1.0, 0.9, 0.8, 0.55))
-		draw_rect(Rect2(bar.position, Vector2(bar.size.x * boss.share(), bar.size.y)), Color(1.0, 0.4, 0.2) if boss.enraged else HP_COLOR)
-		if boss.flash > 0.0:
-			draw_rect(Rect2(bar.position, Vector2(bar.size.x * boss.share(), bar.size.y)), Color(1.0, 1.0, 1.0, boss.flash * 0.35))
+		if _boss_trail > 0.0:
+			UITheme.draw_box(self, Rect2(bar.position, Vector2(maxf(bar.size.x * _boss_trail, bar.size.y), bar.size.y)), Color(1.0, 0.9, 0.8, 0.55), r)
+		if boss.share() > 0.0:
+			var share := Rect2(bar.position, Vector2(maxf(bar.size.x * boss.share(), bar.size.y), bar.size.y))
+			UITheme.draw_box(self, share, Color(1.0, 0.4, 0.2) if boss.enraged else HudIcons.BOSS, r)
+			if boss.flash > 0.0:
+				UITheme.draw_box(self, share, Color(1.0, 1.0, 1.0, boss.flash * 0.35), r)
 		var name_line := boss.title + ("  ·  ENRAGED" if boss.enraged else "")
-		BroadcastUI.text(self, Rect2(bar.position.x, bar.position.y - 26.0, bar.size.x, 24.0), name_line, 18, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 800)
+		var title_rect := Rect2(bar.position.x, bar.position.y - 26.0, bar.size.x, 24.0)
+		if boss is BloodLeviathan:
+			HudIcons.draw_boss(self, Vector2(bar.position.x - 18.0, bar.get_center().y), 26.0, false)
+		UnnaturalHud.hud_text(self, title_rect, name_line, 19, UITheme.INK)
 
-	## Top-left under the XP bar (the Playability pass, P1f): the weapon slots,
-	## then the tome slots, each badge (HexBadge) with its level on a chip and
-	## each free slot an empty outline; then the items in the order they were
-	## picked up, each rimmed in its rarity's colour, with a ×N chip once it has
-	## 2 or more stacks. The items wrap onto more rows when the view's narrow
-	## (split-screen).
+	## Top-left (the Playability pass, P1f; see-through since the HUD
+	## redesign): a faint panel holding the weapon slots (diamonds), then the
+	## tome slots (squares), each with its level on a chip and each free slot
+	## an empty outline; then the items (hexagons) in the order they were
+	## picked up, rimmed in their rarity's colour, with a stack chip once one
+	## has 2 or more. The items wrap onto more rows when the view's narrow.
 	func _draw_powerups(run: UnnaturalRun, fish: FishController) -> void:
-		var k := minf(size.x / UITheme.REF_SIZE.x, size.y / UITheme.REF_SIZE.y)
-		var badge := BADGE * k
-		var gap := BADGE_GAP * k
-		var per_row := maxi(floori((size.x * 0.3 + gap) / (badge + gap)), 1)  # clear of the clock and kills
+		var s := k()
 		var loadout := run.loadout_of(fish)
 		var attack := run.attack_of(fish)
 		var kind := attack.kind if attack else FishAttack.Kind.BITE
-		var row := 0
-		# Weapons.
-		var slots := maxi(run.settings.weapon_slots, loadout.weapons.size())
-		for n in slots:
-			var centre := _slot_at(n, row, badge, gap)
+		var items := run.powerups_of(fish).items()
+		var weapon_slots := maxi(run.settings.weapon_slots, loadout.weapons.size())
+		var tome_slots := maxi(run.settings.tome_slots, loadout.tomes.size())
+		var pad := PANEL_PAD * s
+		var item_w := ITEM_SIZE * 0.8 * s
+		var item_h := ITEM_SIZE * 0.92 * s
+		var gap := ITEM_GAP * s
+		var per_row := clampi(floori((size.x * 0.3 - pad * 2.0 + gap) / (item_w + gap)), 1, ITEMS_PER_ROW)
+		var slot_step := WEAPON_SIZE * s + 14.0 * s
+		var row_h := WEAPON_SIZE * s + 2.0 * s
+		var inner := maxf(LABEL_WIDTH * s + slot_step * maxi(weapon_slots, tome_slots), per_row * (item_w + gap) - gap)
+		var height := pad * 2.0 + row_h * (2 if tome_slots > 0 else 1)
+		var item_rows := ceili(items.size() / float(per_row))
+		if item_rows > 0:
+			height += 4.0 * s + 14.0 * s + 4.0 * s + item_rows * (item_h + gap) - gap
+		var panel := Rect2(MARGIN * s, PANEL_TOP * s, inner + pad * 2.0, height)
+		UITheme.draw_box(self, panel, Color(UITheme.DEEP, 0.3), 9.0 * s, Color(RIM, 0.12), 1.0)
+		var y := panel.position.y + pad + row_h * 0.5
+		var left := panel.position.x + pad
+		# Weapons: gold diamonds (a boss's keeps its colour).
+		_section_label(Rect2(left, y - row_h * 0.5, LABEL_WIDTH * s, row_h), "WEAPONS", "%d/%d" % [loadout.weapons.size(), run.settings.weapon_slots], s)
+		for n in weapon_slots:
+			var centre := Vector2(left + LABEL_WIDTH * s + slot_step * (n + 0.5), y)
 			if n < loadout.weapons.size():
 				var id := loadout.weapons[n]
-				# Weapons have no rarity of their own (a boss's keeps its colour).
-				var tint := UITheme.rarity(Rarity.Tier.BOSS) if id in Weapons.BOSS_ONLY else UITheme.GOLD
-				HexBadge.draw_badge(self, centre, badge, Weapons.glyph(id, kind), tint, true, UITheme.HUD_FILL, HexBadge.Shape.DIAMOND)
-				_level_chip(centre, badge, loadout.level(id), k)
+				var tint := UITheme.rarity(Rarity.Tier.BOSS) if id in Weapons.BOSS_ONLY else LEVEL_COLOR
+				UnnaturalHud.draw_slot(self, HexBadge.Shape.DIAMOND, centre, WEAPON_SIZE * s, Weapons.glyph(id, kind), tint, s)
+				UnnaturalHud.draw_chip(self, centre + Vector2(WEAPON_SIZE * 0.36, WEAPON_SIZE * 0.4) * s, str(loadout.level(id)), tint, s)
 			else:
-				HexBadge.draw_shape(self, HexBadge.Shape.DIAMOND, centre, badge, Color(UITheme.HUD_FILL, 0.35), SLOT_EMPTY, 2.0 * k)
-		# Tomes.
-		if run.settings.tome_slots > 0 or not loadout.tomes.is_empty():
-			row += 1
-			for n in maxi(run.settings.tome_slots, loadout.tomes.size()):
-				var centre := _slot_at(n, row, badge, gap)
+				HexBadge.draw_shape(self, HexBadge.Shape.DIAMOND, centre, WEAPON_SIZE * s, Color(UITheme.DEEP, 0.25), SLOT_EMPTY, 1.0)
+		# Tomes: squares in each tome's colour.
+		if tome_slots > 0:
+			y += row_h
+			_section_label(Rect2(left, y - row_h * 0.5, LABEL_WIDTH * s, row_h), "TOMES", "%d/%d" % [loadout.tomes.size(), run.settings.tome_slots], s)
+			for n in tome_slots:
+				var centre := Vector2(left + LABEL_WIDTH * s + slot_step * (n + 0.5), y)
 				if n < loadout.tomes.size():
 					var id := loadout.tomes[n]
-					HexBadge.draw_badge(self, centre, badge, Tomes.glyph(id), Tomes.color(id), true, UITheme.HUD_FILL, HexBadge.Shape.SQUARE)
-					_level_chip(centre, badge, loadout.tome_level(id), k)
+					UnnaturalHud.draw_slot(self, HexBadge.Shape.SQUARE, centre, TOME_SIZE * s, Tomes.glyph(id), Tomes.color(id), s)
+					UnnaturalHud.draw_chip(self, centre + Vector2(TOME_SIZE * 0.39, TOME_SIZE * 0.4) * s, str(loadout.tome_level(id)), Tomes.color(id), s)
 				else:
-					HexBadge.draw_shape(self, HexBadge.Shape.SQUARE, centre, badge, Color(UITheme.HUD_FILL, 0.35), SLOT_EMPTY, 2.0 * k)
-		# Items.
-		row += 1
-		var n := 0
-		for entry: Array in run.powerups_of(fish).items():
+					HexBadge.draw_shape(self, HexBadge.Shape.SQUARE, centre, TOME_SIZE * s, Color(UITheme.DEEP, 0.25), SLOT_EMPTY, 1.0)
+		if items.is_empty():
+			return
+		# Powerups: hexagons in their rarity's colour.
+		var top := y + row_h * 0.5 + 4.0 * s
+		UnnaturalHud.hud_text(self, Rect2(left, top, inner, 14.0 * s), "POWERUPS", roundi(10.0 * s), LABEL, HORIZONTAL_ALIGNMENT_LEFT, 600)
+		top += 18.0 * s
+		for n in items.size():
+			var entry: Array = items[n]
 			var id: String = entry[0]
 			var stacks: int = entry[1]
-			var centre := _slot_at(n % per_row, row + n / per_row, badge, gap)
-			HexBadge.draw_badge(self, centre, badge, id, UITheme.rarity(Powerup.tier(id)), true, UITheme.HUD_FILL)
+			var centre := Vector2(left + (n % per_row) * (item_w + gap) + item_w * 0.5, top + (n / per_row) * (item_h + gap) + item_h * 0.5)
+			var tint := UITheme.rarity(Powerup.tier(id))
+			UnnaturalHud.draw_slot(self, HexBadge.Shape.HEX, centre, ITEM_SIZE * s, id, tint, s)
 			if stacks >= 2:
-				HexBadge.draw_stack_chip(self, centre, badge, stacks, k * CHIP_SCALE)
-			n += 1
+				UnnaturalHud.draw_chip(self, centre + Vector2(ITEM_SIZE * 0.34, ITEM_SIZE * 0.36) * s, str(stacks), tint, s * 0.85)
 
-	func _slot_at(column: int, row: int, badge: float, gap: float) -> Vector2:
-		return Vector2(16.0 + badge * 0.5 + column * (badge + gap), 40.0 + badge * 0.5 + row * (badge + gap))
-
-	## A small level number on a slot's bottom-right.
-	func _level_chip(centre: Vector2, badge: float, level: int, k: float) -> void:
-		var px := roundi(11.0 * k)
-		var rect := Rect2(centre + Vector2(badge * 0.5 - 15.0 * k, badge * 0.5 - 13.0 * k), Vector2(17.0 * k, 14.0 * k))
-		UITheme.draw_box(self, rect, UITheme.INK, 7.0 * k)
-		UITheme.draw_text(self, rect, str(level), UITheme.condensed(700), px, UITheme.GROUND)
+	## A section's caps label with its count under it ("WEAPONS" / "2/2").
+	func _section_label(rect: Rect2, title: String, count: String, s: float) -> void:
+		var half := rect.size.y * 0.5
+		UnnaturalHud.hud_text(self, Rect2(rect.position.x, rect.position.y + half - 13.0 * s, rect.size.x, 13.0 * s), title, roundi(10.0 * s), LABEL,
+				HORIZONTAL_ALIGNMENT_LEFT, 600)
+		UnnaturalHud.hud_text(self, Rect2(rect.position.x, rect.position.y + half, rect.size.x, 13.0 * s), count, roundi(11.0 * s), UITheme.INK_SOFT,
+				HORIZONTAL_ALIGNMENT_LEFT, 600)
 
 	func _draw_chests(run: UnnaturalRun, fish: FishController) -> void:
 		var camera := get_viewport().get_camera_3d()
@@ -784,27 +788,136 @@ class Bars extends Control:
 						absf(view.size.y * 0.5 / direction.y) if absf(direction.y) > 0.001 else INF)
 				spot = middle + direction * reach
 			var pulse := 0.6 + 0.4 * sin(Time.get_ticks_msec() / 160.0)
-			var diamond := PackedVector2Array([spot + Vector2(0, -12), spot + Vector2(10, 0), spot + Vector2(0, 12), spot + Vector2(-10, 0)])
 			var tint := chest.tint()
-			draw_colored_polygon(diamond, Color(tint, 0.5 + 0.4 * pulse))
+			draw_circle(spot, 13.0 + 2.0 * pulse, Color(tint, 0.15 + 0.15 * pulse), true, -1.0, true)
+			HudIcons.draw_chest(self, spot, 20.0, tint)
+			# The distance, then the price beside a pearl (red when you can't afford it).
 			var price := run.chest_price(chest, fish)
-			var label := "%d M" % roundi(gap)
-			if price > 0:
-				label += "  ·  %d PEARLS" % price
 			var afford := run.can_afford(fish, chest)
-			BroadcastUI.text(self, Rect2(spot.x - 60.0, spot.y + 12.0, 120.0, 18.0), label, 13, tint if afford else Color(1.0, 0.45, 0.4),
-					HORIZONTAL_ALIGNMENT_CENTER, 700)
+			var font := UITheme.condensed(700)
+			var distance := "%d m" % roundi(gap)
+			var text_w := font.get_string_size(distance, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+			var price_w := 0.0
+			if price > 0:
+				price_w = 6.0 + 14.0 + 3.0 + font.get_string_size(str(price), HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+			var x := spot.x - (text_w + price_w) * 0.5
+			UnnaturalHud.hud_text(self, Rect2(x, spot.y + 13.0, text_w, 18.0), distance, 14, tint, HORIZONTAL_ALIGNMENT_LEFT)
+			if price > 0:
+				var pearl_at := Vector2(x + text_w + 6.0 + 7.0, spot.y + 22.0)
+				HudIcons.draw_pearl(self, pearl_at, 15.0)
+				UnnaturalHud.hud_text(self, Rect2(pearl_at.x + 10.0, spot.y + 13.0, price_w, 18.0), str(price), 14,
+						UITheme.INK if afford else Color(1.0, 0.45, 0.4), HORIZONTAL_ALIGNMENT_LEFT)
 			if chest.progress_of(fish) > 0.0 and inside:
 				draw_arc(spot, 22.0, -PI / 2.0, -PI / 2.0 + TAU * chest.progress_of(fish), 32, tint, 4.0)
 
 
-## The mobility skill's readout at the bottom of the view: RB, its name, and
-## READY, ON, or the seconds left on its cooldown.
+## A loadout slot (the HUD redesign): `shape` faintly filled, a thin rim in
+## `rim`, and glyph `id` in soft white. `size` is the shape's 100-unit box (px).
+static func draw_slot(canvas: CanvasItem, shape: HexBadge.Shape, centre: Vector2, size: float, id: String, rim: Color, s: float) -> void:
+	HexBadge.draw_shape(canvas, shape, centre, size, Color(UITheme.DEEP, 0.5), rim, maxf(1.0 * s, 1.0))
+	HexBadge.draw_glyph(canvas, id, centre, size * HexBadge.glyph_share(shape) * (1.15 if shape == HexBadge.Shape.DIAMOND else 1.0),
+			Color(UITheme.INK, 0.92), 1.6)
+
+
+## A small number chip (a slot's level or stacks) centred on `centre`: dark,
+## rimmed in `tint`, the number in it.
+static func draw_chip(canvas: CanvasItem, centre: Vector2, value: String, tint: Color, s: float) -> void:
+	var px := roundi(10.0 * s)
+	var font := UITheme.condensed(700)
+	var height := 12.0 * s
+	var width := maxf(font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x + 7.0 * s, height)
+	var rect := Rect2(centre - Vector2(width, height) * 0.5, Vector2(width, height))
+	UITheme.draw_box(canvas, rect, Color(UITheme.DEEP, 0.88), height * 0.5, Color(tint, 0.65), 1.0)
+	UITheme.draw_text(canvas, rect, value, font, px, tint.lerp(Color.WHITE, 0.35))
+
+
+## The mobility skill's button at the bottom of the view (SkillButton): over
+## the stroke rhythm meter when it's showing, else lower down.
 func _update_skill() -> void:
 	var twist: Traversal = run.twist_of(fish) if is_instance_valid(fish) else null
 	_skill.visible = twist != null and run.settings.twists and not _cards.is_open() and Traversal.skill_title(fish.character) != ""
 	if not _skill.visible:
 		return
-	var state := "ON  ·  PRESS TO END" if twist.quiet else ("ON" if twist.skill_active() else ("READY" if twist.skill_wait() <= 0.0 else "%.1f" % twist.skill_wait()))
-	_skill.text = "RB  ·  %s  ·  %s" % [Traversal.skill_title(fish.character).to_upper(), state]
-	_skill.add_theme_color_override("font_color", Color(0.75, 1.0, 0.8) if twist.skill_wait() <= 0.0 else Color(1.0, 1.0, 1.0, 0.6))
+	_skill.twist = twist
+	_skill.title = Traversal.skill_title(fish.character).to_upper()
+	var meter := fish.swim_strokes and fish.swim_style == FishController.SwimStyle.EXTRA_SWISHY
+	_skill.offset_bottom = -118.0 if meter else -28.0  # over the meter and its PERFECT / EARLY / LATE
+	_skill.offset_top = _skill.offset_bottom - SkillButton.SIZE.y
+
+
+## The mobility skill as a game button (the HUD redesign): a long hexagon
+## with a chevron and the skill's name. Lit and glowing when it's ready;
+## filled while it's on (Go Quiet: until pressed again); greyed while it
+## cools down, a fill sweeping across as it comes back.
+class SkillButton extends Control:
+	const SIZE := Vector2(176.0, 44.0)
+	const READY := Color(70 / 255.0, 214 / 255.0, 1.0)
+	const INNER := Color(6 / 255.0, 42 / 255.0, 61 / 255.0)
+	const COOL_RIM := Color(150 / 255.0, 170 / 255.0, 185 / 255.0, 0.35)
+	const COOL_INNER := Color(18 / 255.0, 27 / 255.0, 35 / 255.0, 0.92)
+	const COOL_TEXT := Color(135 / 255.0, 150 / 255.0, 161 / 255.0)
+
+	var hud: UnnaturalHud
+	var twist: Traversal
+	var title := "DASH"
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(_delta: float) -> void:
+		if visible:
+			queue_redraw()
+
+	## Ready, on, or cooling (for the probes).
+	func state() -> String:
+		if twist == null:
+			return ""
+		if twist.quiet or twist.skill_active():
+			return "on"
+		return "ready" if twist.skill_wait() <= 0.0 else "cooling"
+
+	func _draw() -> void:
+		if twist == null:
+			return
+		var now := state()
+		var notch := size.y * 0.32
+		var outer := _shape(Rect2(Vector2.ZERO, size), notch)
+		var inner := _shape(Rect2(Vector2.ZERO, size).grow(-2.0), notch - 1.0)
+		var lit := now != "cooling"
+		if lit:
+			for n in 3:
+				draw_colored_polygon(_shape(Rect2(Vector2.ZERO, size).grow(3.0 + n * 3.0), notch + 2.0 + n * 2.0), Color(READY, 0.1 - n * 0.03))
+		draw_colored_polygon(outer, READY if lit else COOL_RIM)
+		draw_colored_polygon(inner, INNER if now == "ready" else (READY.darkened(0.35) if now == "on" else COOL_INNER))
+		if now == "cooling":
+			# The way back: the inner fills from the left as the cooldown runs out.
+			var fill := twist.skill_fill()
+			var clip := Rect2(Vector2(2.0, 2.0), Vector2((size.x - 4.0) * fill, size.y - 4.0))
+			var sweep := Geometry2D.intersect_polygons(inner, _rect_points(clip))
+			for part: PackedVector2Array in sweep:
+				draw_colored_polygon(part, Color(COOL_RIM, 0.45))
+		var text_color := Color(0.92, 0.98, 1.0) if lit else COOL_TEXT
+		var chevron := READY if now == "ready" else (Color.WHITE if now == "on" else Color(0.49, 0.55, 0.59))
+		var font := UITheme.caps(roundi(size.y * 0.5), 700, 0.16)
+		var px := roundi(size.y * 0.5)
+		var word := title + ("  ·  ON" if now == "on" else "")
+		var text_w := font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
+		var chevron_w := size.y * 0.42
+		var x := (size.x - text_w - chevron_w - 8.0) * 0.5
+		var mid := size.y * 0.5
+		var h := size.y * 0.17
+		for n in 2:
+			var cx := x + n * chevron_w * 0.48
+			draw_polyline(PackedVector2Array([Vector2(cx, mid - h), Vector2(cx + h, mid), Vector2(cx, mid + h)]), chevron, 2.2, true)
+		var baseline := mid + (font.get_ascent(px) - font.get_descent(px)) * 0.5
+		draw_string(font, Vector2(x + chevron_w + 8.0, baseline), word, HORIZONTAL_ALIGNMENT_LEFT, -1, px, text_color)
+
+	## A long hexagon filling `rect`, its ends pointed by `notch` px.
+	static func _shape(rect: Rect2, notch: float) -> PackedVector2Array:
+		var mid := rect.get_center().y
+		return PackedVector2Array([Vector2(rect.position.x + notch, rect.position.y), Vector2(rect.end.x - notch, rect.position.y),
+				Vector2(rect.end.x, mid), Vector2(rect.end.x - notch, rect.end.y), Vector2(rect.position.x + notch, rect.end.y),
+				Vector2(rect.position.x, mid)])
+
+	static func _rect_points(rect: Rect2) -> PackedVector2Array:
+		return PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)])

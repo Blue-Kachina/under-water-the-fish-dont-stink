@@ -65,7 +65,9 @@ func _run() -> void:
 	var east: Array = strip.place(deg_to_rad(60.0))
 	check(east[0] > strip.size.x * 0.5 and east[1], "60 degrees east is right of it, within the %d-degree span" % roundi(settings.compass_fov))
 	var behind: Array = strip.place(PI)
-	check(not behind[1] and (behind[0] == 0.0 or behind[0] == strip.size.x), "behind is past an end, pinned to it")
+	# Pinned in the rounded end's cap (half the strip's height in from the edge).
+	check(not behind[1] and (is_equal_approx(behind[0], strip.size.y * 0.5) or is_equal_approx(behind[0], strip.size.x - strip.size.y * 0.5)),
+			"behind is past an end, pinned to it")
 	check(hud.top_push() > 0.0 and hud._clock.offset_top > 22.0, "the clock moves down for it (+%.0f px)" % hud.top_push())
 	var camera := hud.player_camera if is_instance_valid(hud.player_camera) else get_viewport().get_camera_3d()
 	if camera:

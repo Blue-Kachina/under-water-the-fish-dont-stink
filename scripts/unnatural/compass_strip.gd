@@ -1,21 +1,27 @@
 class_name CompassStrip
 extends Control
-## Unnatural's heading strip (planning_environment.md, E5): a band across the
-## top of each player's view, under the XP bar, showing compass_fov degrees
-## round the way the camera looks. Ticks every 15 degrees (longer every 45),
-## N, E, S, W (north is the arena's -Z, as on the minimap's ring), and
-## markers, each with its distance in metres:
-## - shrines the team has found (Shrine.discovered), in their colour;
-## - bosses (a skull) and the whirlpool (a spiral);
+## Unnatural's heading strip (planning_environment.md, E5): a rounded band
+## across the top of each player's view, under the top row (level, XP and
+## pearls), showing compass_fov degrees round the way the camera looks. Ticks
+## every 15 degrees (longer every 45), N, E, S, W (north is the arena's -Z, as
+## on the minimap's ring), and markers (HudIcons), each with its distance in
+## metres:
+## - shrines the team has found (Shrine.discovered): a temple in their colour;
+## - the final boss (a devil's head), a mini-boss (a skull) and the whirlpool (a spiral);
 ## - the boss rift (a big red skull), from the start, until the final boss comes;
-## - teammates (an arrow in their colour, a cross while down);
-## - your shut chests within chest_sense_range (a box).
-## A marker past either end sticks there, half-size, with a chevron.
+## - teammates (a diamond in their colour, a cross while down);
+## - your shut chests within chest_sense_range (a chest).
+## A marker past either end sticks there, smaller, with a chevron.
 
-## Its height (px at the 1280x720 design's scale) and its top (px, like the XP bar above it).
-const HEIGHT := 26.0
-const TOP := 30.0
+## Its height and its top (px at the 1280x720 design's scale).
+const HEIGHT := 29.0
+const TOP := 52.0
 const TICK := 15.0
+## Where what sits under the top row starts when there's no strip (px): the
+## clock's top (UnnaturalHud).
+const BASE := 58.0
+## The XP bar's blue (the straight-ahead notch matches it).
+const XP_TINT := Color(70 / 255.0, 214 / 255.0, 1.0)
 
 var hud: UnnaturalHud
 ## The heading shown (radians, clockwise from north), for the probes.
@@ -26,9 +32,9 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-## How far down the strip pushes what sits under the XP bar (px; 0: hidden).
+## How far down the strip pushes what sits under the top row (px; 0: hidden).
 func push() -> float:
-	return TOP + size.y + 18.0 * _k() - 20.0 if visible else 0.0
+	return maxf(position.y + size.y + 8.0 * _k() - BASE, 0.0) if visible else 0.0
 
 
 ## A world direction's bearing (radians, clockwise from north = -Z).
@@ -40,9 +46,10 @@ static func bearing_of(direction: Vector3) -> float:
 ## within the strip's span.
 func place(bearing: float) -> Array:
 	var span := deg_to_rad(maxf(hud.run.settings.compass_fov, 1.0))
+	var inner := size.x - size.y  # the rounded ends hold no ticks
 	var off := wrapf(bearing - heading, -PI, PI)
-	var x := size.x * 0.5 + off / span * size.x
-	return [clampf(x, 0.0, size.x), absf(off) <= span * 0.5]
+	var x := size.x * 0.5 + off / span * inner
+	return [clampf(x, size.y * 0.5, size.x - size.y * 0.5), absf(off) <= span * 0.5]
 
 
 func _process(_delta: float) -> void:
@@ -52,8 +59,8 @@ func _process(_delta: float) -> void:
 		return
 	var view := get_viewport().get_visible_rect().size
 	var k := _k()
-	size = Vector2(roundf(view.x * clampf(run.settings.compass_width, 0.1, 1.0)), HEIGHT * k)
-	position = Vector2(roundf((view.x - size.x) * 0.5), TOP)
+	size = Vector2(roundf(view.x * clampf(run.settings.compass_width, 0.1, 1.0)), roundf(HEIGHT * k))
+	position = Vector2(roundf((view.x - size.x) * 0.5), roundf(TOP * k))
 	modulate.a = run.settings.compass_opacity
 	var camera := hud.player_camera if is_instance_valid(hud.player_camera) else get_viewport().get_camera_3d()
 	var basis := camera.global_basis if camera else hud.fish.global_basis
@@ -75,32 +82,26 @@ func _draw() -> void:
 		return
 	var k := _k()
 	var band := Rect2(Vector2.ZERO, size)
-	draw_rect(band, Color(BroadcastUI.INK, 0.72))
-	draw_line(Vector2(0.0, size.y), Vector2(size.x, size.y), Color(1, 1, 1, 0.25), 1.0)
-	# Fade the band's ends.
-	var fade := minf(size.x * 0.08, 48.0)
-	for n in 6:
-		var w := fade / 6.0
-		var a := 0.5 * (1.0 - n / 6.0)
-		draw_rect(Rect2(n * w, 0.0, w, size.y), Color(BroadcastUI.INK, a))
-		draw_rect(Rect2(size.x - (n + 1) * w, 0.0, w, size.y), Color(BroadcastUI.INK, a))
-	# Ticks and letters.
+	UITheme.draw_box(self, band, Color(UITheme.DEEP, 0.6), size.y * 0.5, Minimap.PANEL_RIM, 1.0)
+	# Ticks and letters, fading towards the ends.
+	var mid := size.x * 0.5
 	for n in 24:
 		var at := place(deg_to_rad(n * TICK))
 		if not at[1]:
 			continue
 		var x: float = at[0]
+		var fade := 1.0 - smoothstep(0.7, 1.0, absf(x - mid) / maxf(mid - size.y * 0.5, 1.0))
 		if n % 6 == 0:
-			var tint := UITheme.CORAL if n == 0 else Color.WHITE
-			BroadcastUI.text(self, Rect2(x - 14.0 * k, 0.0, 28.0 * k, size.y), Minimap.CARDINALS[n / 6], roundi(16.0 * k), tint,
-					HORIZONTAL_ALIGNMENT_CENTER, 800)
+			var tint := UITheme.CORAL if n == 0 else UITheme.INK
+			UITheme.draw_text(self, Rect2(x - 14.0 * k, 0.0, 28.0 * k, size.y), Minimap.CARDINALS[n / 6], UITheme.condensed(700),
+					roundi(15.0 * k), Color(tint, fade))
 		else:
-			var tall := size.y * (0.42 if n % 3 == 0 else 0.25)
-			draw_line(Vector2(x, size.y - tall), Vector2(x, size.y - 2.0), Color(1, 1, 1, 0.6 if n % 3 == 0 else 0.35), 1.5 if n % 3 == 0 else 1.0)
-	# Straight ahead.
-	var mid := size.x * 0.5
-	draw_colored_polygon(PackedVector2Array([Vector2(mid - 5.0 * k, size.y + 6.0 * k), Vector2(mid + 5.0 * k, size.y + 6.0 * k),
-			Vector2(mid, size.y + 1.0)]), Color(1, 1, 1, 0.85))
+			var tall := size.y * (0.3 if n % 3 == 0 else 0.18)
+			draw_line(Vector2(x, size.y - tall - 2.0), Vector2(x, size.y - 3.0), Color(0.78, 0.9, 1.0, (0.5 if n % 3 == 0 else 0.3) * fade),
+					1.5 if n % 3 == 0 else 1.0)
+	# Straight ahead: a small notch over the strip.
+	draw_colored_polygon(PackedVector2Array([Vector2(mid - 5.0 * k, -6.0 * k), Vector2(mid + 5.0 * k, -6.0 * k),
+			Vector2(mid, -1.0)]), XP_TINT)
 	# Markers, nearest drawn last (on top).
 	var marks := []
 	for shrine in run.shrines:
@@ -134,24 +135,24 @@ func _draw_mark(run: UnnaturalRun, mark: Array, from: Vector3, k: float) -> void
 	var at := place(bearing_of(flat))
 	var inside: bool = at[1]
 	var x: float = at[0]
-	var scale := k * (1.0 if inside else 0.65)
+	var scale := k * (1.0 if inside else 0.7)
 	var spot := Vector2(x, size.y * 0.5)
 	var thing: Object = mark[2]
 	match mark[1]:
 		"shrine":
 			var shrine := thing as Shrine
-			Minimap.draw_shrine(self, spot, shrine.tint(), shrine.tide_active, scale * 1.3)
+			Minimap.draw_shrine(self, spot, shrine.tint(), shrine.tide_active, scale * 1.15)
 		"boss":
-			Minimap.draw_skull(self, spot, 8.0 * scale)
+			Minimap.draw_boss(self, spot, thing as Boss, scale * 1.05)
 		"whirlpool":
 			Minimap.draw_whirlpool(self, spot, 8.0 * scale)
 		"rift":
-			Minimap.draw_rift(self, spot, 9.5 * scale)
+			Minimap.draw_rift(self, spot, 9.0 * scale)
 		"player":
 			var fish := thing as FishController
 			var color := fish.body_color()
 			color.a = 1.0
-			Minimap.draw_arrow(self, spot, Vector2.DOWN, color, Color(BroadcastUI.INK, 0.9), 8.0 * scale)
+			HudIcons.draw_mate(self, spot, 13.0 * scale, color)
 			var health := run.health_of(fish)
 			if health and health.down:
 				var c := 5.0 * scale
@@ -163,8 +164,8 @@ func _draw_mark(run: UnnaturalRun, mark: Array, from: Vector3, k: float) -> void
 		var way := -1.0 if x < size.x * 0.5 else 1.0
 		var tip := spot + Vector2(way * 11.0 * scale, 0.0)
 		draw_colored_polygon(PackedVector2Array([tip + Vector2(way * 4.0 * k, 0.0), tip + Vector2(0.0, -4.0 * k), tip + Vector2(0.0, 4.0 * k)]),
-				Color(1, 1, 1, 0.8))
+				Color(UITheme.INK, 0.8))
 		return
 	var metres := roundi(where.distance_to(from))
-	BroadcastUI.text(self, Rect2(x - 24.0 * k, size.y + 1.0, 48.0 * k, 14.0 * k), "%d m" % metres, roundi(11.0 * k),
-			Color(1, 1, 1, 0.85), HORIZONTAL_ALIGNMENT_CENTER, 700)
+	UITheme.draw_text(self, Rect2(x - 24.0 * k, size.y + 1.0, 48.0 * k, 14.0 * k), "%d m" % metres, UITheme.condensed(600),
+			roundi(11.0 * k), Color(UITheme.INK, 0.85))

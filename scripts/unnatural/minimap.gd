@@ -6,7 +6,9 @@ extends Control
 ## minimap_range m from the middle to the rim (0: the whole arena).
 ## - players: an arrow each, in their fish's colour, the way they face (you
 ##   outlined in white; a cross while down);
-## - bosses: a skull (the mini-boss smaller), pinned to the rim when out of range;
+## - bosses: the final boss a devil's head, a mini-boss a skull, pinned to the
+##   rim when out of range (icons: HudIcons);
+## - shrines the team has found: a temple in its colour (grey outline once used);
 ## - the boss rift (BossRift): a big red skull, always shown (pinned to the rim);
 ## - elites: a red dot;
 ## - the zombie swarms: soft red clouds, from the Horde's survey (a coarse
@@ -41,6 +43,8 @@ const SIDES := 48
 ## The compass ring's width (px) round the map, and its letters.
 const BEZEL := 15.0
 const CARDINALS := ["N", "E", "S", "W"]
+## The thin pale rim round the HUD's panels (the HUD redesign).
+const PANEL_RIM := Color(150 / 255.0, 215 / 255.0, 1.0, 0.22)
 
 ## The swarms' texture, shared by every map, and the survey it shows.
 static var _cloud_texture: ImageTexture
@@ -146,9 +150,11 @@ func to_rim(spot: Vector2, inset: float) -> Vector2:
 
 
 func _draw() -> void:
-	draw_circle(_middle, _radius, Color(BroadcastUI.INK, 0.72))
+	draw_circle(_middle, _radius, Color(UITheme.DEEP, 0.62), true, -1.0, true)
 	if hud and is_instance_valid(hud.run) and hud.run.settings.compass_ring:
 		_draw_bezel()
+	else:
+		draw_arc(_middle, _radius, 0.0, TAU, SIDES * 2, PANEL_RIM, 1.5, true)
 
 
 ## The compass ring (planning_environment.md, E5): a band round the map with a
@@ -159,8 +165,8 @@ func _draw_bezel() -> void:
 	var band := outer - _radius
 	if band < 2.0:
 		return  # not laid out yet
-	draw_circle(_middle, _radius + band * 0.5, Color(BroadcastUI.INK, 0.85), false, band, true)
-	draw_arc(_middle, outer, 0.0, TAU, SIDES * 2, Color(1, 1, 1, 0.25), 1.5, true)
+	draw_circle(_middle, _radius + band * 0.5, Color(UITheme.DEEP, 0.78), false, band, true)
+	draw_arc(_middle, outer, 0.0, TAU, SIDES * 2, PANEL_RIM, 1.5, true)
 	for n in 24:
 		var bearing := TAU * n / 24.0
 		var way := turn(Vector2(sin(bearing), -cos(bearing)))
@@ -169,8 +175,8 @@ func _draw_bezel() -> void:
 			var letter: String = CARDINALS[n / 6]
 			var spot := _middle + way * (_radius + band * 0.5)
 			var tint := UITheme.CORAL if n == 0 else Color(1, 1, 1, 0.9)
-			BroadcastUI.text(self, Rect2(spot - Vector2(10.0, 8.0), Vector2(20.0, 16.0)), letter, maxi(roundi(band * 0.8), 8), tint,
-					HORIZONTAL_ALIGNMENT_CENTER, 800)
+			UITheme.draw_text(self, Rect2(spot - Vector2(10.0, 8.0), Vector2(20.0, 16.0)), letter, UITheme.condensed(700),
+					maxi(roundi(band * 0.85), 8), tint)
 			continue
 		var long := n % 3 == 0
 		var inner := _radius + band * (0.3 if long else 0.55)
@@ -178,22 +184,22 @@ func _draw_bezel() -> void:
 
 
 ## Icon painters, shared with the compass strip (CompassStrip).
-## A shrine (P5): a diamond in its colour, pulsing while its Tide runs.
-static func draw_shrine(canvas: CanvasItem, spot: Vector2, tint: Color, running: bool, scale := 1.0) -> void:
-	var r := (6.0 + (1.5 * sin(Time.get_ticks_msec() / 120.0) if running else 0.0)) * scale
-	var e := 2.0 * scale
-	canvas.draw_colored_polygon(PackedVector2Array([spot + Vector2(0.0, -r), spot + Vector2(r, 0.0), spot + Vector2(0.0, r),
-			spot + Vector2(-r, 0.0)]), Color(BroadcastUI.INK, 0.9))
-	canvas.draw_colored_polygon(PackedVector2Array([spot + Vector2(0.0, -r + e), spot + Vector2(r - e, 0.0), spot + Vector2(0.0, r - e),
-			spot + Vector2(-r + e, 0.0)]), tint)
+## A shrine (P5): a temple in its colour (HudIcons), pulsing while its Tide
+## runs; its grey outline once `used`.
+static func draw_shrine(canvas: CanvasItem, spot: Vector2, tint: Color, running: bool, scale := 1.0, used := false) -> void:
+	HudIcons.draw_shrine(canvas, spot, 16.0 * scale, tint, used, running)
 
 
 static func draw_chest(canvas: CanvasItem, spot: Vector2, tint: Color, scale := 1.0) -> void:
-	var box := Rect2(spot - Vector2(5.0, 4.0) * scale, Vector2(10.0, 8.0) * scale)
-	canvas.draw_rect(box.grow(1.5), Color(BroadcastUI.INK, 0.9))
-	canvas.draw_rect(box, tint)
-	canvas.draw_line(Vector2(box.position.x, box.get_center().y - scale), Vector2(box.end.x, box.get_center().y - scale),
-			Color(0.35, 0.2, 0.05), 1.0)
+	HudIcons.draw_chest(canvas, spot, 15.0 * scale, tint)
+
+
+## A boss: the final boss's devil head, or a mini-boss's bone skull.
+static func draw_boss(canvas: CanvasItem, spot: Vector2, boss: Boss, scale := 1.0) -> void:
+	if boss is BloodLeviathan:
+		HudIcons.draw_boss(canvas, spot, 24.0 * scale)
+	else:
+		draw_skull(canvas, spot, 6.5 * scale)
 
 
 ## The way out: a pale spiral on a dark disc.
@@ -309,10 +315,10 @@ class Marks extends Control:
 			if map.on_map(spot, 5.0):
 				Minimap.draw_chest(self, spot, chest.tint())
 		for shrine in run.shrines:
-			if is_instance_valid(shrine) and not shrine.spent and shrine.discovered:
+			if is_instance_valid(shrine) and shrine.discovered:
 				var spot := map.to_map(shrine.global_position)
 				if map.on_map(spot, 6.0):
-					Minimap.draw_shrine(self, spot, shrine.tint(), shrine.tide_active)
+					Minimap.draw_shrine(self, spot, shrine.tint(), shrine.tide_active, 1.0, shrine.spent)
 		if is_instance_valid(run.horde):
 			for at in run.horde.survey_elites:
 				var spot := map.to_map(at)
@@ -322,7 +328,7 @@ class Marks extends Control:
 			if not is_instance_valid(boss) or boss.dying:
 				continue
 			var spot := map.to_map(boss.global_position)
-			Minimap.draw_skull(self, map.to_rim(spot, 9.0), 9.0 if boss is BloodLeviathan else 6.5)
+			Minimap.draw_boss(self, map.to_rim(spot, 10.0), boss)
 		if is_instance_valid(run.whirlpool):
 			Minimap.draw_whirlpool(self, map.to_rim(map.to_map(run.whirlpool.global_position), 9.0), 8.0)
 		if is_instance_valid(run.rift) and not run.rift.spent:

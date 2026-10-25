@@ -248,13 +248,14 @@ func _run() -> void:
 	Input.action_press("show_scoreboard")
 	await _frames(3)
 	var hud: UnnaturalHud = main._unnatural_hud
-	check(hud._board.shown and hud._stats.visible, "the board shows your stats beside it")
-	var row: Dictionary = hud._board.teams[0].rows[0]
-	check(row.badges.size() == run.powerups_of(fish).list().size(),
-			"your powerups are badges under your name (%d)" % row.badges.size())
+	check(hud._summary.visible and hud._summary.shown_player() == fish, "the summary opens on your own run")
+	hud._summary.flip(1)
+	check(hud._summary.shown_player() == null, "flicking on turns to the scoreboard (solo)")
+	hud._summary.flip(1)
+	check(hud._summary.shown_player() == fish, "and back round to you")
 	Input.action_release("show_scoreboard")
 	await _frames(3)
-	check(not hud._stats.visible, "and goes with it")
+	check(not hud._summary.visible, "and goes with it")
 	print("FAILURES: %d" % failures if failures else "ALL PASS")
 	get_tree().quit(1 if failures else 0)
 

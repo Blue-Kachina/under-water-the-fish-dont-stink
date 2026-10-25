@@ -13,8 +13,8 @@ extends CanvasLayer
 ## the teams' possession, boost and territory. It comes up by itself at the end
 ## of the match, once the winner's splash has been.
 ##
-## With Extra Swishy swimming (Nature), the last stride's timing and the flow
-## (StrideMeter) sit at the bottom centre and the boost gauge hides while boost is off; in Nature
+## With Extra Swishy swimming, the stroke rhythm meter
+## (StrideMeter) sits at the bottom centre and the boost gauge hides while boost is off; in Nature
 ## (set_nature) the battery count shows at the top, and the scoreboard (held)
 ## each player's points, battered fish, pearls, best multi and spree, perfect
 ## strides and top speed, with the run's time. In Hunt (set_hunt) the
@@ -187,10 +187,10 @@ func _ready() -> void:
 	_stride_meter.anchor_right = 0.5
 	_stride_meter.anchor_top = 1.0
 	_stride_meter.anchor_bottom = 1.0
-	_stride_meter.offset_left = -140.0
-	_stride_meter.offset_right = 140.0
-	_stride_meter.offset_top = -110.0
-	_stride_meter.offset_bottom = -36.0
+	_stride_meter.offset_left = -240.0
+	_stride_meter.offset_right = 240.0
+	_stride_meter.offset_top = -88.0
+	_stride_meter.offset_bottom = -24.0
 	add_child(_stride_meter)
 
 	_viz = InputViz.new()
@@ -470,7 +470,7 @@ func _process(delta: float) -> void:
 		_course.text = ""
 		return
 	var in_goal_replay := _in_live_replay()
-	_hint.visible = not in_goal_replay
+	_hint.visible = not in_goal_replay and not survivor_cam  # Unnatural: no controls line (the HUD redesign)
 	_update_feed(delta)
 	_feed.visible = not in_goal_replay
 
@@ -984,39 +984,137 @@ class InputViz extends Control:
 		draw_string(ThemeDB.fallback_font, Vector2(pos.x, bar.end.y + 16.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
 
 
-## Extra Swishy's readout (the timing cue itself is the fish's tail, which
-## lights up root to tip as a stride builds): how the last stride was timed,
-## and the flow built up.
+## Extra Swishy's stroke rhythm meter (the HUD redesign, 2026-10-25; the tail
+## still lights up root to tip as a stride builds): a fin at each end, a track
+## from each to the emblem in the middle, and a marker riding in along each
+## track as the current stride builds, reaching the emblem right at its peak.
+## Both sides are just "a stride": any direction counts, so no L / R. The
+## pips light behind the markers; the sweet zone by the emblem brightens as
+## the peak nears; a well-timed stride pops the emblem with a ripple, a poor
+## one flushes it coral, with PERFECT / EARLY / LATE above it.
 class StrideMeter extends Control:
-	const DIM := Color(1, 1, 1, 0.35)
-	const FLOW := Color(0.45, 0.85, 1.0)
-	## How long the last stride's timing shows (s).
+	const LEFT := Color(70 / 255.0, 214 / 255.0, 1.0)
+	const RIGHT := Color(1.0, 201 / 255.0, 74 / 255.0)
+	const MISS := Color(1.0, 122 / 255.0, 89 / 255.0)
+	const EMBLEM := Color(6 / 255.0, 42 / 255.0, 61 / 255.0)
+	## Along each track (0 at the fin, 1 at the emblem): the pips, and where the sweet zone starts.
+	const PIPS := [0.16, 0.35, 0.54, 0.73]
+	const ZONE := 0.82
+	## The fin (54x48 box) and its size on the meter (px).
+	const FIN := "M2 24C14 6 34 2 52 6 42 14 38 20 40 24c-2 4 2 10 12 18C34 46 14 42 2 24Z"
+	const FIN_SIZE := Vector2(42.0, 37.0)
+	## How long the last stride's word, pop and flush show (s).
 	const TIMING_TIME := 0.6
+	const POP_TIME := 0.35
 	var fish: FishController
+	## The last stride's pop (perfect) and flush (poor), 1 fading to 0.
+	var pop := 0.0
+	var miss := 0.0
+	var _strides := 0
+	static var _fin := PackedVector2Array()
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	func _process(_delta: float) -> void:
-		if visible:
-			queue_redraw()
+	func _process(delta: float) -> void:
+		if not visible or fish == null:
+			return
+		var swim := fish.swishy
+		if swim.strides != _strides:
+			_strides = swim.strides
+			if swim.strides > 1 and swim.last_timing >= 0.0:
+				if swim.last_timing >= SwishySwim.SWEET_SPOT:
+					pop = 1.0
+				else:
+					miss = 1.0
+		pop = move_toward(pop, 0.0, delta / POP_TIME)
+		miss = move_toward(miss, 0.0, delta / POP_TIME)
+		queue_redraw()
+
+	## How far the markers have ridden in (0..1, 1 at the peak), or -1 between strides.
+	func approach() -> float:
+		var swim := fish.swishy
+		if swim.phase < 0.0:
+			return -1.0
+		return clampf(swim.phase / maxf(swim.peak_time(), 0.01), 0.0, 1.0)
 
 	func _draw() -> void:
 		if fish == null:
 			return
 		var swim := fish.swishy
-		var font := BroadcastUI.font(700)
-		var width := size.x
-		if swim.last_timing >= 0.0 and swim.phase >= 0.0 and swim.phase < TIMING_TIME:
+		var radius := minf(size.y * 0.36, 26.0)
+		var mid := Vector2(size.x * 0.5, size.y * 0.5 + 4.0)
+		var start := FIN_SIZE.x + 2.0
+		var end := mid.x - radius - 1.0
+		var p := approach()
+		# How bright the sweet zone is: building over the last of the approach, full in the sweet spot.
+		var zone := 0.3
+		if p >= 0.0:
+			zone = lerpf(0.3, 1.0, maxf(swim.sweetness(), smoothstep(0.6, 1.0, p) * (1.0 if swim.phase <= swim.peak_time() else 0.0)))
+		zone = maxf(zone, pop)
+		for side: float in [-1.0, 1.0]:
+			var tint: Color = LEFT if side < 0.0 else RIGHT
+			_draw_fin(mid, side, tint)
+			var a := _x(start, mid.x, side)
+			var b := _x(end, mid.x, side)
+			draw_line(Vector2(a, mid.y), Vector2(b, mid.y), Color(tint, 0.35), 2.0)
+			var zone_a := _x(lerpf(start, end, ZONE), mid.x, side)
+			var zone_rect := Rect2(minf(zone_a, b), mid.y - 7.0, absf(b - zone_a), 14.0)
+			UITheme.draw_box(self, zone_rect, Color(tint, 0.28 * zone), 7.0)
+			for t: float in PIPS:
+				var at := Vector2(_x(lerpf(start, end, t), mid.x, side), mid.y)
+				var lit := p >= t and miss <= 0.0
+				draw_circle(at, 4.0, tint if lit else Color(UITheme.DEEP, 0.9), true, -1.0, true)
+				draw_arc(at, 4.0, 0.0, TAU, 16, tint, 1.5, true)
+			if p >= 0.0:
+				var fade := 1.0 if swim.phase <= swim.peak_time() else swim.power
+				var at := Vector2(_x(lerpf(start, end, p), mid.x, side), mid.y)
+				var glow := Color(tint, 0.35 * fade)
+				draw_circle(at, 9.0, glow, true, -1.0, true)
+				var core := tint.lightened(0.6)
+				core.a = fade
+				draw_colored_polygon(PackedVector2Array([at + Vector2(0, -6.5), at + Vector2(6.5, 0), at + Vector2(0, 6.5), at + Vector2(-6.5, 0)]), core)
+		# The emblem: a spiral in a ring, popping on a good stride, coral on a poor one.
+		var ring := LEFT.lerp(MISS, miss)
+		var r := radius * (1.0 + 0.14 * pop)
+		if pop > 0.0:
+			draw_circle(mid, r + 6.0, Color(LEFT, 0.35 * pop), true, -1.0, true)
+			draw_arc(mid, r + 4.0 + (1.0 - pop) * 14.0, 0.0, TAU, 48, Color(LEFT, 0.5 * pop), 2.0, true)
+		draw_circle(mid, r, EMBLEM, true, -1.0, true)
+		draw_arc(mid, r, 0.0, TAU, 48, ring, 2.0, true)
+		var spiral := PackedVector2Array()
+		for n in 40:
+			var t := n / 39.0
+			spiral.append(mid + Vector2.from_angle(-PI * 0.5 + t * TAU * 2.1) * r * 0.66 * t)
+		draw_polyline(spiral, Color(0.61, 0.91, 1.0).lerp(MISS, miss * 0.7), 2.0, true)
+		# The last stride's timing, above the emblem.
+		if swim.last_timing >= 0.0 and swim.phase >= 0.0 and swim.phase < TIMING_TIME and swim.strides > 1:
 			var perfect := swim.last_timing >= SwishySwim.SWEET_SPOT
-			var text := "PERFECT" if perfect else ("EARLY" if swim.last_early else "LATE")
-			var color := BroadcastUI.GOLD if perfect else Color(1.0, 0.55, 0.45)
+			var word := "PERFECT" if perfect else ("EARLY" if swim.last_early else "LATE")
+			var color := RIGHT if perfect else MISS
 			color.a = 1.0 - swim.phase / TIMING_TIME
-			draw_string(font, Vector2(0, 22), text, HORIZONTAL_ALIGNMENT_CENTER, width, 22, color)
-		var bar := Rect2(width * 0.2, 36.0, width * 0.6, 8.0)
-		draw_rect(bar, DIM, false, 1.5)
-		draw_rect(Rect2(bar.position, Vector2(bar.size.x * swim.flow / maxf(fish.stride_flow_max, 0.01), bar.size.y)), FLOW)
-		draw_string(font, Vector2(0, 64), "FLOW  x%.1f" % (1.0 + swim.flow), HORIZONTAL_ALIGNMENT_CENTER, width, 14, Color.WHITE)
+			UITheme.draw_text(self, Rect2(mid.x - 80.0, mid.y - r - 30.0, 160.0, 22.0), word, UITheme.condensed(700), 18, color)
+
+	## `x` (measured from the left end) on `side`'s half (-1 left, 1 mirrored right).
+	func _x(x: float, middle: float, side: float) -> float:
+		return x if side < 0.0 else middle * 2.0 - x
+
+	func _draw_fin(mid: Vector2, side: float, tint: Color) -> void:
+		if _fin.is_empty():
+			for line: PackedVector2Array in HexBadge.parse_path(FIN).lines:
+				for point in line:
+					if _fin.is_empty() or _fin[_fin.size() - 1].distance_to(point) > 0.001:
+						_fin.append(point)
+			if _fin.size() > 2 and _fin[0].distance_to(_fin[_fin.size() - 1]) < 0.001:
+				_fin.remove_at(_fin.size() - 1)
+		var unit := FIN_SIZE / Vector2(54.0, 48.0)
+		var points := PackedVector2Array()
+		for point in _fin:
+			var x := point.x * unit.x
+			points.append(Vector2(_x(x, mid.x, side), mid.y + (point.y - 24.0) * unit.y))
+		draw_colored_polygon(points, Color(tint, 0.18))
+		points.append(points[0])
+		draw_polyline(points, tint, 1.5, true)
 
 
 ## Nature's multi timer: a bar under the counts that drains over the time left
