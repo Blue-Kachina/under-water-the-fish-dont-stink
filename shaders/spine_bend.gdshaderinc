@@ -38,3 +38,20 @@ void spine_bend(inout vec3 v, inout vec3 n, float weight) {
 	n = normalize(r * n.x + u * n.y + b * n.z);
 	v = world;
 }
+
+// A hinged part (a jaw): a vertex with hinge weight `w` (CUSTOM0.x, BossMesh
+// hinge) turns round the rest x axis through (y hinge.x, z hinge.y) by hinge.z
+// rad times w, before it's bent: positive drops what's in front of the hinge.
+uniform vec3 hinge = vec3(0.0, 0.0, 0.0);
+
+void spine_hinge(inout vec3 v, inout vec3 n, float w) {
+	if (w <= 0.0) {
+		return;
+	}
+	float a = hinge.z * w;
+	float c = cos(a);
+	float s = sin(a);
+	vec2 d = v.yz - hinge.xy;
+	v.yz = hinge.xy + vec2(d.x * c + d.y * s, -d.x * s + d.y * c);
+	n.yz = vec2(n.y * c + n.z * s, -n.y * s + n.z * c);
+}

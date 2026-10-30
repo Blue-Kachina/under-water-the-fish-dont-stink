@@ -735,6 +735,16 @@ static func shared() -> UnnaturalSettings:
 @export_range(0, 200, 1, "or_greater") var shark_call_count := 16
 ## Killing it drops a chest (a powerup pick) and XP worth this much.
 @export_range(0.0, 1000.0, 5.0, "or_greater") var shark_xp := 80.0
+## Its chomp: a player within shark_chomp_range m ahead of its mouth makes it
+## open wide (its jaw drops over shark_chomp_wind s) and snap shut, biting
+## everyone within shark_chomp_reach m of its mouth for shark_chomp_damage;
+## then shark_chomp_every s before the next. Charging, its jaws hang open and
+## snap on the first player they reach.
+@export_range(0.0, 100.0, 0.5, "or_greater") var shark_chomp_range := 14.0
+@export_range(0.05, 3.0, 0.05, "or_greater") var shark_chomp_wind := 0.45
+@export_range(0.5, 40.0, 0.5, "or_greater") var shark_chomp_reach := 6.0
+@export_range(0.0, 500.0, 1.0, "or_greater") var shark_chomp_damage := 35.0
+@export_range(0.0, 30.0, 0.25, "or_greater") var shark_chomp_every := 2.5
 
 @export_group("Blood Leviathan")
 ## The boss: a giant serpent. Beating it completes the stage. Its hp (times 1 +
@@ -778,6 +788,30 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.5, 20.0, 0.25, "or_greater") var final_hold_time := 3.0
 @export_range(0.0, 200.0, 1.0, "or_greater") var final_hold_damage := 10.0
 @export_range(1, 20, 1, "or_greater") var final_hold_strides := 3
+## A grab is made, not snapped to: the player is drawn into the hold over
+## grab_catch_time s. While held, their camera pulls grab_camera_pull m further
+## back to see the boss that has them.
+@export_range(0.0, 2.0, 0.05, "or_greater") var grab_catch_time := 0.3
+@export_range(0.0, 200.0, 1.0, "or_greater") var grab_camera_pull := 26.0
+## The King of Herrings' chomp, in any phase: a player within king_chomp_range m
+## ahead of its mouth makes its jaw gape over king_chomp_wind s and snap shut,
+## biting everyone within king_chomp_reach m of its mouth for king_chomp_damage;
+## king_chomp_every s between chomps.
+@export_range(0.0, 100.0, 0.5, "or_greater") var king_chomp_range := 18.0
+@export_range(0.05, 3.0, 0.05, "or_greater") var king_chomp_wind := 0.55
+@export_range(0.5, 40.0, 0.5, "or_greater") var king_chomp_reach := 7.0
+@export_range(0.0, 500.0, 1.0, "or_greater") var king_chomp_damage := 30.0
+@export_range(0.0, 30.0, 0.25, "or_greater") var king_chomp_every := 3.0
+## In fury the King wraps a player it reaches in coil_loops loops of its body,
+## from coil_radius m round them tightening to coil_tight m over the hold; its
+## squeeze drains up to coil_squeeze times final_hold_damage as it tightens. Each
+## stride loosens it by coil_loosen, and so does each 1% of its hp a friend
+## knocks off it meanwhile.
+@export_range(0.5, 5.0, 0.25, "or_greater") var coil_loops := 2.0
+@export_range(2.0, 60.0, 0.5, "or_greater") var coil_radius := 11.0
+@export_range(1.0, 30.0, 0.5, "or_greater") var coil_tight := 5.0
+@export_range(1.0, 10.0, 0.25, "or_greater") var coil_squeeze := 2.0
+@export_range(0.0, 1.0, 0.05) var coil_loosen := 0.3
 ## The Gulper Mother: every gulper_every s it opens wide and draws in the zombies
 ## within gulper_range m of its mouth (gulper_pull m/s), swallowing up to gulper_max,
 ## each healing it gulper_heal of its max hp. Spitting, it vomits gulper_vomit
@@ -788,6 +822,11 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 0.05, 0.0005, "or_greater") var gulper_heal := 0.003
 @export_range(0, 500, 5, "or_greater") var gulper_max := 40
 @export_range(0, 200, 1, "or_greater") var gulper_vomit := 12
+## In fury the Gulper sucks: a player within gulper_suck_range m in front of its
+## mouth is drawn in at up to gulper_suck m/s; reached, its jaws snap shut and
+## they're swallowed, a lump in its belly, until they stride their way back out.
+@export_range(0.0, 100.0, 1.0, "or_greater") var gulper_suck_range := 26.0
+@export_range(0.0, 60.0, 0.5, "or_greater") var gulper_suck := 14.0
 ## The Whale Fall: a dead whale hagfish_count giant hagfish (hagfish_length m)
 ## have eaten hollow. Each lunges at a player within hagfish_reach m of where it
 ## comes out every hagfish_lunge_every s, and spits slime (slime_damage a touch,
@@ -802,6 +841,11 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 1.0, 0.05) var carcass_armour := 0.25
 @export_range(0.0, 200.0, 1.0, "or_greater") var slime_damage := 5.0
 @export_range(0.5, 20.0, 0.25, "or_greater") var slime_time := 4.0
+## A striking hagfish that reaches a player bites and holds on, reeling them in
+## toward the carcass as it ties itself in a knot (over hagfish_knot_time s) that
+## slides down its body to its head. When it lets go it slimes them.
+@export var hagfish_grabs := true
+@export_range(0.2, 5.0, 0.05, "or_greater") var hagfish_knot_time := 1.1
 ## The Lamprey Queen: every brood_every s one of her brood drops off as
 ## brood_count zombies; hits on her gill holes do gill_bonus times the damage;
 ## spitting, her gills pulse out blood clouds (blood_cloud_damage a touch).
@@ -809,6 +853,14 @@ static func shared() -> UnnaturalSettings:
 @export_range(0, 50, 1, "or_greater") var brood_count := 6
 @export_range(1.0, 10.0, 0.1, "or_greater") var gill_bonus := 2.0
 @export_range(0.0, 200.0, 1.0, "or_greater") var blood_cloud_damage := 8.0
+## In fury she lunges: a player within lamprey_lunge_range m ahead makes her
+## flare her disc for lamprey_lunge_wind s, then strike at lamprey_lunge_speed
+## times her speed; one her disc reaches is latched onto, and she corkscrews
+## round her length at lamprey_spin rad/s while she drains them.
+@export_range(0.0, 100.0, 1.0, "or_greater") var lamprey_lunge_range := 30.0
+@export_range(0.05, 3.0, 0.05, "or_greater") var lamprey_lunge_wind := 0.6
+@export_range(1.0, 6.0, 0.1, "or_greater") var lamprey_lunge_speed := 2.6
+@export_range(0.0, 30.0, 0.25, "or_greater") var lamprey_spin := 5.0
 ## The Fallen Angel (a zombie sea angel, big_changes.md §3): angel_height m
 ## from its horns to its tail tip, hovering upright on wingbeats every
 ## angel_beat s. It locks on to a player, its head bursting into a crown of
@@ -838,6 +890,13 @@ static func shared() -> UnnaturalSettings:
 @export_range(1.0, 5.0, 0.05, "or_greater") var angel_crown_weak := 1.5
 @export_range(0, 100, 1, "or_greater") var angel_butterflies := 14
 @export_range(0.0, 0.05, 0.0005, "or_greater") var angel_butterfly_heal := 0.004
+## Its lock-on, as the clip's angel shadows its butterfly: it picks a player and
+## holds itself angel_lock_gap m off them (times angel_lash_reach), matching
+## their every move and circling them at angel_orbit rad/s, a pale halo round
+## them closing as it locks; after angel_lock_time s locked on, its crown opens.
+@export_range(0.3, 4.0, 0.05, "or_greater") var angel_lock_gap := 0.9
+@export_range(0.0, 5.0, 0.05, "or_greater") var angel_orbit := 0.7
+@export_range(0.0, 15.0, 0.25, "or_greater") var angel_lock_time := 2.25
 
 @export_group("Levels")
 ## XP to the next level: xp_base * level ^ xp_curve.

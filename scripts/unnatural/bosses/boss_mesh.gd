@@ -7,7 +7,9 @@ extends RefCounted
 ## - UV: (along the part 0..1, round it 0..1);
 ## - UV2: (the part's id, its flutter weight 0..1: fins and filaments ripple);
 ## - COLOR: (sin, cos) round its slice as 0..1, how far along the whole body
-##   (z / body length), and a free value per part.
+##   (z / body length), and a free value per part;
+## - CUSTOM0.x: its hinge weight (`hinge` while it was added): a jaw turns round
+##   its hinge by that much of the shader's angle (spine_hinge).
 ## Winding follows FishModel._loft_mesh, so generate_normals points outward.
 ## Parts the shader tells apart by UV2.x: BODY, FIN, BONE (teeth, ribs),
 ## FILAMENT, INSIDE (a mouth or wound's flesh), and any the boss adds.
@@ -24,17 +26,21 @@ var tool := SurfaceTool.new()
 var count := 0
 ## The whole body's length (COLOR.b is z over it).
 var body_length := 60.0
+## The hinge weight given to the vertices added while it's set (a jaw: 1).
+var hinge := 0.0
 
 
 func _init(whole_length := 60.0) -> void:
 	body_length = whole_length
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	tool.set_custom_format(0, SurfaceTool.CUSTOM_R_FLOAT)
 
 
 func _vertex(at: Vector3, uv: Vector2, part: float, weight: float, ring: Vector2, extra := 0.0) -> void:
 	tool.set_uv(uv)
 	tool.set_uv2(Vector2(part, weight))
 	tool.set_color(Color(ring.x * 0.5 + 0.5, ring.y * 0.5 + 0.5, clampf(at.z / maxf(body_length, 0.001), 0.0, 1.0), extra))
+	tool.set_custom(0, Color(hinge, 0.0, 0.0, 0.0))
 	tool.add_vertex(at)
 	count += 1
 

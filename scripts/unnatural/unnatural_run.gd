@@ -891,7 +891,11 @@ func _physics_process(delta: float) -> void:
 		health.update(delta, settings.regen + block_of(fish).value("regen"))
 		if is_picking(fish):
 			health.shield(0.2)  # D3: untouchable while choosing
-		fish.set_model_visible(health.down or health.iframes_left <= 0.0 or fmod(health.iframes_left * FLICKER_RATE, 1.0) < 0.5)
+		var holder := holder_of(fish)
+		if holder:
+			fish.set_model_visible(not holder.hides_held())  # held: steady (its shield isn't i-frames); swallowed: out of sight
+		else:
+			fish.set_model_visible(health.down or health.iframes_left <= 0.0 or fmod(health.iframes_left * FLICKER_RATE, 1.0) < 0.5)
 		var stats := stats_of(fish)
 		stats.top_speed = maxf(stats.top_speed, fish.speed)
 		var attack := _make_attack(fish)
@@ -921,7 +925,8 @@ func _physics_process(delta: float) -> void:
 
 
 ## How much further back `fish`'s survivor cam sits now (m), for the crowd
-## round it and its Size stat (camera_crowd_pull, camera_size_pull).
+## round it, its Size stat (camera_crowd_pull, camera_size_pull), and a final
+## boss holding it (grab_camera_pull: to see what has you).
 func camera_pull_of(fish: FishController) -> float:
 	return _camera_pull.get(fish, 0.0)
 
@@ -933,8 +938,20 @@ func _pull_camera(fish: FishController, delta: float, count: bool) -> void:
 		_crowd[fish] = horde.query_sphere(fish.global_position, settings.camera_crowd_range).size() if settings.camera_crowd_pull > 0.0 else 0
 	var crowd := clampf(float(_crowd.get(fish, 0)) / maxf(settings.camera_crowd_full, 1.0), 0.0, 1.0)
 	var goal := settings.camera_crowd_pull * crowd + settings.camera_size_pull * maxf(block_of(fish).value("size"), 0.0)
+	var rate := settings.camera_pull_rate
+	if holder_of(fish):
+		goal += settings.grab_camera_pull
+		rate = maxf(rate, 3.0)
 	var now: float = _camera_pull.get(fish, 0.0)
-	_camera_pull[fish] = lerpf(now, goal, 1.0 - exp(-settings.camera_pull_rate * delta))
+	_camera_pull[fish] = lerpf(now, goal, 1.0 - exp(-rate * delta))
+
+
+## The final boss holding `fish` now (null: none).
+func holder_of(fish: FishController) -> BloodLeviathan:
+	for boss in bosses:
+		if is_instance_valid(boss) and boss is BloodLeviathan and (boss as BloodLeviathan).held == fish and fish != null:
+			return boss as BloodLeviathan
+	return null
 
 
 ## How many more zombies the players' curses call (Siren's Song): 1 without.

@@ -42,6 +42,7 @@ void vertex() {
 	ring = COLOR.rg * 2.0 - 1.0;
 	part = UV2.x;
 	along = COLOR.b;
+	spine_hinge(VERTEX, NORMAL, CUSTOM0.x);
 	spine_bend(VERTEX, NORMAL, UV2.y);
 }
 

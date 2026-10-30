@@ -74,6 +74,7 @@ var _hurt := ColorRect.new()
 var _shock := ColorRect.new()
 var _cards := LevelUpCards.new()
 var _dps := DpsPanel.new()
+var _break := BreakFree.new()
 var _over_age := -1.0
 var _cam_note := Label.new()
 var _hurt_material := ShaderMaterial.new()
@@ -129,6 +130,15 @@ func _ready() -> void:
 	_skill.offset_left = -SkillButton.SIZE.x * 0.5
 	_skill.offset_right = SkillButton.SIZE.x * 0.5
 	add_child(_skill)
+	_break.anchor_left = 0.5
+	_break.anchor_right = 0.5
+	_break.anchor_top = 0.66
+	_break.anchor_bottom = 0.66
+	_break.offset_left = -BreakFree.SIZE.x * 0.5
+	_break.offset_right = BreakFree.SIZE.x * 0.5
+	_break.offset_top = -BreakFree.SIZE.y * 0.5
+	_break.offset_bottom = BreakFree.SIZE.y * 0.5
+	add_child(_break)
 	_director.offset_top = CompassStrip.BASE + 76.0
 	_director.add_theme_font_size_override("font_size", 14)
 	_director.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
@@ -218,11 +228,8 @@ func _ready() -> void:
 			_final_title = final.title
 			_splash.play(final.title, "FINAL BOSS", final.boss_line(), HP_COLOR, 3.0)
 			final.held_changed.connect(func(held: FishController, on: bool) -> void:
-				if held == fish:
-					if on:
-						_note("STRIDE  ·  STRIDE  ·  STRIDE TO BREAK FREE", HP_COLOR)
-					else:
-						_cam_note.modulate.a = 0.0))
+				if held == fish and on:
+					_cam_note.modulate.a = 0.0))  # the break-free panel says it
 		run.boss_enraged.connect(func(boss: Boss) -> void:
 			_splash.play("%s ENRAGES" % boss.title.trim_prefix("THE "), "NO TIME LIMIT", "AND THE DEAD KEEP COMING", HP_COLOR, 2.4))
 		run.whirlpool_opened.connect(func(_at: Vector3) -> void:
@@ -335,9 +342,9 @@ func _process(delta: float) -> void:
 		_note(_shrine_prompt(shrine), shrine.tint())
 	elif is_instance_valid(fish) and run.rift_near(fish):
 		_note("A CREVICE  ·  IT GOES DOWN A LONG WAY  ·  RED LIGHT BELOW  ·  DIVE IN TO WAKE THE FINAL BOSS", Minimap.RIFT_COLOR)  # held while you're near
-	var holder := run.current_boss() as BloodLeviathan
-	if holder and holder.held == fish:
-		_note("STRIDE  ·  STRIDE  ·  STRIDE TO BREAK FREE", HP_COLOR)  # held while it holds you
+	_break.show_for(run.holder_of(fish) if is_instance_valid(fish) else null, delta)
+	if _break.visible:
+		_cam_note.modulate.a = 0.0
 	_clock.text = _time_text(run.elapsed) if run.stage <= 1 else "STAGE %d  ·  %s" % [run.stage, _time_text(run.stage_time())]
 	_kills.text = "%d KILLS" % run.kills
 	_clock.visible = not _cards.is_open() and not _summary.visible  # the cards' heading is there; the summary covers it
@@ -845,6 +852,143 @@ func _update_skill() -> void:
 	var meter := fish.swim_strokes and fish.swim_style == FishController.SwimStyle.EXTRA_SWISHY
 	_skill.offset_bottom = -118.0 if meter else -28.0  # over the meter and its PERFECT / EARLY / LATE
 	_skill.offset_top = _skill.offset_bottom - SkillButton.SIZE.y
+
+
+## The prompt while a final boss holds you: a dark long-hexagon plate with a
+## red rim, what has you ("SWALLOWED  ·  THE GULPER MOTHER"), STRIDE TO BREAK
+## FREE with a stick flicking side to side beside it, a diamond for each stride
+## needed (lit as you make them, each popping), and the hold's time running
+## down under them. It pops in when you're caught, shakes with each stride and
+## pulses red with each drain.
+class BreakFree extends Control:
+	const SIZE := Vector2(600.0, 150.0)
+	const RIM := Color(1.0, 84 / 255.0, 104 / 255.0)
+	const FILL := Color(14 / 255.0, 6 / 255.0, 12 / 255.0, 0.9)
+
+	## What has you, how far you are, and how long it holds on yet (1 to 0).
+	var verb := "HELD"
+	var who := ""
+	var strides := 0
+	var needed := 3
+	var left := 1.0
+
+	var _shown := 0.0
+	var _pops: Array[float] = []
+	var _shake := 0.0
+	var _age := 0.0
+	var _hp := -1.0
+	var _drained := 0.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		visible = false
+
+	## Shown while `holder` holds the HUD's fish (null: hidden), eased in and out.
+	func show_for(holder: BloodLeviathan, delta: float) -> void:
+		var on := holder != null
+		if on:
+			if not visible or _shown <= 0.0:
+				_pops.clear()
+				strides = 0
+				_hp = -1.0
+			verb = holder.hold_verb()
+			who = holder.title
+			needed = maxi(holder.settings.final_hold_strides, 1)
+			left = holder.hold_share_left()
+			var now := mini(holder.hold_strides, needed)
+			while strides < now:
+				strides += 1
+				_shake = 1.0
+			var health := holder.run.health_of(holder.held)
+			if health:
+				if _hp >= 0.0 and health.hp < _hp - 0.01:
+					_drained = 1.0
+				_hp = health.hp
+		_pops.resize(needed)
+		for n in needed:
+			_pops[n] = move_toward(_pops[n], 1.0 if n < strides else 0.0, delta * 5.0)
+		_shown = move_toward(_shown, 1.0 if on else 0.0, delta * (7.0 if on else 4.0))
+		_shake = maxf(_shake - delta * 4.0, 0.0)
+		_drained = maxf(_drained - delta * 3.0, 0.0)
+		_age += delta
+		visible = _shown > 0.0
+		if visible:
+			queue_redraw()
+
+	func _draw() -> void:
+		var ease_in := 1.0 - pow(1.0 - _shown, 3.0)
+		var grow := lerpf(0.86, 1.0, ease_in)
+		var jolt := sin(_age * 70.0) * 9.0 * _shake * _shake
+		var centre := size * 0.5 + Vector2(jolt, 0.0)
+		draw_set_transform(centre, 0.0, Vector2.ONE * grow)
+		var half := SIZE * 0.5
+		var box := Rect2(-half, SIZE)
+		var notch := 34.0
+		var alpha := ease_in
+		var beat := 0.5 + 0.5 * sin(_age * 7.0)
+		# Glow round it: steady, flaring with each drain.
+		for n in 4:
+			var spread := 4.0 + n * 5.0 + 6.0 * _drained
+			draw_colored_polygon(_shape(box.grow(spread), notch + spread * 0.6), Color(RIM, (0.08 + 0.05 * beat + 0.12 * _drained) * (1.0 - n * 0.22) * alpha))
+		draw_colored_polygon(_shape(box, notch), Color(RIM, alpha))
+		draw_colored_polygon(_shape(box.grow(-2.0), notch - 1.0), Color(FILL.lerp(Color(0.3, 0.02, 0.06, 0.92), _drained * 0.6), FILL.a * alpha))
+		# Hazard ticks along the top edge.
+		for n in 9:
+			var x := lerpf(-half.x + notch + 10.0, half.x - notch - 10.0, n / 8.0)
+			draw_line(Vector2(x - 5.0, -half.y + 2.0), Vector2(x + 5.0, -half.y + 9.0), Color(RIM, 0.35 * alpha), 2.0, true)
+		# What has you.
+		var small := UITheme.caps(15, 700, 0.22)
+		UITheme.draw_text(self, Rect2(-half.x + 60.0, -half.y + 14.0, SIZE.x - 120.0, 20.0), "%s  ·  %s" % [verb, who], small, 15, Color(RIM, alpha))
+		# The stick flicking side to side, and the call.
+		var big := UITheme.display(700)
+		var line := "STRIDE TO BREAK FREE"
+		var px := 34
+		var text_w := big.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
+		var glyph_w := 64.0
+		var x0 := -(text_w + glyph_w + 16.0) * 0.5
+		var mid := -half.y + 62.0
+		_stick(Vector2(x0 + glyph_w * 0.5, mid), alpha)
+		var baseline := mid + (big.get_ascent(px) - big.get_descent(px)) * 0.5
+		draw_string(big, Vector2(x0 + glyph_w + 16.0, baseline), line, HORIZONTAL_ALIGNMENT_LEFT, -1, px, Color(UITheme.INK, alpha))
+		# A diamond for each stride needed.
+		var gap := 34.0
+		var y := mid + 40.0
+		for n in needed:
+			var at := Vector2((n - (needed - 1) * 0.5) * gap, y)
+			var pop: float = _pops[n] if n < _pops.size() else 0.0
+			var lit := n < strides
+			var r := 9.0 + (4.0 * sin(pop * PI) if lit else 0.0)
+			var diamond := PackedVector2Array([at + Vector2(0, -r), at + Vector2(r, 0), at + Vector2(0, r), at + Vector2(-r, 0)])
+			if lit:
+				draw_colored_polygon(diamond, Color(RIM, alpha))
+				draw_colored_polygon(PackedVector2Array([at + Vector2(0, -r * 0.45), at + Vector2(r * 0.45, 0), at + Vector2(0, r * 0.45), at + Vector2(-r * 0.45, 0)]),
+						Color(1.0, 0.85, 0.88, alpha))
+			else:
+				var ring := diamond.duplicate()
+				ring.append(diamond[0])
+				draw_polyline(ring, Color(RIM, 0.6 * alpha), 2.0, true)
+		# The hold running out.
+		var bar := Rect2(-half.x + notch + 30.0, half.y - 16.0, SIZE.x - (notch + 30.0) * 2.0, 4.0)
+		draw_rect(bar, Color(RIM, 0.2 * alpha))
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * left, bar.size.y)), Color(RIM, 0.85 * alpha))
+		draw_set_transform(Vector2.ZERO)
+
+	## A thumbstick flicked left and right (a stride), with chevrons either side.
+	func _stick(at: Vector2, alpha: float) -> void:
+		var swing := sin(_age * 9.0)
+		draw_arc(at, 20.0, 0.0, TAU, 32, Color(UITheme.INK, 0.35 * alpha), 2.0, true)
+		draw_circle(at + Vector2(swing * 10.0, 0.0), 9.0, Color(UITheme.INK, alpha))
+		for side: float in [-1.0, 1.0]:
+			var lit := 0.35 + 0.65 * maxf(swing * side, 0.0)
+			var tip := at + Vector2(side * 30.0, 0.0)
+			draw_polyline(PackedVector2Array([tip + Vector2(-side * 5.0, -6.0), tip, tip + Vector2(-side * 5.0, 6.0)]), Color(RIM, lit * alpha), 2.5, true)
+
+	## A long hexagon filling `rect`, its ends pointed by `notch` px.
+	static func _shape(rect: Rect2, notch: float) -> PackedVector2Array:
+		var mid := rect.get_center().y
+		return PackedVector2Array([Vector2(rect.position.x + notch, rect.position.y), Vector2(rect.end.x - notch, rect.position.y),
+				Vector2(rect.end.x, mid), Vector2(rect.end.x - notch, rect.end.y), Vector2(rect.position.x + notch, rect.end.y),
+				Vector2(rect.position.x, mid)])
 
 
 ## The mobility skill as a game button (the HUD redesign): a long hexagon

@@ -221,6 +221,18 @@ static func build(m: FishModel) -> void:
 	skin.set_shader_parameter("axilla_size", l * 0.028)
 
 
+## Where model `m`'s mouth is (model space, m): `front` its underside at the
+## mouth's front, `back` at its corners, `width` its half width there (the
+## Drowned Shark hinges a jaw there to chomp).
+static func mouth_geometry(m: FishModel) -> Dictionary:
+	var sp: Dictionary = SPECIES[clampi(m.species, 0, SPECIES.size() - 1)]
+	var shape := _shape(sp, m._size)
+	var mouth_s: Vector2 = sp.mouth_s
+	var corner := _slice(shape, mouth_s.y)
+	return {"front": _surface(shape, mouth_s.x, PI), "back": _surface(shape, mouth_s.y, PI), "width": corner[0] * float(sp.mouth_w),
+			"length": m._size.z}
+
+
 ## The species' body in metres for _slice: the ends, widest half sizes and its
 ## shape numbers.
 static func _shape(sp: Dictionary, size: Vector3) -> Dictionary:

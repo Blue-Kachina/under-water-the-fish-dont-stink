@@ -7,8 +7,11 @@ extends BloodLeviathan
 ##   within gulper_range of its mouth, swallowing up to gulper_max, each healing
 ##   it gulper_heal of its max hp (its belly fills);
 ## - spitting, it vomits gulper_vomit zombies at its target with its bile;
-## - in fury it charges mouth open, and a player it reaches is swallowed (held
-##   in its mouth, drained) until they stride their way out.
+## - in fury it charges mouth open, sucking: a player in front of its mouth
+##   (gulper_suck_range) is drawn in, water and grit streaming past them; one it
+##   reaches is swallowed as its jaws snap shut: a lump sliding down its throat
+##   into its belly (drained there), pushing back up with each stride until
+##   it coughs them out the front.
 
 const GULPER_SKIN := preload("res://shaders/boss_gulper.gdshader")
 ## A gulp: how long the mouth stays open (s), and how near the mouth (m, of
@@ -24,6 +27,17 @@ var _open_left := 0.0
 var _in_gulp := 0
 var _gape := 0.0
 var _lure_light: OmniLight3D
+## Sucking now (a player in front of its mouth, in fury), and the times it has.
+var sucking := false
+var sucks := 0
+var _suction: CPUParticles3D
+## The swallowed player's lump: where it is along the body (rest z, m), how
+## far it's gone down (0 the mouth to 1 the belly), and its kick from a stride.
+var _lump_z := 0.0
+var _swallow_t := 0.0
+var _kick := 0.0
+var _shut_left := 0.0
+var _cough_left := 0.0
 
 
 func boss_title() -> String:
@@ -81,6 +95,47 @@ func hold_reach() -> float:
 	return 5.5 * settings.leviathan_girth / 6.0
 
 
+func hold_verb() -> String:
+	return "SWALLOWED"
+
+
+func hides_held() -> bool:
+	return true
+
+
+## In its belly, where the lump is.
+func hold_point() -> Vector3:
+	return rig.place(Vector3(0.0, -0.6 * settings.leviathan_girth / 6.0, _lump_z))
+
+
+## Where its belly is (rest z, m), and its mouth's mid-pouch.
+func _belly_z() -> float:
+	return mouth_length() + body_length() * 0.1
+
+
+func _caught(fish: FishController) -> void:
+	_swallow_t = 0.0
+	_lump_z = mouth_length() * 0.45
+	_shut_left = 0.45
+	_kick = 0.0
+	fish.set_model_visible(false)
+
+
+func _held_strode() -> void:
+	_kick = 1.0
+
+
+## Coughed out the front, in a cloud of its bile.
+func _let_go(fish: FishController) -> void:
+	fish.set_model_visible(true)
+	fish.global_position = rig.place(Vector3(0.0, -1.6 * settings.leviathan_girth / 6.0, -2.0 * settings.leviathan_girth / 6.0))
+	_cough_left = 0.7
+
+
+func release_push(_fish: FishController) -> Vector3:
+	return -rig.frame_at(0.0).basis.z * 24.0 + Vector3.UP * 3.0
+
+
 func grabs() -> bool:
 	return true
 
@@ -89,9 +144,54 @@ func _ready() -> void:
 	super()
 	name = "GulperMother"
 	_gulp_left = settings.gulper_every * 0.6
+	_suction = _suction_particles()
+	add_child(_suction)
+
+
+## Grit and water streaming into its mouth while it sucks: particles round the
+## mouth, pulled into it.
+func _suction_particles() -> CPUParticles3D:
+	var k := settings.leviathan_girth / 6.0
+	var p := CPUParticles3D.new()
+	p.name = "Suction"
+	p.top_level = true
+	p.emitting = false
+	p.amount = 160
+	p.lifetime = 0.8
+	p.local_coords = false
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE_SURFACE
+	p.emission_sphere_radius = 15.0 * k
+	p.direction = Vector3.ZERO
+	p.spread = 180.0
+	p.initial_velocity_min = 0.0
+	p.initial_velocity_max = 2.0
+	p.radial_accel_min = -55.0 * k
+	p.radial_accel_max = -40.0 * k
+	p.gravity = Vector3.ZERO
+	p.particle_flag_align_y = true
+	p.scale_amount_min = 0.6
+	p.scale_amount_max = 1.4
+	var curve := Curve.new()
+	curve.add_point(Vector2(0.0, 0.0))
+	curve.add_point(Vector2(0.25, 1.0))
+	curve.add_point(Vector2(1.0, 0.2))
+	p.scale_amount_curve = curve
+	var streak := BoxMesh.new()
+	streak.size = Vector3(0.05, 0.9, 0.05) * k
+	var look := StandardMaterial3D.new()
+	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	look.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	look.albedo_color = Color(0.75, 0.85, 0.9, 0.35)
+	streak.material = look
+	p.mesh = streak
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return p
 
 
 func _special(delta: float, _prey: FishController) -> void:
+	_suck(delta)
+	_update_lump(delta)
 	# The gulp: open wide, draw the nearby dead in, swallow them.
 	if phase != Phase.FURY:
 		_gulp_left -= delta
@@ -117,6 +217,39 @@ func _special(delta: float, _prey: FishController) -> void:
 				run.horde.shove(i, off.normalized() * settings.gulper_pull * delta * 3.0)
 
 
+## In fury, mouth open: a player in front of its mouth is drawn in.
+func _suck(delta: float) -> void:
+	sucking = false
+	if phase == Phase.FURY and held == null and _regrab_left <= 0.0 and settings.gulper_suck > 0.0:
+		var mouth := mouth_point()
+		for fish in run.local_players():
+			if not run.is_up(fish) or run.is_picking(fish) or not _ahead(fish, settings.gulper_suck_range):
+				continue
+			sucking = true
+			var to := (mouth - fish.global_position).normalized()
+			var now := fish.linear_velocity.dot(to)
+			var change := clampf(settings.gulper_suck - now, 0.0, settings.gulper_suck * delta * 4.0)
+			fish.apply_push(to * change)
+	if sucking and not _suction.emitting:
+		sucks += 1
+
+
+## The lump of a swallowed player: down the throat into the belly, then back
+## up toward the mouth with each stride; it bulges with each stride's kick.
+func _update_lump(delta: float) -> void:
+	_shut_left = maxf(_shut_left - delta, 0.0)
+	_cough_left = maxf(_cough_left - delta, 0.0)
+	_kick = maxf(_kick - delta * 3.0, 0.0)
+	if held == null:
+		return
+	_swallow_t = minf(_swallow_t + delta / 0.7, 1.0)
+	var belly := _belly_z()
+	var down := lerpf(mouth_length() * 0.45, belly, smoothstep(0.0, 1.0, _swallow_t))
+	var climbed := float(hold_strides) / maxf(settings.final_hold_strides, 1)
+	var goal := lerpf(down, mouth_length() * 0.6, climbed)
+	_lump_z = move_toward(_lump_z, goal, delta * body_length() * 0.25)
+
+
 ## Spitting, it vomits a pack at its prey as well as its bile.
 func _spit(at: Vector3) -> void:
 	super(at)
@@ -127,12 +260,25 @@ func _spit(at: Vector3) -> void:
 
 func _glow_now() -> void:
 	super()
-	var open := 1.0 if _open_left > 0.0 or held or phase == Phase.FURY or _diving > 0.0 or winding_up() else 0.15
-	_gape = move_toward(_gape, open, get_physics_process_delta_time() * 1.6)
+	var open := 1.0 if _open_left > 0.0 or phase == Phase.FURY or _diving > 0.0 or winding_up() else 0.15
+	var rate := 1.6
+	if held:
+		open = -0.45  # jaws clamped shut on what it swallowed
+		rate = 8.0 if _shut_left > 0.0 else 1.6
+	if sucking or _cough_left > 0.0:
+		open = 1.25
+		rate = 5.0
+	_gape = move_toward(_gape, open, get_physics_process_delta_time() * rate)
 	var full := clampf(0.15 + swallowed / 60.0, 0.0, 1.0)
+	var k := settings.leviathan_girth / 6.0
+	var lump := Vector3(_lump_z, 3.2 * k, (0.32 + 0.3 * _kick + 0.04 * sin(age * 9.0)) if held else 0.0)
 	for material in skins:
 		material.set_shader_parameter("gape", _gape)
 		material.set_shader_parameter("fullness", full)
+		material.set_shader_parameter("lump", lump)
+	if is_instance_valid(_suction):
+		_suction.emitting = sucking
+		_suction.global_position = rig.place(Vector3(0.0, -1.6 * k, -1.0 * k))
 	if is_instance_valid(_lure_light):
 		_lure_light.light_energy = 2.5 + sin(age * 3.1) * 0.8
 

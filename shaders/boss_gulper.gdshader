@@ -25,6 +25,9 @@ uniform float hinge_y = 0.0;
 uniform float gape = 0.0;  // 0 shut-ish, 1 wide open
 uniform vec2 belly_span = vec2(17.0, 35.0);  // m along the body
 uniform float fullness = 0.3;
+// A swallowed player: a lump at rest z lump.x (m), lump.y m long, pressing out
+// by lump.z (of the girth there); 0: none.
+uniform vec3 lump = vec3(0.0, 4.0, 0.0);
 uniform float dissolve = 0.0;
 uniform float flash = 0.0;
 uniform float warn = 0.0;
@@ -49,6 +52,12 @@ void vertex() {
 		v.x *= 1.0 + gape * 0.45 * m;
 		v.y = cy + (v.y - cy) * (1.0 + gape * 0.55 * m);
 		v.y += gape * m * m * -1.5;
+	}
+	if (lump.z > 0.0 && part < 0.5) {
+		float d = (v.z - lump.x) / max(lump.y, 0.01);
+		float b = lump.z * exp(-d * d * 2.0);
+		v.x *= 1.0 + b;
+		v.y *= 1.0 + b * 1.2;
 	}
 	VERTEX = v;
 	spine_bend(VERTEX, NORMAL, UV2.y);

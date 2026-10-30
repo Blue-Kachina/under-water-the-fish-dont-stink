@@ -6,7 +6,11 @@ extends BloodLeviathan
 ## spit, fury), and:
 ## - every brood_every s one of its brood drops off as brood_count zombies;
 ## - spitting, its gills flare and pulse out clouds of blood (blood_cloud_damage);
-## - in fury, a player its disc touches is latched onto and drained (hold());
+## - in fury she lunges: a player ahead (lamprey_lunge_range) makes her flare
+##   her disc wide for lamprey_lunge_wind s, glowing, then strike; one her disc
+##   touches is latched onto (hold()), the disc clamping tight, and she
+##   corkscrews round her length (lamprey_spin) while she drains them, her gill
+##   holes turning up as she rolls;
 ## - its gill holes are weak points: hits on them do gill_bonus times the damage.
 
 const LAMPREY_SKIN := preload("res://shaders/boss_lamprey.gdshader")
@@ -19,6 +23,16 @@ var _brood_left := 0.0
 var _cloud_left := 2.0
 var _breath := 0.0
 var _flare := 0.0
+## Her lunge (fury): winding up (s left), striking (s left), and how many; her
+## disc (1 flared, negative clamped) and her roll (rad).
+var lunges := 0
+var _lunge_wind := 0.0
+var _lunge_left := 0.0
+var _lunge_cool := 0.0
+var _disc := 0.0
+var _spin := 0.0
+var _puppet_lunge := false
+var _puppet_held := false
 ## The two gill proxies (weak points), after the body's.
 var _gill_parts := PackedInt32Array()
 
@@ -81,6 +95,48 @@ func hold_reach() -> float:
 	return radius() * 1.5
 
 
+func hold_verb() -> String:
+	return "LATCHED ON"
+
+
+## Just off the clamped disc.
+func hold_point() -> Vector3:
+	return rig.place(Vector3(0.0, 0.0, -radius() * 0.35))
+
+
+func release_push(_fish: FishController) -> Vector3:
+	# Flung off the spinning disc.
+	var forward := -rig.frame_at(0.0).basis.z
+	var side := rig.frame_at(0.0).basis.x
+	return (forward * 0.6 + side * 0.8).normalized() * 20.0 + Vector3.UP * 4.0
+
+
+## Winding up a lunge (a puppet: the host says she is), or a dive.
+func winding_up() -> bool:
+	if puppet:
+		return _puppet_lunge or super()
+	return _lunge_wind > 0.0 or super()
+
+
+## Her lunge's lane while she winds one up.
+func telegraph() -> Dictionary:
+	if _lunge_wind > 0.0 or (puppet and _puppet_lunge):
+		var dir := -global_basis.z
+		var progress := 0.6 if puppet else 1.0 - _lunge_wind / maxf(settings.lamprey_lunge_wind, 0.01)
+		return {"from": global_position, "dir": dir, "length": settings.lamprey_lunge_range, "width": radius() * 2.0, "progress": progress}
+	return super()
+
+
+func _net_mode() -> int:
+	return super() + (16 if _lunge_wind > 0.0 else 0) + (32 if held else 0)
+
+
+func _set_net_mode(net_mode: int) -> void:
+	super(net_mode)
+	_puppet_lunge = (net_mode & 16) != 0
+	_puppet_held = (net_mode & 32) != 0
+
+
 func circle_radius() -> float:
 	return 26.0 + body_length() * 0.06
 
@@ -109,7 +165,8 @@ func _pose_parts() -> void:
 			run.horde.place(parts[n], frame.origin, -frame.basis.z)
 
 
-func _special(delta: float, _prey: FishController) -> void:
+func _special(delta: float, prey: FishController) -> void:
+	_lunge(delta, prey)
 	# The brood: one drops off now and then as a pack of zombies, and regrows.
 	for entry: Array in _brood:
 		if entry[1] > 0.0:
@@ -138,12 +195,57 @@ func _special(delta: float, _prey: FishController) -> void:
 					run._hazard(at, radius() * 0.9, 2.5, settings.blood_cloud_damage, Color(0.6, 0.02, 0.03, 0.4), "the Lamprey Queen's blood")
 
 
+## Her lunge (fury): a player ahead in range; she slows, disc flaring, then
+## strikes at lamprey_lunge_speed times her speed.
+func _lunge(delta: float, prey: FishController) -> void:
+	_lunge_cool -= delta
+	if held or (puppet and _puppet_held):
+		_lunge_wind = 0.0
+		_lunge_left = 0.0
+		return
+	if _lunge_wind > 0.0:
+		_lunge_wind -= delta
+		velocity = velocity.move_toward(velocity.normalized() * speed() * 0.35, delta * 60.0)
+		if prey:
+			var to := (prey.global_position - global_position).normalized()
+			velocity = velocity.slerp(to * velocity.length(), 1.0 - exp(-6.0 * delta))
+		if _lunge_wind <= 0.0:
+			_lunge_left = 0.7
+			lunges += 1
+			var aim := (prey.global_position - global_position).normalized() if prey else -global_basis.z
+			velocity = aim * speed() * settings.lamprey_lunge_speed
+	elif _lunge_left > 0.0:
+		_lunge_left -= delta
+		if _lunge_left <= 0.0:
+			_lunge_cool = 2.0
+	elif phase == Phase.FURY and prey and _lunge_cool <= 0.0 and settings.lamprey_lunge_range > 0.0 and _ahead(prey, settings.lamprey_lunge_range):
+		_lunge_wind = settings.lamprey_lunge_wind
+
+
 func _glow_now() -> void:
 	super()
-	_flare = maxf(_flare - get_physics_process_delta_time() * 0.8, 0.0)
+	var delta := get_physics_process_delta_time()
+	_flare = maxf(_flare - delta * 0.8, 0.0)
 	_breath = 0.12 + 0.1 * sin(age * 1.3) + _flare
+	# Her disc: flared to lunge, clamped on her prey, half open in fury.
+	var open := 0.0
+	if held or (puppet and _puppet_held):
+		open = -0.3
+	elif _lunge_wind > 0.0 or _lunge_left > 0.0 or (puppet and _puppet_lunge):
+		open = 1.0
+	elif phase == Phase.FURY:
+		open = 0.35
+	_disc = move_toward(_disc, open, delta * (6.0 if open < 0.0 else 3.0))
+	# Latched on, she rolls round her length; let go, she rights herself.
+	if held or (puppet and _puppet_held):
+		_spin += settings.lamprey_spin * delta
+	else:
+		_spin = lerp_angle(_spin, 0.0, 1.0 - exp(-2.5 * delta))
+	rig.twist = _spin
 	for material in skins:
 		material.set_shader_parameter("breath", _breath)
+		material.set_shader_parameter("disc", _disc)
+		material.set_shader_parameter("disc_len", radius() * 1.35 * 1.7)
 
 
 func _build_look() -> void:

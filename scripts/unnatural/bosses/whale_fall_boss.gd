@@ -7,6 +7,10 @@ extends BloodLeviathan
 ## blowhole, each a rope of hagfish_length m bent along a spine (SpineRig):
 ## - each lunges at a player within reach of where it comes out every
 ##   hagfish_lunge_every s, glowing as it winds up;
+## - a striking hagfish that reaches a player bites and holds on
+##   (hagfish_grabs), reeling them in toward its hole as it ties itself in a
+##   knot that slides down its body to its head, as real hagfish do to tear
+##   flesh; it slimes them when it lets go;
 ## - spitting (from two thirds), they spray slime that stings and slows;
 ## - in fury they tear free and hunt on their own, and the carcass sinks.
 ## The hagfish hold hagfish_share of its hp between them, each its own share:
@@ -33,6 +37,9 @@ var _carcass_xf := Transform3D.IDENTITY
 ## Where each hagfish comes out: [rest point, rest outward direction].
 var _exits: Array = []
 var _carcass_points := PackedVector3Array()
+## The hagfish holding a player (null: none), and how many have bitten one.
+var _grabber: Hagfish
+var bites := 0
 
 
 ## One of its hagfish.
@@ -47,7 +54,7 @@ class Hagfish:
 	var hp := 1.0
 	var alive := true
 	var loose := false
-	## 0 idle, 1 winding up, 2 striking, 3 drawing back.
+	## 0 idle, 1 winding up, 2 striking, 3 drawing back, 4 holding a player.
 	var state := 0
 	var state_left := 0.0
 	var lunge_left := 2.0
@@ -56,6 +63,10 @@ class Hagfish:
 	var dead_for := 0.0
 	var parts := PackedInt32Array()
 	var phase := 0.0
+	## Its knot: how far it has slid from its tail to its head (0 to 1),
+	## and how tied it is (0 none to 1 a whole loop).
+	var knot := 0.0
+	var knot_size := 0.0
 
 
 func boss_title() -> String:
@@ -93,6 +104,31 @@ func proxy_radius(n: int) -> float:
 
 func grabs() -> bool:
 	return false
+
+
+func hold_verb() -> String:
+	return "KNOTTED"
+
+
+## In the biting hagfish's jaws.
+func hold_point() -> Vector3:
+	return _grabber.head if _grabber else mouth_point()
+
+
+## It lets go: it slimes them.
+func _let_go(fish: FishController) -> void:
+	var k := settings.leviathan_girth / 6.0
+	run._hazard(fish.global_position, 3.2 * k, settings.slime_time, settings.slime_damage, Color(0.78, 0.82, 0.45, 0.35), "a hagfish's slime", true)
+	if _grabber:
+		_grabber.state = 3
+		_grabber.state_left = 1.0
+	_grabber = null
+
+
+func release_push(fish: FishController) -> Vector3:
+	var away := fish.global_position - global_position
+	away.y = maxf(away.y, 0.0)
+	return away.normalized() * 18.0 + Vector3.UP * 4.0
 
 
 func telegraph() -> Dictionary:
@@ -143,6 +179,8 @@ func take_part(index: int, amount: float, by: FishController, source: String) ->
 func _kill(h: Hagfish) -> void:
 	if not h.alive:
 		return
+	if h == _grabber:
+		release()
 	h.alive = false
 	h.dead_for = 0.0
 	for index in h.parts:
@@ -180,6 +218,7 @@ func _move(delta: float) -> void:
 			h.loose = true
 	for h in hagfish:
 		_update(h, delta, prey)
+	_update_hold(delta)
 	_pose()
 	_glow_now()
 
@@ -245,7 +284,17 @@ func _update(h: Hagfish, delta: float, prey: FishController) -> void:
 			2:
 				h.head = h.head.move_toward(h.aim, STRIKE_SPEED * rate * delta)
 				h.state_left -= delta
-				if h.state_left <= 0.0 or h.head.distance_to(h.aim) < 0.5:
+				_try_bite(h)
+				if h.state == 2 and (h.state_left <= 0.0 or h.head.distance_to(h.aim) < 0.5):
+					h.state = 3
+					h.state_left = 1.0
+			4:
+				# Holding on: reeling its prey in toward its hole as it knots.
+				var toward := h.head - anchor
+				var gap := toward.length()
+				h.head = anchor + toward / maxf(gap, 0.01) * move_toward(gap, length * 0.42, delta * 7.0)
+				h.knot = minf(h.knot + delta / maxf(settings.hagfish_knot_time, 0.05), 1.0)
+				if _grabber != h:
 					h.state = 3
 					h.state_left = 1.0
 			_:
@@ -266,8 +315,14 @@ func _update(h: Hagfish, delta: float, prey: FishController) -> void:
 			var k := settings.leviathan_girth / 6.0
 			run._hazard(h.head + toward * 3.0 * k, 3.2 * k, settings.slime_time, settings.slime_damage, Color(0.78, 0.82, 0.45, 0.35),
 					"a hagfish's slime", true)
-	_solve(h, anchor, not h.loose)
-	h.rig.follow_chain(h.nodes)
+	# Its knot: tied while it holds a player, slipping loose after.
+	var loop := TAU * settings.hagfish_length * 0.055 * 1.6
+	var room := clampf((length - h.head.distance_to(anchor) * 1.05) / loop, 0.0, 1.0) if not h.loose else 1.0
+	h.knot_size = minf(move_toward(h.knot_size, 1.0 if h.state == 4 else 0.0, delta * 2.5), room)
+	if h.knot_size <= 0.0:
+		h.knot = 0.0
+	_solve(h, anchor, not h.loose, 1.0 - loop * h.knot_size / length)
+	h.rig.follow_chain(_knotted(h, loop * h.knot_size / TAU))
 	h.rig.apply()
 	var at := PackedFloat32Array([0.06, 0.4, 0.75])
 	for p in h.parts.size():
@@ -275,10 +330,58 @@ func _update(h: Hagfish, delta: float, prey: FishController) -> void:
 		run.horde.place(h.parts[p], frame.origin, -frame.basis.z)
 
 
+## A striking hagfish's bite: a player its head reaches is held (hagfish_grabs).
+func _try_bite(h: Hagfish) -> void:
+	if puppet or not settings.hagfish_grabs or held or _regrab_left > 0.0:
+		return
+	var reach := settings.hagfish_length * 0.055 * 2.2
+	for fish in run.local_players():
+		if run.is_up(fish) and not run.is_picking(fish) and fish.global_position.distance_to(h.head) <= reach + UnnaturalRun.PLAYER_RADIUS:
+			_grabber = h
+			hold(fish)
+			if held == fish:
+				bites += 1
+				h.state = 4
+				h.knot = 0.0
+			else:
+				_grabber = null
+			return
+
+
+## The rope's points with its knot tied in: a loop `r` m round where the knot
+## has slid to (from its tail toward its head as h.knot runs), the rope coming
+## out of it beside where it went in, as an overhand knot lies.
+func _knotted(h: Hagfish, r: float) -> PackedVector3Array:
+	if r <= 0.01:
+		return h.nodes
+	var n := h.nodes.size()
+	var k := clampi(roundi(lerpf(n - 4.0, 3.0, smoothstep(0.0, 1.0, h.knot))), 2, n - 3)
+	var at := h.nodes[k]
+	var tailward := (h.nodes[k + 1] - h.nodes[k - 1]).normalized()
+	var side := tailward.cross(Vector3.UP)
+	if side.length_squared() < 0.01:
+		side = tailward.cross(Vector3.RIGHT)
+	side = side.normalized()
+	var lift := side.cross(tailward).normalized()
+	var shift := settings.hagfish_length * 0.055 * 2.3
+	var out := PackedVector3Array()
+	for i in k + 1:
+		out.append(h.nodes[i])
+	var steps := 14
+	for j in range(1, steps + 1):
+		var a := TAU * j / steps
+		out.append(at + lift * r * (1.0 - cos(a)) + tailward * r * sin(a) + side * shift * a / TAU)
+	for i in range(k + 1, n):
+		var fade := 1.0 - float(i - k) / float(n - 1 - k)
+		out.append(h.nodes[i] + side * shift * fade)
+	return out
+
+
 ## A hagfish's rope: its head where it is, its tail end in the carcass (unless
-## loose), every link its length, slack bowing outward and up.
-func _solve(h: Hagfish, anchor: Vector3, anchored: bool) -> void:
-	var link := settings.hagfish_length / float(ROPE - 1)
+## loose), every link its length (times `scale`: shorter while its knot takes
+## up some of it), slack bowing outward and up.
+func _solve(h: Hagfish, anchor: Vector3, anchored: bool, scale := 1.0) -> void:
+	var link := settings.hagfish_length * scale / float(ROPE - 1)
 	if h.nodes.size() != ROPE:
 		h.nodes.resize(ROPE)
 		for n in ROPE:

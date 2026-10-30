@@ -16,8 +16,11 @@ extends Boss
 ## lane showing, telegraph()), and it glows before it spits.
 ## Not beaten leviathan_enrage s after it came, it enrages (enrage_scale on
 ## speed and contact damage; UnnaturalRun has the director escalate too).
-## An alternate can grab a player (hold(): held at its mouth, drained, until
-## they stride their way out or it lets go).
+## An alternate can grab a player (hold(): drawn into its mouth over
+## grab_catch_time, drained, until they stride their way out or it lets go).
+## The King itself chomps in any phase (king_chomp_*: its jaw gapes on its
+## hinge, spine_hinge, then snaps shut), and in fury it coils round a player it
+## reaches, its body wrapped coil_loops times round them, tightening.
 
 signal enraged_now
 signal phase_changed(phase: int)
@@ -25,6 +28,8 @@ signal phase_changed(phase: int)
 signal spat(from: Vector3, directions: PackedVector3Array)
 ## It grabbed a player, or let them go.
 signal held_changed(fish: FishController, held: bool)
+## Its jaws snapped shut at `at`, biting `bit` players.
+signal chomped(at: Vector3, bit: int)
 
 enum Phase { CIRCLE, SPIT, FURY }
 
@@ -65,6 +70,30 @@ var _hold_left := 0.0
 var _drain_left := 0.0
 var _hold_hook := Callable()
 var _regrab_left := 0.0
+## Where the held player was caught, and how far they've been drawn in (0 to 1).
+var _catch_from := Vector3.ZERO
+var _catch_t := 1.0
+## Its chomp: how far its jaw is open (-1 snapped shut, 0 at rest, 1 gaping),
+## its wind-up and snap (s left), the wait for the next, and the counts.
+var jaw := 0.0
+var chomp_count := 0
+var chomp_hits := 0
+var _chomp_wind := 0.0
+var _snap_left := 0.0
+var _chomp_cool := 1.5
+var _puppet_jaw := 0
+## The King's jaw hinge (rest y, z) and the skin it's on.
+var _jaw_hinge := Vector2.ZERO
+var _jaw_skin: ShaderMaterial
+## The coil (the King in fury): round where it caught its prey, how far
+## wrapped (0 to 1) and how tight (0 to 1), the pose it caught them in, and
+## the damage friends have done it since (prying it loose).
+var _coil_center := Vector3.ZERO
+var _coil_angle := 0.0
+var _coil_wrap := 0.0
+var _coil_tight := 0.0
+var _coil_from := PackedVector3Array()
+var _coil_hurt := 0.0
 
 
 func _ready() -> void:
@@ -129,9 +158,79 @@ func mouth_point() -> Vector3:
 	return rig.place(Vector3(0.0, -settings.leviathan_girth * 0.3, 0.5))
 
 
-## Whether it grabs players who touch its mouth while charging (the King doesn't).
+## Whether it grabs players who touch its mouth while charging (the King: in
+## fury, to coil round them).
 func grabs() -> bool:
+	return coils() and phase == Phase.FURY
+
+
+## Whether it chomps, and whether it coils round what it grabs (both the King's).
+func chomps() -> bool:
+	return net_kind() == "boss"
+
+
+func coils() -> bool:
+	return net_kind() == "boss"
+
+
+## Where a held player is kept (its mouth; the King's coil: inside it).
+func hold_point() -> Vector3:
+	return _coil_center if coils() else mouth_point()
+
+
+## Whether a player it holds is out of sight (swallowed).
+func hides_held() -> bool:
 	return false
+
+
+## What it's doing to the player it holds, for the HUD ("COILED", "SWALLOWED").
+func hold_verb() -> String:
+	return "COILED" if coils() else "HELD"
+
+
+## How much of the hold is left (1 just caught, 0 it lets go).
+func hold_share_left() -> float:
+	return clampf(_hold_left / maxf(settings.final_hold_time, 0.01), 0.0, 1.0) if held else 0.0
+
+
+## How hard its hold drains now (times final_hold_damage).
+func hold_drain_scale() -> float:
+	return lerpf(1.0, settings.coil_squeeze, _coil_tight) if coils() else 1.0
+
+
+## A held player strode (one of final_hold_strides toward getting free).
+func _held_strode() -> void:
+	if coils():
+		_coil_tight = maxf(_coil_tight - settings.coil_loosen, 0.0)
+
+
+## It just caught `fish` (the look each boss gives it).
+func _caught(fish: FishController) -> void:
+	if coils():
+		_coil_center = fish.global_position
+		var off := Vector3(global_position.x - _coil_center.x, 0.0, global_position.z - _coil_center.z)
+		if off.length_squared() < 0.01:
+			off = -Vector3(velocity.x, 0.0, velocity.z)
+		_coil_angle = atan2(off.z, off.x)
+		_coil_wrap = 0.0
+		_coil_tight = 0.0
+		_coil_hurt = 0.0
+		_coil_from = rig.points.duplicate()
+		_trail.clear()
+
+
+## It's letting `fish` go.
+func _let_go(_fish: FishController) -> void:
+	pass
+
+
+## How hard a held player is thrown clear when let go.
+func release_push(fish: FishController) -> Vector3:
+	var away := fish.global_position - global_position
+	if coils():
+		away = fish.global_position - mouth_point()
+		away.y = 0.0
+	return away.normalized() * 18.0 + Vector3.UP * 4.0
 
 
 ## Its own extra moves each tick (the host's), with its target (null: none).
@@ -196,27 +295,33 @@ func _build_look() -> void:
 		mesh.tube(path, func(s: float) -> float: return lerpf(0.16, 0.08, s) * k, 7, BossMesh.FILAMENT, Vector2(0.05, 0.8))
 		var tip := path[path.size() - 1]
 		mesh.blob(tip + Vector3(0.0, -0.7 * k, 0.3 * k), Vector3(0.14, 0.95, 0.5) * k, Basis(Vector3.RIGHT, 0.3), 8, 12, BossMesh.FILAMENT)
-	# The lower jaw, hanging open, needle teeth along both jaws.
+	# The lower jaw, hanging open on its hinge (it gapes and snaps: the chomp),
+	# needle teeth along both jaws.
 	var jaw_from := -1.0 * k
 	var jaw_to := 4.4 * k
 	var jaw := func(along: float) -> Vector4:
 		var grow := pow(sin(minf(along * 1.5, 1.0) * PI * 0.5), 0.6)
 		var drop := lerpf(-deep * 0.55 - 2.2 * k, -deep * 0.32, along)
 		return Vector4(1.15 * k * grow, 0.42 * k * grow, drop, 1.8)
+	_jaw_hinge = Vector2(-deep * 0.32, jaw_to)
+	mesh.hinge = 1.0
 	mesh.loft(jaw_from, jaw_to, jaw, 24, 16, BossMesh.INSIDE)
 	for side: float in [-1.0, 1.0]:
+		mesh.hinge = 1.0
 		for n in 13:
 			var t := lerpf(0.08, 0.75, n / 12.0)
 			var slice: Vector4 = jaw.call(t)
 			var z := lerpf(jaw_from, jaw_to, t)
 			mesh.tooth(Vector3(side * slice.x * 0.75, slice.z + slice.y * 0.75, z), Vector3(-side * 0.12, 1.0, 0.2).normalized() * lerpf(0.75, 0.4, t) * k,
 					0.1 * k, Vector3(0.0, 0.0, 0.35))
+		mesh.hinge = 0.0
 		for n in 11:
 			var z := lerpf(0.2, 3.4, n / 10.0) * k
 			var slice: Vector4 = profile.call(z / length)
 			mesh.tooth(Vector3(side * slice.x * 0.8, slice.z - slice.y * 0.72, z), Vector3(side * 0.05, -1.0, 0.15).normalized() * lerpf(0.7, 0.35, n / 10.0) * k,
 					0.09 * k, Vector3(0.0, 0.0, 0.3))
 	var skin := _spine_material(SKIN)
+	_jaw_skin = skin
 	skin.set_shader_parameter("girth", deep)
 	var eye_z := 3.3 * k
 	var eye_slice: Vector4 = profile.call(eye_z / length)
@@ -330,6 +435,13 @@ func speed() -> float:
 
 func take(amount: float, by: FishController, source: String) -> void:
 	super(amount, by, source)
+	if held and coils() and by != held and not puppet:
+		# A friend's hits pry the coil loose: coil_loosen per 1% of its hp.
+		_coil_hurt += amount
+		var step := max_hp * 0.01
+		while _coil_hurt >= step and step > 0.0:
+			_coil_hurt -= step
+			_coil_tight = maxf(_coil_tight - settings.coil_loosen, 0.0)
 	var now := Phase.CIRCLE
 	if share() <= 1.0 / 3.0:
 		now = Phase.FURY
@@ -344,6 +456,12 @@ func _move(delta: float) -> void:
 	if not enraged and settings.leviathan_enrage > 0.0 and age >= settings.leviathan_enrage:
 		_enrage_now()
 	var prey := target()
+	if held and coils():
+		_coil(delta)
+		_update_hold(delta)
+		_update_bolts(delta)
+		_glow_now()
+		return
 	var middle := run.centre
 	if prey:
 		middle = prey.global_position
@@ -388,6 +506,8 @@ func _move(delta: float) -> void:
 			_bolt_left = settings.leviathan_bolt_every / (settings.enrage_scale if enraged else 1.0)
 			_spit(prey.global_position)
 	_special(delta, prey)
+	if chomps():
+		_update_chomp(delta, prey)
 	_update_hold(delta)
 	_update_bolts(delta)
 	_pose()
@@ -432,6 +552,10 @@ func _glow_now() -> void:
 		material.set_shader_parameter("flash", flash)
 		material.set_shader_parameter("warn", pulse)
 		material.set_shader_parameter("rage", 1.0 if enraged else 0.0)
+	if _jaw_skin:
+		# Gaping drops the jaw a long way on its hinge; snapped, it shuts up tight.
+		var angle := jaw * 0.55 if jaw > 0.0 else jaw * 0.34
+		_jaw_skin.set_shader_parameter("hinge", Vector3(_jaw_hinge.x, _jaw_hinge.y, angle))
 
 
 func _enrage_now() -> void:
@@ -439,13 +563,16 @@ func _enrage_now() -> void:
 	enraged_now.emit()
 
 
-## Its phase, plus 8 while it winds up a dive (subclasses add more above 15).
+## Its phase, plus 8 while it winds up a dive, 16 while it winds up a chomp
+## and 32 while it snaps (subclasses that don't chomp add more above 15).
 func _net_mode() -> int:
-	return phase + (8 if _dive_warn > 0.0 else 0)
+	return phase + (8 if _dive_warn > 0.0 else 0) + (16 if _chomp_wind > 0.0 else 0) + (32 if _snap_left > 0.0 else 0)
 
 
 func _set_net_mode(net_mode: int) -> void:
 	_puppet_warn = (net_mode & 8) != 0
+	if chomps():
+		_puppet_jaw = 1 if (net_mode & 16) != 0 else (-1 if (net_mode & 32) != 0 else 0)
 	var now := net_mode & 7
 	if now != phase:
 		phase = now as Phase
@@ -457,8 +584,101 @@ func _place_body() -> void:
 
 
 func _puppet_update(delta: float) -> void:
+	if chomps():
+		jaw = move_toward(jaw, float(_puppet_jaw), delta * (14.0 if _puppet_jaw < 0 else 2.5))
 	_update_bolts(delta)
 	_glow_now()
+
+
+# --- The chomp (the King) -----------------------------------------------------
+
+## Its chomp each tick: a player ahead of its mouth and in range starts one;
+## its jaw gapes over king_chomp_wind, then snaps shut, biting.
+func _update_chomp(delta: float, prey: FishController) -> void:
+	_chomp_cool -= delta
+	if _snap_left > 0.0:
+		_snap_left -= delta
+		jaw = move_toward(jaw, -1.0, delta * 14.0)
+	elif _chomp_wind > 0.0:
+		_chomp_wind -= delta
+		jaw = move_toward(jaw, 1.0, delta * 1.3 / maxf(settings.king_chomp_wind, 0.05))
+		if _chomp_wind <= 0.0:
+			_snap(settings.king_chomp_reach, settings.king_chomp_damage)
+	else:
+		jaw = move_toward(jaw, 0.0, delta * 2.5)
+		if held == null and prey and _chomp_cool <= 0.0 and settings.king_chomp_range > 0.0 and _ahead(prey, settings.king_chomp_range):
+			_chomp_wind = settings.king_chomp_wind
+
+
+## Whether `fish` is within `reach` m of its mouth, in front of it.
+func _ahead(fish: FishController, reach: float) -> bool:
+	var off := fish.global_position - mouth_point()
+	var forward := -rig.frame_at(0.0).basis.z
+	return off.length() <= reach and off.dot(forward) > -off.length() * 0.2
+
+
+## Its jaws snap shut: everyone within `reach` m of its mouth is bitten.
+func _snap(reach: float, damage: float) -> void:
+	_snap_left = 0.3
+	_chomp_cool = settings.king_chomp_every
+	chomp_count += 1
+	var mouth := mouth_point()
+	var bit := 0
+	for fish in run.players:
+		if fish.puppet or not run.is_up(fish) or fish == held:
+			continue
+		if fish.global_position.distance_to(mouth) <= reach + UnnaturalRun.PLAYER_RADIUS:
+			run.hurt(fish, damage * settings.enemy_damage_scale * run.stage_damage(), -1, title.capitalize())
+			bit += 1
+	chomp_hits += bit
+	chomped.emit(mouth, bit)
+
+
+# --- The coil (the King, in fury) ---------------------------------------------
+
+## Coiled round its prey: its head circles them, its body a helix of up to
+## coil_loops turns round them, coil_radius tightening to coil_tight, eased in
+## from the pose it caught them in.
+func _coil(delta: float) -> void:
+	_coil_wrap = minf(_coil_wrap + delta / 0.7, 1.0)
+	_coil_tight = minf(_coil_tight + delta / maxf(settings.final_hold_time * 0.75, 0.1), 1.0)
+	var r := lerpf(settings.coil_radius, settings.coil_tight, _coil_tight) * (1.0 + (1.0 - _coil_wrap) * 0.5)
+	var length := body_length()
+	var loops := minf(settings.coil_loops, length * 0.85 / (TAU * r))
+	var pitch := settings.leviathan_girth * 1.75
+	var top := _coil_center.y + pitch * loops * 0.5
+	# It slides slowly round itself, squeezing.
+	_coil_angle += delta * speed() * 0.35 / r * _orbit
+	var at := func(d: float) -> Vector3:
+		var wound := clampf(d, 0.0, loops * TAU * r)
+		var a := _coil_angle - wound / r * _orbit
+		var p := _coil_center + Vector3(cos(a), 0.0, sin(a)) * r
+		p.y = top - pitch * wound / (TAU * r)
+		if d > wound or d < 0.0:
+			# Past the coil (or ahead of its head), straight on along the turn.
+			var back := Vector3(-sin(a), 0.0, cos(a)) * -_orbit
+			p += back * (d - wound)
+		return p
+	var head: Vector3 = at.call(0.0)
+	var ahead: Vector3 = at.call(-1.0)
+	velocity = (ahead - head).normalized() * speed() * 0.35
+	global_position = head
+	face(ahead - head)
+	var trail := PackedVector3Array()
+	var d := length + 4.0
+	while d > 0.0:
+		trail.append(at.call(d))
+		d -= 1.0
+	_trail = trail
+	rig.follow_trail(head, _trail, (at.call(length + 1.0) - at.call(length)).normalized())
+	if _coil_from.size() == rig.points.size() and _coil_wrap < 1.0:
+		var blend := smoothstep(0.0, 1.0, _coil_wrap)
+		for s in rig.points.size():
+			rig.points[s] = _coil_from[s].lerp(rig.points[s], blend)
+		rig._frames()
+	_pose_parts()
+	_pose_riders()
+	rig.apply()
 
 
 ## A fan of bolts at `at`.
@@ -520,8 +740,14 @@ func hold(fish: FishController) -> void:
 	hold_strides = 0
 	_hold_left = settings.final_hold_time
 	_drain_left = 0.4
-	_hold_hook = func(_timing: float, _flow: float) -> void: hold_strides += 1
+	_catch_from = fish.global_position
+	_catch_t = 0.0 if settings.grab_catch_time > 0.0 else 1.0
+	_chomp_wind = 0.0
+	_hold_hook = func(_timing: float, _flow: float) -> void:
+		hold_strides += 1
+		_held_strode()
 	fish.strode.connect(_hold_hook)
+	_caught(fish)
 	held_changed.emit(fish, true)
 
 
@@ -535,8 +761,8 @@ func release() -> void:
 	if is_instance_valid(fish):
 		if fish.strode.is_connected(_hold_hook):
 			fish.strode.disconnect(_hold_hook)
-		var away := (fish.global_position - global_position).normalized()
-		fish.apply_push(away * 18.0 + Vector3.UP * 4.0)
+		_let_go(fish)
+		fish.apply_push(release_push(fish))
 		var health := run.health_of(fish)
 		if health:
 			health.shield(1.0)
@@ -557,7 +783,9 @@ func _update_hold(delta: float) -> void:
 		release()
 		return
 	_hold_left -= delta
-	held.global_position = mouth_point()
+	_catch_t = minf(_catch_t + delta / maxf(settings.grab_catch_time, 0.01), 1.0)
+	var spot := hold_point()
+	held.global_position = _catch_from.lerp(spot, smoothstep(0.0, 1.0, _catch_t)) if _catch_t < 1.0 else spot
 	held.linear_velocity = velocity
 	var health := run.health_of(held)
 	if health:
@@ -567,7 +795,7 @@ func _update_hold(delta: float) -> void:
 		_drain_left = 0.75
 		if health:
 			health.iframes_left = 0.0
-		run.hurt(held, settings.final_hold_damage * settings.enemy_damage_scale * run.stage_damage(), -1, title.capitalize())
+		run.hurt(held, settings.final_hold_damage * hold_drain_scale() * settings.enemy_damage_scale * run.stage_damage(), -1, title.capitalize())
 	if hold_strides >= settings.final_hold_strides or _hold_left <= 0.0:
 		release()
 

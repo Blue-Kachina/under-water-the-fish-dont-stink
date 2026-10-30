@@ -10,6 +10,10 @@ extends BloodLeviathan
 ## - HOVER: it keeps angel_lash_reach x 1.6 m off its prey, leaning toward
 ##   where it's going, rising on each wingbeat (angel_beat s) and sinking
 ##   between, for angel_rest s;
+## - LOCK: as the clip's angel shadows its butterfly, it picks a player and
+##   holds itself angel_lock_gap x angel_lash_reach m off them, matching their
+##   every move and circling them (angel_orbit), a pale halo round them closing
+##   as it locks on; after angel_lock_time s locked on, its crown opens;
 ## - CROWN: it turns to face its prey and its head bursts open into six
 ##   tentacles over angel_crown s (angel_fury_crown in fury), pale and then
 ##   flushing orange, its lane showing (the wind-up players read);
@@ -20,7 +24,8 @@ extends BloodLeviathan
 ##   (D12: a timed stride dodges), and every zombie it catches is eaten (it
 ##   heals angel_eat_heal of its max hp each);
 ## - HELD: a caught player is held at its mouth in the wrapped crown (the
-##   Gulper's rules: drained, three strides break free), its body curled round.
+##   Gulper's rules: drained, three strides break free), its body curled round,
+##   turning them this way and that as the clip's angel turns its butterfly's shell.
 ## Hits on its head and gut (proxies 0 and 1) do angel_weak times the damage,
 ## angel_crown_weak times more while the crown's open. From two thirds (SPIT)
 ## it sheds angel_butterflies Sea Butterflies every leviathan_bolt_every x 2 s,
@@ -28,7 +33,7 @@ extends BloodLeviathan
 ## FURY it beats faster, its crown opens quicker, it lashes more and its
 ## lashes take turns between the two nearest players.
 
-enum State { HOVER, CROWN, FLURRY, HELD }
+enum State { HOVER, CROWN, FLURRY, HELD, LOCK }
 
 const BODY_SHADER := preload("res://shaders/boss_angel.gdshader")
 const ORGAN_SHADER := preload("res://shaders/boss_angel_organ.gdshader")
@@ -71,6 +76,17 @@ var _tentacles: Array[MeshInstance3D] = []
 var _tentacle_skins: Array[ShaderMaterial] = []
 var _organs: ShaderMaterial
 var _crown_light: OmniLight3D
+## Its lock-on: who, how long it's been locked on (s), how long it has been
+## trying, and the way round them it sits (rad); the halo round them.
+var lock_prey: FishController
+var locks := 0
+var _locked_for := 0.0
+## How far it is from where it means to sit off its prey (m; probes).
+var lock_miss := 0.0
+var _locking := 0.0
+var _lock_angle := 0.0
+var _halo: MeshInstance3D
+var _halo_skin: StandardMaterial3D
 
 
 ## What a flurry is after: a player, or a point (the butterflies it's feeding on).
@@ -126,6 +142,19 @@ func hold_reach() -> float:
 	return settings.angel_lash_reach
 
 
+func hold_verb() -> String:
+	return "CROWNED"
+
+
+## How locked on it is (0 to 1).
+func lock_progress() -> float:
+	if state == State.CROWN or state == State.FLURRY:
+		return 1.0
+	if state != State.LOCK:
+		return 0.0
+	return clampf(_locked_for / maxf(settings.angel_lock_time, 0.01), 0.0, 1.0) if not puppet else 0.6
+
+
 ## It grabs with its lashes, not by charging into you (BloodLeviathan._update_hold).
 func grabs() -> bool:
 	return false
@@ -146,6 +175,26 @@ func _ready() -> void:
 		var hook := func(_timing: float, _flow: float) -> void: _strode_at[fish] = age
 		fish.strode.connect(hook)
 		_hooks[fish] = hook
+	_halo = MeshInstance3D.new()
+	_halo.name = "LockHalo"
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.92
+	torus.outer_radius = 1.0
+	torus.rings = 48
+	torus.ring_segments = 6
+	_halo_skin = StandardMaterial3D.new()
+	_halo_skin.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_halo_skin.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_halo_skin.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_halo_skin.no_depth_test = true
+	_halo_skin.albedo_color = Color(1.0, 0.85, 0.7, 0.0)
+	torus.material = _halo_skin
+	_halo.mesh = torus
+	_halo.top_level = true
+	_halo.visible = false
+	_halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_halo.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	add_child(_halo)
 	_pose()
 
 
@@ -194,7 +243,46 @@ func _move(delta: float) -> void:
 			curl = lerpf(curl, 0.15, 1.0 - exp(-3.0 * delta))
 			tumble = lerpf(tumble, 0.0, 1.0 - exp(-4.0 * delta))
 			if _state_left <= 0.0 and prey:
-				_start_crown()
+				var pick := _pick_prey()
+				if pick.fish:
+					_start_lock(pick.fish)
+				else:
+					_start_crown(pick)
+		State.LOCK:
+			# Shadowing its prey: matching their every move from just off them,
+			# circling slowly, as the clip's angel shadows its butterfly.
+			if not is_instance_valid(lock_prey) or not run.is_up(lock_prey):
+				_rest()
+			else:
+				var gap := settings.angel_lash_reach * settings.angel_lock_gap
+				_lock_angle += settings.angel_orbit * delta * _orbit
+				var slot := lock_prey.global_position + Vector3(cos(_lock_angle), 0.0, sin(_lock_angle)) * gap + Vector3.UP * height() * 0.04
+				# Kept in the arena (by the wall, it sits on the inside of them).
+				var flat := Vector2(slot.x - run.centre.x, slot.z - run.centre.z)
+				var reach := settings.arena_radius - 6.0
+				if flat.length() > reach:
+					flat = flat.normalized() * reach
+					slot = Vector3(run.centre.x + flat.x, slot.y, run.centre.z + flat.y)
+				slot.y = maxf(slot.y, run.centre.y + settings.arena_floor + 3.0)
+				var miss := slot - global_position
+				lock_miss = miss.length()
+				wanted = lock_prey.swim_velocity() + miss * 2.4
+				wanted = wanted.limit_length(speed() * 3.0)
+				var to := lock_prey.global_position - global_position
+				_face_toward(Vector3(to.x, 0.0, to.z), delta, 5.0)
+				crown_open = move_toward(crown_open, 0.12, delta)  # its crown stirring
+				flush = move_toward(flush, 0.15, delta)
+				curl = lerpf(curl, 0.35, 1.0 - exp(-3.0 * delta))
+				tumble = lerpf(tumble, 0.0, 1.0 - exp(-4.0 * delta))
+				_locking += delta
+				if miss.length() < gap * 0.6:
+					_locked_for += delta
+				else:
+					_locked_for = maxf(_locked_for - delta * 0.5, 0.0)
+				if _locked_for >= settings.angel_lock_time or _locking >= settings.angel_lock_time * 3.0 + 2.0:
+					var pick := FlurryTarget.new()
+					pick.fish = lock_prey
+					_start_crown(pick)
 		State.CROWN:
 			var to := _flurry_prey.at() - global_position
 			_face_toward(Vector3(to.x, 0.0, to.z), delta, 6.0)
@@ -234,12 +322,21 @@ func _move(delta: float) -> void:
 				curl = lerpf(curl, 2.3, 1.0 - exp(-4.0 * delta))
 				crown_open = 1.0
 				flush = 1.0
-				tumble = lerpf(tumble, 0.0, 1.0 - exp(-3.0 * delta))
+				# Turning its prey this way and that in its crown.
+				tumble = lerpf(tumble, sin(age * 2.2) * 0.45, 1.0 - exp(-3.0 * delta))
 	# A wingbeat lifts it; between beats it sinks.
 	var stroke := fposmod(_beat_clock, 1.0)
-	var lift := (pow(maxf(sin(stroke * TAU), 0.0), 2.0) - 0.32) * speed() * 0.45
+	var lift := (pow(maxf(sin(stroke * TAU), 0.0), 2.0) - 0.32) * speed() * (0.2 if state == State.LOCK else 0.45)
 	wanted.y += lift
-	steer(wanted, 2.5 if state != State.FLURRY else 5.0, 22.0 if state == State.FLURRY else 9.0, delta)
+	var turn := 2.5
+	var accel := 9.0
+	if state == State.FLURRY:
+		turn = 5.0
+		accel = 22.0
+	elif state == State.LOCK:
+		turn = 8.0
+		accel = 60.0
+	steer(wanted, turn, accel, delta)
 	global_position += velocity * delta
 	var going := Vector3(velocity.x, 0.0, velocity.z).length()
 	lean = lerpf(lean, clampf(going / maxf(speed(), 0.1), 0.0, 1.0) * deg_to_rad(40.0), 1.0 - exp(-3.0 * delta))
@@ -258,10 +355,21 @@ func _crown_time() -> float:
 	return settings.angel_fury_crown if phase == Phase.FURY else settings.angel_crown
 
 
-func _start_crown() -> void:
+## Locks on to `fish`: it shadows them until it's locked on, then its crown opens.
+func _start_lock(fish: FishController) -> void:
+	state = State.LOCK
+	lock_prey = fish
+	locks += 1
+	_locked_for = 0.0
+	_locking = 0.0
+	var off := global_position - fish.global_position
+	_lock_angle = atan2(off.z, off.x)
+
+
+func _start_crown(pick: FlurryTarget = null) -> void:
 	state = State.CROWN
 	_state_left = _crown_time()
-	_flurry_prey = _pick_prey()
+	_flurry_prey = pick if pick else _pick_prey()
 
 
 func _start_flurry() -> void:
@@ -275,6 +383,8 @@ func _start_flurry() -> void:
 
 func _rest() -> void:
 	state = State.HOVER
+	lock_prey = null
+	_orbit = -_orbit
 	_state_left = settings.angel_rest / (settings.enrage_scale if enraged else 1.0)
 	_lash_times.clear()
 
@@ -380,8 +490,16 @@ func winding_up() -> bool:
 	return state == State.CROWN
 
 
-## The crown's lane toward its prey while it opens.
+## The crown's lane toward its prey while it opens; locking on, a thin tether
+## to them filling as it locks.
 func telegraph() -> Dictionary:
+	if state == State.LOCK:
+		var prey := lock_prey if is_instance_valid(lock_prey) else target()
+		if prey == null:
+			return {}
+		var off := prey.global_position - global_position
+		return {"from": global_position, "dir": off.normalized() if off.length_squared() > 0.01 else facing,
+				"length": off.length(), "width": 0.7, "progress": lock_progress()}
 	if state != State.CROWN or _flurry_prey == null:
 		return {}
 	var to := _flurry_prey.at() - global_position
@@ -405,6 +523,30 @@ func _glow_now() -> void:
 		skin.set_shader_parameter("flash", flash)
 	if is_instance_valid(_crown_light):
 		_crown_light.light_energy = 1.2 + crown_open * 3.0 + _lash_glow * 2.0
+	_pose_halo()
+
+
+## The halo round the player it's locking on to: wide and faint at first,
+## closing in and brightening as it locks, flaring orange as its crown opens.
+func _pose_halo() -> void:
+	if not is_instance_valid(_halo):
+		return
+	var prey: FishController = null
+	if state == State.LOCK:
+		prey = lock_prey if is_instance_valid(lock_prey) else (target() if puppet else null)
+	elif state == State.CROWN and _flurry_prey and is_instance_valid(_flurry_prey.fish):
+		prey = _flurry_prey.fish
+	elif state == State.CROWN and puppet:
+		prey = target()
+	_halo.visible = prey != null and not dying
+	if not _halo.visible:
+		return
+	var lock := lock_progress()
+	var size := lerpf(7.0, 2.6, smoothstep(0.0, 1.0, lock)) * (1.0 + 0.06 * sin(age * 8.0))
+	_halo.global_transform = Transform3D(Basis.from_scale(Vector3.ONE * size), prey.global_position)
+	var color := Color(1.0, 0.88, 0.75).lerp(Color(1.0, 0.45, 0.1), crown_open if state == State.CROWN else 0.0)
+	color.a = lerpf(0.25, 0.85, lock) * (0.75 + 0.25 * sin(age * (10.0 if state == State.CROWN else 5.0)))
+	_halo_skin.albedo_color = color
 
 
 ## Its state online: the phase, plus its state above 15 (a puppet opens its
@@ -432,6 +574,9 @@ func _puppet_update(delta: float) -> void:
 		State.HELD:
 			target_open = 1.0
 			target_curl = 2.3
+		State.LOCK:
+			target_open = 0.12
+			target_curl = 0.35
 	if state != State.FLURRY:
 		tumble = lerpf(tumble, 0.0, 1.0 - exp(-3.0 * delta))
 	crown_open = move_toward(crown_open, target_open, delta * 1.5)

@@ -29,6 +29,10 @@ uniform float dissolve = 0.0;
 uniform float flash = 0.0;
 uniform float warn = 0.0;
 uniform float rage = 0.0;
+// The disc flaring wide (1) to lunge, or clamped tight (negative) on its prey,
+// over its first disc_len m.
+uniform float disc = 0.0;
+uniform float disc_len = 6.0;
 
 varying vec3 rest;
 varying vec2 ring;
@@ -40,6 +44,10 @@ void vertex() {
 	ring = COLOR.rg * 2.0 - 1.0;
 	part = UV2.x;
 	along = COLOR.b;
+	if (VERTEX.z < disc_len) {
+		float m = 1.0 - max(VERTEX.z, 0.0) / max(disc_len, 0.01);
+		VERTEX.xy *= 1.0 + disc * 0.4 * m * m;
+	}
 	spine_bend(VERTEX, NORMAL, UV2.y);
 }
 

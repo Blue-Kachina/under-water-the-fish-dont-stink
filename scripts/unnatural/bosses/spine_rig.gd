@@ -16,6 +16,9 @@ var points := PackedVector3Array()
 var rights := PackedVector3Array()
 var ups := PackedVector3Array()
 var materials: Array[ShaderMaterial] = []
+## A roll round its length (rad), the whole body turning with it (the Lamprey
+## Queen corkscrewing on her prey).
+var twist := 0.0
 var instances: Array[GeometryInstance3D] = []
 
 
@@ -109,9 +112,12 @@ func _frames() -> void:
 			guess = Vector3.FORWARD - back * back.z
 		var right := guess.normalized().cross(back).normalized()
 		var up := back.cross(right).normalized()
+		last_up = up
+		if twist != 0.0:
+			right = right.rotated(back, twist)
+			up = up.rotated(back, twist)
 		rights[s] = right
 		ups[s] = up
-		last_up = up
 
 
 ## The frame `d` m back from the head: its basis's x right, y up, z tailward.
