@@ -118,7 +118,7 @@ func _run() -> void:
 
 	# The lingering ones: haze clouds, a lure, the jellies and the coil.
 	var held := run.powerups_of(fish)
-	for id: String in ["attack_purple_haze", "anglerfish_lure", "attack_jellyfish_halo", "attack_leviathans_coil"]:
+	for id: String in ["attack_purple_haze", "anglerfish_lure", "attack_jellyfish_halo", "leviathans_coil"]:
 		held.add(id)
 	await _frames(5)
 	var haze := held.weapon("attack_purple_haze") as PurpleHaze
@@ -128,7 +128,7 @@ func _run() -> void:
 	var lure_powerup: AnglerfishLure = held.held["anglerfish_lure"]
 	lure_powerup.drop()
 	lure_powerup.lures[-1].global_position = at(4.0, 1.0, 10.0)
-	var coil := held.weapon("attack_leviathans_coil") as LeviathansCoil
+	var coil := held.weapon("leviathans_coil") as LeviathansCoil
 	var trail := PackedVector3Array([fish.global_position])
 	for k in coil.count():
 		trail.append(fish.global_position + camera.global_basis.x * (1.5 + k * 1.2) + Vector3.UP * sin(k * 0.8) * 1.2 + camera.global_basis.z * k * 0.4)
@@ -136,7 +136,7 @@ func _run() -> void:
 	coil._draw()
 	await _seconds(0.6)
 	await _shot("fx_lingering")
-	for id: String in ["attack_purple_haze", "anglerfish_lure", "attack_leviathans_coil"]:
+	for id: String in ["attack_purple_haze", "anglerfish_lure", "leviathans_coil"]:
 		held.remove_stack(id)
 	await _frames(3)
 

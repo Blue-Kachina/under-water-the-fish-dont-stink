@@ -86,7 +86,8 @@ func _ready() -> void:
 	run.drop_taken.connect(_on_drop_taken)
 	run.pearl_collected.connect(_on_pearl_collected)
 	run.chest_buried.connect(func(chest: TreasureChest) -> void: Sfx.play_at("unnatural/chest_buried", chest.global_position))
-	run.chest_opened.connect(func(chest: TreasureChest, _fish: FishController) -> void: Sfx.play_at("unnatural/chest_open", chest.global_position))
+	run.chest_opened.connect(func(chest: TreasureChest, _fish: FishController) -> void:
+		Sfx.play_at("unnatural/chest_boss_item" if chest.holds_boss_item() else "unnatural/chest_open", chest.global_position))
 	run.powerup_lost.connect(func(_fish: FishController, _id: String) -> void: Sfx.play("unnatural/powerup_lost"))
 	run.stage_warned.connect(_on_stage_warned)
 	run.stage_event.connect(_on_stage_event)

@@ -102,6 +102,8 @@ func _run() -> void:
 	await _ticks(2)
 	check(log_of.ending.get("outcome", "") == "down", "going down ends the log (%s)" % log_of.ending.get("outcome", "-"))
 	check(str(log_of.ending.get("cause", "")).begins_with("elite "), "with what did it (%s)" % log_of.ending.get("cause", "-"))
+	var taken_by: Dictionary = log_of.ending.get("taken_by", {})
+	check(float(taken_by.get(log_of.ending.get("cause", ""), 0.0)) > 0.0, "damage taken by what hurt (%s)" % JSON.stringify(taken_by))
 	check(log_of.saved_path != "" and FileAccess.file_exists(log_of.saved_path), "saved to %s" % log_of.saved_path)
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(log_of.saved_path)) if log_of.saved_path != "" else null
 	check(parsed is Dictionary and (parsed.samples as Array).size() >= 1 and parsed.ending.outcome == "down", "the file holds the samples and the ending")

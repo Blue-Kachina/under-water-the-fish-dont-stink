@@ -59,7 +59,19 @@ const INFO := {
 	"megalodon_tooth": ["Megalodon Tooth", Color(0.95, 0.92, 0.85), "MT", "Crits finish off zombies under 15% HP (not bosses)", Rarity.Tier.LEGENDARY],
 	"moon_pearl": ["Moon Pearl", Color(0.85, 0.88, 1.0), "MP", "Level-Up Picks +1", Rarity.Tier.LEGENDARY],
 	"abyssal_engine": ["Abyssal Engine", Color(0.5, 0.25, 0.75), "AE", "Quantity +1\nSize +15%", Rarity.Tier.LEGENDARY],
-	"attack_leviathans_coil": ["Leviathan's Coil", Color(0.85, 0.15, 0.2), "LC", "A trail of coils behind you hurts whatever they touch.", Rarity.Tier.BOSS],
+	# Boss items (planning_bosses_and_survival.md §2): each final boss's chest holds its own.
+	"leviathans_coil": ["Leviathan's Coil", Color(0.85, 0.15, 0.2), "LC", "A trail of coils behind you hurts whatever they touch
+More: more coils, harder, wider, faster", Rarity.Tier.BOSS],
+	"gulpers_maw": ["Gulper's Maw", Color(0.55, 0.25, 0.75), "GM", "Every few seconds a maw ahead of you sucks zombies in
+Then spits them out in a volley that hurts what it hits", Rarity.Tier.BOSS],
+	"hagfish_brood": ["Hagfish Brood", Color(0.75, 0.55, 0.6), "HB", "Hagfish on tethers bite zombies and knot them still
+Let go, they leave them slimed and slow", Rarity.Tier.BOSS],
+	"queens_disc": ["Queen's Disc", Color(0.85, 0.3, 0.35), "QD", "A lamprey latches onto the toughest zombie near you and drains it
+Each drain heals you a little", Rarity.Tier.BOSS],
+	"angels_crown": ["Angel's Crown", Color(0.95, 0.85, 0.55), "AC", "Every few seconds a crown of tentacles lashes the zombies ahead
+Each one it kills heals you", Rarity.Tier.BOSS],
+	"drowned_jaws": ["Drowned Jaws", Color(0.6, 0.75, 0.8), "DJ", "Every few seconds your next attack is a chomp
+One huge bite on the zombie ahead", Rarity.Tier.LEGENDARY],
 	"attack_sting": ["Anemone Sting", Color(1.0, 0.55, 0.3), "ST", "A stinging pulse all round you hits everything inside.", Rarity.Tier.COMMON],
 	"attack_bite": ["Ghost Bite", Color(0.7, 0.85, 1.0), "GB", "Huge spectral jaws snap shut on the zombies ahead.", Rarity.Tier.COMMON],
 	"attack_lash": ["Shock Lash", Color(0.5, 0.8, 1.0), "SL", "Your tail whips the nearest zombie, and the shock arcs on.", Rarity.Tier.COMMON],
@@ -143,6 +155,18 @@ static func create(powerup_id: String) -> Powerup:
 			made = PoseidonsTrident.new()
 		"megalodon_tooth", "moon_pearl", "abyssal_engine":
 			made = LegendaryPassive.new()
+		"leviathans_coil":
+			made = LeviathansCoilItem.new()
+		"gulpers_maw":
+			made = GulpersMaw.new()
+		"hagfish_brood":
+			made = HagfishBrood.new()
+		"queens_disc":
+			made = QueensDisc.new()
+		"angels_crown":
+			made = AngelsCrown.new()
+		"drowned_jaws":
+			made = DrownedJaws.new()
 		_:
 			made = Powerup.new()
 	made.id = powerup_id
@@ -157,10 +181,12 @@ static func ids() -> Array[String]:
 
 
 static func title(powerup_id: String) -> String:
+	powerup_id = current_id(powerup_id)
 	return INFO[powerup_id][0] if INFO.has(powerup_id) else powerup_id
 
 
 static func color(powerup_id: String) -> Color:
+	powerup_id = current_id(powerup_id)
 	return INFO[powerup_id][1] if INFO.has(powerup_id) else Color.WHITE
 
 
@@ -202,6 +228,43 @@ static func tier(powerup_id: String) -> int:
 	return INFO[powerup_id][4] if INFO.has(powerup_id) else Rarity.Tier.COMMON
 
 
+## Ids that were renamed, and what they are now (old run logs and presets):
+## the Coil was a boss weapon before it was a boss item.
+const RENAMED := {"attack_leviathans_coil": "leviathans_coil"}
+
+## Items only a boss's chest gives, never a chest's, shrine's or card's pick
+## (planning_bosses_and_survival.md §2): the boss tier, and the Drowned Shark's
+## legendary Drowned Jaws.
+const DROP_ONLY: Array[String] = ["drowned_jaws"]
+
+
+## `powerup_id` as it is now (a renamed one's new id).
+static func current_id(powerup_id: String) -> String:
+	return RENAMED.get(powerup_id, powerup_id)
+
+
+## The item beaten boss `boss` drops in its own chest: each final boss its
+## boss item, the Drowned Shark Drowned Jaws.
+static func boss_item_of(boss: Boss) -> String:
+	if boss is DrownedShark:
+		return "drowned_jaws"
+	if boss is GulperBoss:
+		return "gulpers_maw"
+	if boss is WhaleFallBoss:
+		return "hagfish_brood"
+	if boss is LampreyBoss:
+		return "queens_disc"
+	if boss is FallenAngelBoss:
+		return "angels_crown"
+	return "leviathans_coil"  # the King of Herrings (BloodLeviathan itself)
+
+
+## Whether `powerup_id` only ever comes from a boss's chest (a boss item, or
+## DROP_ONLY): never offered elsewhere, and outside the item limits.
+static func is_boss_drop(powerup_id: String) -> bool:
+	return tier(powerup_id) == Rarity.Tier.BOSS or powerup_id in DROP_ONLY
+
+
 ## Up to `count` different powerups for a chest of rarity `rolled`: its own
 ## first, then the tiers below it (nearest first), then above, each tier's in
 ## a random order. Items only: weapons come from level-up cards. `left_out`:
@@ -223,7 +286,7 @@ static func pick_for_chest(rng: RandomNumberGenerator, rolled: int, count: int, 
 static func pick_from_tier(rng: RandomNumberGenerator, wanted: int, count: int, left_out: Array = []) -> Array[String]:
 	var pool: Array[String] = []
 	for id in ids():
-		if tier(id) == wanted and not is_weapon(id) and id not in left_out:
+		if tier(id) == wanted and not is_weapon(id) and not is_boss_drop(id) and id not in left_out:
 			pool.append(id)
 	var picked: Array[String] = []
 	while not pool.is_empty() and picked.size() < count:
@@ -264,8 +327,8 @@ const STAT_ITEMS: Array[String] = ["barnacle_plating", "hermit_shell", "fizzy_so
 
 ## How fast `powerup_id`'s stacks flatten out (P4's stacking curves; Limits.stack_value).
 static func falloff_for(powerup_id: String, from: UnnaturalSettings) -> float:
-	if from == null or not from.limits or tier(powerup_id) == Rarity.Tier.CURSED or is_weapon(powerup_id):
-		return 0.0
+	if from == null or not from.limits or tier(powerup_id) == Rarity.Tier.CURSED or is_weapon(powerup_id) or is_boss_drop(powerup_id):
+		return 0.0  # a boss item's stacks are outside the limits: each adds in full
 	if powerup_id in STAT_ITEMS:
 		return from.stack_falloff_stats
 	if tier(powerup_id) == Rarity.Tier.LEGENDARY:

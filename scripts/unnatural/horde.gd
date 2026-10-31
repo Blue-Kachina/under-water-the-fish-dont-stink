@@ -79,8 +79,8 @@ const OVERLAY_SHADER := preload("res://shaders/zombie_overlay.gdshader")
 const GLINT_SHADER := preload("res://shaders/zombie_glint.gdshader")
 ## The eyes' quads: each this far either side of the middle (in eye sizes).
 const GLINT_APART := 1.6
-## The eyes grow with distance (1 + d / GLINT_GROW, d in m) so they stay a few pixels.
-const GLINT_GROW := 25.0
+## An elite's eyes are this much bigger.
+const GLINT_ELITE := 1.6
 ## Never more than this many steps in one physics tick (after a hitch).
 const MAX_STEPS := 4
 ## Each zombie picks its target again every this many steps (staggered).
@@ -327,6 +327,27 @@ func apply_murk(density: float) -> void:
 	glint_near = UnnaturalSettings.fog_reach(settings.glint_from, density)
 	glint_far = settings.glint_distance
 	far_reach = UnnaturalSettings.fog_reach(settings.murk_far, density) if settings.murk_far > 0.0 else -1.0
+
+
+## A pair of glint eyes' size (each eye's half-width, m) on a zombie `size` big
+## `gap` m from the camera: glint_size, grown with distance (glint_grow) so far
+## ones stay a pixel or two, and GLINT_ELITE times that on an elite.
+func glint_scale(size: float, gap: float, elite: bool) -> float:
+	var grow := 1.0 + gap / settings.glint_grow if settings.glint_grow > 0.0 else 1.0
+	return size * settings.glint_size * grow * (GLINT_ELITE if elite else 1.0)
+
+
+## A pair of glint eyes' brightness `gap` m from the camera (0: none): rising
+## through the hand-over band (eye_handoff m before glint_near, as the near eyes
+## fade), then dimming over the far glint_fade_far of the band out to glint_far.
+func glint_glow(gap: float) -> float:
+	if glint_far <= 0.0 or glint_near >= glint_far:
+		return 0.0
+	var start := maxf(glint_near - settings.eye_handoff, 0.0)
+	var rise := 1.0 if gap >= glint_near else smoothstep(start, maxf(glint_near, start + 0.01), gap)
+	var fade := (glint_far - glint_near) * settings.glint_fade_far
+	var dim := clampf((glint_far - gap) / 0.01, 0.0, 1.0) if fade <= 0.0 else 1.0 - smoothstep(glint_far - fade, glint_far, gap)
+	return settings.glint_strength * rise * dim
 
 
 ## Counts the zombies into the minimap's grid (cells about `cell` m) and
@@ -1088,9 +1109,17 @@ func _draw_horde(delta: float) -> void:
 		for look in _looks:
 			look.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_ice = move_toward(_ice, 1.0 if frozen_left > 0.0 else 0.0, delta * 3.0)
+	# The near eyes hand over to the glints over the eye_handoff m before glint_near.
+	var glinting := glint_far > 0.0 and glint_near < glint_far
+	var handoff_from := maxf(glint_near - settings.eye_handoff, 0.0) if glinting else 1e6
+	var handoff_to := maxf(glint_near, handoff_from + 0.01) if glinting else 1e6
 	for overlay in _overlays:
 		overlay.set_shader_parameter("rot", settings.rot)
 		overlay.set_shader_parameter("eye_glow", settings.eye_glow)
+		overlay.set_shader_parameter("head_glow", settings.head_glow)
+		overlay.set_shader_parameter("near_eye_strength", settings.near_eye_strength)
+		overlay.set_shader_parameter("eye_fade_from", handoff_from)
+		overlay.set_shader_parameter("eye_fade_to", handoff_to)
 		overlay.set_shader_parameter("frozen", _ice)
 	_fit_detail()
 	var step := 1.0 / maxf(settings.sim_rate, 1.0)
@@ -1109,12 +1138,9 @@ func _draw_horde(delta: float) -> void:
 	glint_used.resize(sets)
 	var frustum := settings.murk_frustum
 	var cull_squared := cull_distance * cull_distance
-	var glints := glint_far > 0.0 and glint_near < glint_far and views > 0
-	var glint_near_squared := glint_near * glint_near
+	var glints := glinting and views > 0
+	var glint_near_squared := handoff_from * handoff_from
 	var glint_far_squared := glint_far * glint_far
-	var glint_fade := maxf(glint_far * 0.25, 1.0)
-	var glint_size := settings.glint_size
-	var glint_strength := settings.glint_strength
 	var mid_squared := settings.lod_mid_distance * settings.lod_mid_distance
 	var far_squared := settings.lod_far_distance * settings.lod_far_distance
 	var warning := (0.6 + 0.4 * sin(_time * 30.0)) * settings.telegraph_glow
@@ -1163,7 +1189,7 @@ func _draw_horde(delta: float) -> void:
 				gap_squared = d_squared
 			if glints and state == State.ALIVE and gap_squared > glint_near_squared and gap_squared < glint_far_squared:
 				var gap := sqrt(gap_squared)
-				var glow := glint_strength * clampf((gap - glint_near) / 6.0, 0.0, 1.0) * clampf((glint_far - gap) / glint_fade, 0.0, 1.0)
+				var glow := glint_glow(gap)
 				if glow > 0.01:
 					var e := glint_used[s] * STRIDE
 					glint_used[s] += 1
@@ -1171,7 +1197,7 @@ func _draw_horde(delta: float) -> void:
 					if e + STRIDE > eyes.size():
 						eyes.resize(maxi(eyes.size() * 2, STRIDE * 256))
 						_glint_buffers[s] = eyes
-					var scale := size * glint_size * (1.0 + gap / GLINT_GROW) * (1.6 if _elite[i] == 1 else 1.0)
+					var scale := glint_scale(size, gap, _elite[i] == 1)
 					var head := at - _axis_z[i] * size * 0.45
 					eyes[e] = scale
 					eyes[e + 1] = 0.0
@@ -1347,6 +1373,7 @@ func _build_looks() -> void:
 		var overlay := ShaderMaterial.new()
 		overlay.shader = OVERLAY_SHADER
 		overlay.set_shader_parameter("rot_color", kinds[k].tint)
+		overlay.set_shader_parameter("eye_spot", SchoolLook.eye_spot(kinds[k].look_key()))
 		_overlays.append(overlay)
 	_glint_material.shader = GLINT_SHADER
 	_add_set()

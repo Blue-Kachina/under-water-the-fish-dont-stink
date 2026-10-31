@@ -19,6 +19,11 @@ const NEAR := 14.0
 const WHITE := Color(1.0, 1.0, 1.0)
 const CRIT := Color(1.0, 0.78, 0.18)
 const TEAM_ALPHA := 0.55
+## Big numbers (ChompKit, chomp_number_scale times bigger): a player's chomp on a
+## zombie (gold, as a crit), and a chomp's bite on this view's player (red).
+const CHOMP := 2
+const BITTEN := 3
+const BITTEN_COLOR := Color(1.0, 0.25, 0.22)
 
 var hud: UnnaturalHud
 ## Numbers started since the run began (merges don't count), and drawn last frame.
@@ -88,7 +93,9 @@ func _on_hit(index: int, amount: float, by: FishController, _source: String, _ch
 	if amount <= 0.0:
 		return
 	var k: int = _open.get(index, -1)
-	if k >= 0 and _age[k] < settings.damage_number_merge and _zombie[k] == index and (_own[k] == 1) == own:
+	if ChompKit.big_hit:
+		k = -1  # a chomp (Drowned Jaws) gets a number of its own, in the big style
+	elif k >= 0 and _age[k] < settings.damage_number_merge and _zombie[k] == index and (_own[k] == 1) == own:
 		_amount[k] += amount
 		_crit[k] = 1 if crit or _crit[k] == 1 else 0
 		_bump[k] = _age[k]
@@ -115,11 +122,41 @@ func _on_hit(index: int, amount: float, by: FishController, _source: String, _ch
 	_zombie[k] = index
 	_at[k] = horde.enemy_position(index) + Vector3.UP * (minf(radius, 4.0) + 0.2) + jitter
 	_amount[k] = amount
-	_crit[k] = 1 if crit else 0
+	_crit[k] = CHOMP if ChompKit.big_hit else (1 if crit else 0)
 	_own[k] = 1 if own else 0
 	_age[k] = 0.0
 	_bump[k] = 0.0
-	_open[index] = k
+	if not ChompKit.big_hit:
+		_open[index] = k
+	made += 1
+
+
+## A big red number at `at` (ChompKit: a chomp's bite on this view's player).
+func add_big(at: Vector3, amount: float) -> void:
+	var settings := hud.run.settings
+	if not settings.damage_numbers or amount <= 0.0:
+		return
+	var room := maxi(settings.damage_numbers_max, 1)
+	if _age.size() != room:
+		_fit(room)
+	var k := 0
+	var oldest := -1.0
+	for n in _age.size():
+		if _age[n] == INF:
+			k = n
+			break
+		if _age[n] > oldest:
+			oldest = _age[n]
+			k = n
+	if _age[k] < INF and _open.get(_zombie[k], -1) == k:
+		_open.erase(_zombie[k])
+	_zombie[k] = -1
+	_at[k] = at
+	_amount[k] = amount
+	_crit[k] = BITTEN
+	_own[k] = 1
+	_age[k] = 0.0
+	_bump[k] = 0.0
 	made += 1
 
 
@@ -174,13 +211,14 @@ func _draw() -> void:
 		if not Rect2(Vector2.ZERO, size).grow(40.0).has_point(spot):
 			continue
 		var crit := _crit[n] == 1
-		var pop := 1.0 + 0.35 * (1.0 - clampf((age - _bump[n]) / POP, 0.0, 1.0))
+		var big := _crit[n] >= CHOMP
+		var pop := 1.0 + (0.6 if big else 0.35) * (1.0 - clampf((age - _bump[n]) / POP, 0.0, 1.0))
 		# Smaller further off (as far as half size), a little bigger for big hits.
 		var near := clampf(NEAR / maxf(camera.global_position.distance_to(at), 0.1), 0.5, 1.2)
 		var px := settings.damage_number_size * k * pop * near * (settings.crit_number_scale if crit else 1.0) \
-				* (1.0 + 0.08 * log(maxf(_amount[n], 1.0)) / log(10.0))
+				* (settings.chomp_number_scale if big else 1.0) * (1.0 + 0.08 * log(maxf(_amount[n], 1.0)) / log(10.0))
 		var fade := 1.0 - smoothstep(0.6, 1.0, age / life)
-		var color := CRIT if crit else WHITE
+		var color := CRIT if crit or _crit[n] == CHOMP else (BITTEN_COLOR if _crit[n] == BITTEN else WHITE)
 		color.a = fade * (1.0 if _own[n] == 1 else TEAM_ALPHA)
 		var text := _text(_amount[n]) + ("!" if crit else "")
 		var font_size := maxi(roundi(px), 6)

@@ -15,6 +15,9 @@ extends Node
 ## --no-scenery: no reef, ruins, edge or shrines, for comparing frame times.
 ## --kinds=sardine,koi,...: the zombie kinds (EnemyKind ids) to spawn, the first
 ## two thirds, the rest spread over the others (default: the original five).
+## --lunge_impact=0|1: zombie lunges' light impact (ChompKit, §4f) off or on
+## (default: the setting's); --iframes=S the players' i-frames (default: the
+## setting's; 0 lets every lunge land). Prints the light impacts played.
 
 const PADS := [11, 12, 13]
 
@@ -28,6 +31,8 @@ var pearls := 0
 var powers := 0
 var profile := false
 var kind_ids: Array[String] = ["sardine", "clownfish", "boxfish", "swordfish", "ray"]
+var lunge_impact := -1
+var iframes := -1.0
 
 
 func _ready() -> void:
@@ -54,6 +59,10 @@ func _ready() -> void:
 			kind_ids.assign(arg.trim_prefix("--kinds=").split(","))
 		elif arg.begins_with("--seconds="):
 			seconds = arg.trim_prefix("--seconds=").to_float()
+		elif arg.begins_with("--lunge_impact="):
+			lunge_impact = arg.trim_prefix("--lunge_impact=").to_int()
+		elif arg.begins_with("--iframes="):
+			iframes = arg.trim_prefix("--iframes=").to_float()
 	get_window().size = Vector2i(1920, 1080)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = 0
@@ -89,6 +98,10 @@ func _run(main: Node) -> void:
 		fish.freeze = true
 
 	settings.god_mode = true
+	if lunge_impact >= 0:
+		settings.lunge_impact = lunge_impact == 1
+	if iframes >= 0.0:
+		settings.iframes = iframes
 	if powers > 0:
 		var power := PowerupSettings.shared()
 		for stack: String in ["torpedo", "lightning", "fire", "bubble", "spine", "jelly", "eel", "charge"]:
@@ -184,6 +197,7 @@ func _run(main: Node) -> void:
 	print("SPLIT players=%d zombies=%d pearls=%d alive=%d apart=%.0f drawn=%.0f powers=%d  frame %.2f ms (%.0f fps) worst %.1f  gpu total %.2f%s  process %.2f  physics %.2f  draw calls %.0f  objects %.0f  horde draw %.2f ms  step %.2f ms" % [
 		run.players.size(), count, run.pearls_out.size(), horde.alive_count(), apart, drawn / frames, powers, elapsed * 1000.0 / frames, frames / elapsed, worst, gpu_total, views,
 		process_ms / frames, physics_ms / frames, draws / frames, objects / frames, draw_ms, step_ms])
+	print("LUNGE IMPACTS lunge_impact=%s played %d merged %d" % [settings.lunge_impact, ChompKit.light_impacts, ChompKit.light_merged])
 	for spike in spikes.slice(0, 12):
 		print("SPIKE " + spike)
 	if profile:

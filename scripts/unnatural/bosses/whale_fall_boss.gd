@@ -12,7 +12,12 @@ extends BloodLeviathan
 ##   knot that slides down its body to its head, as real hagfish do to tear
 ##   flesh; it slimes them when it lets go;
 ## - spitting (from two thirds), they spray slime that stings and slows;
-## - in fury they tear free and hunt on their own, and the carcass sinks.
+## - at two thirds hagfish_free_spit of them tear free and hunt on their own
+##   (a player out of reach of the carcass, further than boss_stalk_range,
+##   makes one tear free sooner); in fury they all do, and the carcass sinks.
+##   A loose one strikes (glowing, its lane showing) from hagfish_hunt_strike m;
+## - the others reach hagfish_reach_growth further each phase, and the
+##   carcass drifts after its prey that much faster.
 ## The hagfish hold hagfish_share of its hp between them, each its own share:
 ## at none it goes limp and sinks away. Until they're all dead the carcass
 ## takes only carcass_armour of the damage.
@@ -37,9 +42,11 @@ var _carcass_xf := Transform3D.IDENTITY
 ## Where each hagfish comes out: [rest point, rest outward direction].
 var _exits: Array = []
 var _carcass_points := PackedVector3Array()
-## The hagfish holding a player (null: none), and how many have bitten one.
+## The hagfish holding a player (null: none), how many have bitten one, and
+## how many strikes they've made.
 var _grabber: Hagfish
 var bites := 0
+var strikes := 0
 
 
 ## One of its hagfish.
@@ -135,6 +142,65 @@ func telegraph() -> Dictionary:
 	return {}
 
 
+## A lane for each hagfish winding up a strike: from its head to where it'll strike.
+func telegraphs() -> Array[Dictionary]:
+	var lanes: Array[Dictionary] = []
+	for h in hagfish:
+		if h.alive and h.state == 1:
+			var to := h.aim - h.head
+			if to.length() > 0.5:
+				lanes.append({"from": h.head, "dir": to.normalized(), "length": to.length(), "width": settings.hagfish_length * 0.055 * 3.0,
+						"progress": 1.0 - h.state_left / WIND})
+	return lanes
+
+
+func own_aggression() -> float:
+	return settings.whale_aggression
+
+
+## The carcass's touch is leviathan_contact, in every phase (it settles in fury, it doesn't charge).
+func contact_scale() -> float:
+	return 1.0
+
+
+## How far a tethered hagfish reaches for a player now (m from its hole).
+func hagfish_reach_now() -> float:
+	return minf(settings.hagfish_reach * (1.0 + settings.hagfish_reach_growth * phase), settings.hagfish_length * 0.95)
+
+
+## How many hagfish should be loose now: all in fury, hagfish_free_spit from
+## two thirds, and one more for a player out of the carcass's reach.
+func _free_count(prey: FishController) -> int:
+	if phase == Phase.FURY:
+		return hagfish.size()
+	var free := settings.hagfish_free_spit if phase == Phase.SPIT else 0
+	if prey and prey.global_position.distance_to(global_position) > settings.boss_stalk_range:
+		free += 1
+	return free
+
+
+## Tears hagfish free (the nearest to `prey` first) until `free` are loose.
+func _tear_free(free: int, prey: FishController) -> void:
+	var loose := 0
+	for h in hagfish:
+		loose += 1 if h.alive and h.loose else 0
+	while loose < free:
+		var best: Hagfish = null
+		var best_gap := INF
+		for h in hagfish:
+			if h.alive and not h.loose and h != _grabber:
+				var gap := h.head.distance_squared_to(prey.global_position) if prey else 0.0
+				if gap < best_gap:
+					best_gap = gap
+					best = h
+		if best == null:
+			return
+		best.loose = true
+		best.state = 0
+		best.lunge_left = minf(best.lunge_left, 1.0)
+		loose += 1
+
+
 func mouth_point() -> Vector3:
 	return global_transform * (_carcass_xf * Vector3(0.0, -1.0, 2.0))
 
@@ -204,7 +270,7 @@ func _move(delta: float) -> void:
 	to.y = 0.0
 	var want := Vector3.ZERO
 	if to.length() > 14.0 * k:
-		want = to.normalized() * speed() * 0.28
+		want = to.normalized() * speed() * 0.28 * (1.0 + settings.hagfish_reach_growth * phase)
 	var floor_y := run.centre.y + settings.arena_floor + (3.6 * k if phase == Phase.FURY else 9.0 * k)
 	want.y = clampf((floor_y - global_position.y) * 0.5, -4.0, 4.0)
 	velocity = velocity.lerp(want, 1.0 - exp(-0.7 * delta))
@@ -213,9 +279,7 @@ func _move(delta: float) -> void:
 		var ahead := -global_basis.z
 		ahead.y = 0.0
 		face(ahead.normalized().slerp(to.normalized(), 1.0 - exp(-0.25 * delta)))
-	if phase == Phase.FURY:
-		for h in hagfish:
-			h.loose = true
+	_tear_free(_free_count(prey), prey)
 	for h in hagfish:
 		_update(h, delta, prey)
 	_update_hold(delta)
@@ -224,9 +288,7 @@ func _move(delta: float) -> void:
 
 
 func _puppet_update(delta: float) -> void:
-	if phase == Phase.FURY:
-		for h in hagfish:
-			h.loose = true
+	_tear_free(_free_count(target()), target())
 	for h in hagfish:
 		_update(h, delta, target())
 	_glow_now()
@@ -260,9 +322,7 @@ func _update(h: Hagfish, delta: float, prey: FishController) -> void:
 	var out := _exit_out(h.index)
 	var rate := settings.enrage_scale if enraged else 1.0
 	if h.loose:
-		var goal := prey.global_position if prey else anchor
-		h.velocity = h.velocity.lerp((goal - h.head).normalized() * 13.0 * rate, 1.0 - exp(-1.6 * delta))
-		h.head += h.velocity * delta
+		_hunt(h, delta, prey, rate)
 	else:
 		var sway := Vector3(sin(age * 0.7 + h.phase), sin(age * 0.9 + h.phase * 1.3) * 0.6, cos(age * 0.6 + h.phase)) * length * 0.16
 		var rest := anchor + out * length * 0.55 + sway
@@ -270,8 +330,7 @@ func _update(h: Hagfish, delta: float, prey: FishController) -> void:
 			0:
 				h.head = h.head.lerp(rest, 1.0 - exp(-1.5 * delta))
 				h.lunge_left -= delta
-				var reach := minf(settings.hagfish_reach, length * 0.95)
-				if not puppet and prey and h.lunge_left <= 0.0 and prey.global_position.distance_to(anchor) <= reach:
+				if not puppet and prey and h.lunge_left <= 0.0 and prey.global_position.distance_to(anchor) <= hagfish_reach_now():
 					h.state = 1
 					h.state_left = WIND
 					h.aim = prey.global_position
@@ -282,12 +341,16 @@ func _update(h: Hagfish, delta: float, prey: FishController) -> void:
 					h.state = 2
 					h.state_left = STRIKE
 			2:
+				if h.state_left >= STRIKE:
+					strikes += 1
 				h.head = h.head.move_toward(h.aim, STRIKE_SPEED * rate * delta)
 				h.state_left -= delta
 				_try_bite(h)
 				if h.state == 2 and (h.state_left <= 0.0 or h.head.distance_to(h.aim) < 0.5):
 					h.state = 3
 					h.state_left = 1.0
+					if not puppet:
+						ChompKit.miss(run, h.head, settings.hagfish_length * 0.055 * 2.2, 0.6)  # its jaws snap on nothing
 			4:
 				# Holding on: reeling its prey in toward its hole as it knots.
 				var toward := h.head - anchor
@@ -302,7 +365,7 @@ func _update(h: Hagfish, delta: float, prey: FishController) -> void:
 				h.state_left -= delta
 				if h.state_left <= 0.0:
 					h.state = 0
-					h.lunge_left = settings.hagfish_lunge_every * run.rng.randf_range(0.8, 1.25) / rate
+					h.lunge_left = settings.hagfish_lunge_every * run.rng.randf_range(0.8, 1.25) / rate / aggression()
 		var off := h.head - anchor
 		if off.length() > length * 0.97:
 			h.head = anchor + off.normalized() * length * 0.97
@@ -330,6 +393,51 @@ func _update(h: Hagfish, delta: float, prey: FishController) -> void:
 		run.horde.place(h.parts[p], frame.origin, -frame.basis.z)
 
 
+## A loose hagfish hunting: it swims after `prey` and, within
+## hagfish_hunt_strike m, winds up (slowing, glowing, its lane showing) and
+## strikes as a tethered one does; holding a player it stays put.
+func _hunt(h: Hagfish, delta: float, prey: FishController, rate: float) -> void:
+	var goal := prey.global_position if prey else _exit_point(h.index)
+	match h.state:
+		1:
+			h.velocity = h.velocity * exp(-4.0 * delta)
+			h.head += h.velocity * delta
+			if prey:
+				h.aim = prey.global_position
+			h.state_left -= delta
+			if h.state_left <= 0.0:
+				h.state = 2
+				h.state_left = STRIKE
+				strikes += 1
+				h.aim = h.head + (h.aim - h.head).normalized() * maxf(h.head.distance_to(h.aim) * 1.2, 4.0)
+		2:
+			h.head = h.head.move_toward(h.aim, STRIKE_SPEED * rate * delta)
+			h.state_left -= delta
+			_try_bite(h)
+			if h.state == 2 and (h.state_left <= 0.0 or h.head.distance_to(h.aim) < 0.5):
+				h.state = 3
+				h.state_left = 1.0
+				if not puppet:
+					ChompKit.miss(run, h.head, settings.hagfish_length * 0.055 * 2.2, 0.6)
+		4:
+			h.velocity = Vector3.ZERO
+			if _grabber != h:
+				h.state = 3
+				h.state_left = 1.0
+		_:
+			h.velocity = h.velocity.lerp((goal - h.head).normalized() * 13.0 * rate * (0.5 if h.state == 3 else 1.0), 1.0 - exp(-1.6 * delta))
+			h.head += h.velocity * delta
+			h.state_left -= delta
+			if h.state == 3 and h.state_left <= 0.0:
+				h.state = 0
+				h.lunge_left = settings.hagfish_lunge_every * run.rng.randf_range(0.8, 1.25) / rate / aggression()
+			h.lunge_left -= delta
+			if h.state == 0 and not puppet and prey and h.lunge_left <= 0.0 and h.head.distance_to(prey.global_position) <= settings.hagfish_hunt_strike:
+				h.state = 1
+				h.state_left = WIND
+				h.aim = prey.global_position
+
+
 ## A striking hagfish's bite: a player its head reaches is held (hagfish_grabs).
 func _try_bite(h: Hagfish) -> void:
 	if puppet or not settings.hagfish_grabs or held or _regrab_left > 0.0:
@@ -343,6 +451,7 @@ func _try_bite(h: Hagfish) -> void:
 				bites += 1
 				h.state = 4
 				h.knot = 0.0
+				ChompKit.impact(run, fish, h.head, settings.grab_impact * 0.8, self)
 			else:
 				_grabber = null
 			return

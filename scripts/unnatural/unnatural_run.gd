@@ -444,6 +444,7 @@ func start() -> void:
 	if kill_pops:
 		kill_pops.clear()
 	director.reset()
+	ChompKit.reset()  # its throttle and view caches are per run
 	_last_rotation = PackedByteArray()
 	_rotate_kinds()
 	timeline.reset()
@@ -482,6 +483,52 @@ func start() -> void:
 func _log_quit() -> void:
 	if run_log and run_log.ending.is_empty() and elapsed >= 10.0:
 		run_log.finish("quit")
+
+
+## The class survival sim's scenario (planning_bosses_and_survival.md §5b),
+## right after start(): the run's clock jumps to `seconds`, so difficulty,
+## zombie hp, the roster's unlocks and the director's baseline follow. The
+## stage events already past are dropped (all of them unless `keep_events`),
+## and the boss rift stays shut. The team is at `player_level` (each level's
+## max hp and signature stat, no cards), every player's own attack at
+## `weapon_level` (its facets spread, its milestones), at full health. With
+## `target` > 0 the director's pressure is held so it wants that many out;
+## `prefill` sends them all now.
+func scenario_jump(seconds: float, player_level: int, weapon_level: int, target := 0, prefill := false, keep_events := false) -> void:
+	elapsed = maxf(seconds, 0.0)
+	for event: Dictionary in timeline.pending.duplicate():
+		if not keep_events or float(event.time) <= elapsed:
+			timeline.drop(event.id)
+	if is_instance_valid(rift):
+		rift.spent = true
+	while levels.level < player_level:
+		levels.level += 1
+		for fish: FishController in _health:
+			if is_instance_valid(fish):
+				block_of(fish).add(StatBlock.signature(fish.character),
+						StatBlock.signature_amount(fish.character, settings.signature_steps, settings))
+	for fish in players:
+		var attack: FishAttack = _attacks.get(fish)
+		if attack:
+			loadout_of(fish).attack_kind = attack.kind
+		loadout_of(fish).add_weapon(Weapons.ATTACK, maxi(weapon_level, 1))
+		_apply_stats(fish)
+		var health: FishHealth = _health.get(fish)
+		if health:
+			health.reset(max_hp_of(fish))
+	director.elapsed = stage_time()
+	if target > 0:
+		director.locked_pressure = maxf(float(target) / maxf(director.baseline(), 1.0), 0.01)
+		director.pressure = director.locked_pressure
+	horde.difficulty = difficulty()
+	if prefill:
+		var around := PackedVector3Array()
+		for fish in players:
+			if is_up(fish):
+				around.append(fish.global_position)
+		director.prefill(around)
+	if run_log:
+		run_log.begin_at(elapsed)
 
 
 ## Where `fish` starts: beside the others, in its co-op place (meta
@@ -1269,6 +1316,8 @@ func _touch_zombies(fish: FishController) -> void:
 			fish.speed_scale = _swim_scale(fish)
 		var away := offset.normalized() if offset.length_squared() > 0.0001 else -nose
 		horde.damage(i, 0.0, "contact", null, away)  # knocked back off the fish
+		if boss == null and horde.enemy_mode(i) == Horde.Lunge.LUNGE:
+			ChompKit.light_impact(self, fish, at + offset)  # a lunge landing: a light, throttled impact
 		return
 
 
@@ -1788,6 +1837,10 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 		var chest := add_chest(boss.global_position, 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
 				TreasureChest.Kind.BOSS)  # a legendary pick (the dash is the Shark's own skill now)
 		chest.name = "SharkChest"
+		# And its own drop beside it: Drowned Jaws (planning_bosses_and_survival.md §2).
+		var jaws := add_chest(boss.global_position + Vector3(3.0, 0.0, 0.0), 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
+				TreasureChest.Kind.BOSS, Powerup.boss_item_of(boss))
+		jaws.name = "JawsChest"
 		director.quiet(settings.quiet_moment)
 		_deep_chests(boss.global_position)
 		if authority:
@@ -1799,9 +1852,10 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 	elif boss is BloodLeviathan:
 		# The run goes on: swim, batter and loot as long as you like. Entering the whirlpool wins.
 		_open_whirlpool(boss.global_position)
-		# And its loot: the Coil, in a chest beside the whirlpool (on every machine, like the shark's).
+		# And its loot: its own boss item (planning_bosses_and_survival.md §2), in a
+		# chest beside the whirlpool (on every machine, like the shark's).
 		var loot := add_chest(boss.global_position + Vector3(9.0, 0.0, 0.0), 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
-				TreasureChest.Kind.BOSS, "attack_leviathans_coil")
+				TreasureChest.Kind.BOSS, Powerup.boss_item_of(boss))
 		loot.name = "LeviathanChest"
 		_deep_chests(boss.global_position)
 
@@ -2085,7 +2139,12 @@ func _offer_chest(fish: FishController) -> void:
 			elif Powerup.INFO.has(item):
 				cards.append(_powerup_card(fish, item))
 			heading = "BOSS TREASURE!"
-			line = "%s'S PRIZE" % Powerup.title(item).to_upper() if item != "" else "THE SHARK'S PRIZE  ·  A LEGENDARY PICK"
+			if item == "":
+				line = "THE SHARK'S PRIZE  ·  A LEGENDARY PICK"
+			elif Powerup.tier(item) == Rarity.Tier.BOSS:
+				line = "A BOSS ITEM  ·  NO SLOT, NO LIMIT  ·  IT STACKS"
+			else:
+				line = "%s  ·  THE SHARK'S OWN" % Powerup.title(item).to_upper()
 		_:
 			var rolled := Rarity.roll(rng, settings, block_of(fish).value("luck"))
 			for id in Powerup.pick_for_chest(rng, rolled, settings.chest_choices, banished_of(fish)):
@@ -2114,9 +2173,8 @@ func _powerup_card(fish: FishController, id: String) -> Dictionary:
 
 
 ## `fish` takes card `index` of those up: a level's weapon or tome goes up (or
-## comes), or a chest's powerup is theirs (another stack; a boss weapon takes
-## a slot, or asks which weapon it replaces); then their next pick, or back to
-## play.
+## comes), or a chest's powerup is theirs (another stack; a boss item too, in
+## no slot); then their next pick, or back to play.
 func pick(fish: FishController, index: int) -> void:
 	var cards: Array = _offers.get(fish, [])
 	if cards.is_empty():
@@ -2125,18 +2183,7 @@ func pick(fish: FishController, index: int) -> void:
 	var offer_kind: String = _offer_kind.get(fish, "level")
 	if offer_kind == "chest":
 		_commit_chest(fish)
-	if offer_kind == "swap":
-		if card.kind == "swap":
-			_take_boss_weapon(fish, card.incoming, card.weapon)
-	elif offer_kind == "chest" and Powerup.is_weapon(card.powerup):
-		var loadout := loadout_of(fish)
-		if loadout.has_weapon(card.powerup) or loadout.weapons.size() < settings.weapon_slots:
-			_take_boss_weapon(fish, card.powerup, "")
-		else:
-			_offer_swap(fish, card.powerup)
-			card_picked.emit(fish, card)
-			return
-	elif offer_kind == "chest":
+	if offer_kind == "chest":
 		powerups_of(fish).add(card.powerup)
 		if _extra_picks.get(fish, 0) > 0 and cards.size() > 1:
 			# Sunken Idol: another pick from what's left of the same chest.
@@ -2220,35 +2267,6 @@ func take_card(fish: FishController, card: Dictionary) -> void:
 					if health and not health.down:
 						health.heal(health.max_hp * float(card.amount))
 	_apply_stats(fish)
-
-
-## Boss weapon `id` is `fish`'s (at coil_arrive_level), in place of `replacing`
-## ("": a free slot, or it's held already: a level up).
-func _take_boss_weapon(fish: FishController, id: String, replacing: String) -> void:
-	var loadout := loadout_of(fish)
-	if loadout.has_weapon(id):
-		loadout.upgrade_weapon(id, Weapons.roll(rng, id, loadout.attack_kind, Rarity.Tier.RARE, settings, powerup_settings))
-	else:
-		if replacing != "":
-			loadout.remove_weapon(replacing)
-		loadout.add_weapon(id, maxi(powerup_settings.coil_arrive_level, 1))
-	powerups_of(fish).refresh()
-	_apply_stats(fish)
-
-
-## Every weapon slot's full: which weapon does boss weapon `incoming` replace?
-## Each held one (not the fish's own attack) as a card, and a card to keep them all.
-func _offer_swap(fish: FishController, incoming: String) -> void:
-	var loadout := loadout_of(fish)
-	var cards := []
-	for id in loadout.weapons:
-		if id != Weapons.ATTACK:
-			cards.append({"kind": "swap", "weapon": id, "incoming": incoming, "tier": Powerup.tier(incoming),
-					"level": loadout.earned_level(id)})
-	cards.append({"kind": "keep", "weapon": incoming, "tier": Rarity.Tier.COMMON})
-	_offers[fish] = cards
-	_offer_kind[fish] = "swap"
-	cards_offered.emit(fish, cards, "%s: NO FREE SLOT" % Powerup.title(incoming).to_upper(), "SWAP A WEAPON FOR IT, OR KEEP YOURS")
 
 
 ## Chests round the arena: chest_count now, on the seabed.
@@ -2633,7 +2651,12 @@ func apply_chest_opened(index: int, fish: FishController) -> void:
 
 ## A chest everyone's opened goes (its place in `chests` stays, for online's indices).
 func _clear_chest(chest: TreasureChest) -> void:
-	if is_instance_valid(chest) and chest.open_for_all(players) and not chest.is_queued_for_deletion() and not _chest_in_use(chest):
+	if not is_instance_valid(chest) or chest.is_queued_for_deletion() or _chest_in_use(chest):
+		return
+	# A boss item goes to its first opener alone with boss_item_every_player off (§2, Q2).
+	var taken := (chest.kind == TreasureChest.Kind.BOSS and Powerup.is_boss_drop(chest.item)
+			and not powerup_settings.boss_item_every_player and not chest.opened_by.is_empty())
+	if taken or chest.open_for_all(players):
 		chest.vanish()
 
 
@@ -3157,6 +3180,7 @@ func _on_lunge_stage(index: int, stage_now: int) -> void:
 			continue
 		var away := offset / gap if gap > 0.01 else aim
 		fish.linear_velocity += away * settings.zombie_punch_knock
+		ChompKit.light_impact(self, fish, at)
 
 
 ## What an elite's modifier does as it dies: Electric shocks round it after

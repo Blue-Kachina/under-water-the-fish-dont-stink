@@ -112,6 +112,24 @@ func _run() -> void:
 	horde._draw_horde(0.0)
 	check(horde.drawn_count == 2, "drawn: the ones at 20 m and 80 m ahead, not 200 m out or behind (%d)" % horde.drawn_count)
 	check(horde.glint_count == 1, "red eyes: only the one at 80 m (%d)" % horde.glint_count)
+	# §1 of planning_bosses_and_survival.md: a hint far off, not a beacon.
+	var scale_20 := horde.glint_scale(1.0, 20.0, false)
+	var scale_100 := horde.glint_scale(1.0, 100.0, false)
+	check(scale_100 <= scale_20 * (100.0 / 20.0), "far eyes never look bigger on screen than near ones (%.3f at 100 m vs %.3f at 20 m, x5)" % [scale_100, scale_20])
+	check(scale_100 / scale_20 < 2.0, "...and barely grow (%.2fx from 20 m to 100 m)" % (scale_100 / scale_20))
+	check(is_equal_approx(horde.glint_scale(1.0, 60.0, true), horde.glint_scale(1.0, 60.0, false) * Horde.GLINT_ELITE), "an elite's are GLINT_ELITE times bigger, by the same rule")
+	var glows: Array[float] = []
+	for gap: float in [horde.glint_near, lerpf(horde.glint_near, horde.glint_far, 0.5), lerpf(horde.glint_near, horde.glint_far, 0.75), horde.glint_far - 1.0]:
+		glows.append(horde.glint_glow(gap))
+	check(glows[0] > 0.99 * settings.glint_strength and glows[1] > 0.99 * settings.glint_strength and glows[2] < glows[1] and glows[3] < glows[2] and glows[3] < 0.05,
+			"the glints dim over the far half of their band (%s)" % str(glows))
+	var handoff := horde.glint_near - settings.eye_handoff * 0.5
+	check(horde.glint_glow(handoff) > 0.0 and horde.glint_glow(handoff) < settings.glint_strength, "and fade in through the hand-over from the near eyes (%.2f)" % horde.glint_glow(handoff))
+	check(horde.glint_glow(horde.glint_near - settings.eye_handoff - 1.0) == 0.0, "none nearer than the hand-over")
+	var overlay: ShaderMaterial = horde._overlays[0]
+	var eye_spot: Vector4 = overlay.get_shader_parameter("eye_spot")
+	check(eye_spot.w > 0.0 and eye_spot.z < 0.0 and eye_spot.x > 0.0, "the near eyes sit on the head, either side (%s)" % str(eye_spot))
+	check(is_equal_approx(float(overlay.get_shader_parameter("eye_fade_to")), horde.glint_near), "and hand over where the glints take over (%.1f m)" % float(overlay.get_shader_parameter("eye_fade_to")))
 	settings.murk_frustum = false
 	horde._draw_horde(0.0)
 	check(horde.drawn_count == 3, "murk_frustum off: the one behind too (%d)" % horde.drawn_count)

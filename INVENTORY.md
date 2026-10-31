@@ -2,7 +2,7 @@
 
 Every playable class, weapon, tome, powerup and bonus in Unnatural (the survivors mode), with their stats.
 
-- **Last synced with code:** 2026-10-24
+- **Last synced with code:** 2026-10-31
 - **Values are defaults.** Almost every number here is a tuning-panel setting (`UnnaturalSettings`, `PowerupSettings`), so a preset can change it. If this file and the code disagree, the code is right; fix this file.
 - **Sources of truth:**
 
@@ -136,7 +136,7 @@ A **class** is a group of fish that play the same way; its **species** change on
 
 Weapons level up from level-up cards (they never come from chests) and go up to Lv 20. Each card raises one or more **facets**, chosen at random (how many depends on rarity, see §1). The steps below are what one common step adds. A fish's starting weapon takes one of its 2 slots.
 
-**Every weapon is a `FishAttack`, and every weapon can be any class's second weapon.** A class's own is the `attack` weapon. Held as a second weapon (an `AttackWeapon`), its id is `attack_` + its hit source (`attack_bite`, `attack_greek_fire`...). Level-up cards offer all of §4a and §4b (`Weapons.card_pool`), except the weapon the fish already holds. Leviathan's Coil is boss-only and never appears on a card.
+**Every weapon is a `FishAttack`, and every weapon can be any class's second weapon.** A class's own is the `attack` weapon. Held as a second weapon (an `AttackWeapon`), its id is `attack_` + its hit source (`attack_bite`, `attack_greek_fire`...). Level-up cards offer all of §4a and §4b (`Weapons.card_pool`), except the weapon the fish already holds. (Leviathan's Coil is a boss item now, §6 Boss tier; old `attack_leviathans_coil` ids map to `leviathans_coil`.)
 
 The split below is about how a weapon works, not who can get it. **Fired** weapons (4a) go off on a cooldown and share one set of facets. **Steady** weapons (4b) work all the time on their own timers, and each has its own facets.
 
@@ -174,7 +174,6 @@ Shared facet steps (`PowerupSettings`): Damage +20%, Rate +12%, Size +12%, Knock
 | **Jellyfish Halo** (`attack_jellyfish_halo`) | Drifters | 2 jellies orbit 3.2 m out at 0.5 turns/s. Each stings for 35 every 0.25 s on touch (1.2 m radius). | 0.1 | Jellies +1, Sting damage +25%, Orbit size +12%, Orbit speed +15%, Sting rate +15% |
 | **Purple Haze** (`attack_purple_haze`) | Alchemists | Every 3.5 s it scatters 3 bombs (+1 per Bombs per scatter, +1 per Quantity) over 0.4 s, each lobbed over 0.45 s at the densest pack within 12 m (× Size) in any direction, led by the pack's velocity; the next go to other packs apart from it, the rest along the best pack's path. It holds the scatter while no zombie is within reach. Each bursts as it lands into a cloud 4 m round (× Size) that lasts 5 s (× Duration): 12 dmg every 0.5 s to each zombie inside, and they're hazed (slowed 50%). Attack Speed counts 2× toward its scatter rate. At most 12 clouds (the oldest go). Replaced Depth Charges (Phase 3): old `attack_depth_charges` ids map to it. | 0.15 | Cloud damage +25%, Cloud size +12%, Cloud life +0.8 s, Bombs per scatter +1, Scatter rate +15% |
 | **Remora Buddy** (`attack_remora_buddy`) | Breachers | 1 remora nips the nearest zombie within 7 m every 1.5 s for 55. | 0.5 | Remoras +1, Bite damage +25%, Bite rate +15%, Reach +15% |
-| **Leviathan's Coil** (`attack_leviathans_coil`) | — (boss only, from the Blood Leviathan; `coil_arrive_level` 5) | 6 coils trail the fish 1.4 m apart. Each hurts what it touches (0.9 m radius) for 55 every 0.25 s. | 0.15 | Coils +3, Coil damage +25%, Coil size +15%, Hit rate +15% |
 
 **Milestones (Lv 5 / 10 / 15 / 20):**
 
@@ -184,7 +183,6 @@ Shared facet steps (`PowerupSettings`): Damage +20%, Rate +12%, Size +12%, Knock
 | Jellyfish Halo | Each jelly trails a ghost that stings too | The halo swings out wide every few seconds | A second, wider halo circles the other way | Stings jump on to the nearest zombie |
 | Purple Haze | Opaline: zombies stay slowed 30% for 2 s after leaving a cloud | Clouds that touch merge into one bigger cloud | Zombies that die hazed burst into a small cloud | Clouds creep toward the nearest zombie |
 | Remora Buddy | Remoras latch on and keep biting | A kill splits a remora in two for a while | Bites tear into the zombies round the one bitten | Remora kills heal you a little |
-| Leviathan's Coil | Coils slow the zombies they touch | The coil's head snaps at zombies near it | The tail lashes out in a shock ring | The coil grows twice as long |
 
 **Proc coefficient:** chances to trigger on-hit powerups (Chain Lightning, Torpedo, Sticky Anemone...) are multiplied by the hit's proc. A hit started by a powerup can't start that same powerup again. Other procs: lightning jump 0.3, torpedo 0.5, burn 0 (P4: weapons that hit very often start nothing).
 
@@ -272,6 +270,21 @@ Items come from **chests**, never from level-up cards. A chest rolls a rarity wi
 | **Megalodon Tooth** (`megalodon_tooth`) | Crits finish off zombies under 15% HP (not bosses) | +5%/stack, max 50% |
 | **Moon Pearl** (`moon_pearl`) | Take +1 card from each level-up offer | +1 per stack |
 | **Abyssal Engine** (`abyssal_engine`) | Quantity +1, Size +15% | +1 and +15% per stack |
+| **Drowned Jaws** (`drowned_jaws`) | **The Drowned Shark's own drop** (its JawsChest, beside its legendary pick; never in a chest's, shrine's or card's pool). Every 6 s (× attack speed) your next attack (a fired weapon's; at once with only steady ones) is a chomp too: 400 dmg on the zombie or boss nearest straight ahead within 7 m (× Size) and 45°, with a chomp's impact at half a boss chomp's (`jaws_impact` 0.5): the big number, blood and teeth, a camera punch | Every 6 s ÷ (1 + 0.3 per extra stack), +100 dmg per stack; outside the limits (no falloff) |
+
+### Boss (final bosses' chests only)
+
+**Boss items** (planning_bosses_and_survival.md §2): each final boss's chest holds its own, with no pick screen. They take **no weapon slot**, **stack** (a second copy, from that boss again or in co-op, adds a stack) and are **outside the item limits**: no stack falloff, never refused. Never offered by level-up cards, treasure or cursed chests, shrines or the Shark's legendary pick. Their card is a hexagon in the boss material (dark crimson glass, a gold trim); their HUD and summary colour is the boss tier's steel blue. Co-op: every player gets their own copy from the chest (`boss_item_every_player` on); off, the first to take it takes it for everyone. Bosses aren't pulled, held or slowed by them, only hurt.
+
+| Item (id) | Boss | Effect (1 stack) | Each stack after the first |
+|---|---|---|---|
+| **Leviathan's Coil** (`leviathans_coil`) | King of Herrings | Was a boss weapon. Works as a Lv 5 Coil (`coil_arrive_level`): 6 coils trail the fish 1.4 m apart, each hurting what it touches (0.9 m radius) for 55 every 0.25 s (proc 0.15), with a facet step for each level below its own, in turn (Coils +3, Coil damage +25%, Coil size +15%, Hit rate +15%), so at Lv 5: 9 coils, damage +25%, size +15%, hit rate +15%. Milestones by its level: Lv 5 coils slow what they touch; Lv 10 its head snaps at zombies near it; Lv 15 its tail lashes out in a shock ring; Lv 20 it grows twice as long | +3 levels (`coil_levels_per_stack`): Lv 8, 11, 14... |
+| **Gulper's Maw** (`gulpers_maw`) | Gulper Mother | Every 6 s (× attack speed) a maw opens 6 m ahead and sucks in the zombies within 9 m (× Size) for 1.2 s, then swallows up to 8 within 3.5 m, chews each for 40 and spits them out in a fan, each with a volley bolt 20 m long, 1.4 m wide (× Size): 60 dmg to every zombie it passes (proc 0.5) | +4 swallowed, +30 bolt dmg, cooldown ÷ (1 + 0.2 per extra stack) |
+| **Hagfish Brood** (`hagfish_brood`) | Whale Fall | 2 hagfish on tethers. Each, every 1.6 s (× attack speed), lunges at a zombie within 10 m (a different one each), bites it for 35 (proc 0.4) and knots on, holding it still for 1.2 s (× Duration); let go, it's slimed: 50% slower for 3 s (× Duration) | +1 hagfish, +15 bite dmg |
+| **Queen's Disc** (`queens_disc`) | Lamprey Queen | A lamprey latches onto the toughest zombie (or boss) within 14 m and corkscrews in: every 0.5 s it drains 30 (proc 0.2) and heals you 1.5 HP. It lets go past 24 m, and re-latches 0.3 s after its host dies | +20 drain, +1 HP heal per drain |
+| **Angel's Crown** (`angels_crown`) | Fallen Angel | Every 5 s (× attack speed) a crown of tentacles bursts from your head and lashes the cone ahead 3 times, 0.18 s apart: each lash 45 dmg (proc 0.4) to every zombie within 10 m (× Size) and 50° of straight ahead. Each zombie it kills heals you 1 HP | +1 lash, +10° (max 180°), +20 dmg, +0.5 HP per kill, cooldown ÷ (1 + 0.1 per extra stack) |
+
+The Test Tank gives any of them (or all, with Drowned Jaws) at N stacks: `tank_boss_item`, `tank_boss_item_stacks`. Each also has a stacks override for testing (`coil_stacks`, `maw_stacks`, `brood_stacks`, `disc_stacks`, `crown_stacks`, `jaws_stacks`).
 
 ### Cursed (blood-red chests only)
 
@@ -345,8 +358,8 @@ Drops are timed as well as rolled: after a drop of a kind, that kind waits its "
 
 | Boss | Reward |
 |---|---|
-| **Drowned Shark** (mini-boss, 5:00) | A chest, 80 XP, 25 pearls. Its chomp: a player within 14 m ahead makes its jaw drop open (0.45 s) and snap shut, 35 to everyone within 6 m of its mouth (every 2.5 s); charging, its jaws hang open and snap on the first player they reach |
-| **Final boss** (10:00): the King of Herrings, or one of its alternates (40%: each equally likely) | Leviathan's Coil (boss weapon, for now, from every final boss); the whirlpool: the next stage, or on the run's last stage the win |
+| **Drowned Shark** (mini-boss, 5:00) | A chest (a legendary pick) and a second chest with Drowned Jaws (§6, Legendary), 80 XP, 25 pearls. Its chomp: a player within 14 m ahead makes its jaw drop open (0.45 s) and snap shut, 35 to everyone within 6 m of its mouth (every 2.5 s); charging, its jaws hang open and snap on the first player they reach |
+| **Final boss** (10:00): the King of Herrings, or one of its alternates (40%: each equally likely) | Its own boss item in its chest (§6 Boss tier): the King Leviathan's Coil, the Gulper Gulper's Maw, the Whale Fall Hagfish Brood, the Lamprey Queen's Disc, the Angel Angel's Crown. Its chest opens with a bigger burst and its own sound. The whirlpool: the next stage, or on the run's last stage the win |
 | Shrine of the Deep (each, this stage) | One more boss chest (legendary pick) from every boss beaten |
 
 ### Final bosses (`scripts/unnatural/bosses/`): all share the Blood Leviathan settings (hp 90,000 × co-op, speed 15, enrage at 2 min), circle then spit (from 2/3 hp) then fury (under 1/3)

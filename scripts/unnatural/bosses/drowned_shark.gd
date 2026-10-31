@@ -5,11 +5,13 @@ extends Boss
 ## player; every shark_charge_every seconds it glows red for shark_telegraph
 ## (time to get out of the way), then charges in a straight line; every
 ## shark_call_every seconds it calls a ring of sardines round its target.
-## It chomps: a player within shark_chomp_range ahead of its mouth makes its
-## jaw drop open on its hinge (over shark_chomp_wind s, its upper jaw pushing
-## forward, teeth bared) and snap shut, biting everyone at its mouth for
-## shark_chomp_damage. Charging, its jaws hang wide and snap on the first
-## player they reach (or at the charge's end, a clack on nothing).
+## It chomps (ChompKit): a player within shark_chomp_range ahead of its mouth
+## makes it wind up over shark_chomp_wind s (its head pulls back and its snout
+## lifts, its jaw drops open on its hinge, its upper jaw pushing forward, teeth
+## bared, and holds wide), then lunge as its jaws slam shut, biting everyone
+## at its mouth then for shark_chomp_damage, and saw its head side to side.
+## Charging, its jaws hang wide and snap on the first player they reach (or
+## at the charge's end, a clack on nothing).
 ## Killing it drops a chest and a big XP pearl (UnnaturalRun).
 
 ## Its jaws snapped shut at `at`, biting `bit` players.
@@ -42,11 +44,11 @@ var _charge_dir := Vector3.FORWARD
 var _model: Node3D
 var _glow := OmniLight3D.new()
 var _length := 1.0
-var _chomp_wind := 0.0
-var _snap_left := 0.0
 var _chomp_cool := 1.0
 var _bit_this_charge := false
-var _puppet_jaw := 0
+## Its chomp's beats (ChompKit), and a puppet's: the host's phase index.
+var _bite: ChompKit.Bite
+var _net_bite := 0
 ## The jaw rig (in the model's space): the hinge, the lower jaw on it, the
 ## upper teeth and palate, the cheeks between them, and the mouth's shape.
 var _hinge: Node3D
@@ -65,6 +67,7 @@ func _ready() -> void:
 	name = "DrownedShark"
 	_charge_left = settings.shark_charge_every
 	_call_left = settings.shark_call_every * 0.5
+	_bite = ChompKit.Bite.new(settings)
 	_model = FishModel.build(FishCharacter.FishClass.HUNTER)
 	_model.scale = Vector3.ONE * settings.shark_size
 	add_child(_model)
@@ -126,7 +129,7 @@ func _move(delta: float) -> void:
 			if _charge_left <= 0.0 and prey and settings.shark_charge_speed > 0.0:
 				mode = Mode.TELEGRAPH
 				_mode_left = settings.shark_telegraph
-				_chomp_wind = 0.0
+				_bite.cancel()
 		Mode.TELEGRAPH:
 			steer(toward.normalized() * speed * 0.25 if toward != Vector3.ZERO else Vector3.ZERO, 3.0, 20.0, delta)
 			_charge_dir = toward.normalized() if toward != Vector3.ZERO else -global_basis.z
@@ -143,7 +146,8 @@ func _move(delta: float) -> void:
 				mode = Mode.HUNT
 				_charge_left = settings.shark_charge_every
 				if not _bit_this_charge and jaw > 0.5:
-					_snap()  # a clack on nothing
+					_bit_this_charge = true
+					_bite.strike_now(settings.shark_chomp_reach)  # a clack on nothing
 	_call_left -= delta
 	if _call_left <= 0.0 and prey and settings.shark_call_every > 0.0:
 		_call_left = settings.shark_call_every
@@ -158,10 +162,17 @@ func _move(delta: float) -> void:
 
 func _puppet_update(delta: float) -> void:
 	var pulse := 0.5 + 0.5 * sin(age * 30.0)
-	_glow.light_energy = (6.0 * pulse * settings.telegraph_glow if mode == Mode.TELEGRAPH else 0.0) + flash * 4.0
+	var warn := mode == Mode.TELEGRAPH or (_bite and _bite.winding())  # a charge's or a chomp's wind-up
+	_glow.light_energy = (6.0 * pulse * settings.telegraph_glow if warn else 0.0) + flash * 4.0
 	if puppet:
-		var goal := 1.0 if _puppet_jaw > 0 or mode == Mode.CHARGE else 0.0
-		jaw = move_toward(jaw, goal, delta * (12.0 if goal < jaw else 3.0))
+		# The host's chomp phase, played here: its bite lands on our own players.
+		_bite.sync(_net_bite)
+		if not _bite.busy() and mode == Mode.CHARGE:
+			_bite.open = move_toward(_bite.open, 1.0, delta * 5.0)
+		if _bite.update(delta):
+			_snap()
+		jaw = _bite.open
+	_pose_head()
 	_pose_jaw()
 
 
@@ -169,14 +180,14 @@ func _place_body() -> void:
 	_place_parts()
 
 
-## Its mode, plus 4 while its jaw is open for a chomp and 8 as it snaps.
+## Its mode, plus its chomp's phase index (ChompKit.Phase) times 4.
 func _net_mode() -> int:
-	return mode + (4 if _chomp_wind > 0.0 else 0) + (8 if _snap_left > 0.0 else 0)
+	return mode + (_bite.index() << 2)
 
 
 func _set_net_mode(net_mode: int) -> void:
 	mode = (net_mode & 3) as Mode
-	_puppet_jaw = 1 if (net_mode & 4) != 0 else (-1 if (net_mode & 8) != 0 else 0)
+	_net_bite = (net_mode >> 2) & 7
 
 
 # --- The chomp ----------------------------------------------------------------
@@ -189,31 +200,39 @@ func mouth_point() -> Vector3:
 	return _model.to_global(front + Vector3(0.0, -0.03, -0.05) * float(_mouth.length))
 
 
-## Its chomp each tick: winding up (jaw dropping open), snapping shut, or,
-## charging, jaws wide for whoever it reaches.
+## Its chomp each tick: a bite's beats (ChompKit.Bite: its head lunging with
+## the strike, the bite landing as the jaws shut), or, charging, jaws wide for
+## whoever it reaches.
 func _update_chomp(delta: float, prey: FishController) -> void:
 	_chomp_cool -= delta
-	if _snap_left > 0.0:
-		_snap_left -= delta
-		jaw = move_toward(jaw, 0.0, delta * 12.0)
-		return
-	if mode == Mode.CHARGE:
+	if not _bite.busy() and mode == Mode.CHARGE:
 		jaw = move_toward(jaw, 1.0, delta * 5.0)
+		_bite.open = jaw
 		if not _bit_this_charge and _reaching() > 0:
-			_snap()
+			_bit_this_charge = true
+			_bite.strike_now(settings.shark_chomp_reach)
 		return
-	if _chomp_wind > 0.0:
-		_chomp_wind -= delta
-		jaw = move_toward(jaw, 1.0, delta * 1.25 / maxf(settings.shark_chomp_wind, 0.05))
-		if _chomp_wind <= 0.0:
-			_snap()
-		return
-	jaw = move_toward(jaw, 0.0, delta * 2.0)
-	if prey and mode == Mode.HUNT and _chomp_cool <= 0.0 and settings.shark_chomp_range > 0.0:
+	var landed := _bite.update(delta)
+	jaw = _bite.open
+	global_position += -global_basis.z * _bite.step  # pulling back, then the lunge
+	if landed:
+		_snap()
+	if not _bite.busy() and prey and mode == Mode.HUNT and _chomp_cool <= 0.0 and settings.shark_chomp_range > 0.0:
 		var off := prey.global_position - mouth_point()
 		if off.length() <= settings.shark_chomp_range and off.dot(-global_basis.z) > off.length() * 0.3:
-			_chomp_wind = settings.shark_chomp_wind
-			velocity += -global_basis.z * settings.shark_speed * 0.5  # a surge in at them
+			_bite.start(settings.shark_chomp_wind, settings.shark_chomp_reach)
+
+
+## Winding up a chomp (its jaws opening or held wide).
+func chomp_winding() -> bool:
+	return _bite.winding()
+
+
+## Its head with the bite: the snout lifting as it winds up and dropping as it
+## strikes, and sawing side to side once its jaws are shut (the model turns).
+func _pose_head() -> void:
+	if _model:
+		_model.rotation = Vector3(_bite.lift * settings.chomp_lift, _bite.saw * settings.chomp_saw, 0.0)
 
 
 ## How many players are at its mouth, in its bite.
@@ -226,10 +245,10 @@ func _reaching() -> int:
 	return count
 
 
-## Snap: its jaws shut, biting everyone at its mouth.
+## Its jaws are shut (the contact frame): it bites everyone at its mouth now
+## (our own players: a puppet's bite lands on the guest's), with the impact;
+## nobody there, it's a heavy clack on nothing.
 func _snap() -> void:
-	_snap_left = 0.25
-	_chomp_wind = 0.0
 	_chomp_cool = settings.shark_chomp_every
 	_bit_this_charge = true
 	chomps += 1
@@ -239,9 +258,11 @@ func _snap() -> void:
 		if fish.puppet or not run.is_up(fish):
 			continue
 		if fish.global_position.distance_to(mouth) <= settings.shark_chomp_reach + UnnaturalRun.PLAYER_RADIUS:
-			run.hurt(fish, settings.shark_chomp_damage * settings.enemy_damage_scale * run.stage_damage(), -1, title.capitalize())
+			ChompKit.bite_player(run, fish, mouth, settings.shark_chomp_damage * settings.enemy_damage_scale * run.stage_damage(), title.capitalize(), self)
 			bit += 1
 	chomp_hits += bit
+	if bit == 0:
+		ChompKit.miss(run, mouth, settings.shark_chomp_reach)
 	chomped.emit(mouth, bit)
 
 

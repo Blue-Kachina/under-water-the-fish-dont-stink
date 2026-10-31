@@ -16,7 +16,7 @@ extends Node
 ##   --minutes M     a run that lasts this long stops there (20)
 ##   --fish F        a FishCharacter class or a list (SKIRMISHER,HUNTER,BULWARK: in turns; GLIDER, LANCER,
 ##                   CHARMER, BULWARK), or "all" to take turns (all)
-##   --picks P       greedy, random, or mixed (turns) (greedy)
+##   --picks P       greedy, random, mixed (turns) or main_only (no cards, pearls or chests) (greedy)
 ##   --god           the bot can't go down (to see the power curve all run)
 ##   --seed S        the bot's dice (random)
 ##   --out NAME      the report's name in user://run_logs/sim/ (sim_<date>)
@@ -102,13 +102,15 @@ func _run() -> void:
 		var picks := SurvivorBot.Picks.GREEDY
 		if options.picks == "random" or (options.picks == "mixed" and n % 2 == 1):
 			picks = SurvivorBot.Picks.RANDOM
+		elif options.picks == "main_only":
+			picks = SurvivorBot.Picks.MAIN_ONLY
 		var started := Time.get_ticks_msec()
 		var log_entry := await _play(fish_class, picks, n)
 		logs.append(log_entry)
 		var seconds := (Time.get_ticks_msec() - started) / 1000.0
 		var ending: Dictionary = log_entry.ending
 		print("  run %d: %s, %s picks: %s at %s, Lv %d, %d kills (%.0fx real time)%s" % [n + 1, fish_classes[fish_class],
-				"greedy" if picks == SurvivorBot.Picks.GREEDY else "random", ending.outcome, _clock(ending.t), ending.level,
+				(SurvivorBot.Picks.keys()[picks] as String).to_lower(), ending.outcome, _clock(ending.t), ending.level,
 				ending.kills, ending.t / maxf(seconds, 0.01), (", " + ending.cause) if ending.cause != "" else ""])
 	main.set_mode(main.FREE_SWIM)
 	await _ticks(3)
@@ -146,7 +148,7 @@ func _play(fish_class: int, picks: int, n: int) -> Dictionary:
 		run.run_log.finish("time")
 	var entry := run.run_log.to_dict()
 	entry["fish"] = FishCharacter.FishClass.keys()[fish_class]
-	entry["picks"] = "greedy" if picks == SurvivorBot.Picks.GREEDY else "random"
+	entry["picks"] = (SurvivorBot.Picks.keys()[picks] as String).to_lower()
 	entry["bot_picked"] = bot.picked
 	bot.queue_free()
 	fish.controls = null

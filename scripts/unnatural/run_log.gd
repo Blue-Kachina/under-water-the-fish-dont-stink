@@ -37,6 +37,9 @@ var pearls_dropped := 0
 var chests_dropped := 0
 ## When each stage after the first began ({"stage", "t" (s)}), P5.
 var stages: Array[Dictionary] = []
+## Damage the players took, by what hurt them (the cause the run log names:
+## a zombie kind, a boss, an elite's fire...), all run.
+var taken_by := {}
 ## The path it was saved to ("" until saved).
 var saved_path := ""
 
@@ -55,6 +58,7 @@ func _init(owner_run: UnnaturalRun) -> void:
 
 func _ready() -> void:
 	run.card_picked.connect(_on_card_picked)
+	run.player_hurt.connect(_on_player_hurt)
 
 
 ## A fresh log, for a run starting now.
@@ -70,6 +74,14 @@ func begin() -> void:
 	_next_sample = 60.0
 	_last = {"damage": 0.0, "taken": 0.0, "kills": 0, "pearls_dropped": 0, "chests_dropped": 0}
 	_last_hurt.clear()
+	taken_by.clear()
+
+
+## A fresh log for a run that jumped to `seconds` (the class survival sim's
+## scenario): its first sample a minute after that.
+func begin_at(seconds: float) -> void:
+	begin()
+	_next_sample = seconds + 60.0
 
 
 func _physics_process(_delta: float) -> void:
@@ -129,7 +141,7 @@ func finish(outcome: String) -> void:
 			"rerolls": stats.get("rerolls", 0), "skips": stats.get("skips", 0), "banished": stats.get("banished", []),
 			"build": _build(fish),
 		})
-	ending = {"t": snappedf(run.elapsed, 0.1), "outcome": outcome, "cause": cause, "level": run.levels.level,
+	ending = {"t": snappedf(run.elapsed, 0.1), "outcome": outcome, "cause": cause, "level": run.levels.level, "taken_by": _rounded(taken_by),
 			"kills": run.kills, "pearls_dropped": pearls_dropped, "chests_dropped": chests_dropped, "players": players,
 			"stage": run.stage, "stages": stages, "run_length": ["short", "standard", "endless"][clampi(settings.run_length, 0, 2)]}
 	if settings.run_logs and may_save():
@@ -175,7 +187,7 @@ func _sample(span: float) -> Dictionary:
 		chests += stats.get("chests", 0)
 		builds.append(_build(fish))
 	var dps := (damage - float(_last.damage)) / maxf(span, 1.0)
-	var hp := _average_hp()
+	var hp := average_hp()
 	var sample := {
 		"t": snappedf(run.elapsed / 60.0, 0.01),
 		"stage": run.stage,
@@ -202,7 +214,7 @@ func _sample(span: float) -> Dictionary:
 
 ## The average max hp of the zombies out now (bosses' bodies left out); with
 ## none out, a plain one's at the difficulty now.
-func _average_hp() -> float:
+func average_hp() -> float:
 	var total := 0.0
 	var count := 0
 	for i in run.horde.alive:
@@ -229,6 +241,13 @@ func _build(fish: FishController) -> Dictionary:
 	for entry: Array in run.powerups_of(fish).items():
 		items[entry[0]] = entry[1]
 	return {"weapons": weapons, "tomes": tomes, "items": items}
+
+
+func _on_player_hurt(fish: FishController, amount: float) -> void:
+	var cause: String = _last_hurt.get(fish, "")
+	if cause == "":
+		cause = "?"
+	taken_by[cause] = float(taken_by.get(cause, 0.0)) + amount
 
 
 func _on_card_picked(fish: FishController, card: Dictionary) -> void:

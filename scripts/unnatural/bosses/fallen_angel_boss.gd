@@ -164,6 +164,11 @@ func circle_radius() -> float:
 	return settings.angel_lash_reach * 1.6
 
 
+## Its body's touch is leviathan_contact, in every phase (it isn't a serpent).
+func contact_scale() -> float:
+	return 1.0
+
+
 func _ready() -> void:
 	super()
 	name = "FallenAngel"
@@ -385,8 +390,12 @@ func _rest() -> void:
 	state = State.HOVER
 	lock_prey = null
 	_orbit = -_orbit
-	_state_left = settings.angel_rest / (settings.enrage_scale if enraged else 1.0)
+	_state_left = settings.angel_rest / (settings.enrage_scale if enraged else 1.0) / aggression()
 	_lash_times.clear()
+
+
+func own_aggression() -> float:
+	return settings.angel_aggression
 
 
 ## Who (or what) the next flurry's for: a player, or, hurt and with Sea

@@ -7,9 +7,9 @@ extends Control
 ## (HexBadge.Shape) and glyph. A level's (CardDeck): a weapon's upgrade (the level it
 ## reaches, the facets it raises, a milestone if it reaches one), a new
 ## weapon, a tome (what it gives), or a fallback; level pips along the
-## bottom. A chest's: its powerups, which stack each would be, stacks as pips.
-## A boss weapon with no slot free: a card per weapon to swap, and one to keep
-## yours. Picked with the left stick, A/D
+## bottom. A chest's: its powerups, which stack each would be, stacks as pips;
+## a boss item's (planning_bosses_and_survival.md §2) in its own boss
+## material, dark crimson glass in a gold trim. Picked with the left stick, A/D
 ## or the arrow keys and A / Enter / Space, the number keys 1-3, or the mouse.
 ## Runs while the game's paused (solo, the cards pause it). For the first
 ## ARM_TIME it ignores the pick button, so a held or mashed A doesn't choose
@@ -50,9 +50,11 @@ const LEATHER_RULE := Color(94 / 255.0, 78 / 255.0, 58 / 255.0)  # #5E4E3A
 const PARCHMENT := Color(239 / 255.0, 228 / 255.0, 204 / 255.0)  # #EFE4CC its text
 const GILT := Color(196 / 255.0, 179 / 255.0, 147 / 255.0)  # #C4B393 its labels
 const TOME_INK := Color(26 / 255.0, 20 / 255.0, 15 / 255.0)  # #1A140F its glyph
+## A boss item's material (§2): dark crimson glass, a gold trim.
+const BOSS_CRIMSON := Color(110 / 255.0, 14 / 255.0, 24 / 255.0)  # #6E0E18
+const BOSS_GOLD := Color(232 / 255.0, 190 / 255.0, 92 / 255.0)  # #E8BE5C
 
-## Each card: a level's (CardDeck), {"powerup", "stacks", "tier"} (a chest's),
-## or a swap's {"kind": "swap"/"keep", "weapon", ...} (UnnaturalRun's offer).
+## Each card: a level's (CardDeck), or {"powerup", "stacks", "tier"} (a chest's).
 var cards: Array = []
 ## The fish's attack's kind (its weapon card's name and glyph), and the level caps.
 var attack_kind := FishAttack.Kind.BITE
@@ -237,12 +239,11 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), UITheme.DIM)
 	var top := _row_centre().y - FOCUSED_SIZE.y * 0.5 * k
 	var chest: bool = not cards.is_empty() and cards[0].has("powerup")
-	var swap: bool = not cards.is_empty() and cards[0].get("kind", "") in ["swap", "keep"]
 	var cursed := heading.begins_with("CURSED")
 	var label_px := roundi(16.0 * k)
 	UITheme.draw_text(self, Rect2(0.0, top - 132.0 * k, size.x, 24.0 * k), heading.to_upper(), UITheme.caps(label_px, 700, 0.3), label_px,
 			UITheme.rarity(Rarity.Tier.CURSED) if cursed else UITheme.GOLD)
-	var ask := "Swap a weapon?" if swap else ("Pick a powerup" if chest else "Pick an upgrade")
+	var ask := "Pick a powerup" if chest else "Pick an upgrade"
 	UITheme.draw_text(self, Rect2(0.0, top - 106.0 * k, size.x, 50.0 * k), ask, UITheme.display(600), roundi(40.0 * k), UITheme.INK)
 	if line:
 		var line_px := roundi(14.0 * k)
@@ -327,9 +328,9 @@ func _draw_card(i: int) -> void:
 		lines = Powerup.blurb_lines(powerup)
 		curses = Powerup.curse_lines(powerup)
 		pips = Vector3i(stacks - 1, 1, PIPS)
-		if look == Look.WEAPON:
-			stack_text = "BOSS WEAPON"
-	elif kind in ["weapon", "new_weapon", "swap", "keep"]:
+		if tier == Rarity.Tier.BOSS:
+			stack_text = "BOSS ITEM" if stacks <= 1 else "BOSS ITEM  ·  STACK %d → %d" % [stacks - 1, stacks]
+	elif kind in ["weapon", "new_weapon"]:
 		look = Look.WEAPON
 		var id: String = card.weapon
 		glyph = Weapons.glyph(id, attack_kind)
@@ -346,13 +347,6 @@ func _draw_card(i: int) -> void:
 				intro = " ".join(Powerup.blurb_lines(id))
 				lines = Weapons.describe_all(id, card.get("gains", {}), attack_kind)
 				pips = Vector3i(0, 1, max_levels.x)
-			"swap":
-				stack_text = "SWAP OUT  ·  LV %d" % level
-				lines = PackedStringArray(["Drop it for %s." % Powerup.title(card.incoming)])
-			"keep":
-				name_text = "Keep yours"
-				stack_text = "NO SWAP"
-				lines = PackedStringArray(["Leave %s behind." % Powerup.title(id)])
 	elif kind in ["tome", "new_tome"]:
 		look = Look.TOME
 		var id: String = card.tome
@@ -417,9 +411,17 @@ func _draw_card(i: int) -> void:
 			pip_empty = LEATHER_DARK
 			pip_fresh = PARCHMENT
 		_:
-			_draw_bubble(rect, g, rim, rim_width)
-			_draw_header(rect, g, "BONUS" if look == Look.BONUS else "POWER-UP", tier_name, LABEL, rim, rim, false)
-			_draw_glass_medal(HexBadge.Shape.CIRCLE if look == Look.BONUS else HexBadge.Shape.HEX, medal, 140.0 * g, rim)
+			var boss := look == Look.POWERUP and tier == Rarity.Tier.BOSS
+			if boss:
+				_draw_boss_glass(rect, g, rim_width)
+			else:
+				_draw_bubble(rect, g, rim, rim_width)
+			_draw_header(rect, g, "BONUS" if look == Look.BONUS else "POWER-UP", tier_name, BOSS_GOLD if boss else LABEL, rim, rim, false)
+			if boss:
+				HexBadge.draw_shape(self, HexBadge.Shape.HEX, medal, 150.0 * g, _a(BOSS_GOLD), BOSS_GOLD, 0.0)
+				_draw_glass_medal(HexBadge.Shape.HEX, medal, 136.0 * g, BOSS_CRIMSON.lightened(0.25))
+			else:
+				_draw_glass_medal(HexBadge.Shape.CIRCLE if look == Look.BONUS else HexBadge.Shape.HEX, medal, 140.0 * g, rim)
 			if look == Look.BONUS:
 				UITheme.draw_text(self, Rect2(medal - Vector2(54.0, 26.0) * g, Vector2(108.0, 52.0) * g), amount, UITheme.display(700),
 						roundi(34.0 * g), _a(UITheme.INK))
@@ -552,6 +554,26 @@ func _draw_bubble(rect: Rect2, g: float, rim: Color, rim_width: float) -> void:
 	for bubble: Vector3 in [Vector3(rect.size.x / g - 33.0, 127.0, 7.0), Vector3(rect.size.x / g - 43.5, 149.5, 3.5), Vector3(26.0, 318.0, 5.0)]:
 		draw_arc(rect.position + Vector2(bubble.x, bubble.y) * g, bubble.z * g, 0.0, TAU, 20, foam, 1.5 * g, true)
 	UITheme.draw_box(self, rect, Color(0, 0, 0, 0), radius, _a(rim), rim_width)
+
+
+## A boss item's card (planning_bosses_and_survival.md §2): dark crimson glass
+## lit from its top-left, a double trim (gold outside, the boss tier's colour
+## inside) and gold filigree corners: not a legendary's gold bubble.
+func _draw_boss_glass(rect: Rect2, g: float, rim_width: float) -> void:
+	var radius := _corner(Look.POWERUP) * g
+	var focus := rect.position + rect.size * Vector2(0.3, 0.18)
+	_radial(HexBadge.rounded_rect(rect, radius, 8), focus, _a(BOSS_CRIMSON), _a(BOSS_CRIMSON.lerp(UITheme.CARD, 0.8)),
+			0.8 * focus.distance_to(rect.end))
+	UITheme.draw_box(self, rect, Color(0, 0, 0, 0), radius, _a(BOSS_GOLD), rim_width + 1.0 * g)
+	UITheme.draw_box(self, rect.grow(-6.0 * g), Color(0, 0, 0, 0), maxf(radius - 6.0 * g, 2.0), _a(UITheme.rarity(Rarity.Tier.BOSS)), maxf(1.5 * g, 1.0))
+	var inset := 14.0 * g
+	var arm := 18.0 * g
+	for corner: Vector2 in [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]:
+		var at := rect.position + rect.size * corner + Vector2(inset if corner.x == 0 else -inset, inset if corner.y == 0 else -inset)
+		var along_x := Vector2(arm if corner.x == 0 else -arm, 0.0)
+		var along_y := Vector2(0.0, arm if corner.y == 0 else -arm)
+		draw_polyline(PackedVector2Array([at + along_x, at, at + along_y]), _a(BOSS_GOLD), maxf(1.5 * g, 1.0), true)
+		draw_circle(at, 2.5 * g, _a(BOSS_GOLD), true, -1.0, true)
 
 
 ## A powerup's medallion: `shape` (`size` wide) rimmed in the rarity's

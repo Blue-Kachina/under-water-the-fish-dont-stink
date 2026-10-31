@@ -14,7 +14,8 @@ extends RefCounted
 ## tank_horde keeps that many chasing zombies out (mortal, no contact damage
 ## unless tank_contact): the perf bench in the game. tank_boss brings in a
 ## boss (the Drowned Shark or any final boss) to practise on, back again
-## tank_boss_respawn s after it's beaten. R resets it all.
+## tank_boss_respawn s after it's beaten, and tank_boss_item gives the boss
+## items at tank_boss_item_stacks stacks (apply_boss_items()). R resets it all.
 
 ## DPS is over this many seconds.
 const DPS_WINDOW := 5.0
@@ -31,8 +32,9 @@ const BOSSES: Array[String] = ["", "miniboss", "boss", "gulper", "whale", "lampr
 const BOSS_AHEAD := 45.0
 ## tank_preset's levels, and what fills the slots, in order.
 const PRESET_LEVELS := [0, 5, 10, 20]
-const PRESET_WEAPONS: Array[String] = ["attack_greek_fire", "attack_jellyfish_halo", "attack_purple_haze", "attack_remora_buddy",
-		"attack_leviathans_coil"]
+const PRESET_WEAPONS: Array[String] = ["attack_greek_fire", "attack_jellyfish_halo", "attack_purple_haze", "attack_remora_buddy"]
+## tank_boss_item's items, in its order (after None; then All).
+const BOSS_ITEMS: Array[String] = ["leviathans_coil", "gulpers_maw", "hagfish_brood", "queens_disc", "angels_crown", "drowned_jaws"]
 const PRESET_TOMES: Array[String] = ["teeth", "tides", "reef", "shell", "schools", "kill", "ages", "currents", "fins", "ram",
 		"fortune", "pearls"]
 
@@ -48,6 +50,8 @@ var _recent: Array = []
 var _rng := RandomNumberGenerator.new()
 ## The tank_preset last applied (0 at the start: Off leaves the panel's values be).
 var _preset := 0
+## The tank_boss_item and its stacks last applied (Vector2i(0, 0): none yet).
+var _boss_items := Vector2i.ZERO
 ## The tank_boss out (or due back), and the boss itself (null: none out now).
 var _boss_pick := 0
 var boss: Boss
@@ -72,6 +76,15 @@ static func apply_preset(level: int, settings: UnnaturalSettings) -> void:
 		var given := Tomes.gives(PRESET_TOMES[n], float(level), settings)
 		for stat: String in given:
 			settings.set("tank_" + stat, float(settings.get("tank_" + stat)) + float(given[stat]))
+
+
+## Boss items for tank_boss_item `pick` (0: None, 1..: BOSS_ITEMS in turn, then
+## All), each at `stacks` through its stacks override; the rest cleared.
+static func apply_boss_items(pick: int, stacks: int) -> void:
+	var powerup_settings := PowerupSettings.shared()
+	for n in BOSS_ITEMS.size():
+		var given := pick == n + 1 or pick == BOSS_ITEMS.size() + 1
+		powerup_settings.set(PowerupSettings.STACKS[BOSS_ITEMS[n]], maxi(stacks, 1) if given else 0)
 
 
 ## The kind the dummies are (appended to the horde's kinds).
@@ -121,6 +134,10 @@ func update(delta: float) -> void:
 	if settings.tank_preset != _preset:
 		_preset = settings.tank_preset
 		apply_preset(PRESET_LEVELS[clampi(_preset, 0, PRESET_LEVELS.size() - 1)], settings)
+	var boss_items := Vector2i(settings.tank_boss_item, settings.tank_boss_item_stacks)
+	if boss_items != _boss_items and (boss_items.x != 0 or _boss_items.x != 0):
+		apply_boss_items(boss_items.x, boss_items.y)
+	_boss_items = boss_items
 	if run.levels.level != settings.tank_level:
 		run.levels.level = maxi(settings.tank_level, 1)
 		for fish in run.players:

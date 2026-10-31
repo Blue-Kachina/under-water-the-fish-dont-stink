@@ -3,9 +3,11 @@ extends Node
 ## by eye (the memorable-bosses pass): the Drowned Shark's jaw open and shut,
 ## the King's gaping jaw and its coil round a player, the Gulper sucking and
 ## then swallowed (its lump, the break-free panel), the Lamprey's flared disc
-## and her latch, a hagfish's knot, the Fallen Angel locked on (its halo).
+## and her latch, a hagfish's knot, the Fallen Angel locked on (its halo);
+## and (chomp) a frame strip through one of the shark's chomps (ChompKit's
+## beats: pull back, gape, hold, strike, shake, recover), chomp_strip.png.
 ## Each boss is live in a real Unnatural run (enemy speed 0). Needs a window.
-##   Godot_console.exe --path . res://tests/boss_moves_shots.tscn -- --out=DIR [--only=shark|king|gulper|lamprey|whale|angel]
+##   Godot_console.exe --path . res://tests/boss_moves_shots.tscn -- --out=DIR [--only=shark|king|gulper|lamprey|whale|angel|chomp]
 
 var out_dir := "user://boss_moves_shots"
 var only := ""
@@ -54,7 +56,7 @@ func _run() -> void:
 	camera.far = 2000.0
 	camera.current = true
 	_hud(false)
-	for step: String in ["shark", "king", "gulper", "lamprey", "whale", "angel"]:
+	for step: String in ["shark", "king", "gulper", "lamprey", "whale", "angel", "chomp"]:
 		if only == "" or only == step:
 			await call("_" + step)
 	get_tree().quit()
@@ -202,6 +204,51 @@ func _angel() -> void:
 	await _view(mid + side * angel.height() * 0.9 + Vector3.UP * angel.height() * 0.15, mid, "angel_lock")
 	settings.enemy_speed_scale = 0.0
 	await _gone(angel)
+
+
+## A frame strip through one shark chomp, its beats stepped by hand (the shark
+## held still): each frame saved, and all of them in one strip.
+func _chomp() -> void:
+	var shark := await _spawn(DrownedShark.new()) as DrownedShark
+	shark._charge_left = 1000.0
+	shark._chomp_cool = 1000.0
+	shark.set_physics_process(false)
+	var head := shark.mouth_point()
+	var side := shark.global_basis.x
+	var fwd := -shark.global_basis.z
+	var l := shark._length
+	var eye := head + side * l * 0.32 + fwd * l * 0.18 - Vector3.UP * l * 0.03
+	var look := head + fwd * l * 0.05
+	var bite: ChompKit.Bite = shark._bite
+	bite.start(settings.shark_chomp_wind, settings.shark_chomp_reach)
+	var total := settings.shark_chomp_wind + settings.chomp_strike + settings.chomp_shake + settings.chomp_recover
+	var times := [0.0, 0.08, 0.16, 0.26, 0.4, 0.52, 0.56, 0.6, 0.72, total]
+	var dt := 1.0 / 240.0
+	var t := 0.0
+	var frames: Array[Image] = []
+	for n in times.size():
+		var until: float = times[n]
+		while t < until:
+			bite.update(dt)
+			shark.global_position += -shark.global_basis.z * bite.step
+			t += dt
+		shark.jaw = bite.open
+		shark._pose_head()
+		shark._pose_jaw()
+		var name := "chomp_%02d_%s" % [n, ChompKit.Phase.keys()[bite.phase].to_lower()]
+		await _view(eye, look, name)
+		frames.append(get_viewport().get_texture().get_image())
+	var w := 400
+	var h := 225
+	var strip := Image.create(w * 5, h * 2, false, Image.FORMAT_RGBA8)
+	for n in frames.size():
+		var frame := frames[n]
+		frame.convert(Image.FORMAT_RGBA8)
+		frame.resize(w, h)
+		strip.blit_rect(frame, Rect2i(0, 0, w, h), Vector2i((n % 5) * w, (n / 5) * h))
+	strip.save_png(out_dir.path_join("chomp_strip.png"))
+	print("shot chomp_strip")
+	await _gone(shark)
 
 
 ## The HUD (and the boss's name splash) shown or not.

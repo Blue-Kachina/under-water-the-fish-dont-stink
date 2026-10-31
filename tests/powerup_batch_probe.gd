@@ -63,10 +63,10 @@ func _run() -> void:
 		var made := Powerup.create(id)
 		# The fish attacks held as weapons (AttackWeapon) level from cards: no stacks override.
 		made_all = made_all and made.get_script() != Powerup and (powers.STACKS.has(id) or Weapons.ATTACK_WEAPONS.has(id))
-	check(Powerup.ids().size() == 52 and made_all, "52 powerups (6 of them fish attacks as weapons), each its own kind with a testing override")
-	check(tiers.get(Rarity.Tier.COMMON, 0) == 20 and tiers.get(Rarity.Tier.UNCOMMON, 0) == 12 and tiers.get(Rarity.Tier.RARE, 0) == 9
-			and tiers.get(Rarity.Tier.LEGENDARY, 0) == 5 and tiers.get(Rarity.Tier.BOSS, 0) == 1 and tiers.get(Rarity.Tier.CURSED, 0) == 5,
-			"tiers: 20 common (Bow Grow Bow among them, D15; the 6 attack weapons, unused), 12 uncommon, 9 rare, 5 legendary, 1 boss, 5 cursed (%s)" % [tiers])
+	check(Powerup.ids().size() == 58 and made_all, "58 powerups (11 of them fish attacks as weapons), each its own kind with a testing override (%d)" % Powerup.ids().size())
+	check(tiers.get(Rarity.Tier.COMMON, 0) == 21 and tiers.get(Rarity.Tier.UNCOMMON, 0) == 12 and tiers.get(Rarity.Tier.RARE, 0) == 9
+			and tiers.get(Rarity.Tier.LEGENDARY, 0) == 6 and tiers.get(Rarity.Tier.BOSS, 0) == 5 and tiers.get(Rarity.Tier.CURSED, 0) == 5,
+			"tiers: 21 common (Bow Grow Bow among them, D15; the 7 fish-attack weapons, unused), 12 uncommon, 9 rare, 6 legendary (Drowned Jaws, the Shark's), 5 boss items (§2), 5 cursed (%s)" % [tiers])
 
 	print("stat commons:")
 	var block := run.block_of(fish)

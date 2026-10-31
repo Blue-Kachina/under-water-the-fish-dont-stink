@@ -30,7 +30,7 @@ func _init(owner_run: UnnaturalRun, owner_fish: FishController) -> void:
 ## One more stack of item `id`. A weapon levels up in the Loadout instead (its
 ## facets spread evenly), slots or not: for tests and the panel.
 func add(id: String) -> void:
-	id = Weapons.current_id(id)
+	id = Powerup.current_id(Weapons.current_id(id))
 	if Powerup.is_weapon(id):
 		var loadout := run.loadout_of(fish)
 		loadout.add_weapon(id, loadout.earned_level(id) + 1)
@@ -305,7 +305,7 @@ func on_battery(index: int) -> void:
 
 ## Items that fire by themselves besides the weapons: the Jelly's quiet stops them too.
 const SELF_FIRING: Array[String] = ["anglerfish_lure", "torpedo", "electric_eel", "tsunami_heart", "ghost_swordfish",
-		"poseidons_trident", "sonar_pinger"]
+		"poseidons_trident", "sonar_pinger", "leviathans_coil", "gulpers_maw", "hagfish_brood", "queens_disc", "angels_crown"]
 
 
 func on_tick(delta: float) -> void:

@@ -18,8 +18,9 @@ extends Boss
 ## speed and contact damage; UnnaturalRun has the director escalate too).
 ## An alternate can grab a player (hold(): drawn into its mouth over
 ## grab_catch_time, drained, until they stride their way out or it lets go).
-## The King itself chomps in any phase (king_chomp_*: its jaw gapes on its
-## hinge, spine_hinge, then snaps shut), and in fury it coils round a player it
+## The King itself chomps in any phase (king_chomp_*, ChompKit: it pulls back,
+## its jaw gapes on its hinge, spine_hinge, holds, then it lunges as its jaws
+## slam shut and saws its body round), and in fury it coils round a player it
 ## reaches, its body wrapped coil_loops times round them, tightening.
 
 signal enraged_now
@@ -44,6 +45,8 @@ const EYE_SHADER := preload("res://shaders/fish_eye.gdshader")
 var phase := Phase.CIRCLE
 var bolts_fired := 0
 var dives := 0
+## Stalking its target (further off than boss_stalk_range): closing in.
+var stalking := false
 ## Its spine, and every material bent along it (flash, warn, rage, dissolve go to each).
 var rig: SpineRig
 var skins: Array[ShaderMaterial] = []
@@ -74,14 +77,14 @@ var _regrab_left := 0.0
 var _catch_from := Vector3.ZERO
 var _catch_t := 1.0
 ## Its chomp: how far its jaw is open (-1 snapped shut, 0 at rest, 1 gaping),
-## its wind-up and snap (s left), the wait for the next, and the counts.
+## its beats (ChompKit; a puppet: the host's phase index), the wait for the
+## next, and the counts.
 var jaw := 0.0
 var chomp_count := 0
 var chomp_hits := 0
-var _chomp_wind := 0.0
-var _snap_left := 0.0
+var _bite: ChompKit.Bite
+var _net_bite := 0
 var _chomp_cool := 1.5
-var _puppet_jaw := 0
 ## The King's jaw hinge (rest y, z) and the skin it's on.
 var _jaw_hinge := Vector2.ZERO
 var _jaw_skin: ShaderMaterial
@@ -100,6 +103,7 @@ func _ready() -> void:
 	super()
 	title = boss_title()
 	name = "BloodLeviathan"
+	_bite = ChompKit.Bite.new(settings)
 	rig = SpineRig.new(body_length(), settings.leviathan_girth * 1.6)
 	_build_look()
 	for n in proxy_count():
@@ -158,10 +162,26 @@ func mouth_point() -> Vector3:
 	return rig.place(Vector3(0.0, -settings.leviathan_girth * 0.3, 0.5))
 
 
-## Whether it grabs players who touch its mouth while charging (the King: in
-## fury, to coil round them).
+## Whether it grabs players who touch its mouth while charging (the King: from
+## coil_from_phase, to coil round them).
 func grabs() -> bool:
-	return coils() and phase == Phase.FURY
+	return coils() and phase >= settings.coil_from_phase
+
+
+## Whether it grabs a player at its mouth now: in fury, or diving.
+func grabbing_now() -> bool:
+	return grabs() and (phase == Phase.FURY or _diving > 0.0)
+
+
+## How hard it presses now: boss_aggression times its own (attacks that much
+## more often, rests that much shorter).
+func aggression() -> float:
+	return maxf(settings.boss_aggression * own_aggression(), 0.05)
+
+
+## Its own aggression setting (the King's: king_aggression).
+func own_aggression() -> float:
+	return settings.king_aggression
 
 
 ## Whether it chomps, and whether it coils round what it grabs (both the King's).
@@ -421,7 +441,15 @@ func _bolt_mesh_look() -> Mesh:
 # --- The fight ----------------------------------------------------------------
 
 func contact() -> float:
-	return settings.leviathan_contact * (settings.enrage_scale if enraged else 1.0) * settings.enemy_damage_scale
+	return settings.leviathan_contact * (settings.enrage_scale if enraged else 1.0) * settings.enemy_damage_scale \
+			* contact_scale()
+
+
+## Its body's contact damage, times leviathan_contact: a serpent's is
+## serpent_contact, and serpent_fury_contact more in fury (it charges through
+## its target again and again then).
+func contact_scale() -> float:
+	return settings.serpent_contact * (settings.serpent_fury_contact if phase == Phase.FURY else 1.0)
 
 
 func speed() -> float:
@@ -473,15 +501,19 @@ func _move(delta: float) -> void:
 		wanted = to_prey.normalized() * speed() * 1.4
 		_diving -= delta
 		if _diving <= 0.0 and phase != Phase.FURY:
-			_dive_left = 5.0
+			_dive_left = settings.leviathan_dive_every / aggression()
 	else:
-		# Circle it at about 22 m (more for a big body), a little up and down.
+		# Circle it at about 22 m (more for a big body), a little up and down;
+		# further off than boss_stalk_range, it stalks: turns and closes in.
 		var flat := Vector3(to_prey.x, 0.0, to_prey.z)
 		var gap := flat.length()
 		var ring := circle_radius()
 		var round_dir := Vector3.UP.cross(flat.normalized()) * _orbit if gap > 0.01 else Vector3.FORWARD
 		var inward := flat.normalized() * clampf((gap - ring) / 10.0, -1.0, 1.0) if gap > 0.01 else Vector3.ZERO
 		wanted = (round_dir + inward + Vector3.UP * sin(age * 0.7) * 0.3).normalized() * speed()
+		stalking = prey != null and to_prey.length() > settings.boss_stalk_range
+		if stalking:
+			wanted = to_prey.normalized() * speed() * settings.boss_stalk_speed
 		if _dive_warn > 0.0:
 			# Gathering itself to dive: slower, glowing, its lane showing.
 			_dive_warn -= delta
@@ -497,13 +529,13 @@ func _move(delta: float) -> void:
 				_dive()
 	if held:
 		wanted *= 0.6  # dragging its prey
-	steer(wanted, 1.4 if phase != Phase.FURY else 2.2, 10.0, delta)
+	steer(wanted, 1.4 if phase != Phase.FURY and not stalking else 2.2, 10.0, delta)
 	global_position += velocity * delta
 	face(velocity)
 	if phase != Phase.CIRCLE and prey and settings.leviathan_bolts > 0 and settings.leviathan_bolt_every > 0.0:
 		_bolt_left -= delta
 		if _bolt_left <= 0.0:
-			_bolt_left = settings.leviathan_bolt_every / (settings.enrage_scale if enraged else 1.0)
+			_bolt_left = settings.leviathan_bolt_every / (settings.enrage_scale if enraged else 1.0) / aggression()
 			_spit(prey.global_position)
 	_special(delta, prey)
 	if chomps():
@@ -516,7 +548,7 @@ func _move(delta: float) -> void:
 
 ## How far out it circles its target (m).
 func circle_radius() -> float:
-	return 22.0 + body_length() * 0.08
+	return (22.0 + body_length() * 0.08) * settings.serpent_circle
 
 
 ## Straight through its target, now.
@@ -547,6 +579,8 @@ func _glow_now() -> void:
 	var warn := winding_up()
 	if not puppet and phase != Phase.CIRCLE and settings.leviathan_bolts > 0 and _bolt_left < settings.leviathan_spit_telegraph:
 		warn = true
+	if chomps() and _bite and _bite.winding():
+		warn = true  # its chomp's wind-up: the dodge window
 	var pulse := (0.5 + 0.5 * sin(age * 26.0)) * settings.telegraph_glow if warn else 0.0
 	for material in skins:
 		material.set_shader_parameter("flash", flash)
@@ -563,16 +597,16 @@ func _enrage_now() -> void:
 	enraged_now.emit()
 
 
-## Its phase, plus 8 while it winds up a dive, 16 while it winds up a chomp
-## and 32 while it snaps (subclasses that don't chomp add more above 15).
+## Its phase, plus 8 while it winds up a dive, and its chomp's phase index
+## (ChompKit.Phase) times 16 (subclasses that don't chomp add more above 15).
 func _net_mode() -> int:
-	return phase + (8 if _dive_warn > 0.0 else 0) + (16 if _chomp_wind > 0.0 else 0) + (32 if _snap_left > 0.0 else 0)
+	return phase + (8 if _dive_warn > 0.0 else 0) + (_bite.index() << 4 if chomps() else 0)
 
 
 func _set_net_mode(net_mode: int) -> void:
 	_puppet_warn = (net_mode & 8) != 0
 	if chomps():
-		_puppet_jaw = 1 if (net_mode & 16) != 0 else (-1 if (net_mode & 32) != 0 else 0)
+		_net_bite = (net_mode >> 4) & 7
 	var now := net_mode & 7
 	if now != phase:
 		phase = now as Phase
@@ -585,7 +619,11 @@ func _place_body() -> void:
 
 func _puppet_update(delta: float) -> void:
 	if chomps():
-		jaw = move_toward(jaw, float(_puppet_jaw), delta * (14.0 if _puppet_jaw < 0 else 2.5))
+		# The host's chomp phase, played here: its bite lands on our own players.
+		_bite.sync(_net_bite)
+		if _bite.update(delta):
+			_snap(settings.king_chomp_reach, settings.king_chomp_damage)
+		_pose_bite()
 	_update_bolts(delta)
 	_glow_now()
 
@@ -593,21 +631,29 @@ func _puppet_update(delta: float) -> void:
 # --- The chomp (the King) -----------------------------------------------------
 
 ## Its chomp each tick: a player ahead of its mouth and in range starts one;
-## its jaw gapes over king_chomp_wind, then snaps shut, biting.
+## its beats (ChompKit.Bite) wind it up over king_chomp_wind, then it lunges
+## as its jaws snap shut, the bite landing as they close.
 func _update_chomp(delta: float, prey: FishController) -> void:
 	_chomp_cool -= delta
-	if _snap_left > 0.0:
-		_snap_left -= delta
-		jaw = move_toward(jaw, -1.0, delta * 14.0)
-	elif _chomp_wind > 0.0:
-		_chomp_wind -= delta
-		jaw = move_toward(jaw, 1.0, delta * 1.3 / maxf(settings.king_chomp_wind, 0.05))
-		if _chomp_wind <= 0.0:
-			_snap(settings.king_chomp_reach, settings.king_chomp_damage)
-	else:
-		jaw = move_toward(jaw, 0.0, delta * 2.5)
-		if held == null and prey and _chomp_cool <= 0.0 and settings.king_chomp_range > 0.0 and _ahead(prey, settings.king_chomp_range):
-			_chomp_wind = settings.king_chomp_wind
+	if _bite.update(delta):
+		_snap(settings.king_chomp_reach, settings.king_chomp_damage)
+	global_position += -global_basis.z * _bite.step  # pulling back, then the lunge
+	_pose_bite()
+	if not _bite.busy() and held == null and prey and _chomp_cool <= 0.0 and settings.king_chomp_range > 0.0 \
+			and _ahead(prey, settings.king_chomp_range):
+		_bite.start(settings.king_chomp_wind, settings.king_chomp_reach)
+
+
+## Winding up a chomp (its jaws opening or held wide).
+func chomp_winding() -> bool:
+	return _bite.winding()
+
+
+## Its jaw from its bite (gaping 1, clamped shut -1), and its body sawing round
+## its length once its jaws are shut.
+func _pose_bite() -> void:
+	jaw = _bite.open - _bite.clamp_shut
+	rig.twist = _bite.saw * settings.chomp_saw * 2.0
 
 
 ## Whether `fish` is within `reach` m of its mouth, in front of it.
@@ -617,10 +663,11 @@ func _ahead(fish: FishController, reach: float) -> bool:
 	return off.length() <= reach and off.dot(forward) > -off.length() * 0.2
 
 
-## Its jaws snap shut: everyone within `reach` m of its mouth is bitten.
+## Its jaws are shut (the contact frame): everyone within `reach` m of its
+## mouth now is bitten, with the impact (our own players: a puppet's bite
+## lands on the guest's); nobody there, a heavy clack on nothing.
 func _snap(reach: float, damage: float) -> void:
-	_snap_left = 0.3
-	_chomp_cool = settings.king_chomp_every
+	_chomp_cool = settings.king_chomp_every / aggression()
 	chomp_count += 1
 	var mouth := mouth_point()
 	var bit := 0
@@ -628,9 +675,11 @@ func _snap(reach: float, damage: float) -> void:
 		if fish.puppet or not run.is_up(fish) or fish == held:
 			continue
 		if fish.global_position.distance_to(mouth) <= reach + UnnaturalRun.PLAYER_RADIUS:
-			run.hurt(fish, damage * settings.enemy_damage_scale * run.stage_damage(), -1, title.capitalize())
+			ChompKit.bite_player(run, fish, mouth, damage * settings.enemy_damage_scale * run.stage_damage(), title.capitalize(), self)
 			bit += 1
 	chomp_hits += bit
+	if bit == 0:
+		ChompKit.miss(run, mouth, reach)
 	chomped.emit(mouth, bit)
 
 
@@ -742,7 +791,7 @@ func hold(fish: FishController) -> void:
 	_drain_left = 0.4
 	_catch_from = fish.global_position
 	_catch_t = 0.0 if settings.grab_catch_time > 0.0 else 1.0
-	_chomp_wind = 0.0
+	_bite.cancel()
 	_hold_hook = func(_timing: float, _flow: float) -> void:
 		hold_strides += 1
 		_held_strode()
@@ -757,7 +806,7 @@ func release() -> void:
 		return
 	var fish := held
 	held = null
-	_regrab_left = 2.5
+	_regrab_left = settings.final_regrab_time
 	if is_instance_valid(fish):
 		if fish.strode.is_connected(_hold_hook):
 			fish.strode.disconnect(_hold_hook)
@@ -772,7 +821,7 @@ func release() -> void:
 func _update_hold(delta: float) -> void:
 	_regrab_left = maxf(_regrab_left - delta, 0.0)
 	if held == null:
-		if grabs() and phase == Phase.FURY or (grabs() and _diving > 0.0):
+		if grabbing_now():
 			var mouth := mouth_point()
 			for fish in run.local_players():
 				if run.is_up(fish) and not run.is_picking(fish) and fish.global_position.distance_to(mouth) <= hold_reach():

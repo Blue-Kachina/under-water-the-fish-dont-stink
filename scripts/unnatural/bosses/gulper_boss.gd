@@ -7,11 +7,13 @@ extends BloodLeviathan
 ##   within gulper_range of its mouth, swallowing up to gulper_max, each healing
 ##   it gulper_heal of its max hp (its belly fills);
 ## - spitting, it vomits gulper_vomit zombies at its target with its bile;
-## - in fury it charges mouth open, sucking: a player in front of its mouth
-##   (gulper_suck_range) is drawn in, water and grit streaming past them; one it
-##   reaches is swallowed as its jaws snap shut: a lump sliding down its throat
-##   into its belly (drained there), pushing back up with each stride until
-##   it coughs them out the front.
+## - it sucks: every gulper_suck_every s it turns on its target, mouth wide,
+##   its lane showing, and a player in front of its mouth (gulper_suck_range)
+##   is drawn in, water and grit streaming past them (weaker before fury:
+##   gulper_suck_circle, gulper_suck_spit); in fury it charges mouth open,
+##   sucking whenever a player's ahead. One it reaches is swallowed as its jaws
+##   snap shut: a lump sliding down its throat into its belly (drained there),
+##   pushing back up with each stride until it coughs them out the front.
 
 const GULPER_SKIN := preload("res://shaders/boss_gulper.gdshader")
 ## A gulp: how long the mouth stays open (s), and how near the mouth (m, of
@@ -27,9 +29,12 @@ var _open_left := 0.0
 var _in_gulp := 0
 var _gape := 0.0
 var _lure_light: OmniLight3D
-## Sucking now (a player in front of its mouth, in fury), and the times it has.
+## Sucking now (a player in front of its mouth), and the times it has; its
+## turn on its target to suck (s left), and the wait for the next.
 var sucking := false
 var sucks := 0
+var _suck_left := 0.0
+var _suck_every := 0.0
 var _suction: CPUParticles3D
 ## The swallowed player's lump: where it is along the body (rest z, m), how
 ## far it's gone down (0 the mouth to 1 the belly), and its kick from a stride.
@@ -113,11 +118,13 @@ func _belly_z() -> float:
 	return mouth_length() + body_length() * 0.1
 
 
+## Its jaws snap shut on them (ChompKit's impact, grab_impact strong).
 func _caught(fish: FishController) -> void:
 	_swallow_t = 0.0
 	_lump_z = mouth_length() * 0.45
 	_shut_left = 0.45
 	_kick = 0.0
+	ChompKit.impact(run, fish, mouth_point(), settings.grab_impact, self)
 	fish.set_model_visible(false)
 
 
@@ -140,10 +147,29 @@ func grabs() -> bool:
 	return true
 
 
+## It swallows a player its mouth reaches while it sucks, too.
+func grabbing_now() -> bool:
+	return super() or sucking
+
+
+func own_aggression() -> float:
+	return settings.gulper_aggression
+
+
+## Its suck's lane while it turns on its target to suck.
+func telegraph() -> Dictionary:
+	if not puppet and _suck_left > 0.0:
+		var forward := -rig.frame_at(0.0).basis.z
+		return {"from": mouth_point(), "dir": forward, "length": settings.gulper_suck_range, "width": hold_reach() * 2.0,
+				"progress": 1.0 - _suck_left / maxf(settings.gulper_suck_time, 0.01)}
+	return super()
+
+
 func _ready() -> void:
 	super()
 	name = "GulperMother"
 	_gulp_left = settings.gulper_every * 0.6
+	_suck_every = settings.gulper_suck_every * 0.5
 	_suction = _suction_particles()
 	add_child(_suction)
 
@@ -189,14 +215,14 @@ func _suction_particles() -> CPUParticles3D:
 	return p
 
 
-func _special(delta: float, _prey: FishController) -> void:
-	_suck(delta)
+func _special(delta: float, prey: FishController) -> void:
+	_suck(delta, prey)
 	_update_lump(delta)
 	# The gulp: open wide, draw the nearby dead in, swallow them.
 	if phase != Phase.FURY:
 		_gulp_left -= delta
 		if _gulp_left <= 0.0 and _open_left <= 0.0:
-			_gulp_left = settings.gulper_every
+			_gulp_left = settings.gulper_every / aggression()
 			_open_left = GULP_TIME
 			_in_gulp = 0
 			gulps += 1
@@ -217,10 +243,28 @@ func _special(delta: float, _prey: FishController) -> void:
 				run.horde.shove(i, off.normalized() * settings.gulper_pull * delta * 3.0)
 
 
-## In fury, mouth open: a player in front of its mouth is drawn in.
-func _suck(delta: float) -> void:
+## Its suck: every gulper_suck_every s (before fury) it turns on `prey` for
+## gulper_suck_time s, mouth open; then, diving, or any time in fury, a player
+## in front of its mouth is drawn in (weaker before fury).
+func _suck(delta: float, prey: FishController) -> void:
 	sucking = false
-	if phase == Phase.FURY and held == null and _regrab_left <= 0.0 and settings.gulper_suck > 0.0:
+	_suck_every -= delta
+	if phase != Phase.FURY and _suck_left <= 0.0 and _suck_every <= 0.0 and prey and held == null and settings.gulper_suck > 0.0 \
+			and prey.global_position.distance_to(mouth_point()) <= settings.gulper_suck_range * 1.6:
+		_suck_left = settings.gulper_suck_time
+		_suck_every = settings.gulper_suck_every / aggression()
+	if _suck_left > 0.0:
+		_suck_left -= delta
+		if prey:
+			var to_prey := (prey.global_position - global_position).normalized()
+			velocity = velocity.slerp(to_prey * velocity.length(), 1.0 - exp(-3.0 * delta))  # turning on its target
+	var pull := settings.gulper_suck
+	if phase == Phase.CIRCLE:
+		pull *= settings.gulper_suck_circle
+	elif phase == Phase.SPIT:
+		pull *= settings.gulper_suck_spit
+	var on := phase == Phase.FURY or _suck_left > 0.0 or _diving > 0.0
+	if on and held == null and _regrab_left <= 0.0 and pull > 0.0:
 		var mouth := mouth_point()
 		for fish in run.local_players():
 			if not run.is_up(fish) or run.is_picking(fish) or not _ahead(fish, settings.gulper_suck_range):
@@ -228,7 +272,7 @@ func _suck(delta: float) -> void:
 			sucking = true
 			var to := (mouth - fish.global_position).normalized()
 			var now := fish.linear_velocity.dot(to)
-			var change := clampf(settings.gulper_suck - now, 0.0, settings.gulper_suck * delta * 4.0)
+			var change := clampf(pull - now, 0.0, pull * delta * 4.0)
 			fish.apply_push(to * change)
 	if sucking and not _suction.emitting:
 		sucks += 1
@@ -260,7 +304,7 @@ func _spit(at: Vector3) -> void:
 
 func _glow_now() -> void:
 	super()
-	var open := 1.0 if _open_left > 0.0 or phase == Phase.FURY or _diving > 0.0 or winding_up() else 0.15
+	var open := 1.0 if _open_left > 0.0 or _suck_left > 0.0 or phase == Phase.FURY or _diving > 0.0 or winding_up() else 0.15
 	var rate := 1.6
 	if held:
 		open = -0.45  # jaws clamped shut on what it swallowed

@@ -12,9 +12,12 @@ extends HunterBot
 ## - opens chests: one it can afford, near and with the horde not on top of
 ##   it, it swims through at battering speed (or, slow, stops by it);
 ## - picks cards: at random, or greedily (new weapons first, then the rarest
-##   upgrades, milestones and useful tomes; it skips cursed items).
+##   upgrades, milestones and useful tomes; it skips cursed items), or none
+##   (MAIN_ONLY, the class survival sim: every level's cards go by with no
+##   skip spent, and it leaves pearls and chests be, so the main weapon stays
+##   at its level and nothing else is ever taken).
 
-enum Picks { RANDOM, GREEDY }
+enum Picks { RANDOM, GREEDY, MAIN_ONLY }
 
 ## How far it looks for zombies to steer away from, pearls and chests (m).
 const DANGER_RANGE := 22.0
@@ -88,11 +91,11 @@ func _choose_goal() -> Vector3:
 		crowd += 1 if gap < CROWD_RANGE else 0
 		away += offset.normalized() / (gap * gap)
 	var goal := _whirlpool_goal(me)
-	if goal == Vector3.INF:
+	if goal == Vector3.INF and picks != Picks.MAIN_ONLY:
 		goal = _chest_goal(me, closest)
 	if goal == Vector3.INF:
 		goal = _ram_goal(me)
-	if goal == Vector3.INF:
+	if goal == Vector3.INF and picks != Picks.MAIN_ONLY:
 		goal = _pearl_goal(me, closest)
 	if goal == Vector3.INF and crowd < CROWD:
 		goal = _hunt_goal(me)
@@ -206,6 +209,20 @@ func _keep_in(goal: Vector3) -> Vector3:
 
 func _on_cards_offered(for_fish: FishController, cards: Array, _heading: String, _line: String) -> void:
 	if for_fish != fish or cards.is_empty():
+		return
+	if picks == Picks.MAIN_ONLY:
+		picked["none"] = picked.get("none", 0) + 1
+		# Deferred: the run is still emitting the offer. A level's goes by, a chest's is put back.
+		(func() -> void:
+			if not is_instance_valid(run) or run.offer_of(fish) != cards:
+				return
+			if run.can_cancel(fish):
+				run.cancel_offer(fish)
+			elif run._offer_kind.get(fish, "") == "level":
+				run.skip_free(fish)
+			else:
+				picked["forced"] = picked.get("forced", 0) + 1  # a chest it can't put back: the run waits on a pick
+				run.pick(fish, 0)).call_deferred()
 		return
 	var index := _choose_card(cards)
 	var card: Dictionary = cards[index]

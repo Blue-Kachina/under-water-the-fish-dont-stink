@@ -217,9 +217,9 @@ func lob(from: Vector3, to: Vector3) -> void:
 ## A cloud bursts at `at`, `size` m round, for `seconds` (the oldest goes past the cap).
 func open_cloud(at: Vector3, size: float, seconds: float, counted := true) -> Cloud:
 	while clouds.size() >= max_clouds():
-		var oldest: Cloud = clouds.pop_front()
+		var oldest: Variant = clouds.pop_front()  # it may be freed already: no typed assign
 		if is_instance_valid(oldest):
-			oldest.fade_out()
+			(oldest as Cloud).fade_out()
 	var cloud := Cloud.new()
 	cloud.radius = size
 	cloud.life = seconds

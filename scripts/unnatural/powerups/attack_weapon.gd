@@ -46,7 +46,17 @@ func _ensure() -> void:
 		attack.powers = settings
 		attack.on_hit = run.hit
 		run.add_child(attack)
-	attack.configure(run.block_of(fish), run.loadout_of(fish).facets_of(id), stacks)
+	attack.configure(run.block_of(fish), held_facets(), attack_level())
+
+
+## Its facets (facet id -> total): its upgrades in the Loadout.
+func held_facets() -> Dictionary:
+	return run.loadout_of(fish).facets_of(id)
+
+
+## The level its attack works at (milestones): its stacks, the weapon's level.
+func attack_level() -> int:
+	return stacks
 
 
 ## The attack wears its own look (FishAttack.wear).

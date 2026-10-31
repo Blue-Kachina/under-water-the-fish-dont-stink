@@ -90,11 +90,16 @@ func _run() -> void:
 	shark.take(1000.0, fish, "probe")
 	await _seconds(2.0)
 	var boss_chest: TreasureChest = null
+	var jaws_chest: TreasureChest = null
 	for chest in run.chests:
 		if is_instance_valid(chest) and chest.kind == TreasureChest.Kind.BOSS:
-			boss_chest = chest
-	check(boss_chest != null and boss_chest.item == "" and boss_chest.tint() == TreasureChest.STEEL,
+			if chest.item == "":
+				boss_chest = chest
+			elif chest.item == "drowned_jaws":
+				jaws_chest = chest
+	check(boss_chest != null and boss_chest.tint() == TreasureChest.STEEL,
 			"the Drowned Shark beaten drops a steel-blue boss chest")
+	check(jaws_chest != null and jaws_chest.holds_boss_item(), "and a second with its own Drowned Jaws (§2 of planning_bosses_and_survival.md)")
 	if boss_chest:
 		run.open_chest(boss_chest, fish)
 		await _frames(2)
@@ -202,7 +207,7 @@ func _run() -> void:
 	horde.clear()
 	fish.revive(Transform3D(Basis.looking_at(Vector3.FORWARD), Vector3(0, 0, 60)))
 	await _ticks(2)
-	var coil := run.powerups_of(fish).weapon("attack_leviathans_coil") as LeviathansCoil
+	var coil := run.powerups_of(fish).weapon("leviathans_coil") as LeviathansCoil
 	for t in 240:
 		fish.linear_velocity = Vector3.FORWARD * 8.0
 		await get_tree().physics_frame

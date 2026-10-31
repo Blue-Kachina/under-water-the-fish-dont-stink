@@ -85,6 +85,7 @@ var _beat_phase := 0.0
 
 func _ready() -> void:
 	layer = 2
+	add_to_group(&"unnatural_huds")  # ChompKit finds a player's own HUD by it
 	_hurt.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_hurt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hurt_material.shader = HURT_SHADER
@@ -727,15 +728,14 @@ class Bars extends Control:
 		UITheme.draw_box(self, panel, Color(UITheme.DEEP, 0.3), 9.0 * s, Color(RIM, 0.12), 1.0)
 		var y := panel.position.y + pad + row_h * 0.5
 		var left := panel.position.x + pad
-		# Weapons: gold diamonds (a boss's keeps its colour).
+		# Weapons: gold diamonds.
 		_section_label(Rect2(left, y - row_h * 0.5, LABEL_WIDTH * s, row_h), "WEAPONS", "%d/%d" % [loadout.weapons.size(), run.settings.weapon_slots], s)
 		for n in weapon_slots:
 			var centre := Vector2(left + LABEL_WIDTH * s + slot_step * (n + 0.5), y)
 			if n < loadout.weapons.size():
 				var id := loadout.weapons[n]
-				var tint := UITheme.rarity(Rarity.Tier.BOSS) if id in Weapons.BOSS_ONLY else LEVEL_COLOR
-				UnnaturalHud.draw_slot(self, HexBadge.Shape.DIAMOND, centre, WEAPON_SIZE * s, Weapons.glyph(id, kind), tint, s)
-				UnnaturalHud.draw_chip(self, centre + Vector2(WEAPON_SIZE * 0.36, WEAPON_SIZE * 0.4) * s, str(loadout.level(id)), tint, s)
+				UnnaturalHud.draw_slot(self, HexBadge.Shape.DIAMOND, centre, WEAPON_SIZE * s, Weapons.glyph(id, kind), LEVEL_COLOR, s)
+				UnnaturalHud.draw_chip(self, centre + Vector2(WEAPON_SIZE * 0.36, WEAPON_SIZE * 0.4) * s, str(loadout.level(id)), LEVEL_COLOR, s)
 			else:
 				HexBadge.draw_shape(self, HexBadge.Shape.DIAMOND, centre, WEAPON_SIZE * s, Color(UITheme.DEEP, 0.25), SLOT_EMPTY, 1.0)
 		# Tomes: squares in each tome's colour.

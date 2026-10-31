@@ -90,12 +90,26 @@ static func shared() -> UnnaturalSettings:
 @export var murk_spawn_anywhere := true
 ## Red eyes in the dark: zombies from where the fog is glint_from thick out to
 ## glint_distance (m; 0: none) show a pair of glowing eyes through the murk,
-## fading with distance.
+## fading with distance. A hint of the next wave, not a beacon.
 @export_range(0.0, 1.0, 0.05) var glint_from := 0.8
-@export_range(0.0, 600.0, 5.0, "or_greater") var glint_distance := 170.0
-@export_range(0.0, 5.0, 0.05, "or_greater") var glint_strength := 1.0
+@export_range(0.0, 600.0, 5.0, "or_greater") var glint_distance := 110.0
+@export_range(0.0, 5.0, 0.05, "or_greater") var glint_strength := 0.25
 ## Each eye's size (m), times the zombie's size.
 @export_range(0.01, 1.0, 0.01, "or_greater") var glint_size := 0.09
+## The eyes grow with distance, times (1 + d / glint_grow) (d in m), so far ones
+## stay a pixel or two instead of shrinking away (0: they never grow; lower: bigger far eyes).
+@export_range(0.0, 1000.0, 5.0, "or_greater") var glint_grow := 120.0
+## The share of the glint band (from where they start out to glint_distance)
+## over which the eyes dim away at its far end, a smooth ramp (0: a hard edge;
+## 1: they dim all the way out).
+@export_range(0.0, 1.0, 0.05) var glint_fade_far := 0.5
+## Zombies close enough to see have a pair of red eyes on their heads
+## (near_eye_strength, their glow; 0: none). For the last eye_handoff m before
+## the glints start, the eyes cross over to the glints, so they never vanish as
+## a zombie closes in. head_glow: the faint red rot glow over the front of the head (times eye_glow).
+@export_range(0.0, 20.0, 0.1, "or_greater") var near_eye_strength := 4.0
+@export_range(0.0, 60.0, 0.5, "or_greater") var eye_handoff := 8.0
+@export_range(0.0, 4.0, 0.05, "or_greater") var head_glow := 0.25
 
 @export_group("Minimap")
 ## A flat map in the corner of each player's view: players and bosses as
@@ -736,12 +750,13 @@ static func shared() -> UnnaturalSettings:
 ## Killing it drops a chest (a powerup pick) and XP worth this much.
 @export_range(0.0, 1000.0, 5.0, "or_greater") var shark_xp := 80.0
 ## Its chomp: a player within shark_chomp_range m ahead of its mouth makes it
-## open wide (its jaw drops over shark_chomp_wind s) and snap shut, biting
+## wind up over shark_chomp_wind s (its head pulls back, its jaw drops open
+## and holds wide: the Chomps group) and snap shut, biting
 ## everyone within shark_chomp_reach m of its mouth for shark_chomp_damage;
 ## then shark_chomp_every s before the next. Charging, its jaws hang open and
 ## snap on the first player they reach.
 @export_range(0.0, 100.0, 0.5, "or_greater") var shark_chomp_range := 14.0
-@export_range(0.05, 3.0, 0.05, "or_greater") var shark_chomp_wind := 0.45
+@export_range(0.05, 3.0, 0.05, "or_greater") var shark_chomp_wind := 0.55
 @export_range(0.5, 40.0, 0.5, "or_greater") var shark_chomp_reach := 6.0
 @export_range(0.0, 500.0, 1.0, "or_greater") var shark_chomp_damage := 35.0
 @export_range(0.0, 30.0, 0.25, "or_greater") var shark_chomp_every := 2.5
@@ -794,13 +809,14 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 2.0, 0.05, "or_greater") var grab_catch_time := 0.3
 @export_range(0.0, 200.0, 1.0, "or_greater") var grab_camera_pull := 26.0
 ## The King of Herrings' chomp, in any phase: a player within king_chomp_range m
-## ahead of its mouth makes its jaw gape over king_chomp_wind s and snap shut,
+## ahead of its mouth makes it wind up over king_chomp_wind s (the Chomps
+## group's beats: pulling back, its jaw gaping, held wide) and snap shut,
 ## biting everyone within king_chomp_reach m of its mouth for king_chomp_damage;
 ## king_chomp_every s between chomps.
 @export_range(0.0, 100.0, 0.5, "or_greater") var king_chomp_range := 18.0
-@export_range(0.05, 3.0, 0.05, "or_greater") var king_chomp_wind := 0.55
+@export_range(0.05, 3.0, 0.05, "or_greater") var king_chomp_wind := 0.65
 @export_range(0.5, 40.0, 0.5, "or_greater") var king_chomp_reach := 7.0
-@export_range(0.0, 500.0, 1.0, "or_greater") var king_chomp_damage := 30.0
+@export_range(0.0, 500.0, 1.0, "or_greater") var king_chomp_damage := 20.0
 @export_range(0.0, 30.0, 0.25, "or_greater") var king_chomp_every := 3.0
 ## In fury the King wraps a player it reaches in coil_loops loops of its body,
 ## from coil_radius m round them tightening to coil_tight m over the hold; its
@@ -897,6 +913,116 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.3, 4.0, 0.05, "or_greater") var angel_lock_gap := 0.9
 @export_range(0.0, 5.0, 0.05, "or_greater") var angel_orbit := 0.7
 @export_range(0.0, 15.0, 0.25, "or_greater") var angel_lock_time := 2.25
+
+@export_group("Chomps")
+## Every jawed boss's chomp (ChompKit) as a real bite's beats: the head pulls
+## back (chomp_pull times its bite's reach) and the snout lifts (chomp_lift
+## rad) over chomp_anticipate s, the jaw drops open (fast, then slowing) over
+## chomp_gape s and holds wide for chomp_hold s; these three are scaled
+## together to fit each boss's own chomp wind (shark_chomp_wind,
+## king_chomp_wind). Then the strike: the head lunges chomp_lunge times the
+## reach as the jaws slam shut over chomp_strike s; it saws side to side
+## (chomp_saw rad) for chomp_shake s, and settles over chomp_recover s.
+@export_range(0.0, 2.0, 0.01, "or_greater") var chomp_anticipate := 0.12
+@export_range(0.0, 2.0, 0.01, "or_greater") var chomp_gape := 0.2
+@export_range(0.0, 2.0, 0.01, "or_greater") var chomp_hold := 0.2
+@export_range(0.01, 1.0, 0.01, "or_greater") var chomp_strike := 0.07
+@export_range(0.0, 2.0, 0.01, "or_greater") var chomp_shake := 0.3
+@export_range(0.0, 2.0, 0.01, "or_greater") var chomp_recover := 0.25
+@export_range(0.0, 3.0, 0.05, "or_greater") var chomp_pull := 0.15
+@export_range(0.0, 4.0, 0.05, "or_greater") var chomp_lunge := 0.8
+@export_range(0.0, 1.0, 0.01, "or_greater") var chomp_lift := 0.15
+@export_range(0.0, 1.0, 0.01, "or_greater") var chomp_saw := 0.12
+## The bite lands on the tick the jaws are this shut (0.9: 90%), from where the
+## mouth is then: the lunge counts, and a side-step during the hold dodges it.
+@export_range(0.5, 1.0, 0.01) var chomp_contact := 0.9
+## A chomp that lands, on the victim: their camera shakes chomp_cam_shake m (at
+## chomp_damage_ref damage; more for more, up to twice) and kicks chomp_cam_kick
+## m toward the boss; the boss and the victim freeze for chomp_hit_stop s (no
+## global slow-down) as their fish squashes by chomp_squash; they're knocked
+## chomp_knockback m/s from the mouth; the red vignette flushes chomp_vignette
+## strong; their pad rumbles chomp_rumble (0 to 1) for chomp_rumble_time s; its
+## damage number is chomp_number_scale times bigger, in red.
+@export_range(0.0, 5.0, 0.05, "or_greater") var chomp_cam_shake := 0.5
+@export_range(0.0, 5.0, 0.05, "or_greater") var chomp_cam_kick := 0.6
+@export_range(1.0, 500.0, 1.0, "or_greater") var chomp_damage_ref := 30.0
+@export_range(0.0, 0.5, 0.01, "or_greater") var chomp_hit_stop := 0.07
+@export_range(0.0, 0.9, 0.05) var chomp_squash := 0.3
+@export_range(0.0, 100.0, 0.5, "or_greater") var chomp_knockback := 14.0
+@export_range(0.0, 4.0, 0.05, "or_greater") var chomp_vignette := 1.6
+@export_range(0.0, 1.0, 0.05) var chomp_rumble := 1.0
+@export_range(0.0, 2.0, 0.05, "or_greater") var chomp_rumble_time := 0.25
+@export_range(1.0, 5.0, 0.05, "or_greater") var chomp_number_scale := 1.8
+## A chomp that misses still clacks: players within chomp_miss_range times its
+## reach of the mouth feel chomp_miss_shake of a hit's shake and rumble.
+@export_range(0.0, 10.0, 0.25, "or_greater") var chomp_miss_range := 2.0
+@export_range(0.0, 2.0, 0.05, "or_greater") var chomp_miss_shake := 0.35
+## The grabs' impact (the Gulper's snap, the Lamprey's latch, a hagfish's
+## bite), times a chomp's.
+@export_range(0.0, 3.0, 0.05, "or_greater") var grab_impact := 0.8
+## A zombie's lunge (or punch) landing gives a light impact: a camera tick of
+## lunge_impact_shake times a chomp's, a rim flash of lunge_impact_flash, a
+## knock of lunge_impact_knock m/s, a rumble of lunge_impact_rumble and a bubble
+## puff; at most one per player every lunge_impact_every s (a swarm reads as a
+## steady rattle, not a constant shake, and costs the same as one lunge).
+@export var lunge_impact := true
+@export_range(0.0, 2.0, 0.05, "or_greater") var lunge_impact_shake := 0.25
+@export_range(0.0, 3.0, 0.05, "or_greater") var lunge_impact_flash := 0.35
+@export_range(0.0, 30.0, 0.25, "or_greater") var lunge_impact_knock := 3.0
+@export_range(0.0, 1.0, 0.05) var lunge_impact_rumble := 0.3
+@export_range(0.0, 2.0, 0.01, "or_greater") var lunge_impact_every := 0.15
+
+@export_group("Boss Aggression")
+## How hard the final bosses press (the Fallen Angel's pressure is the
+## target): boss_aggression multiplies how often they attack (dives, chomps,
+## bolts, gulps and sucks, lunges, hagfish strikes) and divides their rests;
+## each boss's own value multiplies it again (1: as tuned, 2: twice as often).
+@export_range(0.1, 5.0, 0.05, "or_greater") var boss_aggression := 1.0
+@export_range(0.1, 5.0, 0.05, "or_greater") var king_aggression := 1.25
+@export_range(0.1, 5.0, 0.05, "or_greater") var gulper_aggression := 1.0
+@export_range(0.1, 5.0, 0.05, "or_greater") var whale_aggression := 1.5
+@export_range(0.1, 5.0, 0.05, "or_greater") var lamprey_aggression := 1.0
+@export_range(0.1, 5.0, 0.05, "or_greater") var angel_aggression := 1.0
+## Stalking: a final boss whose target is further than boss_stalk_range m turns
+## and closes at boss_stalk_speed times its speed instead of keeping its
+## course, so none can be out-swum for long (the Whale Fall's carcass stays
+## put: a hagfish tears free and hunts instead).
+@export_range(5.0, 300.0, 1.0, "or_greater") var boss_stalk_range := 45.0
+@export_range(0.0, 4.0, 0.05, "or_greater") var boss_stalk_speed := 1.4
+## Out of fury, a serpent dives through its target every leviathan_dive_every s.
+@export_range(0.5, 60.0, 0.25, "or_greater") var leviathan_dive_every := 5.0
+## A final boss that lets a player go can't grab anyone again for
+## final_regrab_time s (the player is a moment untouchable, then free to swim).
+@export_range(0.0, 30.0, 0.25, "or_greater") var final_regrab_time := 7.0
+## The serpents (the King, the Gulper, the Lamprey): they circle their target
+## serpent_circle times their usual ring (closer: more pressure); their bodies
+## touch for serpent_contact times leviathan_contact, and serpent_fury_contact
+## times that again in fury, when they charge through it again and again.
+@export_range(0.2, 3.0, 0.05, "or_greater") var serpent_circle := 0.75
+@export_range(0.0, 2.0, 0.05, "or_greater") var serpent_contact := 0.7
+@export_range(0.0, 2.0, 0.05, "or_greater") var serpent_fury_contact := 0.24
+## Signature moves before fury (fury makes them faster, not possible):
+## - the King coils round a player it reaches as it dives from coil_from_phase;
+@export_enum("From the start", "From two thirds", "Fury only") var coil_from_phase := 1
+## - the Gulper sucks: every gulper_suck_every s it turns on its target, mouth
+##   wide (its suction stream and lane showing), and sucks for gulper_suck_time
+##   s, at gulper_suck times gulper_suck_circle (first phase) or
+##   gulper_suck_spit (from two thirds); in fury, whenever a player's ahead;
+@export_range(0.5, 60.0, 0.25, "or_greater") var gulper_suck_every := 6.0
+@export_range(0.2, 10.0, 0.1, "or_greater") var gulper_suck_time := 2.5
+@export_range(0.0, 2.0, 0.05, "or_greater") var gulper_suck_circle := 0.6
+@export_range(0.0, 2.0, 0.05, "or_greater") var gulper_suck_spit := 0.65
+## - the Lamprey lunges in every phase, lamprey_lunge_circle, lamprey_lunge_spit
+##   and lamprey_lunge_fury s apart;
+@export_range(0.25, 60.0, 0.25, "or_greater") var lamprey_lunge_circle := 2.5
+@export_range(0.25, 60.0, 0.25, "or_greater") var lamprey_lunge_spit := 3.5
+@export_range(0.25, 60.0, 0.25, "or_greater") var lamprey_lunge_fury := 2.0
+## - at two thirds hagfish_free_spit of the Whale Fall's hagfish tear free and
+##   hunt (all of them in fury), and the rest reach hagfish_reach_growth more
+##   per phase; a loose one strikes from hagfish_hunt_strike m.
+@export_range(0, 8, 1, "or_greater") var hagfish_free_spit := 1
+@export_range(0.0, 2.0, 0.05, "or_greater") var hagfish_reach_growth := 0.25
+@export_range(2.0, 60.0, 0.5, "or_greater") var hagfish_hunt_strike := 12.0
 
 @export_group("Levels")
 ## XP to the next level: xp_base * level ^ xp_curve.
@@ -1110,8 +1236,7 @@ static func shared() -> UnnaturalSettings:
 
 @export_group("Test Tank")
 ## A preset for power and frame benchmarks: every weapon slot full (the
-## attack, then Greek Fire, Jellyfish Halo, Purple Haze, Remora Buddy, the
-## Coil) and every tome slot (Teeth, Tides, the Reef, the Shell...), all at
+## attack, then Greek Fire, Jellyfish Halo, Purple Haze, Remora Buddy) and every tome slot (Teeth, Tides, the Reef, the Shell...), all at
 ## that level. It sets the weapons' level overrides (POWERUPS) and the tank's
 ## stats below; Off clears what it set.
 @export_enum("Off", "Full slots Lv 5", "Full slots Lv 10", "Full slots Lv 20") var tank_preset := 0
@@ -1157,6 +1282,14 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_xp_gain := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_pearl_chance := 0.0
 @export_range(0.0, 10.0, 0.05, "or_greater") var tank_luck := 0.0
+
+@export_group("Test Tank: boss items")
+## Boss items to try in the Test Tank (planning_bosses_and_survival.md §2): the
+## one picked (or every one, and the Shark's Drowned Jaws) at
+## tank_boss_item_stacks stacks, through their stacks overrides (POWERUPS);
+## None clears them again.
+@export_enum("None", "Leviathan's Coil", "Gulper's Maw", "Hagfish Brood", "Queen's Disc", "Angel's Crown", "Drowned Jaws", "All") var tank_boss_item := 0
+@export_range(1, 20, 1, "or_greater") var tank_boss_item_stacks := 1
 
 @export_group("Feel")
 ## Damage numbers (the Playability pass, P3) over the zombies your hits land on.

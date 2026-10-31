@@ -179,11 +179,14 @@ func _run() -> void:
 			"+10 MAX HP  ·  +10% SIZE (SIGNATURE)  ·  WEAPONS 2/2  ·  TOMES 2/2", null)
 	await _frames(6)
 	await _shot("cards_level_2")
-	cards.open([{"kind": "swap", "weapon": "attack_greek_fire", "incoming": "attack_leviathans_coil", "tier": Rarity.Tier.BOSS, "level": 5},
-			{"kind": "keep", "weapon": "attack_leviathans_coil", "tier": Rarity.Tier.COMMON}], "LEVIATHAN'S COIL: NO FREE SLOT",
-			"SWAP A WEAPON FOR IT, OR KEEP YOURS", null)
+	cards.open([{"powerup": "angels_crown", "stacks": 1, "tier": Rarity.Tier.BOSS}], "BOSS TREASURE!",
+			"A BOSS ITEM  ·  NO SLOT, NO LIMIT  ·  IT STACKS", null)
 	await _frames(6)
-	await _shot("cards_swap")
+	await _shot("cards_boss_item")
+	cards.open([{"powerup": "gulpers_maw", "stacks": 2, "tier": Rarity.Tier.BOSS}, {"powerup": "drowned_jaws", "stacks": 1, "tier": Rarity.Tier.LEGENDARY},
+			{"powerup": "megalodon_tooth", "stacks": 1, "tier": Rarity.Tier.LEGENDARY}], "BOSS TREASURE!", "BOSS AND LEGENDARY SIDE BY SIDE", null)
+	await _frames(6)
+	await _shot("cards_boss_vs_legendary")
 	cards.close()
 	get_tree().paused = false
 

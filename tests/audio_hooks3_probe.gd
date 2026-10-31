@@ -233,7 +233,7 @@ func _powerups() -> void:
 	var powers := run.powerups_of(fish)
 	heard.clear()
 	for id in ["attack_purple_haze", "anglerfish_lure", "torpedo", "electric_eel", "tsunami_heart", "bubble_wrap",
-			"pufferfish_spines", "attack_greek_fire", "attack_jellyfish_halo", "attack_leviathans_coil"]:
+			"pufferfish_spines", "attack_greek_fire", "attack_jellyfish_halo", "leviathans_coil"]:
 		powers.add(id)
 	await _seconds(0.2)
 	var worn_loops := heard.duplicate()

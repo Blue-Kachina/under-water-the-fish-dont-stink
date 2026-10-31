@@ -12,6 +12,9 @@ extends Node
 ##   --cull=F     murk_cull (the fog amount it stops drawing at; 1: never)
 ##   --frustum=0  draw zombies behind the camera too (murk_frustum off)
 ## Also prints the GPU's and the render thread's time per frame.
+##   --overlay_code=PATH  draw the rot overlay with this shader file instead (an
+##                        A/B of overlay changes, e.g. the near eyes of
+##                        planning_bosses_and_survival.md §1, back to back)
 
 var counts: Array[int] = [500, 1000, 2000, 5000]
 var seconds := 3.0
@@ -19,6 +22,7 @@ var spread := 70.0
 var murk := 0.0
 var cull := -1.0
 var frustum := true
+var overlay_code := ""
 
 
 func _ready() -> void:
@@ -35,6 +39,8 @@ func _ready() -> void:
 			cull = arg.trim_prefix("--cull=").to_float()
 		elif arg.begins_with("--frustum="):
 			frustum = arg.trim_prefix("--frustum=").to_int() != 0
+		elif arg.begins_with("--overlay_code="):
+			overlay_code = arg.trim_prefix("--overlay_code=")
 	get_window().size = Vector2i(1920, 1080)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = 0
@@ -66,6 +72,11 @@ func _run(main: Node) -> void:
 		main.get_node("Ocean").add_child(horde)
 		horde.setup(settings, EnemyKind.defaults(), settings.max_enemies, 1)
 		horde.apply_murk(murk)
+		if not overlay_code.is_empty():
+			var shader := Shader.new()
+			shader.code = FileAccess.get_file_as_string(overlay_code)
+			for overlay in horde._overlays:
+				overlay.shader = shader
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 2
 		for n in count:

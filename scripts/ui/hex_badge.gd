@@ -37,7 +37,15 @@ const GLYPHS := {
 	"anglerfish_lure": "M3 21C3 12 8 5 15 5c2.5 0 4 1.5 4 3.5V10M16.5 12.5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0",
 	"tsunami_heart": "M12 20.5s-8-4.8-8-10.5a4.3 4.3 0 0 1 8-2.2 4.3 4.3 0 0 1 8 2.2c0 5.7-8 10.5-8 10.5zM7.5 12c1.5-1.2 3-1.2 4.5 0s3 1.2 4.5 0",
 	"drowned_fin": "M4 18c4.5 0 7-3 8-8l2.5-6c1 5 2.5 10 6 14zM2 21.5h20",
+	# The boss items (planning_bosses_and_survival.md §2); the Coil's also under its
+	# old weapon id, for a fish whose own attack is set to it (FishAttack.weapon_id_of).
+	"leviathans_coil": "M2 15a3.3 3.3 0 0 1 6.6 0 3.3 3.3 0 0 0 6.6 0 3.3 3.3 0 0 1 6.6 0V10l-2-2",
 	"attack_leviathans_coil": "M2 15a3.3 3.3 0 0 1 6.6 0 3.3 3.3 0 0 0 6.6 0 3.3 3.3 0 0 1 6.6 0V10l-2-2",
+	"gulpers_maw": "M3 9c2.5-5 15.5-5 18 0M3 15c2.5 5 15.5 5 18 0M3 9v6M21 9v6M7 9.5l1 2 1-2.3M15 9.2l1 2.3 1-2M7 14.5l1-2 1 2.3M15 14.8l1-2.3 1 2M12 12a1.5 1.5 0 1 1 1.5 1.5",
+	"hagfish_brood": "M4 6c3 0 4 2 7 2s4-2 7-2M4 12c3 0 4 2 7 2s4-2 7-2M4 18c3 0 4 2 7 2s4-2 7-2M18 6h2M18 12h2M18 18h2M2 4v16",
+	"queens_disc": "M5 12a7 7 0 1 0 14 0a7 7 0 1 0 -14 0M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M12 5v2M12 17v2M5 12h2M17 12h2M7 7l1.4 1.4M15.6 15.6 17 17M7 17l1.4-1.4M15.6 8.4 17 7",
+	"angels_crown": "M4 17h16M5 17l-1-8 4 3 4-6 4 6 4-3-1 8M8 12c-2 1-3 4-5 5M16 12c2 1 3 4 5 5M12 6V3",
+	"drowned_jaws": "M3 8c3-3 15-3 18 0l-2 5c-4 2-10 2-14 0zM6 9l1 3 1-3.3M11 8.5l1 3.5 1-3.5M16 8.7l1 3.3 1-3M8 19c2 1.5 6 1.5 8 0",
 	"blood_moon_shard": "M15 3.5a8.5 8.5 0 1 0 5.5 14 7 7 0 0 1-5.5-14zM10 9l2 3-1.5 3",
 	"glass_coral": "M12 21v-8M12 13 8 9V4.5M12 13l4.5-5V4M8 9 5 7.5M16.5 8 19.5 7M8 21h8",
 	"sirens_song": "M9 17.5V5.5l11-2v12M9 9.5l11-2M4 17.5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0M15 15.5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0",

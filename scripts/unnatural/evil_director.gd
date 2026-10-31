@@ -58,6 +58,9 @@ var quiet_left := 0.0
 var stage_scale := 1.0
 var elite_bonus := 0.0
 var elite_scale := 1.0
+## Held at this (0: off, the usual bending): the class survival sim's scenario
+## pins the director's pressure so every class faces the same target.
+var locked_pressure := 0.0
 
 var _kill_times := PackedFloat32Array()
 var _read_left := 0.0
@@ -87,6 +90,7 @@ func reset() -> void:
 	hushed = false
 	escalation = 1.0
 	cleared = false
+	locked_pressure = 0.0
 	_kill_times.clear()
 	_read_left = READ_INTERVAL
 
@@ -182,12 +186,36 @@ func update(delta: float, around: PackedVector3Array) -> void:
 	packs += 1
 
 
+## The target alive all at once (the class survival sim's --prefill), in
+## packs of swarm_size() round `around` from the usual spawn points, so a
+## scenario starts at full pressure. Returns how many came.
+func prefill(around: PackedVector3Array) -> int:
+	if around.is_empty():
+		return 0
+	var made := 0
+	var missing := target_alive() - horde.alive_count()
+	while missing > 0:
+		var kind := pick_kind()
+		var near := around[rng.randi_range(0, around.size() - 1)]
+		var at: Vector3 = spawn_point.call(near)
+		var count := horde.spawn_pack(kind, mini(swarm_size(), missing), at, 1.5 + sqrt(float(mini(swarm_size(), missing))) * 0.6,
+				(near - at).normalized(), elite_chance())
+		if count <= 0:
+			break  # the horde is full
+		made += count
+		missing -= count
+	return made
+
+
 ## Pressure and breathers from the kill rate and intensity.
 func _read() -> void:
 	var since := elapsed - KILL_WINDOW
 	while not _kill_times.is_empty() and _kill_times[0] < since:
 		_kill_times.remove_at(0)
 	_check_relief()
+	if locked_pressure > 0.0:
+		pressure = locked_pressure
+		return
 	var easy := kill_rate() / maxi(players, 1) >= settings.easy_kill_rate and intensity < settings.calm_intensity
 	if easy:
 		pressure = minf(pressure + settings.pressure_rate * READ_INTERVAL, settings.pressure_max)

@@ -307,8 +307,8 @@ func _draw_summary(run: UnnaturalRun, player: FishController, y: float) -> void:
 	var rows := maxi(maxi(loadout.weapons.size(), loadout.tomes.size()), 1)
 	for n in loadout.weapons.size():
 		var id := loadout.weapons[n]
-		var tint := UITheme.rarity(Rarity.Tier.BOSS) if id in Weapons.BOSS_ONLY else UnnaturalHud.LEVEL_COLOR
-		_loadout_row(PAD, y + 22.0 + n * 46.0, column, HexBadge.Shape.DIAMOND, Weapons.glyph(id, kind), Weapons.title(id, kind), loadout.level(id), tint)
+		_loadout_row(PAD, y + 22.0 + n * 46.0, column, HexBadge.Shape.DIAMOND, Weapons.glyph(id, kind), Weapons.title(id, kind), loadout.level(id),
+				UnnaturalHud.LEVEL_COLOR)
 	for n in loadout.tomes.size():
 		var id := loadout.tomes[n]
 		_loadout_row(PAD + column + 16.0, y + 22.0 + n * 46.0, column, HexBadge.Shape.SQUARE, Tomes.glyph(id), Tomes.title(id),
@@ -384,8 +384,8 @@ func _draw_damage(by: Dictionary, y: float) -> void:
 ## How a damage source shows: [glyph, colour, legend name]. A fish's attack
 ## is a weapon (blue), an item its rarity's colour, ramming coral, a skill pale.
 static func source_look(source: String) -> Array:
-	if source in FishAttack.sources():
-		return ["attack_" + source, WEAPON_BAR, "Weapon"]
+	if source in FishAttack.sources() and not (Powerup.ids().has(source) and not Powerup.is_weapon(source)):
+		return ["attack_" + source, WEAPON_BAR, "Weapon"]  # (the Coil's source is its boss item's id: an item)
 	if Powerup.ids().has(source):
 		if Powerup.is_weapon(source):
 			return [source, WEAPON_BAR, "Weapon"]

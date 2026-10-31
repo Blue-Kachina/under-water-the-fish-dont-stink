@@ -216,7 +216,15 @@ func vanish() -> void:
 		queue_free()
 
 
+## Whether it's a boss's chest holding a boss item, or the Shark's Drowned Jaws
+## (planning_bosses_and_survival.md §2): its opening is bigger (and sounds so).
+func holds_boss_item() -> bool:
+	return kind == Kind.BOSS and item != "" and Powerup.is_boss_drop(item)
+
+
 ## A copy of it on `layer` alone, its lid popping open with a flash, then gone.
+## A boss item's chest bursts in the item's colour and gold too, a ring
+## spreading out and a column of light rising (on the opener's layer alone).
 func _play_opening(layer: int) -> void:
 	var copy := Node3D.new()
 	copy.name = "Opening"
@@ -230,6 +238,9 @@ func _play_opening(layer: int) -> void:
 	copy.add_child(light)
 	_set_layers(copy, layer)
 	Explosion.spawn(get_parent(), global_position + Vector3.UP, tint(), 2.5, 0.0, 0.4)
+	if holds_boss_item():
+		_boss_item_burst(copy)
+		_set_layers(copy, layer)
 	var tween := copy.create_tween()
 	tween.tween_method(func(t: float) -> void:
 		hinge.rotation.x = -1.9 * clampf(t / 0.35 * OPEN_TIME, 0.0, 1.0)
@@ -238,6 +249,42 @@ func _play_opening(layer: int) -> void:
 		glow.emission_energy_multiplier = 0.2 + 2.0 * fade
 		copy.scale = Vector3.ONE * (1.0 if t < 0.6 else lerpf(1.0, 0.01, (t - 0.6) / 0.4)), 0.0, 1.0, OPEN_TIME)
 	tween.tween_callback(copy.queue_free)
+
+
+## The boss item's burst, under `copy` (so it shows on the opener's layer alone).
+func _boss_item_burst(copy: Node3D) -> void:
+	var gold := Color(1.0, 0.78, 0.35)
+	var hue := Powerup.color(item)
+	Explosion.spawn(get_parent(), global_position + Vector3.UP * 1.5, hue, 4.0, 0.0, 0.6)
+	var column := MeshInstance3D.new()
+	column.name = "BossItemColumn"
+	var beam := CylinderMesh.new()
+	beam.top_radius = 0.2
+	beam.bottom_radius = 0.7
+	beam.height = 9.0
+	beam.cap_top = false
+	beam.cap_bottom = false
+	column.mesh = beam
+	var light := FxKit.glow(gold, FxKit.along())
+	column.material_override = light
+	column.position.y = 4.5
+	column.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	copy.add_child(column)
+	var ring := MeshInstance3D.new()
+	ring.name = "BossItemRing"
+	ring.mesh = FxKit.disc_mesh()
+	var spread := FxKit.glow(hue, FxKit.band())
+	ring.material_override = spread
+	ring.position.y = 0.3
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	copy.add_child(ring)
+	var tween := copy.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		var fade := clampf(1.0 - t, 0.0, 1.0)
+		light.albedo_color.a = fade
+		spread.albedo_color.a = fade
+		column.scale = Vector3(1.0 + t, 0.4 + t * 0.8, 1.0 + t)
+		ring.scale = Vector3.ONE * (1.0 + t * 4.0), 0.0, 1.0, OPEN_TIME)
 
 
 func _process(delta: float) -> void:

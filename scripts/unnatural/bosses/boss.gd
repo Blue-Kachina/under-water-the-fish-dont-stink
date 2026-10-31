@@ -38,6 +38,8 @@ var part_radius := PackedFloat32Array()
 var dying := false
 ## The red flash when hit (1 fades to 0).
 var flash := 0.0
+## A chomp's hit-stop (ChompKit): it holds still this many more seconds.
+var hit_stop := 0.0
 
 ## Online: the host's id for it, and whether it's a guest's puppet.
 var boss_id := 0
@@ -79,6 +81,15 @@ func contact() -> float:
 ## dir (unit), length (m), width (m), progress (0 to 1)}, or {} for none.
 func telegraph() -> Dictionary:
 	return {}
+
+
+## Every lane it shows now (most bosses: telegraph()'s, if any).
+func telegraphs() -> Array[Dictionary]:
+	var lane := telegraph()
+	var lanes: Array[Dictionary] = []
+	if not lane.is_empty():
+		lanes.append(lane)
+	return lanes
 
 
 func share() -> float:
@@ -128,8 +139,11 @@ func _physics_process(delta: float) -> void:
 		return
 	if run.is_over:
 		return
-	age += delta
 	flash = maxf(flash - delta * 4.0, 0.0)
+	if hit_stop > 0.0:
+		hit_stop -= delta
+		return
+	age += delta
 	if puppet:
 		_follow_net(delta)
 		return

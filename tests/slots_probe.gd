@@ -4,8 +4,9 @@ extends Node
 ## a slot is free; capped ones gone; fallback cards when nothing's left);
 ## facet rolls match the rarity table over 10,000 rolls; tome cards add their
 ## StatBlock steps; milestones switch on at Lv 5, 10, 15 and 20 (on chest weapons and
-## the fish's attack); chests offer items only; a boss weapon with full slots
-## asks which weapon to swap; level overrides lift a weapon for testing.
+## the fish's attack); chests offer items only; a boss item (the Coil, once a
+## boss weapon) takes no slot, even with them full; level overrides lift a
+## weapon for testing.
 ##   Godot_console.exe --headless --path . res://tests/slots_probe.tscn
 
 var failures := 0
@@ -152,21 +153,18 @@ func _run() -> void:
 	run._apply_stats(fish)
 	check(is_equal_approx(bite.damage_scale, damage_scale + 0.2), "the attack's damage facet scales its hits (%.2f -> %.2f)" % [damage_scale, bite.damage_scale])
 
-	print("boss weapons:")
+	print("boss items:")
 	var offers := []
 	run.cards_offered.connect(func(_f: FishController, offer: Array, _h: String, _l: String) -> void: offers.append(offer))
-	run._offers[fish] = [{"powerup": "attack_leviathans_coil", "stacks": 1, "tier": Rarity.Tier.BOSS}]
+	var weapons_before := loadout.weapons.duplicate()
+	run._offers[fish] = [{"powerup": "leviathans_coil", "stacks": 1, "tier": Rarity.Tier.BOSS}]
 	run._offer_kind[fish] = "chest"
 	run.pick(fish, 0)
 	await _frames(1)
-	check(not offers.is_empty() and offers[-1].any(func(c: Dictionary) -> bool: return c.kind == "swap" and c.weapon == "attack_greek_fire"),
-			"slots full: the Coil asks which weapon to swap")
-	check(offers[-1].any(func(c: Dictionary) -> bool: return c.kind == "keep"), "or to keep yours")
-	run.pick(fish, 0)
-	await _frames(1)
-	check(loadout.has_weapon("attack_leviathans_coil") and not loadout.has_weapon("attack_greek_fire"), "the swap replaces Greek Fire")
-	check(loadout.earned_level("attack_leviathans_coil") == powers.coil_arrive_level, "the Coil arrives at Lv %d" % powers.coil_arrive_level)
-	check(not run.powerups_of(fish).held.has("attack_greek_fire") and run.powerups_of(fish).held.has("attack_leviathans_coil"), "and the powerups follow")
+	check(loadout.weapons == weapons_before and loadout.has_weapon("attack_greek_fire"), "slots full: the Coil takes no slot, nothing's swapped")
+	check(run.powerups_of(fish).stacks("leviathans_coil") == 1 and not Powerup.is_weapon("leviathans_coil"), "it's an item, at 1 stack")
+	var coil_item := run.powerups_of(fish).held["leviathans_coil"] as LeviathansCoilItem
+	check(coil_item.attack_level() == powers.coil_arrive_level, "and works at Lv %d" % powers.coil_arrive_level)
 
 	print("testing overrides:")
 	powers.jelly_stacks = 4

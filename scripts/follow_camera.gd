@@ -212,6 +212,15 @@ var _roll_speed := 0.0
 var _transition_left := 0.0
 ## Still rolling back to level after leaving a surface (see roll_with_surface).
 var _leaving_surface := false
+## A punch (ChompKit: a chomp or a lunge landing on its fish): how hard it
+## shakes now (m, dying away), its kick (m, toward what hit), and its clock.
+var _punch := 0.0
+var _kick := Vector3.ZERO
+var _punch_time := 0.0
+
+## How fast a punch's shake and kick die away (1/s).
+const PUNCH_FADE := 9.0
+const KICK_FADE := 14.0
 
 
 func _ready() -> void:
@@ -219,6 +228,7 @@ func _ready() -> void:
 	# camera itself must not be physics-interpolated.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	keep_aspect = Camera3D.KEEP_WIDTH  # fov is horizontal, like RL's
+	add_to_group(&"follow_cameras")  # ChompKit finds a fish's own view by it
 	_apply_fov()
 	if fish:
 		_rotation = fish.global_basis.get_rotation_quaternion()
@@ -427,8 +437,27 @@ func _process(delta: float) -> void:
 	anchor = _sweep(fish_xform.origin, anchor, ANCHOR_CLEARANCE)
 	eye = _sweep(anchor, eye, collision_margin)
 	eye.y = maxf(eye.y, floor_height + collision_margin)
+	if _punch > 0.001 or _kick.length_squared() > 0.000001:
+		# A punch: a sharp shake (and a small turn with it) plus a kick, dying away.
+		_punch_time += delta
+		var wobble := Vector3(sin(_punch_time * 71.0), sin(_punch_time * 89.0 + 1.3), sin(_punch_time * 53.0 + 2.1)) * _punch
+		eye += look_basis * wobble + _kick
+		look_basis = look_basis * Basis.from_euler(Vector3(wobble.y, wobble.x, wobble.z) * 0.04)
+		_punch *= exp(-PUNCH_FADE * delta)
+		_kick *= exp(-KICK_FADE * delta)
+	else:
+		_punch = 0.0
+		_punch_time = 0.0
 
 	global_transform = Transform3D(look_basis.orthonormalized(), eye)
+
+
+## Punches the view (ChompKit): a shake of `shake` m, dying away, and a kick
+## along `kick` (m). A bigger one at once wins; a smaller one is merged into it.
+func punch(shake: float, kick := Vector3.ZERO) -> void:
+	_punch = maxf(_punch, shake)
+	if kick.length_squared() > _kick.length_squared():
+		_kick = kick
 
 
 ## Where the chase view faces: the fish's nose, or while steady_heading the

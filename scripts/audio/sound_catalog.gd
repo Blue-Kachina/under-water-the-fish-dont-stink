@@ -162,6 +162,7 @@ const ROWS := [
 	["unnatural/magnet_pull_loop", 3, "loop voices=1", "The magnet hoovering up XP."],
 	["unnatural/chest_buried", 2, "3d", "A treasure chest appears."],
 	["unnatural/chest_open", 1, "3d", "A chest opens."],
+	["unnatural/chest_boss_item", 1, "3d", "A boss's chest opens on its boss item: bigger, deeper, triumphant."],
 	["unnatural/powerup_lost", 2, "", "Sunken Idol takes a powerup."],
 	["unnatural/pearl", 2, "pitched cd=0.03", "A pearl (currency): shares the Nature pearl's scale."],
 
@@ -190,6 +191,14 @@ const ROWS := [
 	["pw/drowned_fin_dash", 1, "3d", "Drowned Fin's dash."],
 	["pw/coil_loop", 2, "3d loop voices=1", "Leviathan's Coil trailing."],
 	["pw/coil_hit", 2, "3d voices=3 cd=0.05", "A coil hurts something."],
+	["pw/maw_suck", 2, "3d voices=2", "Gulper's Maw opens and starts sucking zombies in."],
+	["pw/maw_spit", 2, "3d voices=2", "Gulper's Maw gulps shut and spits its volley."],
+	["pw/brood_bite", 2, "3d voices=3 cd=0.05", "A Hagfish Brood hagfish bites and knots on."],
+	["pw/disc_latch", 2, "3d voices=2", "Queen's Disc latches on (a wet suck)."],
+	["pw/disc_drain", 3, "voices=1 cd=0.2", "Queen's Disc drains a sip of life back to you."],
+	["pw/crown_burst", 2, "3d voices=2", "Angel's Crown bursts open on your head."],
+	["pw/crown_lash", 2, "3d voices=3 cd=0.05", "One of Angel's Crown's lashes."],
+	["pw/jaws_ready", 2, "voices=1", "Drowned Jaws are ready: your next attack chomps."],
 	["pw/cursed_take", 2, "", "Taking a cursed powerup."],
 
 	# Stage events.
@@ -214,6 +223,8 @@ const ROWS := [
 	["boss/leviathan_phase", 1, "", "The Blood Leviathan changes phase (circle, spit, fury)."],
 	["boss/leviathan_spit", 2, "3d voices=3", "The Blood Leviathan spits."],
 	["boss/chomp", 1, "3d voices=2", "A boss's jaws snap shut (the Drowned Shark, the King of Herrings)."],
+	["boss/chomp_thud", 1, "3d voices=2", "A chomp lands: the low impact under the crunch (a boss's bite or grab, Drowned Jaws)."],
+	["boss/chomp_miss", 1, "3d voices=2", "A chomp misses: the jaws clack shut on nothing."],
 	["boss/grab", 1, "3d", "A final boss grabs a player: swallowed, coiled, latched on, knotted or crowned."],
 	["boss/break_free", 1, "", "A held player strides free of a final boss."],
 	["boss/gulper_suck", 2, "3d", "The Gulper Mother starts sucking a player in."],

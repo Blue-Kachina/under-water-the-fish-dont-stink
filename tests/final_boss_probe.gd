@@ -11,7 +11,10 @@ extends Node
 ## its lane showing) then lashes: a lash grabs a player who didn't stride, is
 ## dodged by one who did, eats the zombies it catches, and it sheds Sea
 ## Butterflies; and beaten, any of them opens the whirlpool and drops the boss
-## chest.
+## chest. Its drops (planning_bosses_and_survival.md §2): each boss's own chest
+## holds its own boss item, opening it adds the item (the weapon slots
+## unchanged) and a second copy adds a stack; the Drowned Shark drops its
+## legendary pick and a chest with Drowned Jaws.
 ##   Godot_console.exe --headless --path . res://tests/final_boss_probe.tscn
 
 var main: Node
@@ -72,6 +75,7 @@ func _run() -> void:
 
 	for kind: String in ["boss", "gulper", "whale", "lamprey", "angel"]:
 		await _each(kind)
+	await _shark_drops()
 	_finish()
 
 
@@ -115,15 +119,78 @@ func _each(kind: String) -> void:
 	boss.take(boss.hp + 10.0, fish, "probe")
 	await _ticks(3)
 	check(is_instance_valid(run.whirlpool), "beaten, the whirlpool opens")
-	var coil := false
-	for n in range(chests_before, run.chests.size()):
-		coil = coil or (is_instance_valid(run.chests[n]) and run.chests[n].item == "attack_leviathans_coil")
-	check(coil, "and its chest holds the Coil")
+	await _drops(boss, chests_before)
 	await _ticks(int(Boss.DEATH_TIME * 120) + 10)
 	if is_instance_valid(run.whirlpool):
 		run.whirlpool.queue_free()
 	run.whirlpool = null
 	run.cleared_at = -1.0
+
+
+## Beaten `boss`'s drop: its own chest (made after `chests_before`) with its own
+## boss item, which opening adds (no weapon slot), and a second copy stacks.
+func _drops(boss: Boss, chests_before: int) -> void:
+	var wanted := Powerup.boss_item_of(boss)
+	var loot: TreasureChest = null
+	for n in range(chests_before, run.chests.size()):
+		if is_instance_valid(run.chests[n]) and run.chests[n].item == wanted:
+			loot = run.chests[n]
+	check(loot != null and loot.kind == TreasureChest.Kind.BOSS and loot.holds_boss_item() and Powerup.tier(wanted) == Rarity.Tier.BOSS,
+			"and its own chest holds its own boss item, %s" % Powerup.title(wanted))
+	if loot == null:
+		return
+	var powerups := run.powerups_of(fish)
+	var loadout := run.loadout_of(fish)
+	var weapons_before := loadout.weapons.duplicate()
+	var levels_before := weapons_before.map(func(id: String) -> int: return loadout.level(id))
+	run.open_chest(loot, fish)
+	var offer: Array = run._offers.get(fish, [])
+	check(offer.size() == 1 and offer[0].powerup == wanted and not run.can_choose(fish, "rerolls"), "opening it offers just that (no reroll)")
+	run.pick(fish, 0)
+	await get_tree().process_frame
+	check(powerups.stacks(wanted) == 1 and powerups.held.has(wanted), "taking it adds %s" % Powerup.title(wanted))
+	check(loadout.weapons == weapons_before and weapons_before.map(func(id: String) -> int: return loadout.level(id)) == levels_before,
+			"the weapon slots are unchanged (%s)" % [loadout.weapons])
+	powerups.add(wanted)  # a second copy (that boss again, a later stage)
+	check(powerups.stacks(wanted) == 2, "a second copy adds a stack")
+	var limits := settings.limits
+	settings.limits = true
+	check(is_equal_approx((powerups.held[wanted] as Powerup).eff(), 2.0), "and each stack counts in full, limits on (outside the item limits)")
+	settings.limits = limits
+	powerups.clear()  # (not to work on the next boss)
+	await _ticks(2)
+
+
+## The Drowned Shark's drops: its legendary pick, and a chest with Drowned Jaws.
+func _shark_drops() -> void:
+	print("drowned shark drops:")
+	horde.clear()
+	await _ticks(2)
+	var shark := DrownedShark.new()
+	run._add_boss(shark, fish.global_position + Vector3(0.0, 0.0, -30.0), 10.0)
+	await _ticks(3)
+	var chests_before := run.chests.size()
+	shark.take(1000.0, fish, "probe")
+	await _ticks(3)
+	var pick: TreasureChest = null
+	var jaws: TreasureChest = null
+	for n in range(chests_before, run.chests.size()):
+		var chest: TreasureChest = run.chests[n]
+		if is_instance_valid(chest) and chest.kind == TreasureChest.Kind.BOSS:
+			if chest.item == "":
+				pick = chest
+			elif chest.item == "drowned_jaws":
+				jaws = chest
+	check(pick != null, "the Shark still drops its legendary pick")
+	check(jaws != null and Powerup.tier("drowned_jaws") == Rarity.Tier.LEGENDARY and Powerup.is_boss_drop("drowned_jaws"),
+			"and a chest of its own with Drowned Jaws (legendary, never in a pool)")
+	if jaws:
+		run.open_chest(jaws, fish)
+		run.pick(fish, 0)
+		await get_tree().process_frame
+		check(run.powerups_of(fish).stacks("drowned_jaws") == 1, "taking it adds Drowned Jaws")
+		run.powerups_of(fish).clear()
+	await _ticks(int(Boss.DEATH_TIME * 120) + 10)
 
 
 func _grab(boss: BloodLeviathan) -> void:

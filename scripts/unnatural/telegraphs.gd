@@ -4,7 +4,8 @@ extends MultiMeshInstance3D
 ## up its lunge, or a boss its charge or dive, a red lane lies along the way it
 ## will come, filling from its start to its end as the wind-up runs out
 ## (shaders/telegraph.gdshader), so dodging is a skill and the hit feels fair.
-## Each boss's come from Boss.telegraph(), the lungers' (only with
+## Each boss's come from Boss.telegraphs() (one, or a Whale Fall's hagfish
+## each), the lungers' (only with
 ## settings.lunge_lanes: there are a lot of swordfish) from the Horde's
 ## `telegraphing`. One MultiMesh of crossed ribbons, rebuilt each frame;
 ## settings.telegraph_lines off hides it all.
@@ -55,10 +56,10 @@ func _process(_delta: float) -> void:
 		if n >= MAX_LANES:
 			break
 		if is_instance_valid(boss) and not boss.dying:
-			var lane := boss.telegraph()
-			if not lane.is_empty():
-				_lay(n, lane.from, lane.dir, lane.length, lane.width, lane.progress, 1.0)
-				n += 1
+			for lane: Dictionary in boss.telegraphs():
+				if n < MAX_LANES:
+					_lay(n, lane.from, lane.dir, lane.length, lane.width, lane.progress, 1.0)
+					n += 1
 	var horde := run.horde
 	if settings.lunge_lanes and is_instance_valid(horde) and not horde.telegraphing.is_empty():
 		var near := run.local_players()

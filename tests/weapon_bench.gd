@@ -6,7 +6,9 @@ extends Node
 ## fish attack (the attacks' own curves), with the five powerup weapons on as
 ## well; each source's damage per second is its damage over the time.
 ## Reported, not pass/fail: the table to level the weapons against each other.
-##   Godot_console.exe --headless --fixed-fps 120 --path . res://tests/weapon_bench.tscn [-- --seconds 8 --set K=V,...]
+##   Godot_console.exe --headless --fixed-fps 120 --path . res://tests/weapon_bench.tscn [-- --seconds 8 --set K=V,... --out NAME]
+## --out also saves the table as user://run_logs/survival/NAME.csv (source, level, dps), for
+## tools/survival_report.py to cross-check the class survival sim against.
 
 const LEVELS := [1, 5, 10, 15, 20]
 const KINDS := [FishAttack.Kind.STING, FishAttack.Kind.BITE, FishAttack.Kind.LASH, FishAttack.Kind.THRUST,
@@ -19,13 +21,16 @@ var main: Node
 var fish: FishController
 var seconds := 8.0
 var overrides := {}
+var out := ""
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var args := OS.get_cmdline_user_args()
 	for n in args.size() - 1:
-		if args[n] == "--seconds":
+		if args[n] == "--out":
+			out = args[n + 1]
+		elif args[n] == "--seconds":
 			seconds = maxf(args[n + 1].to_float(), 1.0)
 		elif args[n] == "--set":
 			for pair in args[n + 1].split(",", false):
@@ -99,6 +104,12 @@ func _run() -> void:
 	print(head + "  x(1->20)")
 	var sources: Array = table.keys()
 	sources.sort()
+	var csv: FileAccess = null
+	if out != "":
+		DirAccess.make_dir_recursive_absolute(RunLog.DIR + "/survival")
+		csv = FileAccess.open("%s/survival/%s.csv" % [RunLog.DIR, out], FileAccess.WRITE)
+		if csv:
+			csv.store_line("source,level,dps")
 	for source: String in sources:
 		var line := "  %-16s" % source
 		var first := 0.0
@@ -112,7 +123,12 @@ func _run() -> void:
 			first = mean if level == LEVELS[0] else first
 			last = mean
 			line += "  %9.0f" % mean
+			if csv:
+				csv.store_line("%s,%d,%.1f" % [source, level, mean])
 		print(line + "  %7.1f" % (last / maxf(first, 0.01)))
+	if csv:
+		csv.close()
+		print("saved %s/survival/%s.csv" % [ProjectSettings.globalize_path(RunLog.DIR), out])
 	main.set_mode(main.FREE_SWIM)
 	await _ticks(3)
 	get_tree().quit(0)

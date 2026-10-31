@@ -47,6 +47,9 @@ func _run() -> void:
 	await _ticks(5)
 	var run: UnnaturalRun = main.unnatural_run
 	settings.tank_preset = 3  # Full slots Lv 20
+	# The Coil's a boss item now (no slot): at Lv 20 through its stacks (Lv 5, +3 a stack).
+	var powers := PowerupSettings.shared()
+	powers.coil_stacks = ceili((20.0 - powers.coil_arrive_level) / maxf(powers.coil_levels_per_stack, 1)) + 1
 	await _ticks(5)
 	var spawn: Transform3D = run.ocean.spawn_transform()
 	var middle := spawn.origin - spawn.basis.z * TestTank.CLUSTER_AHEAD
@@ -59,7 +62,7 @@ func _run() -> void:
 	var halo := run.powerups_of(fish).weapon("attack_jellyfish_halo") as JellyfishHalo
 	var haze := run.powerups_of(fish).weapon("attack_purple_haze") as PurpleHaze
 	var remora := run.powerups_of(fish).weapon("attack_remora_buddy") as RemoraBuddy
-	var coil := run.powerups_of(fish).weapon("attack_leviathans_coil") as LeviathansCoil
+	var coil := run.powerups_of(fish).weapon("leviathans_coil") as LeviathansCoil
 
 	var kinds := [FishAttack.Kind.STING, FishAttack.Kind.BITE, FishAttack.Kind.LASH, FishAttack.Kind.THRUST,
 			FishAttack.Kind.BUBBLES, FishAttack.Kind.SPINES, FishAttack.Kind.PUNCH]
@@ -116,6 +119,7 @@ func _run() -> void:
 	check(coil and coil.count() == (coil.powers.coil_segments + coil.facet_count("count")) * LeviathansCoil.LONG_SCALE, "and it's twice as long")
 
 	settings.tank_preset = 0
+	powers.coil_stacks = 0
 	await _ticks(3)
 	settings.weapon_slots = 2
 	settings.tome_slots = 2

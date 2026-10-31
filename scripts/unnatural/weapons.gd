@@ -20,9 +20,7 @@ const ATTACK := "attack"
 ## cards list them: every fish's weapon can be any fish's second (not its own
 ## again).
 const POWERUPS: Array[String] = ["attack_greek_fire", "attack_jellyfish_halo", "attack_purple_haze", "attack_remora_buddy",
-		"attack_leviathans_coil", "attack_sting", "attack_bite", "attack_lash", "attack_thrust", "attack_bubbles", "attack_spines", "attack_punch"]
-## Weapons only a boss gives (never offered on a level-up card).
-const BOSS_ONLY: Array[String] = ["attack_leviathans_coil"]
+		"attack_sting", "attack_bite", "attack_lash", "attack_thrust", "attack_bubbles", "attack_spines", "attack_punch"]
 ## The weapons held as a second one: weapon id -> its attack's kind.
 const ATTACK_WEAPONS := {
 	"attack_sting": FishAttack.Kind.STING,
@@ -35,14 +33,14 @@ const ATTACK_WEAPONS := {
 	"attack_jellyfish_halo": FishAttack.Kind.HALO,
 	"attack_purple_haze": FishAttack.Kind.HAZE,
 	"attack_remora_buddy": FishAttack.Kind.REMORA,
-	"attack_leviathans_coil": FishAttack.Kind.COIL,
 	"attack_punch": FishAttack.Kind.PUNCH,
 }
 
 ## Each weapon's facets, by its attack's kind (FishAttack.Kind):
 ## [[facet id, label, kind, step setting, unit]...]. The fired attacks share
 ## the facets FishAttack.configure() puts on their scales (rate, size, damage,
-## knock, count, speed); the steady ones read their own.
+## knock, count, speed); the steady ones read their own. (The Coil's are its
+## boss item's: LeviathansCoilItem spreads them over its level.)
 const ATTACK_FACETS := {
 	FishAttack.Kind.STING: [
 		["damage", "Damage", "pct", "attack_damage_step", ""],
@@ -154,7 +152,7 @@ static func is_weapon(id: String) -> bool:
 
 
 ## The weapons a level-up card may offer as new to a fish whose own attack is
-## `own` (not boss ones, not its own attack again), each equally likely.
+## `own` (not its own attack again), each equally likely.
 ## Weapon ids that were retired, and what they became (old saves, logs and presets).
 const RETIRED := {"attack_depth_charges": "attack_purple_haze"}
 
@@ -167,7 +165,7 @@ static func current_id(id: String) -> String:
 static func card_pool(own: FishAttack.Kind) -> Array[String]:
 	var pool: Array[String] = []
 	for id in POWERUPS:
-		if id not in BOSS_ONLY and ATTACK_WEAPONS.get(id, -1) != own:
+		if ATTACK_WEAPONS.get(id, -1) != own:
 			pool.append(id)
 	return pool
 

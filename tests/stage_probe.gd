@@ -113,8 +113,8 @@ func _run() -> void:
 	var pearls_before := run.pearls_out.size()
 	run.hit(shark.parts[1], shark.hp + 1.0, fish, "battery")
 	await _ticks(2)
-	check(shark.dying and run.current_boss() == null and run.chests.size() == chests_before + 1 and run.chests[-1].global_position.distance_to(at) < 1.0,
-			"beaten: it drops a chest where it was")
+	check(shark.dying and run.current_boss() == null and run.chests.size() == chests_before + 2 and run.chests[-2].global_position.distance_to(at) < 1.0
+			and run.chests[-1].item == "drowned_jaws", "beaten: it drops a chest where it was, and Drowned Jaws' beside it")
 	check(run.pearls_out.size() == pearls_before + settings.boss_pearls, "and %d pearls spill out (D23)" % settings.boss_pearls)
 	await _ticks(10)
 	check(shark.parts.is_empty(), "its proxies are gone")
@@ -158,8 +158,9 @@ func _run() -> void:
 	run.hit(leviathan.parts[0], leviathan.hp + 1.0, fish, "battery")
 	await _ticks(3)
 	check(not completed[0] and not run.is_over and is_instance_valid(run.whirlpool), "beaten: the run goes on and a whirlpool opens")
-	var coil_chest := run.chests.filter(func(c: TreasureChest) -> bool: return is_instance_valid(c) and c.item == "attack_leviathans_coil")
-	check(coil_chest.size() == 1 and (coil_chest[0] as TreasureChest).kind == TreasureChest.Kind.BOSS, "and it leaves a boss chest with the Leviathan's Coil")
+	var own_item := Powerup.boss_item_of(leviathan)
+	var coil_chest := run.chests.filter(func(c: TreasureChest) -> bool: return is_instance_valid(c) and c.item == own_item)
+	check(coil_chest.size() == 1 and (coil_chest[0] as TreasureChest).kind == TreasureChest.Kind.BOSS, "and it leaves a boss chest with its own boss item (%s)" % Powerup.title(own_item))
 	fish.global_position = run.whirlpool.global_position + Vector3(settings.whirlpool_range + 20.0, 0, 0)
 	check(not run.near_whirlpool(fish), "far from the whirlpool: no prompt")
 	fish.global_position = run.whirlpool.global_position + Vector3(settings.whirlpool_range - 2.0, 0, 0)

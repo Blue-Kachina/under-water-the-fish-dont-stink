@@ -3,7 +3,7 @@ extends Resource
 ## Unnatural's powerups' tuning (planning_unnatural.md §7, §10): one group per
 ## powerup, its base numbers and how each stack adds to them, and a `stacks`
 ## override for testing (a player has at least that many). Weapons (Weapons:
-## Greek Fire, the Halo, Purple Haze, Remoras, the Coil, and the fish's own
+## Greek Fire, the Halo, Purple Haze, Remoras, and the fish's own
 ## attack) level up instead of stacking: their `*_step` (and some
 ## `*_per_stack`) values are what one common step of each facet adds, and
 ## their `stacks` override is a level override. Shown in the tuning panel's
@@ -277,16 +277,26 @@ static func shared() -> PowerupSettings:
 @export_range(0.0, 1.0, 0.05) var tsunami_proc := 1.0
 
 
-@export_group("Leviathan's Coil (boss)")
-## A boss weapon, the Blood Leviathan's (it arrives at coil_arrive_level):
-## coil_segments (+ the count facet) glowing coils trail the fish
-## coil_spacing m apart; every coil_tick s each hurts what it touches
-## (coil_radius) for coil_damage, proc coil_proc. A facet step:
-## coil_segments_per_stack more coils, coil_damage_step damage,
-## coil_radius_step coil size, coil_rate_step hit rate. coil_stacks: a level
-## override for testing.
+@export_group("Boss items")
+## Boss items (planning_bosses_and_survival.md §2): each final boss's chest
+## holds its own, which stacks, takes no weapon slot and is outside the item
+## limits. boss_item_every_player: in co-op every player gets a copy from the
+## chest (Risk of Rain 2's way); off, whoever opens it first takes it and it's
+## gone for the rest.
+@export var boss_item_every_player := true
+
+@export_group("Leviathan's Coil (boss item)")
+## The King of Herrings' boss item: coil_segments (+ the count facet) glowing
+## coils trail the fish coil_spacing m apart; every coil_tick s each hurts
+## what it touches (coil_radius) for coil_damage, proc coil_proc. It works at
+## level coil_arrive_level with one stack, coil_levels_per_stack more each
+## stack after: its milestones by that level, and a facet step for each level
+## below it, in turn: coil_segments_per_stack more coils, coil_damage_step
+## damage, coil_radius_step coil size, coil_rate_step hit rate. coil_stacks:
+## a stacks override for testing.
 @export_range(0, 20, 1, "or_greater") var coil_stacks := 0
 @export_range(1, 20, 1, "or_greater") var coil_arrive_level := 5
+@export_range(0, 20, 1, "or_greater") var coil_levels_per_stack := 3
 @export_range(1, 100, 1, "or_greater") var coil_segments := 6
 @export_range(0, 50, 1, "or_greater") var coil_segments_per_stack := 3
 @export_range(0.2, 10.0, 0.1, "or_greater") var coil_spacing := 1.4
@@ -304,6 +314,111 @@ static func shared() -> PowerupSettings:
 @export_range(0.0, 30.0, 0.5, "or_greater") var coil_fade_near := 6.0
 @export_range(0.0, 60.0, 0.5, "or_greater") var coil_fade_far := 13.0
 @export_range(0.1, 10.0, 0.05, "or_greater") var coil_draw_max := 0.9
+
+@export_group("Gulper's Maw (boss item)")
+## The Gulper Mother's boss item: every maw_every s (shorter by
+## maw_rate_per_stack a stack past the first, and with attack speed) a maw
+## opens maw_reach m ahead of the fish and sucks in the zombies within
+## maw_radius m for maw_suck_time s (pull maw_pull). Then it swallows up to
+## maw_swallow of them (more maw_swallow_per_stack a stack) within maw_mouth m,
+## chewing each for maw_chew_damage, and spits them out ahead with a volley: a
+## bolt for each, maw_volley_length m long and maw_volley_width m wide,
+## maw_volley_damage (more maw_volley_damage_per_stack a stack) to every zombie
+## it passes, proc maw_proc.
+@export_range(0, 20, 1, "or_greater") var maw_stacks := 0
+@export_range(0.5, 60.0, 0.5, "or_greater") var maw_every := 6.0
+@export_range(0.0, 2.0, 0.05, "or_greater") var maw_rate_per_stack := 0.2
+@export_range(0.0, 40.0, 0.5, "or_greater") var maw_reach := 6.0
+@export_range(1.0, 60.0, 0.5, "or_greater") var maw_radius := 9.0
+@export_range(0.0, 200.0, 1.0, "or_greater") var maw_pull := 16.0
+@export_range(0.1, 10.0, 0.1, "or_greater") var maw_suck_time := 1.2
+@export_range(0.5, 20.0, 0.25, "or_greater") var maw_mouth := 3.5
+@export_range(0, 200, 1, "or_greater") var maw_swallow := 8
+@export_range(0, 100, 1, "or_greater") var maw_swallow_per_stack := 4
+@export_range(0.0, 5000.0, 5.0, "or_greater") var maw_chew_damage := 40.0
+@export_range(1.0, 100.0, 1.0, "or_greater") var maw_volley_length := 20.0
+@export_range(0.1, 10.0, 0.1, "or_greater") var maw_volley_width := 1.4
+@export_range(0.0, 5000.0, 5.0, "or_greater") var maw_volley_damage := 60.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var maw_volley_damage_per_stack := 30.0
+@export_range(0.0, 1.0, 0.05) var maw_proc := 0.5
+
+@export_group("Hagfish Brood (boss item)")
+## The Whale Fall's boss item: brood_count hagfish (more brood_count_per_stack
+## a stack) ride on tethers. Each, every brood_every s (sooner with attack
+## speed), lunges at a zombie within brood_reach m (a different one each),
+## bites it for brood_damage (more brood_damage_per_stack a stack), proc
+## brood_proc, and knots onto it, holding it still for brood_hold s; let go,
+## it leaves it slimed: brood_slow of its speed gone for brood_slow_time s.
+## Bosses aren't held or slowed, only bitten.
+@export_range(0, 20, 1, "or_greater") var brood_stacks := 0
+@export_range(0, 20, 1, "or_greater") var brood_count := 2
+@export_range(0, 10, 1, "or_greater") var brood_count_per_stack := 1
+@export_range(1.0, 60.0, 0.5, "or_greater") var brood_reach := 10.0
+@export_range(0.1, 30.0, 0.1, "or_greater") var brood_every := 1.6
+@export_range(0.0, 5000.0, 5.0, "or_greater") var brood_damage := 35.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var brood_damage_per_stack := 15.0
+@export_range(0.0, 10.0, 0.1, "or_greater") var brood_hold := 1.2
+@export_range(0.0, 1.0, 0.05) var brood_slow := 0.5
+@export_range(0.0, 20.0, 0.1, "or_greater") var brood_slow_time := 3.0
+@export_range(0.0, 1.0, 0.05) var brood_proc := 0.4
+
+@export_group("Queen's Disc (boss item)")
+## The Lamprey Queen's boss item: a lamprey latches onto the toughest zombie
+## (or boss) within disc_reach m and corkscrews into it: every disc_tick s it
+## drains disc_drain (more disc_drain_per_stack a stack), proc disc_proc, and
+## heals the fish disc_heal hp (more disc_heal_per_stack a stack). It lets go
+## past disc_leash m, and re-latches disc_relatch s after its host dies.
+@export_range(0, 20, 1, "or_greater") var disc_stacks := 0
+@export_range(1.0, 100.0, 0.5, "or_greater") var disc_reach := 14.0
+@export_range(1.0, 200.0, 0.5, "or_greater") var disc_leash := 24.0
+@export_range(0.05, 10.0, 0.05, "or_greater") var disc_tick := 0.5
+@export_range(0.0, 5000.0, 5.0, "or_greater") var disc_drain := 30.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var disc_drain_per_stack := 20.0
+@export_range(0.0, 100.0, 0.1, "or_greater") var disc_heal := 1.5
+@export_range(0.0, 100.0, 0.1, "or_greater") var disc_heal_per_stack := 1.0
+@export_range(0.0, 10.0, 0.05, "or_greater") var disc_relatch := 0.3
+@export_range(0.0, 1.0, 0.05) var disc_proc := 0.2
+
+@export_group("Angel's Crown (boss item)")
+## The Fallen Angel's boss item: every crown_every s (shorter by
+## crown_rate_per_stack a stack past the first, and with attack speed) a crown
+## of tentacles bursts from the fish's head and lashes the cone ahead
+## crown_lashes times (more crown_lashes_per_stack a stack), crown_lash_gap s
+## apart: each lash crown_damage (more crown_damage_per_stack a stack), proc
+## crown_proc, to every zombie within crown_reach m (with Size) and
+## crown_angle degrees of straight ahead (wider crown_angle_per_stack a stack,
+## up to 180). Each zombie it kills heals the fish crown_heal hp (more
+## crown_heal_per_stack a stack).
+@export_range(0, 20, 1, "or_greater") var crown_stacks := 0
+@export_range(0.5, 60.0, 0.5, "or_greater") var crown_every := 5.0
+@export_range(0.0, 2.0, 0.05, "or_greater") var crown_rate_per_stack := 0.1
+@export_range(1, 20, 1, "or_greater") var crown_lashes := 3
+@export_range(0, 10, 1, "or_greater") var crown_lashes_per_stack := 1
+@export_range(0.02, 2.0, 0.02, "or_greater") var crown_lash_gap := 0.18
+@export_range(1.0, 60.0, 0.5, "or_greater") var crown_reach := 10.0
+@export_range(5.0, 180.0, 5.0) var crown_angle := 50.0
+@export_range(0.0, 90.0, 5.0) var crown_angle_per_stack := 10.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var crown_damage := 45.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var crown_damage_per_stack := 20.0
+@export_range(0.0, 100.0, 0.1, "or_greater") var crown_heal := 1.0
+@export_range(0.0, 100.0, 0.1, "or_greater") var crown_heal_per_stack := 0.5
+@export_range(0.0, 1.0, 0.05) var crown_proc := 0.4
+
+@export_group("Drowned Jaws (shark's legendary)")
+## The Drowned Shark's own drop (legendary, never a chest's pick): every
+## jaws_every s (shorter by jaws_rate_per_stack a stack past the first, and
+## with attack speed) the fish's next attack is a chomp too: jaws_damage
+## (more jaws_damage_per_stack a stack) on the zombie or boss nearest straight
+## ahead within jaws_reach m (with Size) and jaws_cone degrees, with a chomp's
+## impact jaws_impact times a boss chomp's (the camera's punch and rumble).
+@export_range(0, 20, 1, "or_greater") var jaws_stacks := 0
+@export_range(0.5, 60.0, 0.5, "or_greater") var jaws_every := 6.0
+@export_range(0.0, 2.0, 0.05, "or_greater") var jaws_rate_per_stack := 0.3
+@export_range(0.0, 20000.0, 10.0, "or_greater") var jaws_damage := 400.0
+@export_range(0.0, 20000.0, 10.0, "or_greater") var jaws_damage_per_stack := 100.0
+@export_range(1.0, 40.0, 0.5, "or_greater") var jaws_reach := 7.0
+@export_range(5.0, 180.0, 5.0) var jaws_cone := 45.0
+@export_range(0.0, 3.0, 0.05, "or_greater") var jaws_impact := 0.5
 
 @export_group("Cursed")
 ## Blood Moon Shard: +shard_damage damage, +shard_taken damage taken, a stack.
@@ -589,7 +704,12 @@ const STACKS := {
 	"attack_purple_haze": "haze_stacks",
 	"anglerfish_lure": "lure_stacks",
 	"tsunami_heart": "tsunami_stacks",
-	"attack_leviathans_coil": "coil_stacks",
+	"leviathans_coil": "coil_stacks",
+	"gulpers_maw": "maw_stacks",
+	"hagfish_brood": "brood_stacks",
+	"queens_disc": "disc_stacks",
+	"angels_crown": "crown_stacks",
+	"drowned_jaws": "jaws_stacks",
 	"blood_moon_shard": "shard_stacks",
 	"glass_coral": "coral_stacks",
 	"sirens_song": "siren_stacks",

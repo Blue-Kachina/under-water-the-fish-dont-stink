@@ -6,9 +6,10 @@ extends BloodLeviathan
 ## spit, fury), and:
 ## - every brood_every s one of its brood drops off as brood_count zombies;
 ## - spitting, its gills flare and pulse out clouds of blood (blood_cloud_damage);
-## - in fury she lunges: a player ahead (lamprey_lunge_range) makes her flare
-##   her disc wide for lamprey_lunge_wind s, glowing, then strike; one her disc
-##   touches is latched onto (hold()), the disc clamping tight, and she
+## - she lunges, in every phase (lamprey_lunge_circle, _spit and _fury s
+##   apart): a player ahead (lamprey_lunge_range) makes her flare her disc wide
+##   for lamprey_lunge_wind s, glowing, her lane showing, then strike; one her
+##   disc touches is latched onto (hold()), the disc clamping tight, and she
 ##   corkscrews round her length (lamprey_spin) while she drains them, her gill
 ##   holes turning up as she rolls;
 ## - its gill holes are weak points: hits on them do gill_bonus times the damage.
@@ -87,6 +88,15 @@ func grabs() -> bool:
 	return true
 
 
+## She latches onto a player her disc reaches as she lunges, too.
+func grabbing_now() -> bool:
+	return super() or _lunge_left > 0.0
+
+
+func own_aggression() -> float:
+	return settings.lamprey_aggression
+
+
 func mouth_point() -> Vector3:
 	return rig.place(Vector3(0.0, 0.0, radius() * 0.3))
 
@@ -102,6 +112,12 @@ func hold_verb() -> String:
 ## Just off the clamped disc.
 func hold_point() -> Vector3:
 	return rig.place(Vector3(0.0, 0.0, -radius() * 0.35))
+
+
+## Her disc slams onto them (ChompKit's impact, grab_impact strong).
+func _caught(fish: FishController) -> void:
+	super(fish)
+	ChompKit.impact(run, fish, mouth_point(), settings.grab_impact, self)
 
 
 func release_push(_fish: FishController) -> Vector3:
@@ -138,7 +154,7 @@ func _set_net_mode(net_mode: int) -> void:
 
 
 func circle_radius() -> float:
-	return 26.0 + body_length() * 0.06
+	return (26.0 + body_length() * 0.06) * settings.serpent_circle
 
 
 func _ready() -> void:
@@ -175,7 +191,7 @@ func _special(delta: float, prey: FishController) -> void:
 				(entry[0] as Node3D).visible = true
 	_brood_left -= delta
 	if _brood_left <= 0.0 and settings.brood_count > 0:
-		_brood_left = settings.brood_every / (settings.enrage_scale if enraged else 1.0)
+		_brood_left = settings.brood_every / (settings.enrage_scale if enraged else 1.0) / aggression()
 		var ready := _brood.filter(func(entry: Array) -> bool: return entry[1] <= 0.0)
 		if not ready.is_empty():
 			var entry: Array = ready[run.rng.randi_range(0, ready.size() - 1)]
@@ -195,8 +211,8 @@ func _special(delta: float, prey: FishController) -> void:
 					run._hazard(at, radius() * 0.9, 2.5, settings.blood_cloud_damage, Color(0.6, 0.02, 0.03, 0.4), "the Lamprey Queen's blood")
 
 
-## Her lunge (fury): a player ahead in range; she slows, disc flaring, then
-## strikes at lamprey_lunge_speed times her speed.
+## Her lunge (any phase): a player ahead in range; she slows, disc flaring,
+## then strikes at lamprey_lunge_speed times her speed.
 func _lunge(delta: float, prey: FishController) -> void:
 	_lunge_cool -= delta
 	if held or (puppet and _puppet_held):
@@ -217,8 +233,13 @@ func _lunge(delta: float, prey: FishController) -> void:
 	elif _lunge_left > 0.0:
 		_lunge_left -= delta
 		if _lunge_left <= 0.0:
-			_lunge_cool = 2.0
-	elif phase == Phase.FURY and prey and _lunge_cool <= 0.0 and settings.lamprey_lunge_range > 0.0 and _ahead(prey, settings.lamprey_lunge_range):
+			var every := settings.lamprey_lunge_fury
+			if phase == Phase.CIRCLE:
+				every = settings.lamprey_lunge_circle
+			elif phase == Phase.SPIT:
+				every = settings.lamprey_lunge_spit
+			_lunge_cool = every / aggression()
+	elif prey and _lunge_cool <= 0.0 and settings.lamprey_lunge_range > 0.0 and _ahead(prey, settings.lamprey_lunge_range):
 		_lunge_wind = settings.lamprey_lunge_wind
 
 

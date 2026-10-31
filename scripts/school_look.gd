@@ -24,7 +24,17 @@ static var _baked := {}
 static var _importers := {}
 ## "class:error" -> Array[Mesh], one per pose (detail_meshes()).
 static var _detailed := {}
+## Class -> Vector4, its eye_spot().
+static var _eye_spots := {}
 
+
+## Where `fish_class`'s right eye is in its baked meshes' space (xyz; the left
+## one mirrors it across x) and how big (w, its radius in m): from the model's
+## "Eye" parts, or a guess from the bounds (the front of the head, up a little)
+## for a model that has none. The Horde's rot overlay lights its zombie eyes here.
+static func eye_spot(fish_class: Variant) -> Vector4:
+	_importers_for(fish_class)
+	return _eye_spots[fish_class]
 
 ## The baked meshes for `fish_class` (a class, or a ZombieLooks id), one per pose in POSES.
 static func meshes(fish_class: Variant) -> Array:
@@ -59,6 +69,7 @@ static func _importers_for(fish_class: Variant) -> Array:
 			model = ZombieLooks.build(fish_class, FishCharacter.FishClass.SKIRMISHER)
 		else:
 			model = FishModel.build(fish_class)
+		_eye_spots[fish_class] = _find_eyes(model)
 		var baked := []
 		for swing: float in POSES:
 			if model.tail:
@@ -71,6 +82,33 @@ static func _importers_for(fish_class: Variant) -> Array:
 		model.free()
 		_importers[fish_class] = baked
 	return _importers[fish_class]
+
+
+## eye_spot() for `model` (at rest: eyes sit ahead of any bend).
+static func _find_eyes(model: FishModel) -> Vector4:
+	var spot := Vector4.ZERO
+	var found := 0
+	for node in model.find_children("Eye*", "MeshInstance3D", true, false):
+		var eye := node as MeshInstance3D
+		if not _shown(eye, model):
+			continue
+		var place := _transform_in(eye, model)
+		spot += Vector4(absf(place.origin.x), place.origin.y, place.origin.z, place.basis.x.length() * 0.5)
+		found += 1
+	if found > 0:
+		return spot / float(found)
+	var bounds := AABB()
+	var first := true
+	for node in model.find_children("*", "MeshInstance3D", true, false):
+		var part := node as MeshInstance3D
+		if part.mesh == null or not _shown(part, model):
+			continue
+		var box := _transform_in(part, model) * part.mesh.get_aabb()
+		bounds = box if first else bounds.merge(box)
+		first = false
+	var length := bounds.size.z
+	return Vector4(bounds.size.x * 0.22, bounds.get_center().y + bounds.size.y * 0.18,
+			bounds.position.z + length * 0.12, maxf(length * 0.035, 0.02))
 
 
 ## `importer`'s mesh with each part at the fewest triangles within `error`,

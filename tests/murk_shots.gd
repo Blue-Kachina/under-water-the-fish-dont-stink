@@ -4,6 +4,9 @@ extends Node
 ## further out), looking up at the surface (no light ring), the minimap with
 ## swarms, elites, a boss and chests, and the same without murk. Needs a
 ## window (not --headless).
+## The distance ladder (planning_bosses_and_survival.md §1): one zombie facing
+## the camera at 8, 20, 40, 80 and 140 m (ladder_<m>.png), printing how red the
+## brightest bit round it is ("eyes"; it should fall with distance).
 ##   Godot_console.exe --path . res://tests/murk_shots.tscn -- --out=DIR
 
 var out_dir := "user://murk_shots"
@@ -37,6 +40,8 @@ func _run() -> void:
 	run.start()
 	await _frames(20)
 	fish.freeze = true
+	settings.card_choices = 0  # no level-up pause mid-ladder
+	await _ladder(horde)
 	var ahead := -fish.global_basis.z
 	ahead.y = 0.0
 	ahead = ahead.normalized()
@@ -80,6 +85,58 @@ func _run() -> void:
 	await _shot("clear")
 	settings.murk_density = 0.035
 	get_tree().quit()
+
+
+## One zombie at each rung, alone, with its eyes measured off the screen.
+func _ladder(horde: Horde) -> void:
+	var camera := Camera3D.new()
+	add_child(camera)
+	camera.current = true
+	var ahead := -fish.global_basis.z
+	ahead.y = 0.0
+	ahead = ahead.normalized()
+	var side := Vector3.UP.cross(ahead)
+	var from := fish.global_position + side * 25.0 + Vector3.UP * 3.0  # clear of the fish and its weapon
+	camera.global_transform = Transform3D(Basis.looking_at(ahead), from)
+	var cameras := School.view_cameras
+	School.view_cameras = [camera] as Array[Camera3D]
+	var last := INF
+	var falling := true
+	for gap: float in [8.0, 20.0, 40.0, 80.0, 140.0]:
+		horde.clear()
+		var at := from + ahead * gap
+		horde.spawn(1, at, (-ahead + side * 0.7).normalized())  # a clownfish, three-quarters on
+		await _frames(10)
+		await _shot("ladder_%d" % int(gap))
+		var image := get_viewport().get_texture().get_image()
+		var centre := camera.unproject_position(at)
+		var per_metre := absf(camera.unproject_position(at + side).x - centre.x)
+		var half := int(maxf(per_metre * 1.5, 10.0))
+		# How much redder than the water round it its reddest pixel is (the
+		# blood moon tints the water red, so the window's median is taken off).
+		var reds: Array[float] = []
+		var peak := 0.0
+		for y in range(maxi(int(centre.y) - half, 0), mini(int(centre.y) + half, image.get_height())):
+			for x in range(maxi(int(centre.x) - half, 0), mini(int(centre.x) + half, image.get_width())):
+				var c := image.get_pixel(x, y)
+				var red := c.r - maxf(c.g, c.b)
+				reds.append(red)
+				peak = maxf(peak, red)
+		reds.sort()
+		var water := reds[reds.size() / 2] if not reds.is_empty() else 0.0
+		peak -= water
+		var zoom := image.get_region(Rect2i(Vector2i(int(centre.x) - 40, int(centre.y) - 40), Vector2i(80, 80)))
+		zoom.resize(320, 320, Image.INTERPOLATE_NEAREST)
+		zoom.save_png(out_dir.path_join("ladder_%d_zoom.png" % int(gap)))
+		print("ladder %3d m: eyes %.3f (reddest pixel over the water), %d px window, glints drawn %d" % [int(gap), peak, half * 2, horde.glint_count])
+		if peak > last + 0.02:
+			falling = false
+		last = peak
+	print("ladder: eye brightness %s with distance" % ("FALLS" if falling else "does NOT fall"))
+	horde.clear()
+	School.view_cameras = cameras
+	camera.current = false
+	camera.queue_free()
 
 
 func _shot(shot_name: String) -> void:

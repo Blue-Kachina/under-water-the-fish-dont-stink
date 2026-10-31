@@ -1,6 +1,9 @@
 // Unnatural's zombie look (Horde): an overlay pass over each fish's baked
 // SchoolLook mesh. Rot (a tint mixed over its own colours), red glowing eyes
-// toward the head and a red rim, and per instance (INSTANCE_CUSTOM): r the hit
+// toward the head and a red rim, a pair of eyes (eye_spot: where the right one
+// sits in the mesh's space and its radius, mirrored across x for the left;
+// near_eye_strength) that hand over to the far glints (zombie_glint.gdshader)
+// from eye_fade_from to eye_fade_to m off the camera, and per instance (INSTANCE_CUSTOM): r the hit
 // flash (times hit_flash, so it can pass 1), g how far through dying it is (it
 // fades), b elite (0 none, 1 a hot glow, 2-5 an elite modifier's colour:
 // Burning, Electric, Frozen, Bloated; P5), a a lunge's telegraph (a pulsing red, times
@@ -13,12 +16,19 @@ uniform vec4 rot_color : source_color = vec4(0.35, 0.45, 0.3, 1.0);
 uniform float rot = 0.5;
 uniform float eye_glow = 2.0;
 uniform float frozen = 0.0;
+uniform vec4 eye_spot = vec4(0.12, 0.08, -0.45, 0.05);
+uniform float near_eye_strength = 4.0;
+uniform float head_glow = 0.25;
+uniform float eye_fade_from = 1e6;
+uniform float eye_fade_to = 1e6;
 
 varying vec4 custom;
 varying float head;
+varying vec3 local;
 
 void vertex() {
 	custom = INSTANCE_CUSTOM;
+	local = VERTEX;
 	// A hair outside the fish's own surface, so the pass always wins the depth test.
 	VERTEX += NORMAL * 0.015;
 	// The nose is -z, the model about 1.2 m long: the front third glows.
@@ -48,12 +58,17 @@ void fragment() {
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
 	vec3 red = vec3(1.0, 0.06, 0.03);
 	vec3 ice = vec3(0.55, 0.85, 1.0);
+	// The eyes: a hot spot on each eye, gone by the time the glints take over.
+	float eye_gap = distance(vec3(abs(local.x), local.y, local.z), eye_spot.xyz);
+	float eye = smoothstep(eye_spot.w * 1.35, eye_spot.w * 0.9, eye_gap)
+			* (1.0 - smoothstep(eye_fade_from, eye_fade_to, length(VERTEX)));
 	ALBEDO = mix(mix(rot_color.rgb, ice, frozen * 0.8), vec3(1.0), flash);
 	ROUGHNESS = 0.9;
-	EMISSION = red * eye_glow * (head * 0.8 + rim * 0.25)
+	EMISSION = red * eye_glow * (head * head_glow + rim * 0.25)
+			+ vec3(1.0, 0.03, 0.01) * eye * near_eye_strength
 			+ vec3(1.0, 0.85, 0.8) * glare * 2.5
 			+ elite_color * elite * flicker * (0.4 + rim) * 1.5
 			+ vec3(1.0, 0.05, 0.02) * warn * 4.0 * (1.0 - frozen)
 			+ ice * frozen * (0.25 + rim * 1.5);
-	ALPHA = clamp(rot + flash + warn + head * 0.5 + rim * 0.3 + frozen * 0.6, 0.0, 1.0) * (1.0 - dead);
+	ALPHA = clamp(rot + flash + warn + head * 0.5 + rim * 0.3 + frozen * 0.6 + eye, 0.0, 1.0) * (1.0 - dead);
 }

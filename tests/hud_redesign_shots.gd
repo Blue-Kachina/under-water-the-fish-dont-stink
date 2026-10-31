@@ -48,14 +48,14 @@ func _run() -> void:
 	run._purses[fish] = 2050
 	var loadout := run.loadout_of(fish)
 	loadout.add_weapon(Weapons.ATTACK, 20)
-	loadout.add_weapon("attack_leviathans_coil", 14)
+	loadout.add_weapon("attack_greek_fire", 14)
 	for n in 18:
 		loadout.add_tome("tides")
 	for n in 19:
 		loadout.add_tome("shell")
 	var powers := run.powerups_of(fish)
 	for id in ["kelp_wrap", "kelp_wrap", "kelp_wrap", "hermit_shell", "hermit_shell", "clam_shield", "whirlpool_charm", "chain_lightning",
-			"speedy_seahorse", "torpedo", "anglerfish_lure", "sea_salt", "sea_salt", "tsunami_heart"]:
+			"speedy_seahorse", "torpedo", "anglerfish_lure", "sea_salt", "sea_salt", "tsunami_heart", "leviathans_coil", "angels_crown", "angels_crown"]:
 		powers.add(id)
 	var block := run.block_of(fish)
 	var gains := {"damage": 4.7, "attack_speed": 2.064, "regen": 7.5, "armour": 23.6, "swim_speed": 0.06, "crit_chance": 0.09, "luck": 0.1}
