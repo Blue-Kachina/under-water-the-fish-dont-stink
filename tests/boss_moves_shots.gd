@@ -93,6 +93,9 @@ func _shark() -> void:
 	var fwd := -shark.global_basis.z
 	var l := shark._length
 	await _view(head + side * l * 0.45 + fwd * l * 0.1 - Vector3.UP * l * 0.05, head, "shark_shut")
+	# Its eye up close (it has no orbs over it, just its own eye gone red).
+	var eye_at := head - fwd * l * 0.12 + side * l * 0.06 + Vector3.UP * l * 0.05
+	await _view(eye_at + side * l * 0.18 + fwd * l * 0.06, eye_at, "shark_eye_close")
 	shark.jaw = 1.0
 	shark._pose_jaw()
 	await _view(head + side * l * 0.45 + fwd * l * 0.1 - Vector3.UP * l * 0.05, head, "shark_open_side")

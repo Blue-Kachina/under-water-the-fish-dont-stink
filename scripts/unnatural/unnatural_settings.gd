@@ -738,6 +738,10 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 60.0, 0.5, "or_greater") var shark_speed := 12.0
 @export_range(1.0, 15.0, 0.25, "or_greater") var shark_size := 15.0
 @export_range(0.0, 500.0, 1.0, "or_greater") var shark_contact := 25.0
+## Its own eyes, gone red: how bright they glow (0: dull red, no glow), and how
+## much more (times) they flare while it winds up a charge or a chomp.
+@export_range(0.0, 20.0, 0.1, "or_greater") var shark_eye_glow := 2.5
+@export_range(0.0, 10.0, 0.1, "or_greater") var shark_eye_flare := 2.0
 ## Every shark_charge_every s it glows red for shark_telegraph s, then charges
 ## at shark_charge_speed (m/s) for shark_charge_time s.
 @export_range(0.0, 60.0, 0.5, "or_greater") var shark_charge_every := 6.0

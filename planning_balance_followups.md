@@ -73,8 +73,8 @@ Purple Haze is not a stat bug: in the same horde, sim dps goes from 2,156 at wea
 
 The Alchemist also loses the most hp at Lv 5-10 (0.49 of max a minute) while its Regen signature is still small.
 
-### Options (**Q1**, the user's call)
-- **A. A merged cloud keeps its parts' damage (recommended).** The merged cloud's tick damage is the sum of the clouds it swallowed, capped by a new `haze_merge_damage_cap` (e.g. 3x one cloud). The milestone then reads as "clouds pool into a big, nastier one", never a loss.
+### Options (**Q1: A decided**, see Decisions)
+- **A. A merged cloud keeps its parts' damage (chosen).** The merged cloud's tick damage is the sum of the clouds it swallowed, capped by a new `haze_merge_damage_cap` (e.g. 3x one cloud). The milestone then reads as "clouds pool into a big, nastier one", never a loss.
 - **B. Raise the size cap.** `MERGE_MAX` becomes `haze_merge_max` and goes up (2.5 -> 4). Simpler, but bigger clouds still tick each zombie once, so on dense packs it can still lose damage.
 - **C. Space the follow-ups out.** `PATH_STEP` becomes `haze_path_step` and goes from 0.9 to 2.1, so the follow-ups rarely touch. That sidesteps the merge rather than fixing it.
 
@@ -107,7 +107,7 @@ weapon_bench with `--spread` rises steadily from Lv 1 to 20 with no drop at Lv 1
 - **Drifter:** `jelly_damage` 35 -> 45. If its clear ratio stays under 0.5, `jelly_count` 2 -> 3 is the bigger lever.
 - **Lancer:** `thrust_cooldown` 1.0 -> 0.85, for the mid-levels. Its Lv 20 is fine.
 
-Apply them one class at a time in the panel defaults, then re-run that class's matrix rows (three classes per process, about 75 min for all four groups).
+**Q5: calibrate first.** These values wait for §4c's calibrated baseline; re-check each against it before applying. Then apply them one class at a time in the panel defaults and re-run that class's matrix rows (three classes per process, about 75 min for all four groups).
 
 ### Check
 Each class's clear ratio at Lv 10 is at least 0.4 (the median is 0.60) with no survival loss. No class moves past the median at Lv 20, so these lift the floor without making new top picks.
@@ -141,7 +141,7 @@ The scenario's average zombie hp runs above the logs' medians (Lv 5: 36-48 vs 25
 
 ## 5. Bosses: items, the Angel, and the bench
 
-### 5a. Boss-item strength (**Q2**, the user's call)
+### 5a. Boss-item strength (**Q2: run-defining**, see Decisions)
 At today's defaults, the boss items are modest spikes, not run-defining ones (3 classes x 2 seeds, items from 10:00):
 
 | Config | Survived | DPS | Clear |
@@ -160,11 +160,11 @@ If the goal is RoR2-strength items, the plan is:
 - The Coil shows *no* dps gain. Before raising numbers, check why: a Lv 5 Coil arriving at minute 10 may simply be weaker than the weapons already running. Try `coil_arrive_level` 5 -> 10 first.
 - Re-run with 5 seeds, not 2. Six runs per setting is too noisy to tune on.
 
-If the user prefers them modest, leave the values and only fix the Coil.
+Decided: run-defining, so all five items get tuned to the target, not just the Coil.
 
-### 5b. The Angel and the regrab cooldown (**Q3**)
+### 5b. The Angel and the regrab cooldown (**Q3: yes**, see Decisions)
 `final_regrab_time` went from a const 2.5 s to a 7 s setting, which brought the serpents' fury down. It applies to the Angel too, the boss everything else is tuned *to*. Its fury damage in the re-run went from 338 to 434 a minute: seed noise or the cooldown.
-- Recommended: give the Angel its own `angel_regrab_time` (default 2.5, the old value) so the target stays put, then re-run the Angel's bench at 10 seeds to settle whether 434 was noise.
+- Decided: give the Angel its own `angel_regrab_time` (default 2.5, the old value) so the target stays put, then re-run the Angel's bench at 10 seeds to settle whether 434 was noise.
 
 ### 5c. The bench's contact bias
 The bench's Hunter bot chases the boss's body, so body contact dominates the numbers, and the fury fix (`serpent_fury_contact` 0.24) was tuned against that. Real players may feel less fury pressure than the table shows.
@@ -173,7 +173,7 @@ The bench's Hunter bot chases the boss's body, so body contact dominates the num
 - The Gulper's phase-2 gap is 1.53x (target 1.5x). Re-check at 10 seeds before touching it; nudge `gulper_suck_every` 6 -> 5.5 only if it holds.
 
 ### 5d. Co-op gaps
-- The boss items' zombie moves (Maw pull/relocate, Brood hold/slow) run only on the owner's machine, like the Whirlpool Charm; hits do sync. **Q4:** sync them now, or leave them with the Whirlpool Charm as a known gap for a later net pass?
+- The boss items' zombie moves (Maw pull/relocate, Brood hold/slow) run only on the owner's machine, like the Whirlpool Charm; hits do sync. **Q4: later.** They stay a known gap alongside the Whirlpool Charm for a future net pass.
 - With `boss_item_every_player` off, a second local player who opens the chest before the first commits still gets a copy. Fix: claim the chest on open, not on commit.
 
 ### 5e. Polish (small, from the reports)
@@ -190,18 +190,18 @@ The bench's Hunter bot chases the boss's body, so body contact dominates the num
 |---|---|---|---|
 | A | §0 close-out (team session), §4c calibration, then start §4a and §4b in the background | full suite vs baseline, `class_survival_sim` smoke | (none) |
 | B | §1 Skirmisher pull settings + new defaults | `milestones_probe`, Skirmisher matrix rows | Build: play the Skirmisher past Lv 15 |
-| C | §2 Haze merge (after Q1) + `open_cloud` fix + weapon_bench `--spread` | `milestones_probe`, weapon_bench, Alchemist rows | Build: Alchemist run |
-| D | §3 offence-floor retunes | matrix rows for the four classes | Build: Brawler and Breacher runs |
+| C | §2 Haze merge (option A) + `open_cloud` fix + weapon_bench `--spread` | `milestones_probe`, weapon_bench, Alchemist rows | Build: Alchemist run |
+| D | §3 offence-floor retunes (after the A calibration baseline) | matrix rows for the four classes | Build: Brawler and Breacher runs |
 | E | Read §4a/§4b; Glider/Scorcher decision; shark tuning if needed | the two passes' reports | Report, then a build if anything changed |
-| F | §5a-§5c boss items, Angel regrab, kite bench (after Q2/Q3) | `boss_pressure_bench --kite`, `boss_items_probe`, whole-run sims at 5 seeds | Build: fight the bosses, pick up their items |
-| G | §5d-§5e co-op and polish (after Q4) | `unnatural_net.sh`, `boss_items_probe` | Build: co-op boss chest |
+| F | §5a-§5c boss items to run-defining, `angel_regrab_time`, kite bench | `boss_pressure_bench --kite`, `boss_items_probe`, whole-run sims at 5 seeds | Build: fight the bosses, pick up their items |
+| G | §5d chest race fix + §5e polish (online item sync deferred) | `unnatural_net.sh`, `boss_items_probe` | Build: co-op boss chest |
 | H | Full matrix re-run on the final tree; update `analysis_class_survival.md` | the §5 matrix, `survival_report.py` | Updated report |
 
 Phases B-D can run as three teammates in parallel: they own different attack files and different settings rows. §4's sim runs go first because they run in the background for over an hour.
 
-## Open questions
-- **Q1.** Purple Haze merge: A (merged cloud keeps its parts' damage, recommended), B (raise the size cap) or C (space the follow-ups out)?
-- **Q2.** Boss items: raise them toward run-defining (the +25% target), or keep them modest and only fix the Coil?
-- **Q3.** Give the Fallen Angel its own regrab time at the old 2.5 s so the tuning target stays fixed?
-- **Q4.** Sync the boss items' zombie moves online now, or leave them with the Whirlpool Charm for a later net pass?
-- **Q5.** Apply the §3 offence-floor values as proposed, or wait for the §4c-calibrated re-run first? (Recommended: calibrate first; it's under two hours of background sims.)
+## Decisions (user, 2026-10-31)
+- **Q1. Purple Haze merge: option A.** A merged cloud keeps the summed damage of the clouds it swallowed, capped by `haze_merge_damage_cap`. `MERGE_MAX` and `PATH_STEP` still become settings.
+- **Q2. Boss items: run-defining.** Tune toward the §5a target (each item adds at least +25% dps or +0.25 clear ratio on its own), Coil first.
+- **Q3. The Angel gets its own regrab time.** `angel_regrab_time` defaults to 2.5 s (the old value); `final_regrab_time` 7 s stays for the serpents.
+- **Q4. Boss items' zombie moves online: later.** They stay owner-only, like the Whirlpool Charm, until a net pass. The `boss_item_every_player` chest race (§5d) is still fixed in this plan.
+- **Q5. Calibrate first.** §4c's zombie-hp fix and a fresh baseline come before any §3 value goes in; the §3 values are re-checked against the calibrated numbers before applying.

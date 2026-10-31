@@ -28,6 +28,7 @@ const GAPE := 0.95
 const PROTRUDE := 0.25
 const FLESH := Color(0.42, 0.07, 0.08)
 const TOOTH := Color(0.86, 0.83, 0.72)
+const EYE_RED := Color(0.55, 0.04, 0.02)
 
 var mode := Mode.HUNT
 var charges := 0
@@ -43,6 +44,7 @@ var _call_left := 0.0
 var _charge_dir := Vector3.FORWARD
 var _model: Node3D
 var _glow := OmniLight3D.new()
+var _eyes: Array[ShaderMaterial] = []
 var _length := 1.0
 var _chomp_cool := 1.0
 var _bit_this_charge := false
@@ -78,16 +80,16 @@ func _ready() -> void:
 	_length = hitbox.z * settings.shark_size
 	var half_width := hitbox.x * 0.5 * settings.shark_size
 	var half_height := hitbox.y * 0.5 * settings.shark_size
-	# Red eyes over the model's own, wherever its head puts them.
-	var model_eyes := _model.find_children("Eye", "Node3D", true, false)
-	for side: float in [-1.0, 1.0]:
-		var e := Boss.eye(0.09 * settings.shark_size)
-		e.position = Vector3(side * half_width * 0.55, half_height * 0.3, -_length * 0.38)
-		for node in model_eyes:
-			var at := _model.transform * (node as Node3D).position
-			if signf(at.x) == side:
-				e.position = at
-		add_child(e)
+	# Its own eyes gone red: a red iris round a thin dark slit, glowing like an ember.
+	for node in _model.find_children("Eye*", "MeshInstance3D", true, false):
+		var material := (node as MeshInstance3D).material_override as ShaderMaterial
+		if material and material.shader == FishModel.FISH_EYE:
+			material.set_shader_parameter("iris", EYE_RED)
+			material.set_shader_parameter("iris_inner", EYE_RED.darkened(0.5))
+			material.set_shader_parameter("sheen", 0.1)
+			material.set_shader_parameter("pupil", 0.5)
+			material.set_shader_parameter("pupil_stretch", 0.3)
+			_eyes.append(material)
 	_glow.light_color = Color(1.0, 0.1, 0.05)
 	_glow.omni_range = _length * 1.5
 	_glow.light_energy = 0.0
@@ -164,6 +166,10 @@ func _puppet_update(delta: float) -> void:
 	var pulse := 0.5 + 0.5 * sin(age * 30.0)
 	var warn := mode == Mode.TELEGRAPH or (_bite and _bite.winding())  # a charge's or a chomp's wind-up
 	_glow.light_energy = (6.0 * pulse * settings.telegraph_glow if warn else 0.0) + flash * 4.0
+	# Its eyes smoulder, and flare with the wind-up.
+	var eye_glow := settings.shark_eye_glow * (1.0 + settings.shark_eye_flare * pulse if warn else 1.0)
+	for material in _eyes:
+		material.set_shader_parameter("glow", eye_glow)
 	if puppet:
 		# The host's chomp phase, played here: its bite lands on our own players.
 		_bite.sync(_net_bite)

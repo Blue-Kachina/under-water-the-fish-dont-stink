@@ -12,6 +12,8 @@ uniform float pupil = 0.42;  // its radius, of the visible disc's
 uniform float iris_size = 0.82;  // the iris's radius, of the visible disc's
 uniform float pupil_stretch = 1.0;  // 1 round; more stretches it side to side (sharks, rays)
 uniform float sheen = 0.45;  // how metallic the iris is
+uniform vec4 glow_color : source_color = vec4(1.0, 0.08, 0.03, 1.0);
+uniform float glow = 0.0;  // an ember glow in the iris, brightest round the pupil (0: none; zombie eyes)
 
 varying vec3 dir;
 
@@ -41,6 +43,7 @@ void fragment() {
 	float on_iris = (1.0 - in_pupil) * (1.0 - smoothstep(iris_size - aa, iris_size + aa, length(face))) * (1.0 - back);
 	ALBEDO = color;
 	METALLIC = sheen * on_iris;
+	EMISSION = glow_color.rgb * glow * on_iris * (1.0 - 0.6 * smoothstep(pupil, iris_size, length(face)));
 	ROUGHNESS = 0.04;
 	SPECULAR = 0.8;
 	CLEARCOAT = 1.0;

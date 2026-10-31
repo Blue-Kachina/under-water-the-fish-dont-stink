@@ -261,21 +261,3 @@ func _exit_tree() -> void:
 				run.horde.remove(index)
 	parts.clear()
 
-
-## A glowing red eye.
-static func eye(radius: float) -> MeshInstance3D:
-	var mesh := SphereMesh.new()
-	mesh.radius = radius
-	mesh.height = radius * 2.0
-	mesh.radial_segments = 10
-	mesh.rings = 5
-	var glow := StandardMaterial3D.new()
-	glow.albedo_color = Color(1.0, 0.1, 0.05)
-	glow.emission_enabled = true
-	glow.emission = Color(1.0, 0.1, 0.05)
-	glow.emission_energy_multiplier = 4.0
-	mesh.material = glow
-	var node := MeshInstance3D.new()
-	node.mesh = mesh
-	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	return node
