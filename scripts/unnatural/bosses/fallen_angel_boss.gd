@@ -146,6 +146,10 @@ func hold_verb() -> String:
 	return "CROWNED"
 
 
+func regrab_time() -> float:
+	return settings.angel_regrab_time
+
+
 ## How locked on it is (0 to 1).
 func lock_progress() -> float:
 	if state == State.CROWN or state == State.FLURRY:

@@ -9,6 +9,9 @@ extends Powerup
 
 ## Tentacle strokes drawn for each lash.
 const STROKES := 3
+## How wide (m) and how long (s) each stroke shows.
+const STROKE_WIDTH := 0.6
+const STROKE_TIME := 0.35
 
 ## Bursts, lashes and hp healed so far, for the probes.
 var bursts := 0
@@ -85,14 +88,23 @@ func lash() -> void:
 		var gap := to.length()
 		if gap < 0.001 or to.dot(ahead) >= gap * min_cos - horde.enemy_radius(i):
 			struck.append(i)
+	var hit_at := PackedVector3Array()
+	for n in mini(struck.size(), STROKES):
+		hit_at.append(horde.enemy_position(struck[n]))
 	run.hit_area(struck, damage(), fish, id, head, 1.0, settings.crown_proc, [id])
 	var up := fish.global_basis.y
 	var half := deg_to_rad(angle())
+	# The strokes go to the zombies it struck first (so the lash reads as a hit),
+	# then sweep the rest of the cone.
 	for n in STROKES:
-		var turn := _dice.randf_range(-half, half)
-		var lift := _dice.randf_range(-0.25, 0.25)
-		var tip := head + ahead.rotated(up, turn).rotated(fish.global_basis.x, lift).normalized() * far
-		GhostSwordfish.streak(run, head, tip, color(id), 0.35, 0.22)
+		var tip: Vector3
+		if n < hit_at.size():
+			tip = hit_at[n]
+		else:
+			var turn := _dice.randf_range(-half, half)
+			var lift := _dice.randf_range(-0.25, 0.25)
+			tip = head + ahead.rotated(up, turn).rotated(fish.global_basis.x, lift).normalized() * far
+		GhostSwordfish.streak(run, head, tip, color(id), STROKE_WIDTH, STROKE_TIME)
 	Sfx.play_at("pw/crown_lash", head)
 
 

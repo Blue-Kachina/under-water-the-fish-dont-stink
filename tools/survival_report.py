@@ -43,7 +43,7 @@ SOURCES = {
 NUMERIC = ["seed", "weapon_level", "at_min", "player_level", "target", "target_end", "time_to_down", "seconds", "max_hp",
            "hp_lost_per_s", "lowest_hp_share", "taken", "taken_contact", "taken_lunge", "taken_hazard", "taken_ranged",
            "taken_boss", "taken_other", "battered", "battery_damage", "contact_share", "damage", "dps", "kills",
-           "kills_per_min", "avg_zombie_hp", "ttk", "overkill_share", "hits", "hits_per_s", "damage_per_hit", "avg_alive",
+           "kills_per_min", "avg_zombie_hp", "start_zombie_hp", "ttk", "overkill_share", "hits", "hits_per_s", "damage_per_hit", "avg_alive",
            "max_alive", "fill", "spawn_rate", "clear_ratio", "spawned", "level_end", "cards_passed", "forced_picks", "real_s"]
 NOTES_START = "<!-- notes -->"
 NOTES_END = "<!-- /notes -->"

@@ -227,6 +227,8 @@ func _setup_tail_cue() -> void:
 	var plain: Array[MeshInstance3D] = []
 	var bounds := AABB()
 	for node in tail.find_children("*", "MeshInstance3D", true, false):
+		if node.has_meta("marco_reveal"):
+			continue  # Marco Polo's reveal copies (HiderLooks) come and go
 		var part := node as MeshInstance3D
 		var shader_material := part.material_override as ShaderMaterial
 		if shader_material and shader_material.shader in [FIN_MEMBRANE, RAY_SKIN]:

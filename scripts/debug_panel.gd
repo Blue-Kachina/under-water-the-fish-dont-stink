@@ -40,7 +40,7 @@ const PREVIEW_DIR := "res://assets/ui/previews"
 ## The sections in order: [id, title]. Game, Display and Controls are
 ## UISettings and Controls; the rest are tuning targets.
 const SECTIONS := [["game", "Game"], ["display", "Display"], ["audio", "Audio"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"],
-		["gaits", "Gaits"], ["ball", "Ball"], ["nature", "Nature"], ["unnatural", "Unnatural"], ["powerups", "Powerups"]]
+		["gaits", "Gaits"], ["ball", "Ball"], ["nature", "Nature"], ["unnatural", "Unnatural"], ["powerups", "Powerups"], ["marco_polo", "Marco Polo"]]
 ## Who each tuning section is for ("Used by ...").
 const USED_BY := {
 	"camera": "the follow camera, in every mode",
@@ -49,6 +49,7 @@ const USED_BY := {
 	"ball": "the ball in Fish Sticks",
 	"nature": "Nature, Hunt and Unnatural",
 	"unnatural": "Unnatural and the Test Tank",
+	"marco_polo": "Marco Polo",
 	"powerups": "Unnatural's powerups",
 }
 ## The Game, Display and Controls options: key -> [title, group, description, used by].
@@ -100,6 +101,8 @@ const TABS := {
 			["Loot", ["Chests", "Drops", "Rarity"]],
 			["Test Tank", ["Test Tank"]],
 			["Performance", ["Performance"]]],
+	"marco_polo": [["Match", ["Match"]], ["Noise & Sight", ["Noise", "Exposure", "Layers", "Sonar"]], ["Marco! scan", ["Marco! scan"]], ["Roles", ["Seeker", "Hider"]],
+			["Scoring", ["Scoring"]], ["Fake Fish & Portholes", ["Fake Fish", "Portholes"]], ["Bots", ["Bots"]]],
 	"powerups": [["General", []], ["Weapons", []], ["Common", []], ["Uncommon", []], ["Rare", []], ["Epic", []], ["Legendary", []], ["Boss", []],
 			["Cursed", []]],
 	"controls": [["Keyboard & Mouse", []], ["Controller", []]],
@@ -206,7 +209,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 7  # over the pause menu and the home screen
 	_targets = {"fish": fish, "gaits": GaitSettings.shared(), "camera": follow_camera, "ball": ball_settings, "nature": NatureSettings.shared(),
-			"unnatural": UnnaturalSettings.shared(), "powerups": PowerupSettings.shared()}
+			"unnatural": UnnaturalSettings.shared(), "powerups": PowerupSettings.shared(), "marco_polo": MarcoPoloSettings.shared()}
 	for section: String in _targets:
 		_defaults[section] = _snapshot(_targets[section])
 	_build_ui()

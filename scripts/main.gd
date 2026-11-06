@@ -31,6 +31,8 @@ signal nature_started(run: NatureRun)
 signal nature_ended
 signal unnatural_started(run: UnnaturalRun)
 signal unnatural_ended
+signal marco_polo_started(game: MarcoPoloMatch)
+signal marco_polo_ended
 
 ## Environment name -> script. Each script builds its own world and provides
 ## spawn_transform() and configure_environment(env).
@@ -38,6 +40,8 @@ const ENVIRONMENTS := {
 	"Obstacle Course": preload("res://scripts/arena.gd"),
 	"Ocean": preload("res://scripts/ocean.gd"),
 	"Aquarium Arena": preload("res://scripts/aquarium_arena.gd"),
+	"Sunken Temple": preload("res://scripts/marco_polo/temple_arena.gd"),  # Marco Polo's
+	"Aquarium": preload("res://scripts/marco_polo/fish_tank_arena.gd"),
 }
 const SETTINGS_PATH := "user://playground.cfg"
 const FREE_PLAY := "Free Play"
@@ -49,11 +53,12 @@ const UNNATURAL := "Unnatural"
 const TEST_TANK := "Test Tank"
 const OBSTACLE_COURSE := "Obstacle Course"
 const REPLAYS := "Replays"
-const MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, NATURE, HUNT, UNNATURAL, TEST_TANK, OBSTACLE_COURSE, REPLAYS]
+const MARCO_POLO := "Marco Polo"
+const MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, NATURE, HUNT, UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, REPLAYS]
 ## Modes played as a match, which wait on a card for Play.
-const MATCH_MODES := [ONE_V_ONE, NATURE, HUNT, UNNATURAL, TEST_TANK]
+const MATCH_MODES := [ONE_V_ONE, NATURE, HUNT, UNNATURAL, TEST_TANK, MARCO_POLO]
 ## Modes played on Nature's tuning.
-const NATURE_MODES := [NATURE, HUNT, UNNATURAL, TEST_TANK, OBSTACLE_COURSE]
+const NATURE_MODES := [NATURE, HUNT, UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO]
 ## Nature's tuning: Extra Swishy strides, no boost.
 const NATURE_PRESET := "res://presets/nature.cfg"
 ## Mode -> the environment it's played in.
@@ -66,6 +71,7 @@ const MODE_ENVIRONMENTS := {
 	UNNATURAL: "Ocean",
 	TEST_TANK: "Ocean",
 	OBSTACLE_COURSE: "Obstacle Course",
+	MARCO_POLO: "Sunken Temple",  # its card's arena picker decides (mode_environment())
 	REPLAYS: "Aquarium Arena",
 }
 ## Each mode's tile in the home screen's mode picker (ModePicker): its title,
@@ -99,6 +105,9 @@ const MODE_TILES := {
 	TEST_TANK: {"title": "Test Tank", "icon": "mode_test_tank", "colors": [Color(0.12, 0.08, 0.2), Color(0.75, 0.55, 1.0)],
 		"pitch": "Unnatural's shooting range: dummies to hit, every stat to set, and a DPS readout.",
 		"short": "Dummies and a DPS readout", "play": ["Solo"]},
+	MARCO_POLO: {"title": "Marco Polo", "icon": "mode_marco_polo", "colors": [Color(0.03, 0.14, 0.12), Color(0.4, 1.0, 0.7)],
+		"pitch": "Hide and seek by sound. Score in the seeker's sight, keep quiet, and don't get tagged.",
+		"short": "Hide and seek by sound", "play": ["Solo", "Online"]},
 }
 ## Converted replays are kept here, so a .replay converts only once. Bump the
 ## folder when the converter's output changes, so old conversions are redone.
@@ -119,6 +128,8 @@ var hunt_match: HuntMatch
 ## The Unnatural run being played, if any, and its HUD.
 var unnatural_run: UnnaturalRun
 var _unnatural_hud: UnnaturalHud
+## The Marco Polo match being played, if any.
+var marco_polo: MarcoPoloMatch
 ## The first player's school wheel and edge arrows, while a Nature run is on.
 var _target_wheel: TargetWheel:
 	get:
@@ -252,12 +263,12 @@ func _open_coop() -> void:
 
 
 ## Starts `mode` straight away (the home screen's mode picker): a match mode's
-## match too, with no card to wait on. Picking the mode that's on starts it
-## afresh.
+## match too, with no card to wait on (but Marco Polo, whose card picks the
+## variant and arena). Picking the mode that's on starts it afresh.
 func start_mode(mode: String) -> void:
 	if mode not in MODES:
 		return
-	if mode == current_mode and current_environment == MODE_ENVIRONMENTS[mode]:
+	if mode == current_mode and current_environment == mode_environment(mode):
 		if mode == REPLAYS:
 			return
 		if _playing():
@@ -267,8 +278,25 @@ func start_mode(mode: String) -> void:
 			reset_play()
 	else:
 		set_mode(mode)
-	if _match_card:
+	if _match_card and mode != MARCO_POLO:
 		play_match()
+
+
+## The environment `mode` plays in: Marco Polo's is its card's arena pick
+## (the plain Ocean only inside a test probe; a saved "Ocean" anywhere else
+## plays the first of the card's arenas).
+func mode_environment(mode: String) -> String:
+	if mode != MARCO_POLO:
+		return MODE_ENVIRONMENTS[mode]
+	var arena: String = MarcoPoloSettings.shared().arena
+	var in_probe := get_tree() != null and get_tree().current_scene != self
+	if arena in MarcoPoloSettings.ARENAS or (in_probe and arena == MarcoPoloSettings.TEST_ARENA):
+		if ENVIRONMENTS.has(arena):
+			return arena
+	for fallback: String in MarcoPoloSettings.ARENAS:
+		if ENVIRONMENTS.has(fallback):
+			return fallback
+	return MODE_ENVIRONMENTS[mode]
 
 
 ## The mode last played (not Replays). Older settings picked the environment
@@ -326,6 +354,8 @@ func set_character(character: FishCharacter.FishClass) -> void:
 		nature_run.start()
 	elif hunt_match:
 		hunt_match.kickoff()
+	elif marco_polo:
+		pass  # the new look plays from the next round (each round respawns everyone)
 	elif unnatural_run:
 		unnatural_run.start()
 	else:
@@ -395,6 +425,10 @@ func reset_play() -> void:
 	if hunt_match:
 		hunt_match.restart()
 		return
+	if marco_polo:
+		if marco_polo.authority:
+			marco_polo.start_match()
+		return
 	if unnatural_run:
 		if unnatural_run.authority:
 			unnatural_run.start()  # online, the host's restart is everyone's
@@ -415,6 +449,8 @@ func _reset_label() -> String:
 		return "Restart kickoff"
 	if hunt_match:
 		return "Restart match"
+	if marco_polo:
+		return "Restart match" if marco_polo.authority else ""
 	if unnatural_run:
 		return "Reset the tank" if unnatural_run.test_tank else "Restart run"
 	return "Restart" if nature_run else "Reset"
@@ -614,7 +650,29 @@ func _show_match_card() -> void:
 	_match_card = MatchCard.new()
 	_match_card.message = _match_card_text(current_mode)
 	_match_card.play_requested.connect(play_match)
+	if current_mode == MARCO_POLO:
+		_marco_polo_card(_match_card)
 	add_child(_match_card)
+
+
+## Marco Polo's card picks the variant, whether you seek or hide first (Start
+## as) and the arena (only arenas that are
+## built: ENVIRONMENTS), and notes split-screen players it dropped.
+func _marco_polo_card(card: MatchCard) -> void:
+	var mp := MarcoPoloSettings.shared()
+	card.choices.append({"title": "Variant", "options": MarcoPoloSettings.VARIANT_NAMES, "index": int(mp.variant),
+			"changed": func(i: int) -> void: mp.variant = i as MarcoPoloSettings.Variant})
+	card.choices.append({"title": "Start as", "options": MarcoPoloSettings.START_AS_NAMES, "index": int(mp.start_as),
+			"changed": func(i: int) -> void: mp.start_as = i as MarcoPoloSettings.StartAs})
+	var arenas: Array = MarcoPoloSettings.ARENAS.filter(func(arena_name: String) -> bool: return ENVIRONMENTS.has(arena_name))
+	card.choices.append({"title": "Arena", "options": arenas, "index": maxi(arenas.find(mp.arena), 0),
+			"changed": func(i: int) -> void:
+				mp.arena = arenas[i]
+				if current_environment != mp.arena:
+					set_environment.call_deferred(mp.arena)})  # a new card comes with it
+	if _local and _local.dropped_for_marco_polo > 0:
+		card.note = "No split-screen in Marco Polo (one screen would give the hiders away): %d local player%s dropped. Play together online." \
+				% [_local.dropped_for_marco_polo, "" if _local.dropped_for_marco_polo == 1 else "s"]
 
 
 ## What a match mode's card says.
@@ -630,6 +688,8 @@ static func _match_card_text(mode: String) -> String:
 			return "Test Tank: Unnatural's shooting range. Immortal dummies wait ahead (a cluster, and lines at 10, 20 and 40 m) and the DPS readout shows each damage source. Set your level, every stat, the dummies and a chasing horde in the tuning panel's UNNATURAL > Test Tank. R resets."
 		UNNATURAL:
 				return "Unnatural: there's a blood moon tonight, and every fish in the sea has turned but you. Survive the zombie horde. Your fish bites on its own: huge ghost jaws snap on whatever's ahead. Ram them at speed to batter them too (it doesn't hurt you), but any other touch does. Swim through the XP pearls they drop to level up."
+		MARCO_POLO:
+			return "Marco Polo: hide and seek by sound. Each round one fish seeks and the rest hide: you seek once, and a bot seeks while you hide (Start as picks which comes first). Hiders score while they're in the seeker's line of sight, even unseen, but every noise (fast swimming, flips, badly timed strides) shows them to the seeker, layer by layer. The seeker tags by touch (click the left stick, or M, to call \"Marco!\"); hiders throw a Fake Fish with RB. Y swaps follow and free cam, as in Unnatural. Last Fish Swimming: tagged is out. Join the Seekers: tagged hunts with them."
 	return mode
 
 
@@ -656,7 +716,7 @@ func _close_replay() -> void:
 ## Plays `mode` (one of MODES) from now on, in its environment. Remembered,
 ## apart from Replays (and in test probes).
 func set_mode(mode: String, remember := true) -> void:
-	if mode not in MODES or (mode == current_mode and current_environment == MODE_ENVIRONMENTS[mode]):
+	if mode not in MODES or (mode == current_mode and current_environment == mode_environment(mode)):
 		return
 	var was_replays := current_mode == REPLAYS
 	if mode == REPLAYS and not was_replays and current_mode in MODES:
@@ -665,8 +725,8 @@ func set_mode(mode: String, remember := true) -> void:
 	GaitSettings.fish_sticks_now = mode in [FREE_PLAY, ONE_V_ONE]
 	if was_replays and mode != REPLAYS:
 		_leave_replays()
-	if current_environment != MODE_ENVIRONMENTS[mode]:
-		set_environment(MODE_ENVIRONMENTS[mode])  # which applies the mode
+	if current_environment != mode_environment(mode):
+		set_environment(mode_environment(mode))  # which applies the mode
 	else:
 		_apply_mode()
 	if mode == REPLAYS and not was_replays:
@@ -685,11 +745,17 @@ func set_mode(mode: String, remember := true) -> void:
 ## Shows a match mode's card (the match starts on Play), or ends the match
 ## (or card) outside one.
 func _apply_mode() -> void:
+	if _local:
+		_local.no_split_screen = current_mode == MARCO_POLO
+		if current_mode == MARCO_POLO and _local.count() > 1:
+			_local.dropped_for_marco_polo = _local.count() - 1
+		elif current_mode != MARCO_POLO:
+			_local.dropped_for_marco_polo = 0
 	if current_mode not in [NATURE, UNNATURAL] and _local:
 		_local.drop_extras()  # split-screen co-op is Nature's and Unnatural's
 	_use_nature_tuning(current_mode in NATURE_MODES)
 	_use_course_cam(current_mode == OBSTACLE_COURSE)
-	var wanted: bool = current_mode in MATCH_MODES and current_environment == MODE_ENVIRONMENTS[current_mode]
+	var wanted: bool = current_mode in MATCH_MODES and current_environment == mode_environment(current_mode)
 	if wanted:
 		# From one match mode straight to another in the same water (Nature to Hunt):
 		# the other's match or card goes first.
@@ -713,7 +779,7 @@ func _apply_mode() -> void:
 
 ## A match, a Nature run or a Hunt is on.
 func _playing() -> bool:
-	return match_1v1 != null or nature_run != null or hunt_match != null or unnatural_run != null
+	return match_1v1 != null or nature_run != null or hunt_match != null or unnatural_run != null or marco_polo != null
 
 
 ## The mode of the match being played ("" when none).
@@ -724,6 +790,8 @@ func _playing_mode() -> String:
 		return NATURE
 	if unnatural_run:
 		return TEST_TANK if unnatural_run.test_tank else UNNATURAL
+	if marco_polo:
+		return MARCO_POLO
 	return HUNT if hunt_match else ""
 
 
@@ -769,6 +837,9 @@ func _start_match() -> void:
 		return
 	if current_mode == HUNT:
 		_start_hunt()
+		return
+	if current_mode == MARCO_POLO:
+		_start_marco_polo()
 		return
 	if current_mode in [UNNATURAL, TEST_TANK]:
 		_start_unnatural(current_mode == TEST_TANK)
@@ -833,6 +904,58 @@ func _start_nature(authority := true) -> void:
 	_environment.add_child(nature_run)
 	_local.attach_run(nature_run)  # each player's ball cam, school wheel and HUD
 	nature_started.emit(nature_run)
+
+
+## Marco Polo in the arena picked on its card: the player and bots (no
+## split-screen; online players join through CoopSession), the follow cam with
+## no ball cam. The world's run here (`authority`) unless this is an online
+## session's guest.
+func _start_marco_polo(authority := true) -> void:
+	_local.drop_extras()
+	marco_polo = MarcoPoloMatch.new()
+	marco_polo.name = "MarcoPolo"
+	marco_polo.authority = authority
+	marco_polo.setup(_environment, _fish, _camera)
+	_hud.survivor_cam = true  # Unnatural's follow and free cam (MarcoPoloMatch keeps it on), no controls line
+	_hud.plate_filter = marco_polo.shows_plate  # the seeker sees hiders' plates only once they show
+	_camera.ball = null
+	_camera.ball_cam = false
+	_environment.add_child(marco_polo)
+	_camera.snap()
+	marco_polo_started.emit(marco_polo)
+
+
+## Online co-op's host in Marco Polo: the match ours, the world run here. One
+## already running stays (its guests join it).
+func host_marco_polo() -> void:
+	if marco_polo and marco_polo.authority:
+		return
+	set_mode(MARCO_POLO)
+	_end_match()
+	_close_match_card()
+	_start_marco_polo(true)
+
+
+## Online co-op's guest in Marco Polo: our fish in the host's match, in the
+## host's arena.
+func guest_marco_polo(arena: String) -> void:
+	if ENVIRONMENTS.has(arena):
+		MarcoPoloSettings.shared().arena = arena
+	set_mode(MARCO_POLO)
+	if current_environment != mode_environment(MARCO_POLO):
+		set_environment(mode_environment(MARCO_POLO))
+	_end_match()
+	_close_match_card()
+	_start_marco_polo(false)
+
+
+## Back from being a guest: Marco Polo on our own again (us and bots).
+func solo_marco_polo() -> void:
+	if current_mode != MARCO_POLO:
+		return
+	_end_match()
+	_close_match_card()
+	_start_marco_polo(true)
 
 
 func _start_hunt() -> void:
@@ -917,6 +1040,14 @@ func _end_match() -> void:
 		_unnatural_hud.queue_free()
 		_unnatural_hud = null
 		unnatural_ended.emit()
+	if marco_polo:
+		marco_polo.end()
+		marco_polo.queue_free()
+		marco_polo = null
+		_camera.target = null
+		_hud.survivor_cam = false
+		_hud.plate_filter = Callable()
+		marco_polo_ended.emit()
 	if hunt_match:
 		hunt_match.end()
 		hunt_match.queue_free()

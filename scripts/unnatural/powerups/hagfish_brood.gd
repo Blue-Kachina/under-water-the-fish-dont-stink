@@ -9,9 +9,6 @@ extends Powerup
 ## and swims back. A boss is only bitten (not held or slowed).
 
 enum Phase { IDLE, LUNGE, KNOT, BACK }
-## How long a lunge out and a swim back take (s).
-const LUNGE_TIME := 0.18
-const BACK_TIME := 0.3
 ## How far behind and round the fish they ride (in its hitbox lengths).
 const RIDE := 0.7
 const SLIME := Color(0.6, 0.8, 0.45)
@@ -66,7 +63,7 @@ func on_tick(delta: float) -> void:
 					if target >= 0:
 						one.phase = Phase.LUNGE
 						one.target = target
-						one.left = LUNGE_TIME
+						one.left = settings.brood_lunge_time
 						one.from = rest
 					else:
 						one.cool = 0.25  # nothing in reach: look again soon
@@ -75,7 +72,7 @@ func on_tick(delta: float) -> void:
 				if not horde.is_alive(one.target):
 					_back(one, rest)
 				else:
-					var share := 1.0 - clampf(one.left / LUNGE_TIME, 0.0, 1.0)
+					var share := 1.0 - clampf(one.left / settings.brood_lunge_time, 0.0, 1.0)
 					at = (one.from as Vector3).lerp(horde.enemy_position(one.target), share * share)
 					if one.left <= 0.0:
 						_bite(one)
@@ -90,7 +87,7 @@ func on_tick(delta: float) -> void:
 						_back(one, at)
 			Phase.BACK:
 				one.left -= delta
-				var share := 1.0 - clampf(one.left / BACK_TIME, 0.0, 1.0)
+				var share := 1.0 - clampf(one.left / settings.brood_back_time, 0.0, 1.0)
 				at = (one.from as Vector3).lerp(rest, share)
 				if one.left <= 0.0:
 					one.phase = Phase.IDLE
@@ -128,7 +125,7 @@ func _let_go(one: Dictionary) -> void:
 func _back(one: Dictionary, from: Vector3) -> void:
 	one.phase = Phase.BACK
 	one.target = -1
-	one.left = BACK_TIME
+	one.left = settings.brood_back_time
 	one.from = from
 
 

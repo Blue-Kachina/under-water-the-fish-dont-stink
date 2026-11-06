@@ -21,7 +21,7 @@ const BUSES := {"ui": "UI", "voice": "Voice", "music": "Music", "amb": "Ambience
 const CATEGORIES := {
 	"ui": "Menus", "fish": "Your fish", "ball": "Ball", "arena": "Arena", "match": "Matches", "hunt": "Hunt",
 	"battered": "Battered", "nature": "Nature", "unnatural": "Unnatural", "pw": "Powerups", "stage": "Stage events",
-	"boss": "Bosses", "fx": "Shared effects", "amb": "Ambience", "voice": "Callouts", "music": "Music",
+	"boss": "Bosses", "mp": "Marco Polo", "fx": "Shared effects", "amb": "Ambience", "voice": "Callouts", "music": "Music",
 }
 
 const ROWS := [
@@ -233,6 +233,28 @@ const ROWS := [
 	["boss/hit", 1, "3d layers voices=2 cd=0.05", "A boss takes damage."],
 	["boss/defeated", 1, "", "A boss is defeated."],
 
+	# Marco Polo.
+	["mp/marco", 1, "3d", "The seeker calls \"Marco!\" (heard by everyone, from the seeker)."],
+	["mp/polo", 1, "3d voices=6", "A hider (or a Fake Fish) answers \"Polo!\"."],
+	["mp/tag", 1, "", "A seeker tags a hider: TAGGED!"],
+	["mp/eliminated", 1, "", "A tagged hider is out (Last Fish Swimming): belly-up and floating away."],
+	["mp/ping", 2, "voices=3 cd=0.05", "A blip lands on the seeker's sonar scope (seeker only)."],
+	["mp/seen", 2, "voices=1 cd=0.4", "A soft tick while you're in the seeker's sight and scoring (only on the hider's own machine)."],
+	["mp/heartbeat", 3, "3d voices=2 cd=0.3", "Optional: the seeker hears a faint heartbeat from a hider at the cardiovascular layer."],
+	["mp/aura", 2, "3d voices=2 cd=0.3", "A hider flares into the aura layer (a big blunder)."],
+	["mp/count", 1, "pitched", "The seeker's count while the hiders scatter (climbs)."],
+	["mp/bump", 1, "3d layers voices=3 cd=0.08", "Two fish bump, or a fish knocks off a porthole's rim: a soft fleshy thud with a scale scrape, harder at speed."],
+	["mp/round_over", 1, "", "The round ends: the ROUND_OVER card."],
+	["mp/fake_throw", 3, "", "Throwing a Fake Fish (only the thrower hears it; it makes no noise in the game)."],
+	["mp/fake_pop", 1, "3d", "A Fake Fish bursts into bubbles (end of its life, or tagged)."],
+	["mp/fooled", 1, "", "The seeker tagged a Fake Fish: FOOLED!"],
+	["mp/porthole_in", 2, "3d", "Slipping into a porthole."],
+	["mp/porthole_out", 1, "3d", "Jumping out of a porthole: a loud whoosh."],
+	["mp/gasp", 2, "voices=1 cd=0.6", "Gasping while the Out of Water gauge fills (the hider in the porthole)."],
+	["mp/fish_out_of_water", 1, "3d", "The gauge fills: FISH OUT OF WATER! The fish flops out gasping."],
+	["mp/airstone", 2, "3d loop voices=6", "An aquarium airstone / bubble curtain fizzing."],
+	["mp/chest_burp", 2, "3d voices=2", "The aquarium's treasure chest pops open and burps bubbles."],
+
 	# Shared effects.
 	["fx/explosion", 1, "3d layers voices=4 cd=0.03", "An explosion (torpedoes, depth charges, the lure)."],
 	["fx/burst_cloud", 2, "3d voices=3", "A burst cloud."],
@@ -297,6 +319,10 @@ const FALLBACKS := {
 	"unnatural/punch_hit": "unnatural/attack_own_hit",
 	"pw/haze_scatter": "pw/depth_charge_drop",
 	"pw/haze_burst": "fx/explosion",
+	"mp/bump": "fish/bump",
+	"mp/fake_pop": "fx/pop",
+	"mp/count": "match/countdown",
+	"mp/airstone": "arena/bubble_column_loop",
 }
 
 static var _events := {}

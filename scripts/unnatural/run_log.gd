@@ -261,8 +261,6 @@ func _on_card_picked(fish: FishController, card: Dictionary) -> void:
 			what = "%s Lv %d" % [card.tome, card.level]
 		"fallback":
 			what = "fallback %s" % card.what
-		"swap":
-			what = "swap %s for %s" % [card.weapon, card.incoming]
 		_:
 			if card.has("powerup"):
 				what = "item %s x%d" % [card.powerup, card.get("stacks", 1)]

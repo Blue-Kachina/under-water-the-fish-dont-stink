@@ -142,12 +142,21 @@ static func shared() -> PowerupSettings:
 @export_range(0, 20, 1, "or_greater") var remora_count := 1
 @export_range(0, 10, 1, "or_greater") var remora_count_per_stack := 1
 @export_range(0.05, 20.0, 0.05, "or_greater") var remora_interval := 1.5
-@export_range(0.5, 60.0, 0.5, "or_greater") var remora_range := 7.0
-@export_range(0.0, 1000.0, 1.0, "or_greater") var remora_damage := 55.0
+@export_range(0.5, 60.0, 0.5, "or_greater") var remora_range := 9.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var remora_damage := 70.0
 @export_range(0.0, 1.0, 0.05) var remora_proc := 0.5
-@export_range(0.0, 2.0, 0.01, "or_greater") var remora_damage_step := 0.25
+@export_range(0.0, 2.0, 0.01, "or_greater") var remora_damage_step := 0.15
 @export_range(0.0, 2.0, 0.01, "or_greater") var remora_rate_step := 0.15
 @export_range(0.0, 2.0, 0.01, "or_greater") var remora_range_step := 0.15
+## A nip that kills hands back its surplus as time: the share of the nip the
+## zombie didn't need, times remora_kill_refund, comes off its turn (0: none).
+## So remoras chew through a pack of weak zombies (early on) and keep their
+## pace on ones a nip barely kills.
+@export_range(0.0, 1.0, 0.05) var remora_kill_refund := 1.0
+## The third milestone: each nip tears into every other zombie within
+## remora_tear_reach m for remora_tear_share of its damage.
+@export_range(0.0, 20.0, 0.25, "or_greater") var remora_tear_reach := 2.5
+@export_range(0.0, 2.0, 0.05, "or_greater") var remora_tear_share := 0.25
 
 @export_group("Bubble Wrap")
 ## A bubble round the fish: once it's gone bubble_ready s untouched (less
@@ -178,12 +187,12 @@ static func shared() -> PowerupSettings:
 ## halo_radius_step orbit size, halo_spin_step orbit speed, jelly_rate_step
 ## sting rate. jelly_stacks: a level override for testing.
 @export_range(0, 20, 1, "or_greater") var jelly_stacks := 0
-@export_range(0, 20, 1, "or_greater") var jelly_count := 2
+@export_range(0, 20, 1, "or_greater") var jelly_count := 4
 @export_range(0, 10, 1, "or_greater") var jelly_count_per_stack := 1
 @export_range(0.5, 30.0, 0.1, "or_greater") var halo_radius := 3.2
 @export_range(0.0, 5.0, 0.05, "or_greater") var halo_spin := 0.5
 @export_range(0.1, 10.0, 0.05, "or_greater") var jelly_radius := 1.2
-@export_range(0.0, 1000.0, 1.0, "or_greater") var jelly_damage := 35.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var jelly_damage := 45.0
 @export_range(0.05, 5.0, 0.05, "or_greater") var jelly_tick := 0.25
 @export_range(0.0, 1.0, 0.05) var jelly_proc := 0.1
 @export_range(0.0, 2.0, 0.01, "or_greater") var jelly_damage_step := 0.25
@@ -238,6 +247,16 @@ static func shared() -> PowerupSettings:
 @export_range(0.0, 1.0, 0.05) var haze_film_slow := 0.3
 @export_range(0.0, 10.0, 0.1, "or_greater") var haze_film_time := 2.0
 @export_range(0.0, 20.0, 0.1, "or_greater") var haze_creep := 1.5
+## Merging (the second milestone): the bigger cloud grows to hold both (by
+## volume), up to haze_merge_max times one cloud's radius, and keeps the
+## summed damage of the clouds it swallowed, up to haze_merge_damage_cap
+## times one cloud's for every bomb in a scatter (0.5: 4 bombs pool up to 2
+## clouds' worth; more bombs, from the facet or Quantity, raise it with them).
+@export_range(1.0, 10.0, 0.1, "or_greater") var haze_merge_max := 2.5
+@export_range(0.1, 10.0, 0.05, "or_greater") var haze_merge_damage_cap := 0.5
+## The bombs past the packs land haze_path_step cloud radii apart along the
+## best pack's path (under 2: they touch, so they merge from the second milestone).
+@export_range(0.1, 5.0, 0.05, "or_greater") var haze_path_step := 0.9
 @export_range(0.0, 2.0, 0.01, "or_greater") var haze_damage_step := 0.25
 @export_range(0.0, 2.0, 0.01, "or_greater") var haze_size_step := 0.12
 @export_range(0.0, 10.0, 0.1, "or_greater") var haze_life_step := 0.8
@@ -295,13 +314,13 @@ static func shared() -> PowerupSettings:
 ## damage, coil_radius_step coil size, coil_rate_step hit rate. coil_stacks:
 ## a stacks override for testing.
 @export_range(0, 20, 1, "or_greater") var coil_stacks := 0
-@export_range(1, 20, 1, "or_greater") var coil_arrive_level := 5
+@export_range(1, 20, 1, "or_greater") var coil_arrive_level := 10
 @export_range(0, 20, 1, "or_greater") var coil_levels_per_stack := 3
 @export_range(1, 100, 1, "or_greater") var coil_segments := 6
 @export_range(0, 50, 1, "or_greater") var coil_segments_per_stack := 3
 @export_range(0.2, 10.0, 0.1, "or_greater") var coil_spacing := 1.4
 @export_range(0.1, 10.0, 0.05, "or_greater") var coil_radius := 0.9
-@export_range(0.0, 1000.0, 1.0, "or_greater") var coil_damage := 55.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var coil_damage := 75.0
 @export_range(0.05, 5.0, 0.05, "or_greater") var coil_tick := 0.25
 @export_range(0.0, 1.0, 0.05) var coil_proc := 0.15
 @export_range(0.0, 2.0, 0.01, "or_greater") var coil_damage_step := 0.25
@@ -338,9 +357,13 @@ static func shared() -> PowerupSettings:
 @export_range(0.0, 5000.0, 5.0, "or_greater") var maw_chew_damage := 40.0
 @export_range(1.0, 100.0, 1.0, "or_greater") var maw_volley_length := 20.0
 @export_range(0.1, 10.0, 0.1, "or_greater") var maw_volley_width := 1.4
-@export_range(0.0, 5000.0, 5.0, "or_greater") var maw_volley_damage := 60.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var maw_volley_damage := 90.0
 @export_range(0.0, 5000.0, 5.0, "or_greater") var maw_volley_damage_per_stack := 30.0
 @export_range(0.0, 1.0, 0.05) var maw_proc := 0.5
+## The spat zombies fan out maw_fan rad (edge to edge, the volley's bolts too)
+## and are thrown out along it at maw_spit_speed m/s.
+@export_range(0.0, 6.3, 0.05) var maw_fan := 0.9
+@export_range(0.0, 100.0, 1.0, "or_greater") var maw_spit_speed := 22.0
 
 @export_group("Hagfish Brood (boss item)")
 ## The Whale Fall's boss item: brood_count hagfish (more brood_count_per_stack
@@ -355,12 +378,15 @@ static func shared() -> PowerupSettings:
 @export_range(0, 10, 1, "or_greater") var brood_count_per_stack := 1
 @export_range(1.0, 60.0, 0.5, "or_greater") var brood_reach := 10.0
 @export_range(0.1, 30.0, 0.1, "or_greater") var brood_every := 1.6
-@export_range(0.0, 5000.0, 5.0, "or_greater") var brood_damage := 35.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var brood_damage := 50.0
 @export_range(0.0, 5000.0, 5.0, "or_greater") var brood_damage_per_stack := 15.0
 @export_range(0.0, 10.0, 0.1, "or_greater") var brood_hold := 1.2
 @export_range(0.0, 1.0, 0.05) var brood_slow := 0.5
 @export_range(0.0, 20.0, 0.1, "or_greater") var brood_slow_time := 3.0
 @export_range(0.0, 1.0, 0.05) var brood_proc := 0.4
+## A hagfish's lunge out takes brood_lunge_time s, its swim back brood_back_time s.
+@export_range(0.02, 2.0, 0.01, "or_greater") var brood_lunge_time := 0.18
+@export_range(0.02, 3.0, 0.01, "or_greater") var brood_back_time := 0.3
 
 @export_group("Queen's Disc (boss item)")
 ## The Lamprey Queen's boss item: a lamprey latches onto the toughest zombie
@@ -372,7 +398,7 @@ static func shared() -> PowerupSettings:
 @export_range(1.0, 100.0, 0.5, "or_greater") var disc_reach := 14.0
 @export_range(1.0, 200.0, 0.5, "or_greater") var disc_leash := 24.0
 @export_range(0.05, 10.0, 0.05, "or_greater") var disc_tick := 0.5
-@export_range(0.0, 5000.0, 5.0, "or_greater") var disc_drain := 30.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var disc_drain := 45.0
 @export_range(0.0, 5000.0, 5.0, "or_greater") var disc_drain_per_stack := 20.0
 @export_range(0.0, 100.0, 0.1, "or_greater") var disc_heal := 1.5
 @export_range(0.0, 100.0, 0.1, "or_greater") var disc_heal_per_stack := 1.0
@@ -398,7 +424,7 @@ static func shared() -> PowerupSettings:
 @export_range(1.0, 60.0, 0.5, "or_greater") var crown_reach := 10.0
 @export_range(5.0, 180.0, 5.0) var crown_angle := 50.0
 @export_range(0.0, 90.0, 5.0) var crown_angle_per_stack := 10.0
-@export_range(0.0, 5000.0, 5.0, "or_greater") var crown_damage := 45.0
+@export_range(0.0, 5000.0, 5.0, "or_greater") var crown_damage := 70.0
 @export_range(0.0, 5000.0, 5.0, "or_greater") var crown_damage_per_stack := 20.0
 @export_range(0.0, 100.0, 0.1, "or_greater") var crown_heal := 1.0
 @export_range(0.0, 100.0, 0.1, "or_greater") var crown_heal_per_stack := 0.5

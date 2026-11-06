@@ -6,7 +6,12 @@ extends Node
 ## fish attack (the attacks' own curves), with the five powerup weapons on as
 ## well; each source's damage per second is its damage over the time.
 ## Reported, not pass/fail: the table to level the weapons against each other.
-##   Godot_console.exe --headless --fixed-fps 120 --path . res://tests/weapon_bench.tscn [-- --seconds 8 --set K=V,... --out NAME]
+##   Godot_console.exe --headless --fixed-fps 120 --path . res://tests/weapon_bench.tscn [-- --seconds 8 --set K=V,... --out NAME --spread]
+## --spread: the dummies hold still, scattered SPREAD_RADIUS m round instead of
+## in one tight cluster, and the whole field drifts (DRIFT_SPEED m/s, turning
+## DRIFT_TURN rad/s) with the fish's circle following it. A tight, still
+## cluster lets area weapons (Purple Haze) cover it all at Lv 1; spread out,
+## bigger and more clouds have more to find.
 ## --out also saves the table as user://run_logs/survival/NAME.csv (source, level, dps), for
 ## tools/survival_report.py to cross-check the class survival sim against.
 
@@ -16,17 +21,24 @@ const KINDS := [FishAttack.Kind.STING, FishAttack.Kind.BITE, FishAttack.Kind.LAS
 ## The circle the fish swims round the cluster (m) and how fast (m/s).
 const CIRCLE := 6.0
 const SWIM := 8.0
+## --spread's field: its radius and half-height (m), and its drift.
+const SPREAD_RADIUS := 14.0
+const SPREAD_HEIGHT := 2.5
+const DRIFT_SPEED := 1.0
+const DRIFT_TURN := 0.12
 
 var main: Node
 var fish: FishController
 var seconds := 8.0
 var overrides := {}
 var out := ""
+var spread := false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var args := OS.get_cmdline_user_args()
+	spread = args.has("--spread")
 	for n in args.size() - 1:
 		if args[n] == "--out":
 			out = args[n + 1]
@@ -53,7 +65,7 @@ func _run() -> void:
 	settings.tome_slots = 0
 	settings.tank_horde = 0
 	settings.tank_contact = false
-	settings.tank_slow_walkers = true
+	settings.tank_slow_walkers = not spread
 	settings.tank_preset = 0
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
@@ -76,10 +88,21 @@ func _run() -> void:
 			await _ticks(3)
 			run.start()
 			await _ticks(2)
+			var centre := middle
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 7  # the same field at every level
+			if spread:
+				_scatter(run.horde, centre, rng)
 			var turn := 0.0
 			for n in roundi(seconds * 120.0):
 				turn += SWIM / CIRCLE / 120.0
-				var want := middle + Vector3(cos(turn), 0.0, sin(turn)) * CIRCLE
+				if spread:
+					var drift := Vector3.FORWARD.rotated(Vector3.UP, n * DRIFT_TURN / 120.0) * DRIFT_SPEED / 120.0
+					centre += drift
+					for i in run.horde.alive:
+						if run.horde.is_immortal(i):
+							run.horde.place(i, run.horde.enemy_position(i) + drift)
+				var want := centre + Vector3(cos(turn), 0.0, sin(turn)) * CIRCLE
 				var tangent := Vector3(-sin(turn), 0.0, cos(turn))
 				fish.linear_velocity = tangent * SWIM + (want - fish.global_position) * 3.0
 				await get_tree().physics_frame
@@ -132,6 +155,15 @@ func _run() -> void:
 	main.set_mode(main.FREE_SWIM)
 	await _ticks(3)
 	get_tree().quit(0)
+
+
+## --spread: every dummy to a random spot in a flat disc SPREAD_RADIUS m round `centre`.
+func _scatter(horde: Horde, centre: Vector3, rng: RandomNumberGenerator) -> void:
+	for i in horde.alive:
+		if not horde.is_immortal(i):
+			continue
+		var out := Vector3.FORWARD.rotated(Vector3.UP, rng.randf() * TAU) * SPREAD_RADIUS * sqrt(rng.randf())
+		horde.relocate(i, centre + out + Vector3.UP * rng.randf_range(-SPREAD_HEIGHT, SPREAD_HEIGHT))
 
 
 func _ticks(n: int) -> void:

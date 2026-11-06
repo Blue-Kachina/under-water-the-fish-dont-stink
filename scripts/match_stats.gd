@@ -30,6 +30,16 @@ const DEMO = "demo"
 const TOUCH = "touch"
 const CLEAR = "clear"
 const CENTER = "center"
+## Marco Polo's (MarcoPoloMatch.stats, for its end card): a seeker's tag; points
+## a hider earned while in sight (per layer); a close call (seen at muscular or
+## above within close_call_range and not tagged); a hider still in at a round's
+## end; a seeker tagging a Fake Fish; a hider drying out in a porthole.
+const TAG = "tag"
+const SEEN = "seen"
+const CLOSE_CALL = "close_call"
+const SURVIVED = "survived"
+const FOOLED = "fooled"
+const OUT_OF_WATER = "out_of_water"
 ## Rocket League's points for each (a battery scores as RL's demo). RL doesn't
 ## publish its rules for touches, clears and centres; these are its usual
 ## values, and the judging below a guess.

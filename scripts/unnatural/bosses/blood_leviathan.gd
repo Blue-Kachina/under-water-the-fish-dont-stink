@@ -800,13 +800,18 @@ func hold(fish: FishController) -> void:
 	held_changed.emit(fish, true)
 
 
+## How long after letting go it can't grab again.
+func regrab_time() -> float:
+	return settings.final_regrab_time
+
+
 ## Lets go of the held player, flinging them clear, a moment untouchable.
 func release() -> void:
 	if held == null:
 		return
 	var fish := held
 	held = null
-	_regrab_left = settings.final_regrab_time
+	_regrab_left = regrab_time()
 	if is_instance_valid(fish):
 		if fish.strode.is_connected(_hold_hook):
 			fish.strode.disconnect(_hold_hook)

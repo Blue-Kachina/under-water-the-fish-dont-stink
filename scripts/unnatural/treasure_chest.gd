@@ -204,6 +204,25 @@ func reshut_for(fish: FishController, layer := 0) -> bool:
 	return true
 
 
+## Taken by its opener alone (a boss item with boss_item_every_player off):
+## shut from everyone's view while they choose, so no one else opens it too.
+func claim() -> void:
+	_shown = 0
+	if is_inside_tree():
+		_set_layers(_shut, _shown)
+		_shut.visible = false
+
+
+## Its opener put it back: there for everyone again.
+func unclaim() -> void:
+	if is_queued_for_deletion() or _vanished:
+		return
+	_shown = PLAYER_LAYERS
+	if is_inside_tree():
+		_set_layers(_shut, _shown)
+		_shut.visible = true
+
+
 ## Gone for good (everyone's opened it, or it's no more on the host).
 func vanish() -> void:
 	_vanished = true

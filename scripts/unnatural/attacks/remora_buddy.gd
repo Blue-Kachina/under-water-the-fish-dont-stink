@@ -4,11 +4,14 @@ extends FishAttack
 ## the Breachers' (baby whales) own: remoras ride
 ## along under the fish (count(): remora_count, + the count facet). Each nips
 ## the nearest zombie within reach() every interval() s for damage() (proc
-## coefficient remora_proc); they take turns, so the nips come evenly.
+## coefficient remora_proc); they take turns, so the nips come evenly. A nip
+## that kills hands back the share of it the zombie didn't need (times
+## remora_kill_refund) as time off its turn.
 ## Milestones: at the first, a nip latches on, biting LATCH_BITES more times
 ## (LATCH_SHARE of the damage); at the second, a remora's kill splits one off
 ## for SPLIT_TIME s (up to as many more as there are); at the third, each nip
-## tears into every other zombie within TEAR_REACH for TEAR_SHARE of it; at
+## tears into every other zombie within remora_tear_reach m for
+## remora_tear_share of it; at
 ## the fourth, a remora's kill heals its fish HEAL_SHARE of its max hp (at
 ## most once every HEAL_GAP s).
 
@@ -16,8 +19,6 @@ const LATCH_BITES := 3
 const LATCH_GAP := 0.3
 const LATCH_SHARE := 0.5
 const SPLIT_TIME := 6.0
-const TEAR_REACH := 2.5
-const TEAR_SHARE := 0.5
 const HEAL_SHARE := 0.01
 const HEAL_GAP := 0.25
 
@@ -89,14 +90,18 @@ func _work(delta: float) -> void:
 	var to := run.horde.enemy_position(target)
 	_lunge(nips, to)
 	PowerupFx.flash(run, to, 0.8, tint(), 0.2)
+	var had := run.horde.enemy_hp(target)
 	strike(target, damage(), (to - at).normalized(), powers.remora_proc)
+	if not run.horde.is_alive(target):
+		var surplus := clampf(1.0 - had / maxf(damage() * damage_scale, 0.01), 0.0, 1.0)
+		_next = maxf(_next - interval() / n * surplus * powers.remora_kill_refund, 0.0)
 	if milestone(3):
 		var torn := PackedInt32Array()
-		for i in run.horde.query_sphere(to, TEAR_REACH):
+		for i in run.horde.query_sphere(to, powers.remora_tear_reach):
 			if i != target:
 				torn.append(i)
 		tears += torn.size()
-		strike_area(torn, damage() * TEAR_SHARE, to, powers.remora_proc * TEAR_SHARE)
+		strike_area(torn, damage() * powers.remora_tear_share, to, powers.remora_proc * powers.remora_tear_share)
 	if milestone(1) and run.horde.is_alive(target):
 		_latched.append([target, LATCH_BITES, LATCH_GAP])
 

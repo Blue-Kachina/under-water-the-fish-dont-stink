@@ -71,6 +71,7 @@ const REBINDABLE := [
 	["camera_up", "Look up", "Camera"],
 	["camera_down", "Look down", "Camera"],
 	["ball_cam", "Ball cam / swap cam", "Camera"],
+	["marco", "Marco! (Marco Polo)", "Moves"],
 	["pause", "Pause", "Game"],
 	["reset", "Reset", "Game"],
 	["show_scoreboard", "Scoreboard (hold)", "Game"],
@@ -137,6 +138,9 @@ func _enter_tree() -> void:
 	_axis("ui_section_next", JOY_AXIS_TRIGGER_RIGHT, 1.0, [KEY_END], DEADZONE_BUTTON)
 	# Held: the 1v1's scoreboard (RL's is on Tab, which the panel has).
 	_button("show_scoreboard", JOY_BUTTON_DPAD_UP, [KEY_B])
+	# Marco Polo's "Marco!" (the seeker's sonar call): clicking the left stick, as Y
+	# swaps the camera there.
+	_button("marco", JOY_BUTTON_LEFT_STICK, [KEY_M])
 
 	# Replay playback (only while a replay plays; the jump button also plays and
 	# pauses, and boost switches the Camera between Player and Director).

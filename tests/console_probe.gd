@@ -142,7 +142,7 @@ func _run() -> void:
 	var shown: Array = modes.call()
 	check(not shown.has("Fish Sticks") and not shown.has(main.TEST_TANK), "hidden by default: no Fish Sticks, no Test Tank (%s)" % [shown])
 	check(picker._featured.mode == "Unnatural", "the Test Tank last played: Unnatural's featured instead")
-	check(not picker._grid[3].visible and picker._grid[2].size.x > picker._grid[1].size.x * 1.5, "three singles: the bottom one takes the row")
+	check(picker._grid[3].visible and shown.has("Marco Polo"), "four singles with Marco Polo in (Fish Sticks hidden): the grid is full")
 	check(not picker._more_label.visible, "no MORE row")
 	_pad(JOY_BUTTON_BACK)
 	await _frames(1)

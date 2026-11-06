@@ -1,7 +1,8 @@
 extends CanvasLayer
 ## The console (autoloaded as "Console"): ` (the key under Esc) opens it over
-## the top of the screen, ` or Esc closes it. There are no commands yet: what's
-## typed is echoed back as unknown.
+## the top of the screen, ` or Esc closes it. Modes register their commands
+## (register_command(), e.g. Marco Polo's mp_*) while they're on; "help" lists them,
+## and anything else typed is echoed back as unknown.
 ##
 ## While it's open it has all the input. Every action's bindings are taken off
 ## the InputMap until it closes (and the held ones let go), so nothing that
@@ -38,6 +39,32 @@ var _was_paused := false
 var _stick := {JOY_AXIS_LEFT_X: "", JOY_AXIS_LEFT_Y: ""}
 var _blink := 0.0
 var _s := 1.0
+## Registered commands: name -> {"help", "run": Callable(args: PackedStringArray) -> String}.
+var _commands := {}
+
+
+## Adds a command: typing `command_name` and its arguments calls `run` with the
+## arguments (PackedStringArray), and what it returns is printed.
+func register_command(command_name: String, help: String, run: Callable) -> void:
+	_commands[command_name] = {"help": help, "run": run}
+
+
+func unregister_command(command_name: String) -> void:
+	_commands.erase(command_name)
+
+
+func has_command(command_name: String) -> bool:
+	return _commands.has(command_name)
+
+
+## Runs `command` as if typed (no echo); what it printed, or "" for an unknown one.
+func run_command(command: String) -> String:
+	var words := command.strip_edges().split(" ", false)
+	if words.is_empty() or not _commands.has(words[0]):
+		return ""
+	var entry: Dictionary = _commands[words[0]]
+	var run: Callable = entry.run
+	return str(run.call(words.slice(1)))
 
 
 func _ready() -> void:
@@ -257,7 +284,19 @@ func _submit() -> void:
 	if command.is_empty():
 		return
 	print_line("> " + command)
-	print_line("Unknown command: %s (there are no commands yet)" % command.get_slice(" ", 0))
+	var word := command.get_slice(" ", 0)
+	if word == "help" and not _commands.is_empty():
+		var names := _commands.keys()
+		names.sort()
+		for command_name: String in names:
+			print_line("%s: %s" % [command_name, _commands[command_name].help])
+		return
+	if _commands.has(word):
+		var said := run_command(command)
+		if not said.is_empty():
+			print_line(said)
+		return
+	print_line("Unknown command: %s%s" % [word, " (help lists them)" if not _commands.is_empty() else " (there are no commands yet)"])
 
 
 func _refresh_line() -> void:

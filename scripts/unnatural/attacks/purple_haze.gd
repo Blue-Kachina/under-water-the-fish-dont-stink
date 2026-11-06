@@ -14,7 +14,8 @@ extends FishAttack
 ##
 ## Milestones: at the first, Opaline: a zombie that leaves a cloud stays slowed
 ## haze_film_slow for haze_film_time s; at the second, clouds that touch merge
-## into one bigger cloud; at the third, a zombie that dies hazed bursts into a
+## into one bigger cloud that keeps their summed damage (haze_merge_max,
+## haze_merge_damage_cap); at the third, a zombie that dies hazed bursts into a
 ## small cloud; at the fourth, clouds creep toward the nearest zombie.
 
 ## A lob arcs LOB_RISE of its length up.
@@ -25,13 +26,9 @@ const PACK_TRIES := 12
 const FAN_SHARE := 0.35
 ## Seconds before it looks again when a scatter found nothing in reach.
 const HOLD_RETRY := 0.25
-## Bombs past the packs land this many cloud radii apart along the best pack's path.
-const PATH_STEP := 0.9
 ## The third milestone's death clouds: this share of the size, and of the life.
 const DEATH_SIZE := 0.5
 const DEATH_LIFE := 0.6
-## Merging: the bigger cloud grows to hold both (by volume), capped at MERGE_MAX times its own size.
-const MERGE_MAX := 2.5
 const COLOR := Color(0.62, 0.3, 0.85)
 
 ## For the probes and weapon_bench: bombs lobbed, clouds that burst, clouds
@@ -88,6 +85,12 @@ func damage() -> float:
 
 func life() -> float:
 	return (powers.haze_life + facet("life")) * duration_scale
+
+
+## The most a merged cloud's damage pools to, in clouds' worth: haze_merge_damage_cap
+## for every bomb in a scatter, so the bombs facet and Quantity raise it too.
+func merge_cap() -> float:
+	return maxf(powers.haze_merge_damage_cap * per_scatter(), 1.0)
 
 
 func max_clouds() -> int:
@@ -193,10 +196,10 @@ func spots(count: int) -> Array[Vector3]:
 	var n := 1
 	while result.size() < count:
 		if drift.length() > 0.5:
-			result.append(first + drift.normalized() * r * PATH_STEP * n)
+			result.append(first + drift.normalized() * r * powers.haze_path_step * n)
 		else:
 			var out := Vector3.FORWARD.rotated(Vector3.UP, TAU * n / maxf(count - 1, 1.0))
-			result.append(first + out * r * PATH_STEP)
+			result.append(first + out * r * powers.haze_path_step)
 		n += 1
 	return result
 
@@ -239,14 +242,19 @@ func _tick_clouds(delta: float) -> void:
 		_merge()
 	var hazed_now := {}
 	var coated := run.twist_of(fish) if run else null
-	for k in range(clouds.size() - 1, -1, -1):
-		var cloud := clouds[k]
-		if not is_instance_valid(cloud):
-			clouds.remove_at(k)
+	var live: Array[Cloud] = []
+	for item: Variant in clouds:  # it may be freed already: no typed assign
+		if is_instance_valid(item) and not (item as Cloud).fading:
+			live.append(item as Cloud)
+	# A kill below can open a death cloud (on_kill), which can push the oldest
+	# out of the list, so this walks a copy.
+	clouds = live.duplicate()
+	for cloud in live:
+		if cloud.fading:
 			continue
 		cloud.age += delta
 		if cloud.age >= cloud.life:
-			clouds.remove_at(k)
+			clouds.erase(cloud)
 			cloud.fade_out()
 			continue
 		if milestone(4):
@@ -273,9 +281,10 @@ func _tick_clouds(delta: float) -> void:
 				extra.append(i)
 			else:
 				plain.append(i)
-		strike_area(plain, damage(), Vector3.INF, powers.haze_proc)
+		var hurt := damage() * cloud.power
+		strike_area(plain, hurt, Vector3.INF, powers.haze_proc)
 		if not extra.is_empty():
-			strike_area(extra, damage() * (1.0 + settings.coat_bonus), Vector3.INF, powers.haze_proc)
+			strike_area(extra, hurt * (1.0 + settings.coat_bonus), Vector3.INF, powers.haze_proc)
 	# Opaline: those that just left a cloud stay slowed a while.
 	if milestone(1):
 		for i: int in _hazed:
@@ -284,28 +293,34 @@ func _tick_clouds(delta: float) -> void:
 	_hazed = hazed_now
 
 
-## The second milestone: two clouds that touch become one, the bigger grown to hold both.
+## The second milestone: two clouds that touch become one, the bigger grown to
+## hold both, with both clouds' damage (up to merge_cap() clouds' worth).
 func _merge() -> void:
 	for a in clouds.size():
-		var one := clouds[a]
-		if not is_instance_valid(one) or one.fading:
+		var first: Variant = clouds[a]  # it may be freed already: no typed assign
+		if not is_instance_valid(first) or (first as Cloud).fading:
 			continue
+		var one := first as Cloud
 		for b in range(a + 1, clouds.size()):
-			var other := clouds[b]
-			if not is_instance_valid(other) or other.fading:
+			var second: Variant = clouds[b]
+			if not is_instance_valid(second) or (second as Cloud).fading:
 				continue
+			var other := second as Cloud
 			if one.global_position.distance_to(other.global_position) > one.radius + other.radius:
 				continue
 			var keep := one if one.radius >= other.radius else other
 			var gone := other if keep == one else one
 			var grown := pow(pow(keep.radius, 3.0) + pow(gone.radius, 3.0), 1.0 / 3.0)
-			keep.radius = minf(grown, radius() * MERGE_MAX)
+			keep.radius = minf(grown, radius() * powers.haze_merge_max)
+			keep.power = minf(keep.power + gone.power, merge_cap())
 			keep.life = maxf(keep.life, keep.age + gone.life - gone.age)
 			keep.paid = keep.paid or gone.paid
 			keep.global_position = keep.global_position.lerp(gone.global_position, 0.3)
+			# Out of the list now: a fading cloud no longer hurts, and it frees itself.
+			clouds.remove_at(b if gone == other else a)
 			gone.fade_out()
 			merges += 1
-			return  # one a tick: the list changes as it fades
+			return  # one a tick: the list just changed
 
 
 ## The fourth milestone: a cloud drifts toward the nearest zombie.
@@ -323,8 +338,11 @@ func on_kill(at: Vector3, _source: String) -> void:
 	if not milestone(3):
 		return
 	# The killed zombie's slot is already free; it was hazed if it died in a cloud.
-	for cloud in clouds:
-		if is_instance_valid(cloud) and not cloud.fading and cloud.global_position.distance_to(at) <= cloud.radius:
+	for item: Variant in clouds:  # it may be freed already: no typed assign
+		if not is_instance_valid(item):
+			continue
+		var cloud := item as Cloud
+		if not cloud.fading and cloud.global_position.distance_to(at) <= cloud.radius:
 			death_clouds += 1
 			open_cloud(at, radius() * DEATH_SIZE, life() * DEATH_LIFE, false)
 			return
@@ -333,9 +351,9 @@ func on_kill(at: Vector3, _source: String) -> void:
 func on_removed() -> void:
 	_queue.clear()
 	_hazed.clear()
-	for cloud in clouds:
-		if is_instance_valid(cloud):
-			cloud.queue_free()
+	for item: Variant in clouds:
+		if is_instance_valid(item):
+			(item as Cloud).queue_free()
 	clouds.clear()
 	for bomb in bombs:
 		if is_instance_valid(bomb):
@@ -398,6 +416,8 @@ class Cloud extends Node3D:
 	## Whether it counts as a bomb's (weapon_bench), and whether it has hurt something yet.
 	var counted := true
 	var paid := false
+	## Its tick damage, in clouds' worth: 1, or the sum of those it merged (the second milestone).
+	var power := 1.0
 	var fading := false
 	var _fade_left := FADE
 	var _ball := MeshInstance3D.new()

@@ -16,6 +16,12 @@ extends HunterBot
 ##   (MAIN_ONLY, the class survival sim: every level's cards go by with no
 ##   skip spent, and it leaves pearls and chests be, so the main weapon stays
 ##   at its level and nothing else is ever taken).
+## With `stand_still` (the class survival sim's control pass) it never swims:
+## it only turns to face the nearest zombie, off the throttle, so a weapon is
+## measured without the bot's pathing.
+## With `boss_standoff` > 0 (the class survival sim's default) it treats a
+## boss like a player would: it never hunts one, and with any boss's body
+## within that many m it swims away round it instead of into its jaws.
 
 enum Picks { RANDOM, GREEDY, MAIN_ONLY }
 
@@ -44,6 +50,10 @@ const PICK_DELAY := 0.05
 
 var run: UnnaturalRun
 var picks := Picks.GREEDY
+## Aims but never swims (see above).
+var stand_still := false
+## Metres it keeps from a boss's body (0: off, it hunts bosses like the rest).
+var boss_standoff := 0.0
 ## Cards picked, by kind ("weapon", "tome", "item", ...), for the report.
 var picked := {}
 
@@ -70,6 +80,12 @@ func _physics_process(delta: float) -> void:
 
 ## Always swimming to the goal it picks (HunterBot's HUNT, no commits or evades).
 func _think(_delta: float) -> void:
+	if stand_still:
+		mode = Mode.COMMIT  # off the throttle: the stick only turns it
+		var me := fish.global_position
+		var nearest := run.horde.nearest_in_cone(me, Vector3.FORWARD, HUNT_RANGE, -1.0)
+		_goal = run.horde.enemy_position(nearest) if nearest >= 0 else me - fish.global_basis.z * 10.0
+		return
 	mode = Mode.HUNT
 	_goal = _choose_goal()
 
@@ -91,6 +107,8 @@ func _choose_goal() -> Vector3:
 		crowd += 1 if gap < CROWD_RANGE else 0
 		away += offset.normalized() / (gap * gap)
 	var goal := _whirlpool_goal(me)
+	if goal == Vector3.INF:
+		goal = _standoff_goal(me)
 	if goal == Vector3.INF and picks != Picks.MAIN_ONLY:
 		goal = _chest_goal(me, closest)
 	if goal == Vector3.INF:
@@ -179,10 +197,41 @@ func _pearl_goal(me: Vector3, closest: float) -> Vector3:
 	return best
 
 
-## The nearest zombie within HUNT_RANGE (bosses too: its attacks are what beat them).
+## The nearest zombie within HUNT_RANGE (bosses too, unless it keeps a
+## boss_standoff: its attacks are what beat them).
 func _hunt_goal(me: Vector3) -> Vector3:
 	var index := run.horde.nearest_in_cone(me, Vector3.FORWARD, HUNT_RANGE, -1.0)
-	return run.horde.enemy_position(index) if index >= 0 else Vector3.INF
+	if index < 0 or (boss_standoff > 0.0 and run.boss_at(index) != null):
+		return Vector3.INF
+	return run.horde.enemy_position(index)
+
+
+## With a boss's body within boss_standoff: away from its nearest part and
+## round it (along _kite_sign), so its attacks still reach while it keeps out
+## of the jaws. INF with none that close (or the stand-off off).
+func _standoff_goal(me: Vector3) -> Vector3:
+	if boss_standoff <= 0.0:
+		return Vector3.INF
+	var nearest := Vector3.INF
+	var best := boss_standoff
+	for boss in run.bosses:
+		if not is_instance_valid(boss) or boss.dying:
+			continue
+		for i in boss.parts:
+			var at := run.horde.enemy_position(i)
+			var gap := me.distance_to(at) - run.horde.enemy_radius(i)
+			if gap < best:
+				best = gap
+				nearest = at
+	if nearest == Vector3.INF:
+		return Vector3.INF
+	var out := me - nearest
+	out.y *= 0.5  # mostly round it, not over it
+	out = out.normalized() if out.length() > 0.5 else -fish.global_basis.z
+	var around := out.cross(Vector3.UP)
+	if around.length() < 0.1:
+		around = Vector3.RIGHT
+	return me + (out + around.normalized() * _kite_sign * 0.6).normalized() * boss_standoff
 
 
 ## Round the middle at KITE_RADIUS of the arena, a little ahead along the circle.
@@ -263,10 +312,6 @@ func _score(card: Dictionary) -> float:
 		"fallback":
 			var health := run.health_of(fish)
 			return 60.0 if card.what == "heal" and health and health.share() < 0.5 else 1.0
-		"swap":
-			return 80.0 - float(card.get("level", 1)) * 5.0  # swap out the weakest
-		"keep":
-			return 30.0
 	if card.has("powerup"):
 		if int(card.tier) == Rarity.Tier.CURSED:
 			return 2.0

@@ -425,7 +425,11 @@ func _hunt(h: Hagfish, delta: float, prey: FishController, rate: float) -> void:
 				h.state = 3
 				h.state_left = 1.0
 		_:
-			h.velocity = h.velocity.lerp((goal - h.head).normalized() * 13.0 * rate * (0.5 if h.state == 3 else 1.0), 1.0 - exp(-1.6 * delta))
+			var hunt := settings.hagfish_hunt_speed
+			if phase == Phase.FURY:
+				var far := inverse_lerp(settings.hagfish_hunt_strike, maxf(settings.hagfish_fury_catchup, settings.hagfish_hunt_strike + 0.1), h.head.distance_to(goal))
+				hunt *= lerpf(1.0, settings.hagfish_fury_hunt, clampf(far, 0.0, 1.0))
+			h.velocity = h.velocity.lerp((goal - h.head).normalized() * hunt * rate * (0.5 if h.state == 3 else 1.0), 1.0 - exp(-1.6 * delta))
 			h.head += h.velocity * delta
 			h.state_left -= delta
 			if h.state == 3 and h.state_left <= 0.0:

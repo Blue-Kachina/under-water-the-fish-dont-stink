@@ -4,14 +4,22 @@ extends CanvasLayer
 ## the mode is, and Play. Sits along the bottom of the screen. The home
 ## screen's mode picker starts matches straight away (ModePicker, whose X
 ## shows this card's text as the mode's rules), so this mostly shows when a
-## mode's picked some other way.
+## mode's picked some other way. A mode can add pickers (choices: Marco Polo's
+## variant and arena) and a note.
 
 signal play_requested
 
 ## What the mode is, set before adding the card.
 var message := ""
+## Pickers shown over Play, set before adding the card: each {"title",
+## "options": [names], "index": the one picked, "changed": Callable(index)}.
+var choices: Array = []
+## A line under the message (e.g. players dropped), or "".
+var note := ""
 
 var _play: Button
+## The pickers (OptionButtons), in choices' order.
+var pickers: Array[OptionButton] = []
 
 
 func _ready() -> void:
@@ -28,13 +36,17 @@ func _ready() -> void:
 	panel.anchor_bottom = 1.0
 	panel.offset_left = -440.0 * s
 	panel.offset_right = 440.0 * s
-	panel.offset_top = -170.0 * s
+	panel.offset_top = (-170.0 - 56.0 * choices.size() - (40.0 if note else 0.0)) * s
 	panel.offset_bottom = -56.0 * s  # above the hint line
 	add_child(panel)
 
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", roundi(10.0 * s))
+	panel.add_child(column)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", roundi(18.0 * s))
-	panel.add_child(row)
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(row)
 	var label := UITheme.label(message, "body", 16.0, UITheme.INK_SOFT, s)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -50,4 +62,24 @@ func _ready() -> void:
 	_play.add_theme_stylebox_override("normal", UITheme.box(UITheme.PANEL, 14.0 * s, UITheme.AQUA, 2.0 * s))
 	_play.pressed.connect(func() -> void: play_requested.emit())
 	row.add_child(_play)
+	if note:
+		var noted := UITheme.label(note, "body", 14.0, UITheme.AQUA, s)
+		noted.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		column.add_child(noted)
+	for choice: Dictionary in choices:
+		var line := HBoxContainer.new()
+		line.add_theme_constant_override("separation", roundi(12.0 * s))
+		column.add_child(line)
+		var title := UITheme.label(String(choice.title), "body", 16.0, UITheme.INK_SOFT, s)
+		title.custom_minimum_size.x = 110.0 * s
+		line.add_child(title)
+		var picker := OptionButton.new()
+		picker.custom_minimum_size = Vector2(320.0, 44.0) * s
+		for option: String in choice.options:
+			picker.add_item(option)
+		picker.select(clampi(int(choice.index), 0, maxi(picker.item_count - 1, 0)))
+		var changed: Callable = choice.changed
+		picker.item_selected.connect(func(index: int) -> void: changed.call(index))
+		line.add_child(picker)
+		pickers.append(picker)
 	_play.grab_focus.call_deferred()  # so Enter / A presses it

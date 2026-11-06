@@ -395,6 +395,14 @@ static func shared() -> UnnaturalSettings:
 ## How much of the Size bonus the pulse gets (1: all; 0.5: +40% Size makes it
 ## 20% wider). It hits everything inside, so size is worth more to it.
 @export_range(0.0, 2.0, 0.05, "or_greater") var sting_size_weight := 0.5
+## The third milestone's pull: each pulse draws the zombies within
+## sting_pull_reach times its radius toward the fish at sting_pull_speed m/s
+## (a gather, not a drag onto the fish: 8 m/s from 2x pulled the pack onto it)...
+@export_range(0.0, 5.0, 0.05, "or_greater") var sting_pull_reach := 1.4
+@export_range(0.0, 30.0, 0.5, "or_greater") var sting_pull_speed := 3.0
+## ...but not those already within sting_pull_stop times the fish's hitbox
+## length of it, so they gather in a ring (0: pulls all the way in).
+@export_range(0.0, 10.0, 0.1, "or_greater") var sting_pull_stop := 3.0
 
 @export_group("Shock Lash")
 ## The String Ray's: its tail whips the nearest zombie within lash_range (m),
@@ -414,7 +422,7 @@ static func shared() -> UnnaturalSettings:
 ## The Swordfish's: a spear of light shot ahead (at the nearest zombie within
 ## thrust_aim_cone degrees of the nose, else straight on), piercing up to
 ## thrust_pierce zombies. More Quantity: more spears, thrust_spread degrees apart.
-@export_range(0.0, 1000.0, 1.0, "or_greater") var thrust_damage := 34.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var thrust_damage := 40.0
 @export_range(0.05, 10.0, 0.05, "or_greater") var thrust_cooldown := 1.0
 ## Its speed (m/s), how far it flies (m) and its hit radius (m).
 @export_range(1.0, 300.0, 1.0, "or_greater") var thrust_speed := 45.0
@@ -461,14 +469,18 @@ static func shared() -> UnnaturalSettings:
 ## collapses there: punch_collapse_share of the strike to every zombie within
 ## punch_collapse_radius m (proc punch_collapse_proc). More Quantity: more
 ## gloves, punch_follow_gap s apart, from alternate claws.
-@export_range(0.0, 1000.0, 1.0, "or_greater") var punch_damage := 30.0
-@export_range(0.05, 10.0, 0.05, "or_greater") var punch_cooldown := 0.7
+@export_range(0.0, 1000.0, 1.0, "or_greater") var punch_damage := 40.0
+@export_range(0.05, 10.0, 0.05, "or_greater") var punch_cooldown := 0.35
 @export_range(1.0, 200.0, 1.0, "or_greater") var punch_speed := 30.0
-@export_range(1.0, 60.0, 0.5, "or_greater") var punch_range := 7.0
+@export_range(1.0, 60.0, 0.5, "or_greater") var punch_range := 10.0
 @export_range(1.0, 5.0, 0.05, "or_greater") var punch_over_bow := 1.2
 @export_range(0.05, 5.0, 0.05, "or_greater") var punch_size := 0.8
 @export_range(0.0, 1.0, 0.05) var punch_fade := 0.4
-@export_range(0.0, 10.0, 0.1, "or_greater") var punch_knock := 2.0
+@export_range(0.0, 10.0, 0.1, "or_greater") var punch_knock := 1.0
+## A punched zombie flies off at most this share of the punch's reach a second,
+## after the Knockback stat (which the Brawler's signature grows every level),
+## so it stays where the next glove can reach it (0: no cap).
+@export_range(0.0, 5.0, 0.05, "or_greater") var punch_knock_max := 0.0
 @export_range(0.0, 180.0, 5.0) var punch_aim_cone := 60.0
 @export_range(0.0, 1.0, 0.01, "or_greater") var punch_collapse_delay := 0.08
 @export_range(0.0, 3.0, 0.05, "or_greater") var punch_collapse_share := 0.5
@@ -737,20 +749,20 @@ static func shared() -> UnnaturalSettings:
 @export_range(1.0, 100000.0, 50.0, "or_greater") var shark_hp := 30000.0
 @export_range(0.0, 60.0, 0.5, "or_greater") var shark_speed := 12.0
 @export_range(1.0, 15.0, 0.25, "or_greater") var shark_size := 15.0
-@export_range(0.0, 500.0, 1.0, "or_greater") var shark_contact := 25.0
+@export_range(0.0, 500.0, 1.0, "or_greater") var shark_contact := 15.0
 ## Its own eyes, gone red: how bright they glow (0: dull red, no glow), and how
 ## much more (times) they flare while it winds up a charge or a chomp.
 @export_range(0.0, 20.0, 0.1, "or_greater") var shark_eye_glow := 2.5
 @export_range(0.0, 10.0, 0.1, "or_greater") var shark_eye_flare := 2.0
 ## Every shark_charge_every s it glows red for shark_telegraph s, then charges
 ## at shark_charge_speed (m/s) for shark_charge_time s.
-@export_range(0.0, 60.0, 0.5, "or_greater") var shark_charge_every := 6.0
+@export_range(0.0, 60.0, 0.5, "or_greater") var shark_charge_every := 9.0
 @export_range(0.0, 5.0, 0.05, "or_greater") var shark_telegraph := 1.0
 @export_range(0.0, 100.0, 1.0, "or_greater") var shark_charge_speed := 36.0
 @export_range(0.0, 5.0, 0.05, "or_greater") var shark_charge_time := 1.2
 ## Every shark_call_every s it calls a ring of shark_call_count sardines round its target.
-@export_range(0.0, 120.0, 1.0, "or_greater") var shark_call_every := 12.0
-@export_range(0, 200, 1, "or_greater") var shark_call_count := 16
+@export_range(0.0, 120.0, 1.0, "or_greater") var shark_call_every := 16.0
+@export_range(0, 200, 1, "or_greater") var shark_call_count := 10
 ## Killing it drops a chest (a powerup pick) and XP worth this much.
 @export_range(0.0, 1000.0, 5.0, "or_greater") var shark_xp := 80.0
 ## Its chomp: a player within shark_chomp_range m ahead of its mouth makes it
@@ -760,10 +772,10 @@ static func shared() -> UnnaturalSettings:
 ## then shark_chomp_every s before the next. Charging, its jaws hang open and
 ## snap on the first player they reach.
 @export_range(0.0, 100.0, 0.5, "or_greater") var shark_chomp_range := 14.0
-@export_range(0.05, 3.0, 0.05, "or_greater") var shark_chomp_wind := 0.55
+@export_range(0.05, 3.0, 0.05, "or_greater") var shark_chomp_wind := 0.75
 @export_range(0.5, 40.0, 0.5, "or_greater") var shark_chomp_reach := 6.0
-@export_range(0.0, 500.0, 1.0, "or_greater") var shark_chomp_damage := 35.0
-@export_range(0.0, 30.0, 0.25, "or_greater") var shark_chomp_every := 2.5
+@export_range(0.0, 500.0, 1.0, "or_greater") var shark_chomp_damage := 24.0
+@export_range(0.0, 30.0, 0.25, "or_greater") var shark_chomp_every := 3.5
 
 @export_group("Blood Leviathan")
 ## The boss: a giant serpent. Beating it completes the stage. Its hp (times 1 +
@@ -998,6 +1010,9 @@ static func shared() -> UnnaturalSettings:
 ## A final boss that lets a player go can't grab anyone again for
 ## final_regrab_time s (the player is a moment untouchable, then free to swim).
 @export_range(0.0, 30.0, 0.25, "or_greater") var final_regrab_time := 7.0
+## The Fallen Angel's own regrab time (the boss the others are tuned to keeps
+## its old 2.5 s): it can't crown anyone again for angel_regrab_time s.
+@export_range(0.0, 30.0, 0.25, "or_greater") var angel_regrab_time := 2.5
 ## The serpents (the King, the Gulper, the Lamprey): they circle their target
 ## serpent_circle times their usual ring (closer: more pressure); their bodies
 ## touch for serpent_contact times leviathan_contact, and serpent_fury_contact
@@ -1020,13 +1035,21 @@ static func shared() -> UnnaturalSettings:
 ##   and lamprey_lunge_fury s apart;
 @export_range(0.25, 60.0, 0.25, "or_greater") var lamprey_lunge_circle := 2.5
 @export_range(0.25, 60.0, 0.25, "or_greater") var lamprey_lunge_spit := 3.5
-@export_range(0.25, 60.0, 0.25, "or_greater") var lamprey_lunge_fury := 2.0
+@export_range(0.25, 60.0, 0.25, "or_greater") var lamprey_lunge_fury := 3.0
 ## - at two thirds hagfish_free_spit of the Whale Fall's hagfish tear free and
 ##   hunt (all of them in fury), and the rest reach hagfish_reach_growth more
 ##   per phase; a loose one strikes from hagfish_hunt_strike m.
 @export_range(0, 8, 1, "or_greater") var hagfish_free_spit := 1
 @export_range(0.0, 2.0, 0.05, "or_greater") var hagfish_reach_growth := 0.25
 @export_range(2.0, 60.0, 0.5, "or_greater") var hagfish_hunt_strike := 12.0
+## A loose hagfish hunts at hagfish_hunt_speed m/s (times its rate), and
+## up to hagfish_fury_hunt times that in fury, so a player who kites can't simply
+## out-swim them all. The fury speed-up is catch-up only: none within
+## hagfish_hunt_strike m of the goal, all of it from hagfish_fury_catchup m out,
+## so a player fighting up close isn't hounded any harder.
+@export_range(1.0, 60.0, 0.5, "or_greater") var hagfish_hunt_speed := 13.0
+@export_range(0.5, 4.0, 0.05, "or_greater") var hagfish_fury_hunt := 2.4
+@export_range(2.0, 100.0, 0.5, "or_greater") var hagfish_fury_catchup := 20.0
 
 @export_group("Levels")
 ## XP to the next level: xp_base * level ^ xp_curve.

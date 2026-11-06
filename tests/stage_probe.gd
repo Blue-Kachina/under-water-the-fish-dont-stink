@@ -54,6 +54,7 @@ func _run() -> void:
 	settings.boss_time = 12.0
 	settings.leviathan_enrage = 6.0
 	settings.leviathan_bolt_every = 0.5
+	settings.final_boss = 1  # the King: the checks below are its (Random picks a serpent with other parts and moves)
 	fish.character = FishCharacter.FishClass.HUNTER
 	main.set_mode(main.UNNATURAL)
 	await _ticks(3)

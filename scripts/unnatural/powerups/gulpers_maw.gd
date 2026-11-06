@@ -10,10 +10,6 @@ extends Powerup
 ## every zombie it passes (volley_damage()). Bosses aren't pulled or
 ## swallowed, but the volley hits them.
 
-## How wide the spat volley fans (rad, edge to edge), and how hard the spat
-## zombies are thrown out along it (m/s).
-const FAN := 0.9
-const SPIT_SPEED := 22.0
 ## The funnel's glow at its strongest: a see-through swirl, so it never hides the fish.
 const FUNNEL_STRENGTH := 0.55
 
@@ -115,11 +111,11 @@ func _swallow(at: Vector3, ahead: Vector3) -> void:
 	run.hit_area(eaten, settings.maw_chew_damage, fish, id, Vector3.INF, 0.0, settings.maw_proc, [id])
 	var up := Vector3.UP if absf(ahead.y) < 0.95 else Vector3.RIGHT
 	for n in eaten.size():
-		var turn := 0.0 if eaten.size() == 1 else lerpf(-FAN * 0.5, FAN * 0.5, float(n) / (eaten.size() - 1))
+		var turn := 0.0 if eaten.size() == 1 else lerpf(-settings.maw_fan * 0.5, settings.maw_fan * 0.5, float(n) / (eaten.size() - 1))
 		var way := ahead.rotated(up, turn).normalized()
 		if horde.is_alive(eaten[n]):
 			horde.relocate(eaten[n], at + way * 0.5)
-			horde.shove(eaten[n], way * SPIT_SPEED)
+			horde.shove(eaten[n], way * settings.maw_spit_speed)
 		_bolt(at, way, eaten[n])
 
 

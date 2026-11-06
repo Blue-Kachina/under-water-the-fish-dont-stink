@@ -16,6 +16,7 @@ const SECTIONS := {
 	"unnatural": ["res://scripts/unnatural/unnatural_settings.gd"],
 	"powerups": ["res://scripts/unnatural/powerups/powerup_settings.gd"],
 	"gaits": ["res://scripts/gait_settings.gd"],
+	"marco_polo": ["res://scripts/marco_polo/marco_polo_settings.gd"],
 }
 ## The Gait exports, which the GAITS section shows once per class.
 const GAIT_SCRIPT := "res://scripts/gait.gd"

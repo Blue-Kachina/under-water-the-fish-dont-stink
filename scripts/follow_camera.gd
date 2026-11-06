@@ -67,11 +67,18 @@ var ball: Node3D
 var course: Arena
 ## Ball cam, or ring cam on the course.
 var ball_cam := false
+## Set by the mode (Marco Polo): called with what the camera follows, it returns
+## the camera's whole transform (a porthole's view, no wall pull-in) or null to
+## follow as usual.
+var pose_override := Callable()
 ## Set by the mode (Nature): holding the ball cam button opens a wheel (its
 ## school wheel, TargetWheel) instead, and a short press toggles on release.
 var hold_opens_wheel := false
 ## How long (s) the button must be held to open the wheel.
 var wheel_hold_time := 0.3
+## Set by the mode (Marco Polo's hiders): the mode reads the ball cam button
+## itself, so here it does nothing.
+var button_taken := false
 ## The wheel is open: the right stick picks on it instead of looking around.
 var wheel_open := false
 ## Whose controls turn it (look around, ball cam): null for every controller
@@ -301,6 +308,9 @@ func set_ball_cam(on: bool) -> void:
 ## toggles on a short press's release instead, and holding it wheel_hold_time
 ## opens the wheel until it's let go.
 func _ball_cam_button(delta: float) -> void:
+	if button_taken:
+		_ball_cam_held = -1.0
+		return
 	if steady_heading and not hold_opens_wheel:
 		# The survivor cam has no ball: the button swaps its modes instead.
 		if _player_input().just_pressed("ball_cam"):
@@ -338,6 +348,11 @@ func _process(delta: float) -> void:
 	var subject: Variant = _subject()
 	if subject == null:
 		return
+	if pose_override.is_valid():
+		var pose: Variant = pose_override.call(subject)
+		if pose is Transform3D:
+			global_transform = pose
+			return
 
 	_ball_cam_button(delta)
 	_transition_left = maxf(_transition_left - delta, 0.0)

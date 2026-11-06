@@ -94,6 +94,58 @@ static func draw_mate(canvas: CanvasItem, centre: Vector2, size: float, tint: Co
 	_fill(canvas, _MATE, centre, size, tint, RIM, maxf(size / 16.0, 1.0))
 
 
+## Marco Polo's layers (planning_marco_polo.md §3), 1 skeleton .. 5 aura, for
+## the hider's layer pip: a bone, a heart, a muscle's blocks, scales and a glow,
+## in their own colour when `lit`, a dim outline of it when not.
+const LAYER_COLORS := [Color.WHITE, Color(0.93, 0.9, 0.82), Color(1.0, 0.25, 0.3), Color(0.85, 0.3, 0.25),
+		Color(1.0, 0.62, 0.3), Color(1.0, 0.92, 0.45)]
+## Marco Polo's mode tile glyph (24-unit stroke path, HexBadge style): a sonar
+## ring with its sweep line and a blip.
+const MARCO_POLO_GLYPH := "M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M7.5 12a4.5 4.5 0 1 0 9 0a4.5 4.5 0 1 0-9 0M12 12l6.4-6.4M15.5 15.6a1.1 1.1 0 1 0 2.2 0a1.1 1.1 0 1 0-2.2 0"
+
+
+static func draw_layer(canvas: CanvasItem, layer: int, centre: Vector2, size: float, lit: bool) -> void:
+	var tint: Color = LAYER_COLORS[clampi(layer, 1, 5)]
+	if not lit:
+		tint = Color(tint.darkened(0.55), 0.55)
+	var r := size * 0.5
+	var width := maxf(size / 9.0, 1.5)
+	if lit:
+		canvas.draw_circle(centre, r, Color(RIM, 0.75), true, -1.0, true)
+	match layer:
+		1:  # a bone, corner to corner
+			var a := centre + Vector2(-r, r) * 0.48
+			var b := centre + Vector2(r, -r) * 0.48
+			canvas.draw_line(a, b, tint, width * 1.6, true)
+			for end: Vector2 in [a, b]:
+				var side := (b - a).normalized().orthogonal() * r * 0.17
+				canvas.draw_circle(end + side, r * 0.19, tint, true, -1.0, true)
+				canvas.draw_circle(end - side, r * 0.19, tint, true, -1.0, true)
+		2:
+			_fill(canvas, _HEART, centre, size * 0.9, tint)
+		3:  # a muscle: a lozenge of W-shaped blocks
+			var points := PackedVector2Array()
+			for n in 20:
+				var t := TAU * n / 20.0
+				points.append(centre + Vector2(cos(t) * r * 0.78, sin(t) * r * 0.48))
+			canvas.draw_colored_polygon(points, tint)
+			var septum := RIM if lit else Color(RIM, 0.4)
+			for k in 3:
+				var x := centre.x + (k - 1) * r * 0.42
+				canvas.draw_polyline(PackedVector2Array([Vector2(x + r * 0.12, centre.y - r * 0.4), Vector2(x - r * 0.08, centre.y),
+						Vector2(x + r * 0.12, centre.y + r * 0.4)]), septum, maxf(width * 0.6, 1.0), true)
+		4:  # scales: three rows of arcs
+			for row in 3:
+				for k in 3 - row % 2:
+					var at := centre + Vector2((k - (1.0 if row % 2 == 0 else 0.5)) * r * 0.55, (row - 1) * r * 0.42)
+					canvas.draw_arc(at, r * 0.3, 0.0, PI, 10, tint, width, true)
+		5:  # the aura: a glow with rays
+			canvas.draw_circle(centre, r * 0.36, tint, true, -1.0, true)
+			for n in 8:
+				var way := Vector2.from_angle(TAU * n / 8.0)
+				canvas.draw_line(centre + way * r * 0.52, centre + way * r * (0.85 if n % 2 == 0 else 0.72), tint, width, true)
+
+
 static func _shape(path: String) -> PackedVector2Array:
 	if _shapes.has(path):
 		return _shapes[path]

@@ -36,6 +36,10 @@ var slots: Array[PlayerSlot] = []
 var run: Node
 ## The tuning panel (DebugPanel), whose tuning every player gets.
 var panel: Node
+## No joining at all (Marco Polo: one shared screen would give hiders away).
+var no_split_screen := false
+## How many players the last drop_extras() dropped (for Marco Polo's card note).
+var dropped_for_marco_polo := 0
 
 var _split: SplitScreen
 ## Where the fish live (main), and where the first player's views go back to.
@@ -103,7 +107,7 @@ func _joinable_pad(pad: int) -> bool:
 
 ## Joining is open: a run on, with room, and a controller to spare.
 func can_join() -> bool:
-	return is_instance_valid(run) and slots.size() < MAX_PLAYERS and not get_tree().paused
+	return not no_split_screen and is_instance_valid(run) and slots.size() < MAX_PLAYERS and not get_tree().paused
 
 
 func _process(delta: float) -> void:

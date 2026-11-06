@@ -25,6 +25,11 @@ extends Node
 ##   --fish F       the bot's class (HUNTER)
 ##   --out NAME     user://run_logs/boss_bench/NAME.csv (boss_pressure_<date>)
 ##   --set K=V,...  tuning for this bench only, as run_sim's --set
+##   --kite         the bot kites instead of hunting (planning_balance_followups.md
+##                  §5c): it keeps boss_stalk_range x KITE_SHARE m from the boss's
+##                  head (the Whale Fall: its nearest hagfish's), circling, and
+##                  swims out of any telegraphed lane it's in or near
+##   --kite_share X that share (0.5)
 
 const BOSSES := ["king", "gulper", "whale", "lamprey", "angel"]
 ## The final boss's run kind -> its name in the table.
@@ -43,13 +48,13 @@ const PLAYER_LEVEL := 34
 ## A hit taken counts as under threat this long after (s).
 const HURT_MEMORY := 0.5
 const COLUMNS := ["boss", "phase", "seed", "seconds", "survived", "attacks_per_min", "landed_per_min", "damage_per_min",
-		"threat_share", "longest_gap", "first_attack", "grabs_per_min", "telegraphs_per_min", "moves"]
+		"threat_share", "longest_gap", "first_attack", "grabs_per_min", "telegraphs_per_min", "fish_speed", "fish_top_speed", "moves"]
 
 var main: Node
 var fish: FishController
 var settings := UnnaturalSettings.shared()
 var options := {"bosses": BOSSES.duplicate(), "phases": [1, 3], "seeds": 5, "seconds": 90.0, "threat": 15.0, "fish": "HUNTER",
-		"out": "", "set": {}}
+		"out": "", "set": {}, "kite": false, "kite_share": 0.5}
 var rows: Array[Dictionary] = []
 
 var _run: UnnaturalRun
@@ -65,6 +70,7 @@ func _ready() -> void:
 
 
 func _parse(args: PackedStringArray) -> void:
+	options.kite = "--kite" in args
 	for n in args.size() - 1:
 		var value := args[n + 1]
 		match args[n].trim_prefix("--"):
@@ -82,6 +88,8 @@ func _parse(args: PackedStringArray) -> void:
 				options.fish = value.to_upper()
 			"out":
 				options.out = value
+			"kite_share":
+				options.kite_share = maxf(value.to_float(), 0.0)
 			"set":
 				for pair in value.split(",", false):
 					var parts := pair.split("=")
@@ -109,8 +117,9 @@ func _go() -> void:
 	fish = main.get_node("Fish")
 	await _ticks(3)
 	var fish_class := maxi(FishCharacter.FishClass.keys().find(options.fish), 0)
-	print("boss_pressure_bench: %s vs %s, phases %s, %d seeds x %.0f s, threat %.0f m" % [options.fish, ",".join(options.bosses),
-			",".join(options.phases.map(func(p: int) -> String: return str(p))), options.seeds, options.seconds, options.threat])
+	print("boss_pressure_bench: %s vs %s, phases %s, %d seeds x %.0f s, threat %.0f m%s" % [options.fish, ",".join(options.bosses),
+			",".join(options.phases.map(func(p: int) -> String: return str(p))), options.seeds, options.seconds, options.threat,
+			", kiting at %.0f m" % (settings.boss_stalk_range * float(options.kite_share)) if options.kite else ""])
 	for kind: String in options.bosses:
 		for phase: int in options.phases:
 			for s in int(options.seeds):
@@ -140,7 +149,7 @@ func _play(fish_class: int, kind: String, phase: int, dice: int) -> Dictionary:
 	_run = main.unnatural_run
 	_run.rng.seed = dice * 104729 + phase
 	_build()
-	var bot := SurvivorBot.new()
+	var bot: SurvivorBot = KiteBot.new() if options.kite else SurvivorBot.new()
 	bot.name = "SurvivorBot"
 	bot.fish = fish
 	bot.run = _run
@@ -150,6 +159,9 @@ func _play(fish_class: int, kind: String, phase: int, dice: int) -> Dictionary:
 	bot.rng.seed = dice
 	var boss := UnnaturalRun.make_final_boss(kind)
 	_run._add_boss(boss, _run.spawn_point(fish.global_position), BOSS_HP)
+	if bot is KiteBot:
+		(bot as KiteBot).boss = boss
+		(bot as KiteBot).keep = settings.boss_stalk_range * float(options.kite_share)
 	var share: float = PHASE_SHARE[phase]
 	boss.hp = BOSS_HP * share
 	boss.phase = (phase - 1) as BloodLeviathan.Phase
@@ -178,11 +190,17 @@ func _play(fish_class: int, kind: String, phase: int, dice: int) -> Dictionary:
 	var telegraphs := 0
 	var was_warning := false
 	var attacks := 0
+	var speed_sum := 0.0
+	var top_speed := 0.0
+	var ticks := 0
 	var delta := 1.0 / Engine.physics_ticks_per_second
 	while _run.elapsed - start < options.seconds and not health.down and is_instance_valid(boss):
 		await get_tree().physics_frame
 		boss.hp = BOSS_HP * share  # held in its phase's band
 		var now := _run.elapsed - start
+		speed_sum += fish.speed
+		top_speed = maxf(top_speed, fish.speed)
+		ticks += 1
 		var started: int = spits[0]
 		spits[0] = 0
 		if started > 0:
@@ -232,7 +250,7 @@ func _play(fish_class: int, kind: String, phase: int, dice: int) -> Dictionary:
 		"damage_per_min": snappedf(_damage / minutes, 0.1), "threat_share": snappedf(threat_time / maxf(seconds, 0.01), 0.001),
 		"longest_gap": snappedf(longest, 0.1), "first_attack": snappedf(first_attack, 0.1) if first_attack >= 0.0 else -1.0,
 		"grabs_per_min": snappedf(grabs / minutes, 0.01), "telegraphs_per_min": snappedf(telegraphs / minutes, 0.1),
-		"moves": moves,
+		"fish_speed": snappedf(speed_sum / maxi(ticks, 1), 0.1), "fish_top_speed": snappedf(top_speed, 0.1), "moves": moves,
 	}
 
 
@@ -294,7 +312,7 @@ func _report() -> void:
 		var list: Array = cells[key]
 		var mean := {"runs": list.size(), "downs": 0}
 		for column: String in ["attacks_per_min", "landed_per_min", "damage_per_min", "threat_share", "longest_gap",
-				"first_attack", "grabs_per_min", "telegraphs_per_min"]:
+				"first_attack", "grabs_per_min", "telegraphs_per_min", "fish_speed", "fish_top_speed"]:
 			var total := 0.0
 			for row: Dictionary in list:
 				total += float(row[column])
@@ -303,8 +321,8 @@ func _report() -> void:
 			mean.downs += 0 if row.survived else 1
 		means[key] = mean
 	print("\nmeans over the seeds (vs the Fallen Angel in the same phase: damage/min and threat within ±25%, gap <= 1.5x):")
-	print("  %-16s %5s %8s %8s %8s %7s %7s %7s %7s %5s  %s" % ["boss", "phase", "atk/min", "land/min", "dmg/min", "threat", "gap s",
-			"first s", "grab/m", "downs", "vs Angel"])
+	print("  %-16s %5s %8s %8s %8s %7s %7s %7s %7s %5s %11s  %s" % ["boss", "phase", "atk/min", "land/min", "dmg/min", "threat", "gap s",
+			"first s", "grab/m", "downs", "speed/top", "vs Angel"])
 	for phase: int in options.phases:
 		var angel: Dictionary = means.get("%s|%d" % [TITLES.angel, phase], {})
 		for kind: String in options.bosses:
@@ -324,9 +342,9 @@ func _report() -> void:
 				verdict = ", ".join(notes)
 			elif kind == "angel":
 				verdict = "target"
-			print("  %-16s %5d %8.1f %8.1f %8.0f %6.0f%% %7.1f %7.1f %7.2f %5d  %s" % [TITLES.get(kind, kind), phase, m.attacks_per_min,
-					m.landed_per_min, m.damage_per_min, m.threat_share * 100.0, m.longest_gap, m.first_attack, m.grabs_per_min,
-					m.downs, verdict])
+			print("  %-16s %5d %8.1f %8.1f %8.0f %6.0f%% %7.1f %7.1f %7.2f %5d %5.1f/%5.1f  %s" % [TITLES.get(kind, kind), phase,
+					m.attacks_per_min, m.landed_per_min, m.damage_per_min, m.threat_share * 100.0, m.longest_gap, m.first_attack,
+					m.grabs_per_min, m.downs, m.fish_speed, m.fish_top_speed, verdict])
 	var dir := "%s/boss_bench" % RunLog.DIR
 	DirAccess.make_dir_recursive_absolute(dir)
 	var stem: String = options.out if options.out != "" else "boss_pressure_" + Time.get_datetime_string_from_system().replace(":", "-").replace("T", "_")
@@ -341,6 +359,78 @@ func _report() -> void:
 			csv.store_line(",".join(line))
 		csv.close()
 	print("saved %s/%s.csv" % [ProjectSettings.globalize_path(dir), stem])
+
+
+## --kite: a SurvivorBot that keeps `keep` m from the boss's head, circling it,
+## and swims straight out of any telegraphed lane it's in or near (LANE_MARGIN m).
+class KiteBot extends SurvivorBot:
+	const LANE_MARGIN := 4.0
+	## How far ahead round the ring it aims (rad).
+	const LEAD := 0.6
+
+	var boss: BloodLeviathan
+	var keep := 22.5
+
+	func _choose_goal() -> Vector3:
+		_holding = false
+		if not is_instance_valid(boss):
+			return super()
+		var me := fish.global_position
+		var dodge := _out_of_lanes(me)
+		if dodge != Vector3.INF:
+			return _keep_in(dodge)
+		var head := _head()
+		var offset := me - head
+		offset.y *= 0.5  # mostly round it, not over it
+		var out := offset.normalized() if offset.length() > 0.5 else Vector3.BACK
+		var around := out.cross(Vector3.UP)
+		if around.length() < 0.1:
+			around = Vector3.RIGHT
+		var on_ring := (out * cos(LEAD) + around.normalized() * _kite_sign * sin(LEAD)).normalized()
+		var goal := head + on_ring * keep
+		# The other zombies (butterflies, loose hagfish) push it off, as SurvivorBot.
+		var away := Vector3.ZERO
+		for i in run.horde.query_sphere(me, DANGER_RANGE):
+			if i in boss.parts:
+				continue
+			var from := me - run.horde.enemy_position(i)
+			var gap := maxf(from.length() - run.horde.enemy_radius(i), 0.5)
+			away += from.normalized() / (gap * gap)
+		if away.length() > 0.0:
+			var push := clampf(away.length() * 8.0, 0.0, 1.0)
+			goal = me + ((goal - me).normalized() * (1.0 - push) + away.normalized() * push).normalized() * maxf(me.distance_to(goal), 15.0)
+		var kept := _keep_in(goal)
+		if kept.distance_to(goal) > 5.0 and rng.randf() < 0.02:
+			_kite_sign = -_kite_sign  # pinned at the edge: go round the other way
+		return kept
+
+	## The boss's head; the Whale Fall's carcass stays put, so its nearest hagfish's.
+	func _head() -> Vector3:
+		var head := boss.mouth_point()
+		if "hagfish" in boss:
+			var best := INF
+			for h: Variant in boss.get("hagfish"):
+				if h.alive and fish.global_position.distance_to(h.head) < best:
+					best = fish.global_position.distance_to(h.head)
+					head = h.head
+		return head
+
+	## A goal straight out of the nearest telegraphed lane it's in or near (INF: none).
+	func _out_of_lanes(me: Vector3) -> Vector3:
+		for lane: Dictionary in boss.telegraphs():
+			var from: Vector3 = lane.from
+			var dir: Vector3 = lane.dir
+			var along := clampf((me - from).dot(dir), 0.0, float(lane.length))
+			var side := me - (from + dir * along)
+			if side.length() > float(lane.width) * 0.5 + UnnaturalRun.PLAYER_RADIUS + LANE_MARGIN:
+				continue
+			side -= dir * side.dot(dir)
+			if side.length() < 0.1:
+				side = dir.cross(Vector3.UP) * _kite_sign
+				if side.length() < 0.1:
+					side = Vector3.RIGHT
+			return me + side.normalized() * 20.0
+		return Vector3.INF
 
 
 func _ticks(n: int) -> void:

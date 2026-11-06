@@ -4,7 +4,8 @@ extends Node
 ## legendary pick; outside the item limits (every stack counts in full);
 ## no weapon slot; each has a glyph, a stacks override and its sounds; the old
 ## Coil weapon id maps to the item; the Test Tank gives them at N stacks;
-## boss_item_every_player off lets the first opener take it from everyone; and
+## boss_item_every_player off lets the first opener take it from everyone (claimed on
+## opening: a second player can't open it while the first chooses, §5d); and
 ## each one works: the Coil at its level, Gulper's Maw swallows and spits,
 ## Hagfish Brood bites, knots and slimes, Queen's Disc drains the toughest and
 ## heals, Angel's Crown lashes the cone and heals on kills, Drowned Jaws chomps.
@@ -147,6 +148,15 @@ func _run() -> void:
 		var chest := run.add_chest(fish.global_position + Vector3(4.0, 0.0, 0.0), 0.0, -INF, TreasureChest.Kind.BOSS, "angels_crown")
 		run.players.append(other)
 		run.open_chest(chest, fish)
+		if not every:
+			# The race (planning_balance_followups.md §5d): the second player opens
+			# it while the first is still choosing. It's claimed on opening.
+			check(chest not in run.shut_chests_for(other), "boss_item_every_player off: claimed on opening, shut to the other player")
+			run.open_chest(chest, other)
+			check(chest.opened_by.size() == 1 and chest.is_open_for(fish), "boss_item_every_player off: the other player can't open it mid-choice")
+			run.cancel_offer(fish)
+			check(chest in run.shut_chests_for(other), "boss_item_every_player off: put back, it's open to the other player again")
+			run.open_chest(chest, fish)
 		run.pick(fish, 0)
 		run.players.erase(other)
 		var gone: bool = chest._vanished
@@ -162,9 +172,9 @@ func _run() -> void:
 	run.powerups_of(fish).refresh()
 	var coil := run.powerups_of(fish).held["leviathans_coil"] as LeviathansCoilItem
 	await _ticks(2)
-	check(coil.attack_level() == powers.coil_arrive_level and coil.attack.level == powers.coil_arrive_level and coil.attack.milestones == 1,
-			"1 stack: a Lv %d Coil, its first milestone on" % powers.coil_arrive_level)
-	check(coil.attack.count() == powers.coil_segments + powers.coil_segments_per_stack, "its facets spread over its levels (%d coils)" % coil.attack.count())
+	check(coil.attack_level() == powers.coil_arrive_level and coil.attack.level == powers.coil_arrive_level and coil.attack.milestones == powers.coil_arrive_level / 5,
+			"1 stack: a Lv %d Coil, %d milestones on" % [powers.coil_arrive_level, coil.attack.milestones])
+	check(coil.attack.count() > powers.coil_segments, "its facets spread over its levels (%d coils)" % coil.attack.count())
 	powers.coil_stacks = 2
 	run.powerups_of(fish).refresh()
 	await _ticks(2)

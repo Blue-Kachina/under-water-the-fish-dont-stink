@@ -40,7 +40,7 @@ const SCHOOL_RATE := 10.0
 ## Tuning changes are sent this long (s) after the last one, not every slider step.
 const TUNING_DELAY := 0.25
 ## The tuning that's the host's (the camera stays each player's own).
-const TUNING_SECTIONS := ["fish", "gaits", "nature", "unnatural", "powerups"]
+const TUNING_SECTIONS := ["fish", "gaits", "nature", "unnatural", "powerups", "marco_polo"]
 ## How often (s) guests time the round trip to the host, and send any change of
 ## their players (joining, leaving, a new fish).
 const PING_INTERVAL := 1.0
@@ -52,6 +52,9 @@ var run: NatureRun
 ## The Unnatural run in the session (instead of `run`), and its messages.
 var urun: UnnaturalRun
 var unnatural_net := UnnaturalNet.new()
+## The Marco Polo match in the session (instead of `run`), and its messages.
+var mpm: MarcoPoloMatch
+var marco_polo_net := MarcoPoloNet.new()
 ## pid -> {"pid", "peer", "name", "character", "species" (its key), "index"}.
 var roster := {}
 ## The last status line (for the menu).
@@ -89,6 +92,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	unnatural_net.coop = self
 	add_child(unnatural_net)
+	marco_polo_net.coop = self
+	add_child(marco_polo_net)
 	var session := get_parent()
 	session.session_started.connect(_on_session_started)
 	session.session_ended.connect(_on_session_ended)
@@ -103,6 +108,8 @@ func attach_main(game: Node) -> void:
 	main.nature_ended.connect(_on_nature_ended)
 	main.unnatural_started.connect(_on_unnatural_started)
 	main.unnatural_ended.connect(_on_unnatural_ended)
+	main.marco_polo_started.connect(_on_marco_polo_started)
+	main.marco_polo_ended.connect(_on_marco_polo_ended)
 	main._local.players_changed.connect(func(_count: int) -> void: _players_changed())
 	main._panel.tuning_changed.connect(func() -> void:
 		if _is_host():
@@ -125,6 +132,8 @@ func _is_host() -> bool:
 
 ## The session's run here: Nature's or Unnatural's (null: none).
 func _game_run() -> Node:
+	if mpm and is_instance_valid(mpm):
+		return mpm
 	if urun and is_instance_valid(urun):
 		return urun
 	if run and is_instance_valid(run):
@@ -135,6 +144,11 @@ func _game_run() -> Node:
 ## Whether this machine is in Unnatural (the mode a session it hosts is in).
 func _in_unnatural() -> bool:
 	return main != null and main.get("current_mode") == "Unnatural"
+
+
+## Whether this machine is in Marco Polo (the mode a session it hosts is in).
+func _in_marco_polo() -> bool:
+	return main != null and main.get("current_mode") == "Marco Polo"
 
 
 func _set_status(text: String) -> void:
@@ -156,13 +170,18 @@ func _on_session_started() -> void:
 		_set_status("Hosting: waiting for friends" if NetSession.backend == NetSession.Backend.STEAM
 				else "Hosting on port %d: waiting for friends" % NetSession.port)
 		var unnatural := _in_unnatural()
-		if unnatural:
+		var marco_polo := _in_marco_polo()
+		if marco_polo:
+			main.host_marco_polo()
+		elif unnatural:
 			main.host_unnatural_run()
 		else:
 			main.host_nature_run()
 		for entry in _local_players():
 			_add_to_roster(entry, 1)
-		if unnatural:
+		if marco_polo:
+			_hook_marco_polo(main.marco_polo)
+		elif unnatural:
 			_hook_unnatural(main.unnatural_run)
 		else:
 			_hook(main.nature_run)
@@ -179,8 +198,10 @@ func _on_session_ended(reason: String) -> void:
 		return
 	var was_guest := _welcomed and run and not run.authority
 	var was_unnatural_guest := _welcomed and urun and is_instance_valid(urun) and not urun.authority
+	var was_marco_polo_guest := _welcomed and mpm and is_instance_valid(mpm) and not mpm.authority
 	_unhook()
 	_unhook_unnatural()
+	_unhook_marco_polo()
 	for pid: int in _remote.keys():
 		_drop_remote(pid)
 	roster.clear()
@@ -199,6 +220,10 @@ func _on_session_ended(reason: String) -> void:
 		_switching = true
 		main.solo_unnatural_run()
 		_switching = false
+	elif was_marco_polo_guest:
+		_switching = true
+		main.solo_marco_polo()  # back to Marco Polo against bots, the match ours
+		_switching = false
 
 
 func _on_peer_left(peer: int) -> void:
@@ -210,6 +235,42 @@ func _on_peer_left(peer: int) -> void:
 	_sync_puppets()
 	_send_all("_roster", [roster], true)
 	_set_status("A friend left: %d playing" % roster.size())
+
+
+func _on_marco_polo_started(match_node: MarcoPoloMatch) -> void:
+	if is_active() and (_welcomed or _is_host()):
+		_hook_marco_polo(match_node)
+
+
+func _on_marco_polo_ended() -> void:
+	_unhook_marco_polo()
+	if is_active() and not _switching:
+		NetSession.leave("Left Marco Polo, so the session ended" if _is_host() else "Left the session")
+
+
+## Wires a Marco Polo match up to the session (MarcoPoloNet), puppets joining it.
+func _hook_marco_polo(match_node: MarcoPoloMatch) -> void:
+	if mpm == match_node or match_node == null:
+		return
+	_unhook_marco_polo()
+	mpm = match_node
+	marco_polo_net.hook(mpm)
+	for net: NetFish in _remote.values():
+		if is_instance_valid(net.fish) and net.fish.get_parent() != mpm:
+			net.fish.reparent(mpm)
+		mpm.add_player(net.fish)
+	_sync_puppets()
+
+
+func _unhook_marco_polo() -> void:
+	marco_polo_net.unhook()
+	if mpm == null or not is_instance_valid(mpm):
+		mpm = null
+		return
+	for net: NetFish in _remote.values():
+		if is_instance_valid(net.fish):
+			mpm.remove_player(net.fish)
+	mpm = null
 
 
 func _on_nature_started(nature_run: NatureRun) -> void:
@@ -458,6 +519,9 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if is_active() and mpm and is_instance_valid(mpm):
+		_marco_polo_tick(delta)
+		return
 	if is_active() and urun and is_instance_valid(urun):
 		_unnatural_tick(delta)
 		return
@@ -510,6 +574,25 @@ func _unnatural_tick(delta: float) -> void:
 				_send_all("_fish_state", [pid, now, fish.global_position, fish.global_basis.get_rotation_quaternion(),
 						fish.linear_velocity, fish.replay_fx(), _teleports.get(fish, 0)], false)
 	unnatural_net.tick(delta)
+
+
+## Marco Polo: the puppets follow their players (hidden once eliminated and
+## floated away), ours goes out, then MarcoPoloNet's.
+func _marco_polo_tick(delta: float) -> void:
+	for net: NetFish in _remote.values():
+		if net.has_state() and is_instance_valid(net.fish):
+			net.fish.visible = not mpm.eliminated.has(net.fish) or mpm._floating.has(net.fish)
+			net.apply()
+	_send_left -= delta
+	if _send_left <= 0.0:
+		_send_left += 1.0 / SEND_RATE
+		var now := _now()
+		var fish: FishController = mpm.local_fish()
+		var pid := pid_of(fish)
+		if pid >= 0:
+			_send_all("_fish_state", [pid, now, fish.global_position, fish.global_basis.get_rotation_quaternion(),
+					fish.linear_velocity, fish.replay_fx(), _teleports.get(fish, 0)], false)
+	marco_polo_net.tick(delta)
 
 
 static func _now() -> float:
@@ -637,6 +720,15 @@ func _host_tuning() -> Dictionary:
 	return sections
 
 
+## The session's world for a guest joining, in whichever mode it is.
+func _world_of_mode() -> Dictionary:
+	if mpm and is_instance_valid(mpm):
+		return marco_polo_net.world()
+	if urun and is_instance_valid(urun):
+		return unnatural_net.world()
+	return _world()
+
+
 ## The world as it is now, for a guest joining.
 func _world() -> Dictionary:
 	var schools := []
@@ -680,7 +772,8 @@ func _hello(version: int, players: Array) -> void:
 	for entry: Dictionary in players:
 		_add_to_roster(entry, peer)
 	_sync_puppets()
-	_send_to(peer, "_welcome", [roster, _host_tuning(), unnatural_net.world() if urun and is_instance_valid(urun) else _world()], true)
+	var world: Dictionary = _world_of_mode()
+	_send_to(peer, "_welcome", [roster, _host_tuning(), world], true)
 	_send_all("_roster", [roster], true)
 	_set_status("Hosting: %d playing" % roster.size())
 
@@ -731,6 +824,15 @@ func _welcome(host_roster: Dictionary, tuning: Dictionary, world: Dictionary) ->
 	_welcomed = true
 	roster = host_roster
 	_own_tuning = main._panel.tuning_snapshot()
+	if world.get("mode", "nature") == "marco_polo":
+		_apply_tuning(tuning)  # before the match: it reads the host's settings as it starts
+		_switching = true
+		main.guest_marco_polo(str(world.get("arena", "Ocean")))  # our own player in the host's match
+		_switching = false
+		_hook_marco_polo(main.marco_polo)
+		marco_polo_net.apply_world(world)
+		_set_status("Playing with %d others" % (roster.size() - _local_players().size()))
+		return
 	if world.get("mode", "nature") == "unnatural":
 		_apply_tuning(tuning)  # before the run: it reads the host's settings as it starts
 		_switching = true

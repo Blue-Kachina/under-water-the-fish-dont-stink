@@ -173,18 +173,17 @@ func _check_home() -> void:
 	var unreached := tiles.filter(func(tile: Control) -> bool: return tile not in seen)
 	check(unreached.is_empty(), "every tile reachable with the D-pad (not: %s)" % [unreached.map(func(tile: Control) -> String: return str(tile.get("mode")))])
 	check(escapes.is_empty(), "no step leads out of the picker (%s)" % [escapes])
-	var free_play: ModePicker.Tile
-	for tile: ModePicker.Tile in picker._grid:
-		if tile.mode == main.OBSTACLE_COURSE:
-			free_play = tile
+	# The bottom-right single (with Marco Polo and Fish Sticks shown, Nature;
+	# the Obstacle Course goes down to the MORE row).
+	var free_play: ModePicker.Tile = picker._grid[3] if picker._grid[3].visible else picker._grid[2]
 	for button: JoyButton in [JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_DOWN]:
 		await _button(button)
-	check(get_viewport().gui_get_focus_owner() == free_play, "right, right, down: Obstacle Course")
+	check(get_viewport().gui_get_focus_owner() == free_play, "right, right, down: the bottom-right tile, %s (focus: %s)" % [free_play.mode, get_viewport().gui_get_focus_owner().get("mode")])
 	await _button(JOY_BUTTON_DPAD_DOWN)
 	var focus_more: Control = get_viewport().gui_get_focus_owner()
 	check(focus_more in picker._more, "down again: the MORE row (%s)" % focus_more.get("mode"))
 	await _button(JOY_BUTTON_DPAD_UP)
-	check(get_viewport().gui_get_focus_owner() == free_play, "and up: back to Obstacle Course")
+	check(get_viewport().gui_get_focus_owner() == free_play, "and up: back to %s" % free_play.mode)
 	await _button(JOY_BUTTON_B)
 	await _frames(2)
 
@@ -488,7 +487,7 @@ func _check_held_scroll(panel: Node) -> void:
 	await _seconds(2.5)
 	_hold(JOY_BUTTON_DPAD_DOWN, false)
 	await _frames(2)
-	check(get_viewport().gui_get_focus_owner() == panel._section_buttons["powerups"], "held down the sections: to the last, no further")
+	check(get_viewport().gui_get_focus_owner() == panel._section_buttons[panel.SECTIONS[-1][0]], "held down the sections: to the last (%s), no further" % panel.SECTIONS[-1][0])
 	panel._section_buttons["fish"].grab_focus()
 	await _frames(2)
 	rows[0].grab_focus()

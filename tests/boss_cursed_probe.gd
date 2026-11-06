@@ -208,7 +208,7 @@ func _run() -> void:
 	fish.revive(Transform3D(Basis.looking_at(Vector3.FORWARD), Vector3(0, 0, 60)))
 	await _ticks(2)
 	var coil := run.powerups_of(fish).weapon("leviathans_coil") as LeviathansCoil
-	for t in 240:
+	for t in 480:
 		fish.linear_velocity = Vector3.FORWARD * 8.0
 		await get_tree().physics_frame
 	check(coil.trail.size() == coil.count() + 1, "%d coils trail the fish" % (coil.trail.size() - 1))

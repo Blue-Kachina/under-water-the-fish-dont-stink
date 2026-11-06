@@ -493,8 +493,10 @@ func _log_quit() -> void:
 ## max hp and signature stat, no cards), every player's own attack at
 ## `weapon_level` (its facets spread, its milestones), at full health. With
 ## `target` > 0 the director's pressure is held so it wants that many out;
-## `prefill` sends them all now.
-func scenario_jump(seconds: float, player_level: int, weapon_level: int, target := 0, prefill := false, keep_events := false) -> void:
+## `prefill` sends them all now, each pack as if it came up to `prefill_age`
+## s ago (0: all at the jump's difficulty; see _scenario_prefill).
+func scenario_jump(seconds: float, player_level: int, weapon_level: int, target := 0, prefill := false, keep_events := false,
+		prefill_age := 0.0) -> void:
 	elapsed = maxf(seconds, 0.0)
 	for event: Dictionary in timeline.pending.duplicate():
 		if not keep_events or float(event.time) <= elapsed:
@@ -526,9 +528,39 @@ func scenario_jump(seconds: float, player_level: int, weapon_level: int, target 
 		for fish in players:
 			if is_up(fish):
 				around.append(fish.global_position)
-		director.prefill(around)
+		_scenario_prefill(around, prefill_age)
 	if run_log:
 		run_log.begin_at(elapsed)
+
+
+## scenario_jump's prefill: the director's target out at once, in packs round
+## `around`. A real run's horde is a mix of zombies that came up over the last
+## minutes, each at the difficulty level it spawned at, so each pack here comes
+## from a time up to `age` s back (evenly spread): that time's difficulty level,
+## kinds, pack size and elite chance. With `age` 0, all of it is from now.
+func _scenario_prefill(around: PackedVector3Array, age: float) -> void:
+	if around.is_empty():
+		return
+	if age <= 0.0:
+		director.prefill(around)
+		return
+	var now := director.elapsed
+	var level_now := horde.difficulty
+	var missing := director.target_alive() - horde.alive_count()
+	while missing > 0:
+		var back := rng.randf() * minf(age, now)
+		director.elapsed = now - back
+		horde.difficulty = maxf(level_now - back / 60.0 * settings.difficulty_per_minute, 0.0)
+		var size := mini(director.swarm_size(), missing)
+		var near := around[rng.randi_range(0, around.size() - 1)]
+		var at: Vector3 = director.spawn_point.call(near)
+		var count := horde.spawn_pack(director.pick_kind(), size, at, 1.5 + sqrt(float(size)) * 0.6, (near - at).normalized(),
+				director.elite_chance())
+		if count <= 0:
+			break  # the horde is full
+		missing -= count
+	director.elapsed = now
+	horde.difficulty = level_now
 
 
 ## Where `fish` starts: beside the others, in its co-op place (meta
@@ -2429,13 +2461,27 @@ func shut_chests() -> Array[TreasureChest]:
 	return shut
 
 
-## The chests `fish` hasn't opened yet.
+## The chests `fish` hasn't opened yet (not a boss item someone else has claimed).
 func shut_chests_for(fish: FishController) -> Array[TreasureChest]:
 	var shut: Array[TreasureChest] = []
 	for chest in chests:
-		if is_instance_valid(chest) and not chest.is_open_for(fish) and not chest.is_queued_for_deletion():
+		if is_instance_valid(chest) and not chest.is_open_for(fish) and not chest.is_queued_for_deletion() \
+				and not _claimed_by_other(chest, fish):
 			shut.append(chest)
 	return shut
+
+
+## Whether `chest` holds a boss item that goes to its first opener alone
+## (boss_item_every_player off, §2 Q2).
+func _boss_item_alone(chest: TreasureChest) -> bool:
+	return chest.kind == TreasureChest.Kind.BOSS and Powerup.is_boss_drop(chest.item) and not powerup_settings.boss_item_every_player
+
+
+## Whether someone other than `fish` has opened `chest` and its boss item is
+## theirs alone: claimed on opening, not on taking the card, so a second player
+## can't open it while the first is still choosing (planning_balance_followups.md §5d).
+func _claimed_by_other(chest: TreasureChest, fish: FishController) -> bool:
+	return _boss_item_alone(chest) and not chest.opened_by.is_empty() and not chest.is_open_for(fish)
 
 
 ## `fish`'s render layer (TreasureChest.player_layer), if it's played here (0: a puppet).
@@ -2540,8 +2586,10 @@ func unlocked_chest_near(fish: FishController) -> TreasureChest:
 ## powerup pick for them, and it's gone from their view.
 func open_chest(chest: TreasureChest, fish: FishController) -> void:
 	var price := chest_price(chest, fish)
-	if not chest.open_for(fish, layer_of(fish)):
+	if _claimed_by_other(chest, fish) or not chest.open_for(fish, layer_of(fish)):
 		return
+	if _boss_item_alone(chest):
+		chest.claim()
 	add_pearls(fish, -price)
 	if price > 0:
 		stats_of(fish)["paid_chests"] = stats_of(fish).get("paid_chests", 0) + 1
@@ -2578,6 +2626,8 @@ func cancel_offer(fish: FishController) -> void:
 	var info: Dictionary = _chest_offer[fish]
 	var chest: TreasureChest = info.chest
 	chest.reshut_for(fish, layer_of(fish))
+	if _boss_item_alone(chest) and chest.opened_by.is_empty():
+		chest.unclaim()
 	_backed_out[fish] = chest
 	add_pearls(fish, info.price)
 	var stats := stats_of(fish)
@@ -2602,6 +2652,8 @@ func apply_chest_reshut(index: int, fish: FishController) -> void:
 	if chests[index].reshut_for(fish, layer_of(fish)):
 		var stats := stats_of(fish)
 		stats["chests"] = maxi(stats.get("chests", 0) - 1, 0)
+		if _boss_item_alone(chests[index]) and chests[index].opened_by.is_empty():
+			chests[index].unclaim()
 
 
 ## A chest everyone's opened goes, unless someone's still choosing from it
@@ -2646,6 +2698,8 @@ func apply_chest_opened(index: int, fish: FishController) -> void:
 		return
 	if chests[index].open_for(fish, layer_of(fish)):
 		stats_of(fish)["chests"] = stats_of(fish).get("chests", 0) + 1
+		if _boss_item_alone(chests[index]):
+			chests[index].claim()
 	_clear_chest(chests[index])
 
 

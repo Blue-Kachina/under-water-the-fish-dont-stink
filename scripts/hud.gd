@@ -99,6 +99,9 @@ var survivor_cam := false:
 	set(value):
 		survivor_cam = value
 		_update_hint()
+## Set by the mode (Marco Polo): called with another fish, false hides its name
+## plate (the seeker sees hiders' only once they show enough). Unset: all show.
+var plate_filter := Callable()
 
 
 func _ready() -> void:
@@ -724,6 +727,8 @@ func _update_name_plates() -> void:
 	if live and camera and fish:
 		for other: FishController in get_tree().get_nodes_in_group(FishController.GROUP):
 			if other == fish or not other.is_visible_in_tree() or other.battered:
+				continue
+			if plate_filter.is_valid() and not bool(plate_filter.call(other)):
 				continue
 			var above := other.global_position + Vector3.UP * NAME_PLATE_HEIGHT
 			if camera.is_position_behind(above):

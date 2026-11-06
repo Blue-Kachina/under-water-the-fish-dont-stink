@@ -18,7 +18,7 @@ signal chosen(mode: String)
 signal closed
 
 ## The big modes, in order; the featured one comes out of here (or MORE).
-const PRIMARY := ["Unnatural", "Fish Sticks", "Hunt", "Nature", "Obstacle Course"]
+const PRIMARY := ["Unnatural", "Marco Polo", "Fish Sticks", "Hunt", "Nature", "Obstacle Course"]
 const MORE := ["Test Tank"]  # (Free Swim is retired: refining_weaponry.md §2.8)
 ## Modes left out unless shown (SELECT, after the Konami code).
 const HIDDEN := ["Fish Sticks", "Test Tank"]

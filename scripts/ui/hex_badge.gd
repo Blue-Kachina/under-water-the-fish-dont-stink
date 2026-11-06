@@ -41,7 +41,7 @@ const GLYPHS := {
 	# old weapon id, for a fish whose own attack is set to it (FishAttack.weapon_id_of).
 	"leviathans_coil": "M2 15a3.3 3.3 0 0 1 6.6 0 3.3 3.3 0 0 0 6.6 0 3.3 3.3 0 0 1 6.6 0V10l-2-2",
 	"attack_leviathans_coil": "M2 15a3.3 3.3 0 0 1 6.6 0 3.3 3.3 0 0 0 6.6 0 3.3 3.3 0 0 1 6.6 0V10l-2-2",
-	"gulpers_maw": "M3 9c2.5-5 15.5-5 18 0M3 15c2.5 5 15.5 5 18 0M3 9v6M21 9v6M7 9.5l1 2 1-2.3M15 9.2l1 2.3 1-2M7 14.5l1-2 1 2.3M15 14.8l1-2.3 1 2M12 12a1.5 1.5 0 1 1 1.5 1.5",
+	"gulpers_maw": "M2 12c3-7.5 17-7.5 20 0c-3 7.5-17 7.5-20 0zM7.5 8l1.5 3.5 1.5-4M13.5 7.5l1.5 4 1.5-3.5M12 14.5h.01",
 	"hagfish_brood": "M4 6c3 0 4 2 7 2s4-2 7-2M4 12c3 0 4 2 7 2s4-2 7-2M4 18c3 0 4 2 7 2s4-2 7-2M18 6h2M18 12h2M18 18h2M2 4v16",
 	"queens_disc": "M5 12a7 7 0 1 0 14 0a7 7 0 1 0 -14 0M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M12 5v2M12 17v2M5 12h2M17 12h2M7 7l1.4 1.4M15.6 15.6 17 17M7 17l1.4-1.4M15.6 8.4 17 7",
 	"angels_crown": "M4 17h16M5 17l-1-8 4 3 4-6 4 6 4-3-1 8M8 12c-2 1-3 4-5 5M16 12c2 1 3 4 5 5M12 6V3",
@@ -96,6 +96,7 @@ const GLYPHS := {
 	"mode_free_swim": "M2 8c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0M2 13c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0M2 18c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0",
 	"mode_obstacle_course": "M5 21V3.5l10 3.8-10 3.8M13 16a4 4 0 1 0 8 0a4 4 0 1 0-8 0",
 	"mode_test_tank": "M4 12a8 8 0 1 0 16 0a8 8 0 1 0-16 0M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0",
+	"mode_marco_polo": "M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M7.5 12a4.5 4.5 0 1 0 9 0a4.5 4.5 0 1 0-9 0M12 12l6.4-6.4M15.5 15.6a1.1 1.1 0 1 0 2.2 0a1.1 1.1 0 1 0-2.2 0",
 	"mode_replays": "M3.5 12a8.5 8.5 0 1 0 2.5-6M3 3.5V8h4.5M10 8.5l5.5 3.5-5.5 3.5z",
 	# The home screen's Class details: a class's passive twist and its mobility skill.
 	"detail_passive": "M6 18C6 10.5 9.5 7 16.5 7M14 4.5 16.5 7 14 9.5M15 13a2 2 0 1 0 4 0a2 2 0 1 0-4 0",

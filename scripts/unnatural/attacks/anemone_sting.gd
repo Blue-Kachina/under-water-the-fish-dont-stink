@@ -10,8 +10,9 @@ extends FishAttack
 ## own AnemoneSting) follows ECHO_AFTER s later, ECHO_SIZE times as big for
 ## ECHO_DAMAGE of the damage; at its second, every sting takes SLOW_SHARE of
 ## the zombie's speed; at its third, each pulse draws the zombies within
-## PULL_REACH times its radius toward the fish (PULL_SPEED m/s); at its
-## fourth, the echo has an echo of its own (a third pulse, bigger again).
+## sting_pull_reach times its radius toward the fish (sting_pull_speed m/s,
+## stopping sting_pull_stop hitbox lengths out); at its fourth, the echo has
+## an echo of its own (a third pulse, bigger again).
 
 ## The pulse grows to full size, hurts there, then fades.
 const GROW_TIME := 0.1
@@ -24,8 +25,6 @@ const ECHO_AFTER := 0.15
 const ECHO_SIZE := 1.5
 const ECHO_DAMAGE := 0.5
 const SLOW_SHARE := 0.6
-const PULL_REACH := 2.0
-const PULL_SPEED := 8.0
 
 var is_echo := false
 ## 0: the pulse itself; 1: its echo; 2: the echo's echo (the fourth milestone).
@@ -137,11 +136,12 @@ func _animate(delta: float) -> void:
 			for i in stung:
 				if horde.is_alive(i):
 					horde.shove(i, -horde.enemy_velocity(i) * SLOW_SHARE)
-		if milestones >= 3:
-			for i in horde.query_sphere(at, radius() * PULL_REACH):
+		if milestones >= 3 and settings.sting_pull_speed > 0.0:
+			var stop := settings.sting_pull_stop * fish.hitbox_length
+			for i in horde.query_sphere(at, radius() * settings.sting_pull_reach):
 				var inward := at - horde.enemy_position(i)
-				if inward.length_squared() > 0.01:
-					horde.shove(i, inward.normalized() * PULL_SPEED)
+				if inward.length_squared() > maxf(stop * stop, 0.01):
+					horde.shove(i, inward.normalized() * settings.sting_pull_speed)
 	if _age >= GROW_TIME + FADE_TIME:
 		_age = -1.0
 		visible = false

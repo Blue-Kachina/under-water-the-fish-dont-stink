@@ -5,7 +5,8 @@ extends FishAttack
 ## (straight on if one is anywhere within reach ahead). The glove flies
 ## punch_speed m/s for reach() m with a punch_size m hit radius, fading out
 ## over the last punch_fade of its flight, and stops at the first zombie it
-## touches: the strike, punch_damage and a heavy knockback (punch_knock).
+## touches: the strike, punch_damage and a heavy knockback (punch_knock, but
+## never flung faster than punch_knock_max of reach() a second).
 ## punch_collapse_delay s later the cavitation bubble it left collapses at the
 ## impact point: a flash and a ring, punch_collapse_share of the strike to
 ## every zombie within punch_collapse_radius m (proc punch_collapse_proc),
@@ -174,6 +175,7 @@ func _fly(glove: Dictionary, delta: float) -> bool:
 		var impact := horde.enemy_position(j)
 		strike(j, glove.damage, way * settings.punch_knock)
 		_fling(j, glove.damage)
+		_cap_knock(j, way)
 		_collapses.append({"left": settings.punch_collapse_delay, "at": impact, "damage": glove.damage, "haymaker": glove.haymaker})
 		glove.pierce -= 1
 		if glove.pierce <= 0:
@@ -200,6 +202,17 @@ func _collapse(collapse: Dictionary) -> void:
 		for i in targets:
 			if not (twist and twist.is_flung(i)):  # a stun would stop Heavy Hitter's missile dead
 				horde.slow(i, 1.0, STUN_TIME)
+
+
+## The struck zombie flies off no faster than punch_knock_max times reach() a
+## second (Knockback and all), so the next glove can still reach it.
+func _cap_knock(index: int, way: Vector3) -> void:
+	if settings.punch_knock_max <= 0.0 or not horde.is_alive(index):
+		return
+	var most := reach() * settings.punch_knock_max
+	var away := horde.enemy_velocity(index).dot(way)
+	if away > most:
+		horde.shove(index, -way * (away - most))
 
 
 ## Heavy Hitter (the Brawlers' twist): the struck zombie becomes a missile.

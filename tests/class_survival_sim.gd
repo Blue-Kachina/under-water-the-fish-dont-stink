@@ -27,7 +27,16 @@ extends Node
 ##   --player_level N  the team's level (every level)
 ##   --target N        the director's target alive (every level; 0: its own, unheld)
 ##   --no_prefill      start with the horde empty (it ramps in as usual)
+##   --prefill_age MIN the prefilled packs come from up to MIN minutes back, each
+##                     at that time's difficulty level and kinds, like a real
+##                     run's horde (0.5; 0: all at the jump's). 0.5 puts the
+##                     jump's average zombie hp within the logs' noise of their
+##                     medians (planning_balance_followups.md §4c)
 ##   --events          keep the stage events still to come (default: none)
+##   --stand_still     the bot aims but never swims (a control: the weapon
+##                     without the bot's pathing; planning_balance_followups §4a)
+##   --boss_standoff M the bot keeps M m from a boss's body and never hunts one,
+##                     as a player kites it (18; 0: it hunts bosses, as before)
 ##   --out NAME        files in user://run_logs/survival/ (survival_<date>):
 ##                     NAME.csv (a row per run), NAME.json (logs, sheets)
 ##   --set K=V,...     tuning for this sim only, as run_sim's --set
@@ -37,18 +46,18 @@ extends Node
 
 ## Real runs' medians when the main weapon reached each level (§5a, from
 ## tools/medians.py): [minute, team level, director's target].
-const CONDITIONS := {5: [2.3, 8, 125], 10: [4.8, 16, 395], 15: [8.0, 29, 896], 20: [10.1, 34, 1205]}
+const CONDITIONS := {5: [2.38, 8, 156], 10: [4.74, 16, 395], 15: [7.97, 29, 896], 20: [10.09, 34, 1205]}
 const COLUMNS := ["fish", "attack", "weapon_level", "pass", "seed", "at_min", "player_level", "target", "target_end", "survived", "time_to_down",
 		"seconds", "max_hp", "hp_lost_per_s", "lowest_hp_share", "taken", "taken_contact", "taken_lunge", "taken_hazard",
 		"taken_ranged", "taken_boss", "taken_other", "battered", "battery_damage", "contact_share", "damage", "dps", "kills",
-		"kills_per_min", "avg_zombie_hp", "ttk", "overkill_share", "hits", "hits_per_s", "damage_per_hit", "avg_alive",
+		"kills_per_min", "avg_zombie_hp", "start_zombie_hp", "ttk", "overkill_share", "hits", "hits_per_s", "damage_per_hit", "avg_alive",
 		"max_alive", "fill", "spawn_rate", "clear_ratio", "spawned", "level_end", "cards_passed", "forced_picks", "real_s"]
 
 var main: Node
 var fish: FishController
 var settings := UnnaturalSettings.shared()
 var options := {"fish": "all", "levels": [5, 10, 15, 20], "passes": ["mortal", "god"], "seeds": 5, "seed_base": 1, "minutes": 1.0,
-		"at": -1.0, "player_level": -1, "target": -1, "prefill": true, "events": false, "out": "", "set": {}, "picks": "main_only"}
+		"at": -1.0, "player_level": -1, "target": -1, "prefill": true, "prefill_age": 0.5, "events": false, "stand_still": false, "boss_standoff": 18.0, "out": "", "set": {}, "picks": "main_only"}
 var rows: Array[Dictionary] = []
 var logs: Array[Dictionary] = []
 ## "CLASS:level" -> the weapon sheet; class -> its base stats.
@@ -92,6 +101,8 @@ func _parse(args: PackedStringArray) -> void:
 				options.player_level = value.to_int()
 			"target":
 				options.target = value.to_int()
+			"prefill_age":
+				options.prefill_age = maxf(value.to_float(), 0.0)
 			"out":
 				options.out = value
 			"picks":
@@ -107,6 +118,11 @@ func _parse(args: PackedStringArray) -> void:
 			"events":
 				options.events = true
 				takes = false
+			"stand_still":
+				options.stand_still = true
+				takes = false
+			"boss_standoff":
+				options.boss_standoff = maxf(value.to_float(), 0.0)
 			_:
 				takes = false
 		n += 2 if takes else 1
@@ -131,7 +147,7 @@ func _go() -> void:
 	var total: int = chosen.size() * (options.levels as Array).size() * (options.passes as Array).size() * int(options.seeds)
 	print("class_survival_sim: %d runs (%s; Lv %s; %s; %d seeds; %.1f min each%s)" % [total, ",".join(chosen),
 			",".join(options.levels.map(func(l: int) -> String: return str(l))), ",".join(options.passes), options.seeds,
-			options.minutes, ", prefill" if options.prefill else ""])
+			options.minutes, (", prefill" if options.prefill else "") + (", standing still" if options.stand_still else "")])
 	var clock := Time.get_ticks_msec()
 	var done := 0
 	for class_id: String in chosen:
@@ -148,6 +164,7 @@ func _go() -> void:
 					print("  %3d/%d %-10s Lv %2d %-6s seed %d: %s, %.0f dps, %d kills, clear %.2f, hp lost %.1f/s (%.1fx real time)" % [done,
 							total, class_id, level, pass_name, row.seed, ("survived" if row.survived else "down at %.0f s" % row.time_to_down),
 							row.dps, row.kills, row.clear_ratio, row.hp_lost_per_s, row.seconds / maxf(row.real_s, 0.01)])
+		_save((Time.get_ticks_msec() - clock) / 1000.0)  # each class's rows readable as soon as it's done
 	main.set_mode(main.FREE_SWIM)
 	await _ticks(3)
 	settings.run_logs = was_logging
@@ -174,12 +191,14 @@ func _play(fish_class: int, level: int, pass_name: String, dice: int) -> Diction
 	await _ticks(5)
 	_run = main.unnatural_run
 	_run.rng.seed = dice * 7919 + level
-	_run.scenario_jump(at_min * 60.0, player_level, level, target, options.prefill, options.events)
+	_run.scenario_jump(at_min * 60.0, player_level, level, target, options.prefill, options.events, options.prefill_age * 60.0)
 	var bot := SurvivorBot.new()
 	bot.name = "SurvivorBot"
 	bot.fish = fish
 	bot.run = _run
 	bot.picks = {"greedy": SurvivorBot.Picks.GREEDY, "random": SurvivorBot.Picks.RANDOM}.get(options.picks, SurvivorBot.Picks.MAIN_ONLY)
+	bot.stand_still = options.stand_still
+	bot.boss_standoff = options.boss_standoff
 	bot.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(bot)
 	bot.rng.seed = dice  # after its _ready's randomize
@@ -193,6 +212,7 @@ func _play(fish_class: int, level: int, pass_name: String, dice: int) -> Diction
 	var max_hp := health.max_hp
 	var start := _run.elapsed
 	var alive_start := _run.horde.alive_count()
+	var hp_start := 0.0  # the jump's horde, against the real runs' medians (§4c)
 	var target_start := _run.director.target_alive()
 	var swarm_start := _run.director.swarm_size()
 	var cap: float = start + options.minutes * 60.0
@@ -212,6 +232,8 @@ func _play(fish_class: int, level: int, pass_name: String, dice: int) -> Diction
 	while _run.run_log.ending.is_empty() and _run.elapsed < cap:
 		await get_tree().physics_frame
 		frames += 1
+		if hp_start == 0.0 and _run.elapsed >= start + 0.25:  # the run's going (not held for the jump's cards)
+			hp_start = _run.run_log.average_hp()
 		var alive := _run.horde.alive_count()
 		alive_sum += alive
 		alive_max = maxi(alive_max, alive)
@@ -249,7 +271,7 @@ func _play(fish_class: int, level: int, pass_name: String, dice: int) -> Diction
 		"battered": int(stats.battered), "battery_damage": snappedf(float((stats.by_source as Dictionary).get("battery", 0.0)), 0.1),
 		"contact_share": snappedf(float(contact_frames) / maxf(frames, 1), 0.001), "damage": snappedf(damage, 0.1),
 		"dps": snappedf(dps, 0.1), "kills": _run.kills, "kills_per_min": snappedf(kills_per_min, 0.1),
-		"avg_zombie_hp": snappedf(avg_hp, 0.1), "ttk": snappedf(avg_hp / dps, 0.001) if dps > 0.0 else -1.0,
+		"avg_zombie_hp": snappedf(avg_hp, 0.1), "start_zombie_hp": snappedf(hp_start, 0.1), "ttk": snappedf(avg_hp / dps, 0.001) if dps > 0.0 else -1.0,
 		"overkill_share": snappedf(1.0 - _hit_dealt / _hit_amount, 0.001) if _hit_amount > 0.0 else 0.0,
 		"hits": _hits, "hits_per_s": snappedf(_hits / maxf(seconds, 0.01), 0.01),
 		"damage_per_hit": snappedf(_hit_amount / maxf(_hits, 1), 0.01), "avg_alive": snappedf(alive_sum / maxf(frames, 1), 0.1),

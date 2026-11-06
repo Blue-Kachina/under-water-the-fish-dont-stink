@@ -1,5 +1,5 @@
 class_name Minimap
-extends Control
+extends RoundMap
 ## Unnatural's minimap (planning_murk.md §7): a flat, round, top-down map in
 ## the bottom-right of each player's view (one per UnnaturalHud, so split-screen
 ## gets one each). Your heading is up (minimap_heading_up; off: north is up),
@@ -36,15 +36,8 @@ const CLOUD_CELL := 4.0
 ## How far in from the bottom-right corner it sits (px).
 const MARGIN := Vector2(18.0, 48.0)
 const ELITE_COLOR := Color(1.0, 0.2, 0.15)
-const BONE := Color(0.92, 0.88, 0.8)
 ## The boss rift's skull.
 const RIFT_COLOR := Color(1.0, 0.16, 0.1)
-const SIDES := 48
-## The compass ring's width (px) round the map, and its letters.
-const BEZEL := 15.0
-const CARDINALS := ["N", "E", "S", "W"]
-## The thin pale rim round the HUD's panels (the HUD redesign).
-const PANEL_RIM := Color(150 / 255.0, 215 / 255.0, 1.0, 0.22)
 
 ## The swarms' texture, shared by every map, and the survey it shows.
 static var _cloud_texture: ImageTexture
@@ -56,14 +49,6 @@ var hud: UnnaturalHud
 var _clouds := Clouds.new()
 var _marks := Marks.new()
 var _cloud_material := ShaderMaterial.new()
-## This frame's map: the middle (world and px), its axes (flat world, unit),
-## px per metre and the radius (px).
-var _centre := Vector3.ZERO
-var _right := Vector2.RIGHT
-var _forward := Vector2.UP
-var _scale := 1.0
-var _radius := 1.0
-var _middle := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -89,29 +74,21 @@ func _process(_delta: float) -> void:
 	var settings := run.settings
 	var view := get_viewport().get_visible_rect().size
 	var side := roundf(clampf(settings.minimap_size, 0.05, 0.6) * view.y)
-	size = Vector2(side, side)
-	position = view - size - MARGIN
+	# The middle and how far it reaches.
+	var reach := settings.minimap_range
+	var centre := hud.fish.global_position
+	if reach <= 0.0:
+		centre = run.centre
+		reach = settings.arena_radius * 1.05
+	# Which way is up: where the camera looks (or the fish faces), or north.
+	var forward := Vector2(0.0, -1.0)
+	if settings.minimap_heading_up:
+		var camera := hud.player_camera if is_instance_valid(hud.player_camera) else get_viewport().get_camera_3d()
+		forward = RoundMap.heading(camera, hud.fish)
+	frame(view - Vector2(side, side) - MARGIN, side, centre, reach, forward, settings.compass_ring)
 	_clouds.size = size
 	_marks.size = size
 	modulate.a = settings.minimap_opacity
-	_middle = size * 0.5
-	_radius = side * 0.5 - (BEZEL if settings.compass_ring else 3.0)
-	# The middle and how far it reaches.
-	var reach := settings.minimap_range
-	_centre = hud.fish.global_position
-	if reach <= 0.0:
-		_centre = run.centre
-		reach = settings.arena_radius * 1.05
-	_scale = _radius / maxf(reach, 1.0)
-	# Which way is up: where the camera looks (or the fish faces), or north.
-	_forward = Vector2(0.0, -1.0)
-	if settings.minimap_heading_up:
-		var camera := hud.player_camera if is_instance_valid(hud.player_camera) else get_viewport().get_camera_3d()
-		var basis := camera.global_basis if camera else hud.fish.global_basis
-		var ahead := Vector2(-basis.z.x, -basis.z.z)
-		if ahead.length_squared() > 0.0001:
-			_forward = ahead.normalized()
-	_right = Vector2(-_forward.y, _forward.x)
 	if is_instance_valid(run.horde):
 		run.horde.survey(CLOUD_CELL, 1.0 / maxf(settings.minimap_rate, 1.0))
 		_refresh_clouds(run.horde)
@@ -120,67 +97,8 @@ func _process(_delta: float) -> void:
 	_marks.queue_redraw()
 
 
-## `at` on the map (px, from its top-left corner).
-func to_map(at: Vector3) -> Vector2:
-	var d := Vector2(at.x - _centre.x, at.z - _centre.z)
-	return _middle + Vector2(d.dot(_right), -d.dot(_forward)) * _scale
-
-
-## A direction on the flat world (x, z) as one on the map.
-func turn(direction: Vector2) -> Vector2:
-	return Vector2(direction.dot(_right), -direction.dot(_forward))
-
-
-## The world point (x, z) under `spot` on the map.
-func from_map(spot: Vector2) -> Vector2:
-	var s := (spot - _middle) / _scale
-	return Vector2(_centre.x, _centre.z) + _right * s.x - _forward * s.y
-
-
-## Whether `spot` is on the map (within `inset` px of the rim).
-func on_map(spot: Vector2, inset := 0.0) -> bool:
-	return spot.distance_to(_middle) <= _radius - inset
-
-
-## `spot` pulled in to the rim (less `inset` px), if it's off the map.
-func to_rim(spot: Vector2, inset: float) -> Vector2:
-	var off := spot - _middle
-	var most := _radius - inset
-	return _middle + off.limit_length(most)
-
-
 func _draw() -> void:
-	draw_circle(_middle, _radius, Color(UITheme.DEEP, 0.62), true, -1.0, true)
-	if hud and is_instance_valid(hud.run) and hud.run.settings.compass_ring:
-		_draw_bezel()
-	else:
-		draw_arc(_middle, _radius, 0.0, TAU, SIDES * 2, PANEL_RIM, 1.5, true)
-
-
-## The compass ring (planning_environment.md, E5): a band round the map with a
-## tick every 15 degrees (longer every 45) and N, E, S, W where they lie,
-## turning with the map. North is the arena's -Z.
-func _draw_bezel() -> void:
-	var outer := size.x * 0.5 - 1.0
-	var band := outer - _radius
-	if band < 2.0:
-		return  # not laid out yet
-	draw_circle(_middle, _radius + band * 0.5, Color(UITheme.DEEP, 0.78), false, band, true)
-	draw_arc(_middle, outer, 0.0, TAU, SIDES * 2, PANEL_RIM, 1.5, true)
-	for n in 24:
-		var bearing := TAU * n / 24.0
-		var way := turn(Vector2(sin(bearing), -cos(bearing)))
-		var major := n % 6 == 0
-		if major:
-			var letter: String = CARDINALS[n / 6]
-			var spot := _middle + way * (_radius + band * 0.5)
-			var tint := UITheme.CORAL if n == 0 else Color(1, 1, 1, 0.9)
-			UITheme.draw_text(self, Rect2(spot - Vector2(10.0, 8.0), Vector2(20.0, 16.0)), letter, UITheme.condensed(700),
-					maxi(roundi(band * 0.85), 8), tint)
-			continue
-		var long := n % 3 == 0
-		var inner := _radius + band * (0.3 if long else 0.55)
-		draw_line(_middle + way * inner, _middle + way * (outer - band * 0.15), Color(1, 1, 1, 0.55 if long else 0.35), 1.5 if long else 1.0, true)
+	draw_plate(Color(UITheme.DEEP, 0.62), hud and is_instance_valid(hud.run) and hud.run.settings.compass_ring)
 
 
 ## Icon painters, shared with the compass strip (CompassStrip).
@@ -214,14 +132,6 @@ static func draw_whirlpool(canvas: CanvasItem, spot: Vector2, radius: float) -> 
 	canvas.draw_polyline(points, Whirlpool.COLOR, 2.0, true)
 
 
-static func draw_skull(canvas: CanvasItem, spot: Vector2, radius: float) -> void:
-	canvas.draw_circle(spot, radius + 1.5, Color(BroadcastUI.INK, 0.9))
-	canvas.draw_circle(spot + Vector2(0.0, -radius * 0.15), radius * 0.85, BONE)
-	canvas.draw_rect(Rect2(spot + Vector2(-radius * 0.5, radius * 0.25), Vector2(radius, radius * 0.6)), BONE)
-	canvas.draw_circle(spot + Vector2(-radius * 0.35, -radius * 0.15), radius * 0.24, Color(0.6, 0.0, 0.0))
-	canvas.draw_circle(spot + Vector2(radius * 0.35, -radius * 0.15), radius * 0.24, Color(0.6, 0.0, 0.0))
-
-
 ## The boss rift: a big red skull on a dark disc, ringed red, slowly pulsing.
 static func draw_rift(canvas: CanvasItem, spot: Vector2, radius: float) -> void:
 	var beat := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 260.0)
@@ -239,17 +149,6 @@ static func draw_rift(canvas: CanvasItem, spot: Vector2, radius: float) -> void:
 	for n in 3:
 		var x := (n - 1) * r * 0.3
 		canvas.draw_line(spot + Vector2(x, r * 0.55), spot + Vector2(x, r * 0.85), socket, maxf(r * 0.1, 1.0))
-
-
-## A player's arrow pointing `ahead` (unit, on the canvas), in `color`.
-static func draw_arrow(canvas: CanvasItem, spot: Vector2, ahead: Vector2, color: Color, outline: Color, length: float) -> void:
-	var side := Vector2(-ahead.y, ahead.x)
-	var arrow := PackedVector2Array([spot + ahead * length, spot - ahead * length * 0.6 + side * length * 0.65,
-			spot - ahead * length * 0.25, spot - ahead * length * 0.6 - side * length * 0.65])
-	var ring := arrow.duplicate()
-	ring.append(arrow[0])
-	canvas.draw_colored_polygon(arrow, color)
-	canvas.draw_polyline(ring, outline, 1.5, true)
 
 
 ## The swarms' texture from the Horde's survey, when there's a new one.
@@ -290,8 +189,8 @@ class Clouds extends Control:
 		var points := PackedVector2Array()
 		var uvs := PackedVector2Array()
 		var colors := PackedColorArray()
-		for n in Minimap.SIDES:
-			var spot := map._middle + Vector2.from_angle(TAU * n / Minimap.SIDES) * map._radius
+		for n in RoundMap.SIDES:
+			var spot := map._middle + Vector2.from_angle(TAU * n / RoundMap.SIDES) * map._radius
 			var world := map.from_map(spot)
 			points.append(spot)
 			uvs.append(Vector2((world.x - horde.survey_origin.x) / span, (world.y - horde.survey_origin.z) / span))
@@ -308,7 +207,7 @@ class Marks extends Control:
 		var me := map.hud.fish
 		if not is_instance_valid(run) or not is_instance_valid(me):
 			return
-		draw_arc(map._middle, map._radius, 0.0, TAU, Minimap.SIDES, Color(1, 1, 1, 0.35), 2.0, true)
+		draw_arc(map._middle, map._radius, 0.0, TAU, RoundMap.SIDES, Color(1, 1, 1, 0.35), 2.0, true)
 		_draw_edge(run)
 		for chest in run.shut_chests_for(me):
 			var spot := map.to_map(chest.global_position)
@@ -361,7 +260,7 @@ class Marks extends Control:
 		var ahead := map.turn(facing.normalized()) if facing.length_squared() > 0.0001 else Vector2.UP
 		var color := fish.body_color()
 		color.a = 1.0
-		Minimap.draw_arrow(self, spot, ahead, color, Color.WHITE if mine else Color(BroadcastUI.INK, 0.9), 9.0 if mine else 7.5)
+		RoundMap.draw_arrow(self, spot, ahead, color, Color.WHITE if mine else Color(BroadcastUI.INK, 0.9), 9.0 if mine else 7.5)
 		var health := run.health_of(fish)
 		if health and health.down:
 			var x := 5.0
