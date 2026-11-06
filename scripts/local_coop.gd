@@ -391,14 +391,14 @@ func _refresh_cameras() -> void:
 ## A character none of the players are.
 func _unused_character() -> FishCharacter.FishClass:
 	var taken := slots.map(func(slot: PlayerSlot) -> FishCharacter.FishClass: return slot.fish.character)
-	for fish_class: FishCharacter.FishClass in FishCharacter.CLASSES:
+	for fish_class: FishCharacter.FishClass in FishCharacter.pickable_classes():
 		if fish_class not in taken:
 			return fish_class
-	return FishCharacter.CLASSES.keys()[0]
+	return FishCharacter.pickable_classes()[0]
 
 
 func _next_character(slot: PlayerSlot, step: int) -> void:
-	var fish_classes: Array = FishCharacter.CLASSES.keys()
+	var fish_classes: Array = FishCharacter.pickable_classes()
 	var at := fish_classes.find(slot.fish.character)
 	slot.fish.character = fish_classes[posmod(at + step, fish_classes.size())]  # its first species
 

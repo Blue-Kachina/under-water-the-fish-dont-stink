@@ -387,8 +387,15 @@ func _local_players() -> Array:
 
 ## How `fish` (player `pid`) is sent in the roster.
 static func player_entry(pid: int, fish: FishController) -> Dictionary:
-	return {"pid": pid, "name": fish.display_name, "character": int(fish.character),
-			"species": FishCharacter.species_key(fish.character, fish.species)}
+	var character := fish.character
+	var species := fish.species
+	# A Marco Polo whale is sent as the player's own fish: the role swap is local.
+	if fish.has_meta("mp_base_look"):
+		var base: Array = fish.get_meta("mp_base_look")
+		character = base[0] as FishCharacter.FishClass
+		species = int(base[1])
+	return {"pid": pid, "name": fish.display_name, "character": int(character),
+			"species": FishCharacter.species_key(character, species)}
 
 
 ## The species a roster entry's fish wears (its first if the entry has none: an
@@ -483,7 +490,9 @@ func _sync_puppets() -> void:
 			if game:
 				game.add_player(net.fish)
 		var species := entry_species(entry)
-		if net.fish.character != entry.character or net.fish.species != species:
+		# A puppet the match has grown into a whale keeps that body (mp_swapped).
+		var swapped: bool = net.fish.has_meta("mp_swapped") and bool(net.fish.get_meta("mp_swapped"))
+		if not swapped and (net.fish.character != entry.character or net.fish.species != species):
 			net.fish.set_look(entry.character, species)
 		net.fish.display_name = entry.name
 		net.fish.set_meta("coop_index", entry.index)

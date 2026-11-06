@@ -102,7 +102,7 @@ func _arena(arena_name: String) -> void:
 		pilot.fish = player
 		game.add_child(pilot)
 		pilot.bind(game)
-	_row = {"rounds": 0, "tags": 0, "time": 0.0, "ends": {}, "settled_found": 0, "blind": 0, "fakes": 0, "fooled": 0,
+	_row = {"split": {}, "rounds": 0, "tags": 0, "time": 0.0, "ends": {}, "settled_found": 0, "blind": 0, "fakes": 0, "fooled": 0,
 			"entries": 0, "knocks": 0, "out_of_water": 0, "pings": 0, "in_view": 0.0, "chases": 0, "closest": [], "exposed": 0.0, "in_sight": 0.0, "both": 0.0}
 	_pilots.clear()
 	_chase_closest.clear()
@@ -158,6 +158,7 @@ func _report(game: MarcoPoloMatch) -> void:
 	print("  points by layer (none, skeleton, cardio, muscle, skin, aura): %s" % str(by_layer.map(func(v: float) -> String: return "%.0f" % v)))
 	print("  settled hiders found %d of %d settles (%.0f%%)" % [_row.settled_found, _settles, 100.0 * _row.settled_found / maxi(_settles, 1)])
 	print("  blind tags %d of %d" % [_row.blind, _row.tags])
+	print("  whale tags by what led them (hider seen through the whale's eyes / a streak head within 12 m): %s" % str(_row.split))
 	print("  Fake Fish thrown %d, fooled %d (%.0f%%)" % [_row.fakes, _row.fooled, 100.0 * _row.fooled / maxi(int(_row.fakes), 1)])
 	print("  porthole entries %d, knocks %d, out of water %d (%.0f%% of entries)" % [_row.entries, _row.knocks, _row.out_of_water,
 			100.0 * _row.out_of_water / maxi(int(_row.entries), 1)])
@@ -180,6 +181,14 @@ func _on_caught(hider: FishController, how: String, by: FishController, _game: M
 	_row.tags += 1
 	if float(_still.get(hider, 0.0)) >= SETTLED:
 		_row.settled_found += 1
+	if is_instance_valid(by) and _game.is_whale(by):
+		var sight := _game.whale_sees(by, hider) > 0.0
+		var streak := false
+		for head in _game.streak_heads_of(by):
+			if (head.pos as Vector3).distance_to(hider.global_position) <= 12.0:
+				streak = true
+		var key := "sight+streak" if sight and streak else ("sight only" if sight else ("streak only" if streak else "neither"))
+		_row.split[key] = int(_row.split.get(key, 0)) + 1
 	if is_instance_valid(by):
 		var saw := _time - float(_seen_at.get([by, hider], -INF)) <= BLIND_WINDOW
 		var heard := false

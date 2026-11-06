@@ -334,7 +334,7 @@ func _new_match() -> void:
 
 ## A random fish (and its species) and name for the opponent.
 func _pick_opponent() -> void:
-	opponent.character = FishCharacter.CLASSES.keys().pick_random()
+	opponent.character = FishCharacter.pickable_classes().pick_random()
 	opponent.display_name = OPPONENT_NAMES.pick_random()
 
 

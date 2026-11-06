@@ -8,6 +8,8 @@ extends Node
 
 ## Most triangles a model may have (its parts all together).
 const MAX_TRIANGLES := 40000
+## Titans are drawn from across the arena with 3 LODs, so they get their own cap (LOD 0 only).
+const MAX_TITAN_TRIANGLES := 60000
 ## Classes that needn't bend into a tail (no tail stalk to bend).
 const NO_BEND := [FishCharacter.FishClass.DRIFTER, FishCharacter.FishClass.GLIDER]
 
@@ -43,7 +45,8 @@ func _check_model(fish_class: FishCharacter.FishClass, species: int) -> void:
 	check(model.tail != null and model.fin_left != null and model.fin_right != null, "has its swim pivots")
 	check(model.find_child("Body", true, false) is GeometryInstance3D, "has a Body")
 	var triangles := _triangles(model)
-	check(triangles <= MAX_TRIANGLES, "%d triangles (at most %d)" % [triangles, MAX_TRIANGLES])
+	var cap := MAX_TITAN_TRIANGLES if fish_class == FishCharacter.FishClass.TITAN else MAX_TRIANGLES
+	check(triangles <= cap, "%d triangles (at most %d)" % [triangles, cap])
 	model.set_body_color(Color(0.1, 0.4, 1.0))
 	check(model.body_color().is_equal_approx(Color(0.1, 0.4, 1.0)), "takes a team tint")
 	model.reset_body_color()
@@ -67,10 +70,12 @@ func _check_model(fish_class: FishCharacter.FishClass, species: int) -> void:
 	model.free()
 
 
-## Triangles in every mesh part of `model`.
+## Triangles in every mesh part of `model` (lower LODs, meta lod > 0, don't count).
 func _triangles(model: Node) -> int:
 	var total := 0
 	for node in model.find_children("*", "MeshInstance3D", true, false):
+		if node.has_meta("lod") and int(node.get_meta("lod")) != 0:
+			continue
 		var mesh := (node as MeshInstance3D).mesh
 		if mesh == null:
 			continue

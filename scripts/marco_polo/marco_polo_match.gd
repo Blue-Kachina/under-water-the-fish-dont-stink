@@ -56,6 +56,16 @@ signal local_burst(amount: float)
 signal local_button(action: String)
 ## The host: bots came or went (people joined online, so fewer are needed).
 signal bots_changed
+## `seeker`'s whale is about to call "Marco!" (marco_tell_time before it): bubbles, a tell for hiders.
+signal marco_tell_started(seeker: FishController, time: float)
+## A whale's pick is final (the host's, on every machine): `fish` is `species` of the Titans, skin `skin`.
+signal whale_picked(fish: FishController, species: int, skin: int)
+## A guest: our own whale pick changed (`locked`: A / Enter), for the host.
+signal local_whale_pick(species: int, skin: int, locked: bool)
+## The host: a whale's wake pushes `hider` (a person's fish on another machine, which applies it) by `impulse` (m/s).
+signal wake_pushed(hider: FishController, impulse: Vector3)
+## `fish` just grew into a whale (a seeker's swap or a convert's), for its grow effect.
+signal titan_grew(fish: FishController)
 
 enum Role { HIDER, SEEKER }
 enum Phase { COUNTDOWN, LIVE, ROUND_OVER, OVER }
@@ -69,6 +79,7 @@ const SOUNDS := {"bump": "mp/bump", "tag": "mp/tag", "eliminated": "mp/eliminate
 ## Where the helpers others own live (wired once they parse).
 const SONAR_MAP_PATH := "res://scripts/marco_polo/sonar_map.gd"
 const PORTHOLE_SYSTEM_PATH := "res://scripts/marco_polo/porthole_system.gd"
+const HIDEAWAY_SYSTEM_PATH := "res://scripts/marco_polo/hideaway.gd"
 const BOT_PATH := "res://scripts/marco_polo/marco_polo_bot.gd"
 const FAKE_FISH_PATH := "res://scripts/marco_polo/fake_fish.gd"
 ## Ocean spawns: hiders on a ring this far (m) round the seeker's start.
@@ -77,6 +88,8 @@ const OCEAN_SPAWN_RING := 22.0
 const BOUNDARY_STIFFNESS := 2.0
 const BOUNDARY_OUTWARD := 2.0
 const BOUNDARY_MAX := 30.0
+## Skins each whale species has (cosmetic; the pick card cycles them).
+const WHALE_SKINS := 3
 ## The console's commands.
 const COMMANDS := ["mp_role", "mp_noise", "mp_expose", "mp_tag", "mp_eliminate", "mp_round", "mp_fake", "mp_porthole", "mp_cone"]
 
@@ -85,6 +98,8 @@ var settings := MarcoPoloSettings.shared()
 var environment: Node3D
 var arena: Node3D
 var porthole_system: Node
+## The arena's Hideaways (hideaway.gd): Stale Water, hidden from the sonar map. Null if it has none.
+var hideaway_system: Node
 ## The world's run here (the host's, or solo); off on an online guest.
 var authority := true
 ## Every fish in the match (people's and bots'), never assuming two.
@@ -166,6 +181,22 @@ var _net_hidden := {}
 var _net_pings: Array = []
 ## The player's own values from before the match, put back on end().
 var _player_base := {}
+## A seeker's whale pick: fish -> {species, skin, locked}. The last one a person
+## made is remembered in settings (whale_last_pick / whale_last_skin).
+var _whale_pick := {}
+## A converted hider's seconds left of its join cooldown (the whale pick window).
+var _pick_left := {}
+## Whales' exposure through their own eyes (whale_sees): seeker -> {hider -> exposure}.
+var _whale_exposure := {}
+## Seeker -> its Marco's full cooldown (s: marco_cooldown, or the auto interval).
+var _marco_total := {}
+## Seeker -> seconds to its next automatic "Marco!", and whether its tell has gone out.
+var _auto_left := {}
+var _auto_tell := {}
+## Whale -> seconds to the next stand-in tail stroke, and the model whose power_stroke it listens to.
+var _stroke_left := {}
+var _stroke_model := {}
+var _stroke_real := {}
 var _sight: SightCone
 var _hud: Node
 var _looks: Node
@@ -194,7 +225,9 @@ func _ready() -> void:
 	_rng.randomize()
 	center = environment.spawn_transform().origin if environment.has_method("spawn_transform") else Vector3.ZERO
 	_player_base = {"buoyancy": _local.buoyancy, "boost_enabled": _local.boost_enabled, "bow_scale": _local.bow_scale,
-			"speed_scale": _local.speed_scale, "rl_surface_mechanics": _local.rl_surface_mechanics}
+			"speed_scale": _local.speed_scale, "rl_surface_mechanics": _local.rl_surface_mechanics, "turn_scale": _local.turn_scale,
+			"drag_scale": _local.drag_scale, "top_speed_scale": _local.top_speed_scale, "boost_scale": _local.boost_scale,
+			"accel_scale": _local.accel_scale, "hitbox_scale": _local.hitbox_scale}
 	if authority:
 		_fill_with_bots()
 	for fish in players:
@@ -225,6 +258,8 @@ func end() -> void:
 		(environment as Ocean).boundary_radius = 0.0
 	if is_instance_valid(camera):
 		camera.set("target", null)
+		if "body_follow" in camera:
+			camera.set("body_follow", 1.0)
 		if "button_taken" in camera:
 			camera.set("button_taken", false)
 		if "pose_override" in camera:
@@ -234,6 +269,7 @@ func end() -> void:
 		return
 	for key: String in _player_base:
 		_local.set(key, _player_base[key])
+	_restore_look(_local)
 	_restore_layers(_local)
 	_local.team = -1
 	_local.controls_locked = false
@@ -278,6 +314,15 @@ func remove_player(fish: FishController) -> void:
 	_heartbeat_left.erase(fish)
 	_net_exposure.erase(fish)
 	_net_hidden.erase(fish)
+	_whale_pick.erase(fish)
+	_pick_left.erase(fish)
+	_whale_exposure.erase(fish)
+	_marco_total.erase(fish)
+	_auto_left.erase(fish)
+	_auto_tell.erase(fish)
+	_stroke_left.erase(fish)
+	_stroke_model.erase(fish)
+	_stroke_real.erase(fish)
 	starting_seekers.erase(fish)
 	if _spectating == fish:
 		_spectating = null
@@ -307,7 +352,7 @@ func _fill_with_bots() -> void:
 	for i in range(have, maxi(settings.min_players, 2)):
 		var fish: FishController = FISH_SCENE.instantiate()
 		fish.name = "MarcoBot%d" % i
-		fish.character = FishCharacter.CLASSES.keys().pick_random()
+		fish.character = FishCharacter.pickable_classes().pick_random()
 		fish.display_name = String(names[i % names.size()])
 		add_child(fish)
 		Match1v1.copy_tuning(_local, fish)
@@ -425,6 +470,11 @@ func _begin_round(index: int, starting: Array[FishController], places: Dictionar
 	_close.clear()
 	_marco_left.clear()
 	_marco_ring.clear()
+	_marco_total.clear()
+	_auto_left.clear()
+	_auto_tell.clear()
+	_whale_exposure.clear()
+	_pick_left.clear()
 	_net_exposure.clear()
 	_net_hidden.clear()
 	_net_own_tally = 0.0
@@ -452,6 +502,8 @@ func _begin_round(index: int, starting: Array[FishController], places: Dictionar
 				fish.revive(places[fish] as Transform3D)
 			fish.linear_velocity = Vector3.ZERO
 			fish.angular_velocity = Vector3.ZERO
+		if as_seeker and settings.whale_seeker:
+			_roll_pick(fish)
 		apply_role(fish, role[fish])
 		_fake_charges[fish] = settings.fake_charges if not as_seeker else 0
 	for fish in starting:
@@ -465,11 +517,19 @@ func _begin_round(index: int, starting: Array[FishController], places: Dictionar
 		if camera.has_method("snap"):
 			camera.call_deferred("snap")
 	round_started.emit(index, starting[0] if not starting.is_empty() else null)
+	if authority:
+		for fish in starting:
+			if bots.has(fish) and settings.whale_seeker:
+				_finish_pick(fish)  # a bot's pick is made: the guests are told it
 	_announce_local_role()
 
 
 ## Role values come with the role: boost, bow, buoyancy, speed, team (plan §1).
-func apply_role(fish: FishController, new_role: int) -> void:
+## A whale seeker (whale_seeker) is also a body: the Titans class at whale_length,
+## its species its pick, and the whale values on top. Becoming a hider swaps the
+## fish back to the player's own class and species. `defer_body` leaves the body
+## as it is (a convert waits out its join cooldown before it grows, _grow()).
+func apply_role(fish: FishController, new_role: int, defer_body := false) -> void:
 	var seeker := new_role == Role.SEEKER
 	fish.boost_enabled = seeker and settings.seeker_boost
 	fish.boost_amount = 100.0
@@ -478,14 +538,18 @@ func apply_role(fish: FishController, new_role: int) -> void:
 	fish.speed_scale = settings.seeker_speed_scale if seeker else 1.0
 	fish.rl_surface_mechanics = settings.stick_to_surfaces
 	fish.team = 1 if seeker else 0
+	if not defer_body:
+		_apply_body(fish, seeker)
 	if seeker:
 		_fake_charges[fish] = 0
 		if _meters.has(fish):
 			(_meters[fish] as NoiseMeter).detach()
 			_meters.erase(fish)
 		_exposure[fish] = {}
+		_whale_exposure[fish] = {}
 		_pings[fish] = []
 		_marco_left[fish] = 0.0
+		_marco_total[fish] = settings.marco_cooldown
 	elif not _meters.has(fish) and (authority or fish == _local):
 		_meters[fish] = _new_meter(fish)
 	if _meters.has(fish):
@@ -544,6 +608,8 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	if is_instance_valid(camera):
 		camera.set("ball_cam", false)
+		if "body_follow" in camera:
+			camera.set("body_follow", settings.whale_cam_follow)  # a whale's cam sits back in proportion
 		camera.set("hold_opens_wheel", false)  # Y swaps views, never a wheel
 		# Unnatural's two views (follow and free cam, Y swaps them) for every role
 		# and the spectator; a porthole's view (pose_override) comes first.
@@ -559,6 +625,9 @@ func _go_live() -> void:
 	for fish in starting_seekers:
 		if not fish.puppet:
 			fish.controls_locked = false
+		if authority and settings.whale_seeker and not bool(whale_pick_of(fish).locked):
+			_finish_pick(fish)  # the pick window is over: the whale on show is the one they get
+		_start_auto_beat(fish)
 	_set_phase(Phase.LIVE)
 	time_left = settings.round_time
 
@@ -566,8 +635,13 @@ func _go_live() -> void:
 func _live_step(delta: float) -> void:
 	if porthole_system and porthole_system.has_method("step"):
 		porthole_system.call("step", delta)
+	if hideaway_system:
+		hideaway_system.call("step", delta)
 	_tick_holds(delta)
+	_tick_picks(delta)
 	_tick_marco(delta)
+	_tick_auto(delta)
+	_tick_strokes(delta)
 	for fish: FishController in _meters.keys():
 		var meter: NoiseMeter = _meters[fish]
 		meter.muted = is_hidden(fish) or eliminated.has(fish)
@@ -597,9 +671,9 @@ func _tick_holds(delta: float) -> void:
 
 
 func _tick_marco(delta: float) -> void:
-	for seeker: FishController in _marco_left.keys():
+	for seeker: Variant in _marco_left.keys():  # untyped: a freed fish (a swapped-out clone) can still be a key
 		_marco_left[seeker] = maxf(float(_marco_left[seeker]) - delta, 0.0)
-	for seeker: FishController in _marco_ring.keys():
+	for seeker: Variant in _marco_ring.keys():
 		_marco_ring[seeker] = maxf(float(_marco_ring[seeker]) - delta, 0.0)
 
 
@@ -608,6 +682,7 @@ func _tick_marco(delta: float) -> void:
 ## the clocks down between the host's updates.
 func _guest_step(delta: float) -> void:
 	_tick_holds(delta)
+	_tick_picks(delta)
 	_tick_marco(delta)
 	if phase == Phase.LIVE:
 		time_left = maxf(time_left - delta, 0.0)
@@ -653,6 +728,8 @@ func _end_round() -> void:
 func _reset_portholes() -> void:
 	if is_instance_valid(porthole_system) and porthole_system.has_method("reset"):
 		porthole_system.call("reset")
+	if is_instance_valid(hideaway_system):
+		hideaway_system.call("reset")
 
 
 func _finish_match() -> void:
@@ -733,6 +810,8 @@ func _porthole_pose(subject: Variant) -> Variant:
 	var fish := subject as FishController
 	if fish == null or porthole_system == null:
 		return null
+	if hideaway_system != null and bool(hideaway_system.call("is_hidden", fish)):
+		return null  # a hideaway's fish swims about: the ordinary camera
 	if not authority and fish == _local:
 		return porthole_system.call("camera_transform", fish) if porthole_system.call("porthole_of", fish) != null else null
 	if not is_hidden(fish):
@@ -751,6 +830,8 @@ func _porthole_pose(subject: Variant) -> Variant:
 func is_hidden(fish: FishController) -> bool:
 	if not authority:
 		return _net_hidden.has(fish)
+	if hideaway_system != null and bool(hideaway_system.call("is_hidden", fish)):
+		return true
 	return porthole_system != null and porthole_system.has_method("is_hidden") and bool(porthole_system.call("is_hidden", fish))
 
 
@@ -785,6 +866,84 @@ func local_exposure(hider: FishController) -> float:
 	if local_view_role() != Role.SEEKER:
 		return 0.0
 	return exposure(_local, hider)
+
+
+## `seeker`'s exposure of `hider` through the whale's own eyes (0..1): a whale's
+## murk-thick sight (titan_sight_range, whale_near_share / whale_half_share), its
+## layer floor past near sight (whale_layer_floor), the aura and the Marco!
+## bump kept; for any seeker that isn't a whale, exposure(). Bots read this and
+## the whale's own view is drawn from it, so what a bot notices is what a person
+## could see. (Scoring still reads exposure(): D11.) On a guest, the host's value.
+func whale_sees(seeker: FishController, hider: FishController) -> float:
+	if not is_whale(seeker):
+		return exposure(seeker, hider)
+	var seen: float
+	if not authority:
+		seen = float(_net_exposure.get(hider, 0.0)) if seeker == _local else 0.0
+	else:
+		seen = float((_whale_exposure.get(seeker, {}) as Dictionary).get(hider, 0.0))
+	if settings.whale_layer_floor > 0 and settings.layer_for(seen) < settings.whale_layer_floor \
+			and hider.global_position.distance_to(seeker.global_position) > whale_near_sight():
+		return 0.0
+	return seen
+
+
+## The sight range a Titan has (m): the arena's, over whale_murk (the murk's
+## thickness in its view). B's murk view and the bots read this.
+func titan_sight_range() -> float:
+	return sight_range() / maxf(settings.whale_murk, 1.0)
+
+
+## The whale's full-exposure and half-exposure distances (m), shares of titan_sight_range().
+func whale_near_sight() -> float:
+	return titan_sight_range() * settings.whale_near_share
+
+
+func whale_half_sight() -> float:
+	return clampf(titan_sight_range() * settings.whale_half_share, whale_near_sight(), titan_sight_range())
+
+
+## distance_falloff() for a whale's eyes.
+func whale_falloff(distance: float) -> float:
+	return _falloff(distance, whale_near_sight(), whale_half_sight(), titan_sight_range())
+
+
+## Whether `hider` is in `seeker`'s view: for a whale its own cone (whale_cone_angle)
+## within titan_sight_range() and a clear line (the host, bots), else in_sight().
+func whale_in_sight(seeker: FishController, hider: FishController) -> bool:
+	if not is_whale(seeker):
+		return in_sight(seeker, hider)
+	if not is_instance_valid(seeker) or not is_instance_valid(hider) or is_hidden(hider) or not hider.visible:
+		return false
+	var eye := eye_of(seeker)
+	var to := hider.global_position - eye
+	var distance := to.length()
+	if distance > titan_sight_range():
+		return false
+	if distance > 0.001:
+		var local := view_of(seeker).orthonormalized().inverse() * to
+		if acos(clampf(-local.z / distance, -1.0, 1.0)) > deg_to_rad(settings.whale_cone_angle) * 0.5:
+			return false
+	return SightCone.clear_line(seeker.get_world_3d().direct_space_state, eye, SightCone.body_points(hider), _fish_rids(), _blockers_mask())
+
+
+## The streaks `seeker`'s calls left in the water (MarcoScan.streak_heads): [{pos, heading, age, strength}].
+func streak_heads_of(seeker: FishController) -> Array[Dictionary]:
+	var scan: Variant = get_meta("marco_scan") if has_meta("marco_scan") else null
+	if scan is MarcoScan and is_instance_valid(scan):
+		return (scan as MarcoScan).streak_heads(seeker)
+	return []
+
+
+## Whether `fish` is a whale seeker now (whale_seeker on, and a seeker): its body
+## is a Titan, or it's a convert growing into one.
+func is_whale(fish: FishController) -> bool:
+	return settings.whale_seeker and is_instance_valid(fish) and role_of(fish) == Role.SEEKER
+
+
+## Whether `seeker`'s "Marco!" is the automatic beat (the manual button is retired for whales).
+func uses_auto_marco(seeker: FishController) -> bool:
+	return settings.marco_auto and is_whale(seeker)
 
 
 ## `fish`'s hidden round tally: only for the local player's own HUD (0 for anyone else's while the round's on).
@@ -860,33 +1019,40 @@ func _fish_rids() -> Array[RID]:
 # --- Noise, exposure and sight ----------------------------------------------
 
 ## A burst of noise from `fish` (porthole knocks, rim bumps, exits, chest burps).
-func add_noise(fish: FishController, amount: float) -> void:
+func add_noise(fish: FishController, amount: float, force := false) -> void:
 	if _meters.has(fish):
-		(_meters[fish] as NoiseMeter).add(amount)
+		var meter: NoiseMeter = _meters[fish]
+		if force:
+			meter.muted = false  # it just came out of hiding: this burst is heard
+		meter.add(amount)
 
 
 ## The distance falloff of exposure (1 within near_sight, 0.5 at half_sight, 0 at the sight range).
 func distance_falloff(distance: float) -> float:
-	var reach := sight_range()
-	if distance <= settings.near_sight:
+	return _falloff(distance, settings.near_sight, settings.half_sight, sight_range())
+
+
+func _falloff(distance: float, near: float, half: float, reach: float) -> float:
+	if distance <= near:
 		return 1.0
 	if distance >= reach:
 		return 0.0
-	var half := clampf(settings.half_sight, settings.near_sight, reach)
+	half = clampf(half, near, reach)
 	if distance <= half:
-		return lerpf(1.0, 0.5, (distance - settings.near_sight) / maxf(half - settings.near_sight, 0.001))
+		return lerpf(1.0, 0.5, (distance - near) / maxf(half - near, 0.001))
 	return lerpf(0.5, 0.0, (distance - half) / maxf(reach - half, 0.001))
 
 
 ## What `seeker` would see of `hider` now, before the fade.
-func exposure_target(seeker: FishController, hider: FishController) -> float:
+func exposure_target(seeker: FishController, hider: FishController, through_whale_eyes := false) -> float:
 	if is_hidden(hider) or eliminated.has(hider):
 		return 0.0
 	var v := hider.swim_velocity()
 	if Vector2(v.x, v.z).length() < settings.still_speed:
 		return 0.0  # stationary = invisible
 	var raw := pow(clampf(noise(hider), 0.0, 1.0), settings.exposure_curve)
-	var falloff := distance_falloff(hider.global_position.distance_to(seeker.global_position))
+	var distance := hider.global_position.distance_to(seeker.global_position)
+	var falloff := whale_falloff(distance) if through_whale_eyes else distance_falloff(distance)
 	if raw >= settings.layer_aura:
 		falloff = maxf(falloff, settings.aura_min_falloff)
 	return raw * falloff
@@ -903,10 +1069,20 @@ func _update_exposure(delta: float) -> void:
 			var target := exposure_target(seeker, hider)
 			var now := float(seen.get(hider, 0.0))
 			seen[hider] = target if target >= now else maxf(now - settings.exposure_fade * delta, target)
-		for hider: FishController in seen.keys():
-			if not watched.has(hider):
-				seen.erase(hider)
+		for gone: Variant in seen.keys():
+			if not is_instance_valid(gone) or not watched.has(gone):
+				seen.erase(gone)
 		_exposure[seeker] = seen
+		if is_whale(seeker):
+			var through: Dictionary = _whale_exposure.get(seeker, {})
+			for hider in watched:
+				var target := exposure_target(seeker, hider, true)
+				var now := float(through.get(hider, 0.0))
+				through[hider] = target if target >= now else maxf(now - settings.exposure_fade * delta, target)
+			for gone: Variant in through.keys():
+				if not is_instance_valid(gone) or not watched.has(gone):
+					through.erase(gone)
+			_whale_exposure[seeker] = through
 
 
 ## Sets every seeker's view of `hider` (the console's mp_expose, probes).
@@ -915,6 +1091,9 @@ func set_exposure(hider: FishController, value: float) -> void:
 		var seen: Dictionary = _exposure.get(seeker, {})
 		seen[hider] = clampf(value, 0.0, 1.0)
 		_exposure[seeker] = seen
+		var through: Dictionary = _whale_exposure.get(seeker, {})
+		through[hider] = clampf(value, 0.0, 1.0)
+		_whale_exposure[seeker] = through
 
 
 ## Hiders in a seeker's direct line of sight score per second, once per seeker,
@@ -969,7 +1148,7 @@ func _check_tags() -> void:
 		for hider in live_hiders():
 			if is_hidden(hider):
 				continue  # the bow can't reach into a porthole
-			if Battery.touching(seeker, hider):
+			if Battery.touching(seeker, hider) and _in_tag_zone(seeker, hider):
 				tag(seeker, hider)
 				if phase != Phase.LIVE:
 					return
@@ -999,10 +1178,7 @@ func _on_caught(hider: FishController, how: String, by: FishController) -> void:
 		_stat_add(hider, MatchStats.OUT_OF_WATER, 1)
 	caught.emit(hider, how, by)
 	if settings.variant == MarcoPoloSettings.Variant.CONVERSION:
-		role[hider] = Role.SEEKER
-		apply_role(hider, Role.SEEKER)
-		_hold_fish(hider, settings.convert_hold)
-		role_changed.emit(hider, Role.SEEKER)
+		_convert(hider)
 	else:
 		_eliminate(hider)
 	_announce_local_role()
@@ -1069,6 +1245,337 @@ func _hold_fish(fish: FishController, seconds: float) -> void:
 	_hold[fish] = maxf(float(_hold.get(fish, 0.0)), seconds)
 	if not fish.puppet:
 		fish.controls_locked = true
+
+
+# --- Whales (planning_marco_whales.md) --------------------------------------
+
+## The body scale a Titan has: whale_length over the class's own length (1 when 0).
+func whale_body_scale() -> float:
+	var base := FishCharacter.hitbox_size(FishCharacter.FishClass.TITAN).z
+	return settings.whale_length / base if settings.whale_length > 0.0 else 1.0
+
+
+## A seeker's body (whale: the Titans class), or a hider's own back.
+func _apply_body(fish: FishController, seeker: bool) -> void:
+	if seeker and settings.whale_seeker:
+		_become_titan(fish)
+	else:
+		_restore_look(fish)
+
+
+func _become_titan(fish: FishController) -> void:
+	if not bool(fish.get_meta("mp_swapped", false)):
+		# The player's own look, for CoopSession's roster and for putting back.
+		fish.set_meta("mp_base_look", [int(fish.character), fish.species])
+		fish.set_meta("mp_swapped", true)
+	var pick := whale_pick_of(fish)
+	if fish.character != FishCharacter.FishClass.TITAN or fish.species != int(pick.species) or fish.skin != int(pick.skin):
+		fish.set_look(FishCharacter.FishClass.TITAN, int(pick.species), int(pick.skin))
+	_whale_values(fish, true)
+	_watch_strokes(fish)
+	_rescale_lod(fish)
+
+
+## The Titan model's LOD ranges follow the visual root's scale (TitanModel's titan_lod_rescale meta).
+func _rescale_lod(fish: FishController) -> void:
+	var model: Node = fish.get("_visual")
+	if model != null and model.has_meta("titan_lod_rescale") and not is_equal_approx(fish.body_scale, 1.0):
+		(model.get_meta("titan_lod_rescale") as Callable).call(fish.body_scale)
+
+
+## The fish's own class and species again, its whale values off.
+func _restore_look(fish: FishController) -> void:
+	if not is_instance_valid(fish):
+		return
+	if bool(fish.get_meta("mp_swapped", false)):
+		var base: Array = fish.get_meta("mp_base_look", [int(fish.character), fish.species])
+		fish.set_meta("mp_swapped", false)
+		fish.set_look(int(base[0]) as FishCharacter.FishClass, int(base[1]))
+	_whale_values(fish, false)
+
+
+## The whale's size and handling (Whale settings) on, or all back to a fish's.
+func _whale_values(fish: FishController, whale: bool) -> void:
+	var hitbox := settings.whale_hitbox_scale if whale else 1.0
+	var body := whale_body_scale() if whale else 1.0
+	if not is_equal_approx(fish.hitbox_scale, hitbox):
+		fish.hitbox_scale = hitbox
+	if not is_equal_approx(fish.body_scale, body):
+		fish.body_scale = body
+	fish.turn_scale = settings.whale_turn_scale if whale else 1.0
+	fish.accel_scale = settings.whale_accel_scale if whale else 1.0
+	fish.drag_scale = settings.whale_accel_scale if whale else 1.0  # heavy to start, hard to stop
+	fish.top_speed_scale = settings.whale_speed_scale if whale else 1.0
+	fish.boost_scale = settings.whale_boost_scale if whale else 1.0
+	if whale:
+		fish.speed_scale = settings.seeker_speed_scale * settings.whale_speed_scale
+
+
+## Skins each species of the Titans has.
+func whale_skin_count(_species := 0) -> int:
+	return WHALE_SKINS
+
+
+## `fish`'s whale pick: {species, skin, locked}.
+func whale_pick_of(fish: FishController) -> Dictionary:
+	if not _whale_pick.has(fish):
+		_whale_pick[fish] = _default_pick(fish)
+	return _whale_pick[fish]
+
+
+## A bot's pick is at random, a person's the last they made (the card opens on it).
+func _default_pick(fish: FishController) -> Dictionary:
+	if bots.has(fish):
+		return {"species": _rng.randi_range(0, FishCharacter.species_count(FishCharacter.FishClass.TITAN) - 1),
+				"skin": _rng.randi_range(0, WHALE_SKINS - 1), "locked": true}
+	return {"species": clampi(settings.whale_last_pick, 0, FishCharacter.species_count(FishCharacter.FishClass.TITAN) - 1),
+			"skin": clampi(settings.whale_last_skin, 0, WHALE_SKINS - 1), "locked": false}
+
+
+func _roll_pick(fish: FishController) -> void:
+	_whale_pick[fish] = _default_pick(fish)
+
+
+## Seconds left to pick `fish`'s whale (the local player's by default): while the seeker waits out
+## hide_time, or a caught hider its join cooldown (whale_join_hold); -1 when
+## there's nothing to pick (a hider, a spectator, whales switched off, a pick
+## already locked). The pick card (B's) shows while this is 0 or more.
+func whale_pick_window_left(fish: FishController = null) -> float:
+	var who := fish if fish != null else _local
+	if not is_instance_valid(who) or not settings.whale_seeker or role_of(who) != Role.SEEKER or bots.has(who):
+		return -1.0
+	if bool(whale_pick_of(who).locked):
+		return -1.0
+	if phase == Phase.COUNTDOWN and starting_seekers.has(who):
+		return maxf(phase_left, 0.0)
+	return float(_pick_left.get(who, -1.0))
+
+
+## The local player's whale pick: `species` of the Titans, skin `skin`, `locked`
+## (A / Enter) or only on show. It's the card's call, for every cycle and for the
+## lock; the swap happens when it's locked or the window runs out.
+func request_whale_pick(species: int, skin: int, locked := false) -> void:
+	if whale_pick_window_left() < 0.0:
+		return
+	species = posmod(species, FishCharacter.species_count(FishCharacter.FishClass.TITAN))
+	skin = posmod(skin, whale_skin_count(species))
+	if authority:
+		apply_whale_request(_local, species, skin, locked)
+		return
+	_whale_pick[_local] = {"species": species, "skin": skin, "locked": locked}
+	if locked:
+		_remember_pick(species, skin)
+	local_whale_pick.emit(species, skin, locked)
+
+
+## The host: `fish` (ours, a person's on another machine) shows, or locks, a pick.
+func apply_whale_request(fish: FishController, species: int, skin: int, locked: bool) -> void:
+	if not authority or not is_instance_valid(fish) or not is_whale(fish) or bool(whale_pick_of(fish).locked):
+		return
+	var open := (phase == Phase.COUNTDOWN and starting_seekers.has(fish)) or _pick_left.has(fish)
+	if not open:
+		return
+	species = posmod(species, FishCharacter.species_count(FishCharacter.FishClass.TITAN))
+	_whale_pick[fish] = {"species": species, "skin": posmod(skin, WHALE_SKINS), "locked": false}
+	if locked:
+		_finish_pick(fish)
+
+
+## The host: `fish`'s pick is final: its whale wears it (if it has the body yet)
+## and everyone is told (whale_picked, which the net sends).
+func _finish_pick(fish: FishController) -> void:
+	var pick := whale_pick_of(fish)
+	pick.locked = true
+	if not bots.has(fish) and (fish == _local or fish.puppet):
+		_remember_pick(int(pick.species), int(pick.skin))
+	_wear_pick(fish)
+	whale_picked.emit(fish, int(pick.species), int(pick.skin))
+
+
+## A guest: the host's final pick for `fish`.
+func apply_net_whale_pick(fish: FishController, species: int, skin: int) -> void:
+	if not is_instance_valid(fish):
+		return
+	_whale_pick[fish] = {"species": species, "skin": skin, "locked": true}
+	if fish == _local:
+		_remember_pick(species, skin)
+	_wear_pick(fish)
+	whale_picked.emit(fish, species, skin)
+
+
+## The pick on a fish already a whale.
+func _wear_pick(fish: FishController) -> void:
+	if fish.character != FishCharacter.FishClass.TITAN:
+		return  # a convert still waiting: _grow() puts it on
+	var pick := whale_pick_of(fish)
+	if fish.species != int(pick.species) or fish.skin != int(pick.skin):
+		fish.set_look(FishCharacter.FishClass.TITAN, int(pick.species), int(pick.skin))
+		_whale_values(fish, true)
+		_watch_strokes(fish)
+
+
+func _remember_pick(species: int, skin: int) -> void:
+	settings.whale_last_pick = species
+	settings.whale_last_skin = skin
+
+
+## Join the Seekers: a caught hider is a seeker at once (the host's roles), and
+## waits out whale_join_hold (convert_hold without whales) as the fish it was,
+## picking its whale on the card, before it grows into one.
+func _convert(hider: FishController) -> void:
+	role[hider] = Role.SEEKER
+	var whale := settings.whale_seeker
+	apply_role(hider, Role.SEEKER, whale)
+	if whale:
+		_roll_pick(hider)
+		_pick_left[hider] = settings.whale_join_hold
+		_hold_fish(hider, settings.whale_join_hold)
+		if authority and bots.has(hider):
+			_finish_pick(hider)
+	else:
+		_hold_fish(hider, settings.convert_hold)
+	role_changed.emit(hider, Role.SEEKER)
+
+
+func _tick_picks(delta: float) -> void:
+	for fish: FishController in _pick_left.keys():
+		if not is_instance_valid(fish):
+			_pick_left.erase(fish)
+			continue
+		var left: float = _pick_left[fish] - delta
+		if left > 0.0:
+			_pick_left[fish] = left
+			continue
+		_pick_left.erase(fish)
+		if authority and not bool(whale_pick_of(fish).locked):
+			_finish_pick(fish)
+		_grow(fish)
+
+
+## A convert's swap into its whale (the join cooldown's over).
+func _grow(fish: FishController) -> void:
+	if not is_whale(fish) or eliminated.has(fish):
+		return
+	_become_titan(fish)
+	_start_auto_beat(fish)
+	_play_at("mp/whale_grow", fish.global_position)
+	if settings.whale_grow_time > 0.0:
+		var full := fish.body_scale
+		fish.body_scale = full * 0.2
+		var tween := create_tween()
+		tween.tween_method(func(k: float) -> void:
+			if is_instance_valid(fish):
+				fish.body_scale = full * k, 0.2, 1.0, settings.whale_grow_time).set_trans(Tween.TRANS_SINE)
+		tween.tween_callback(func() -> void:
+			if is_instance_valid(fish):
+				_rescale_lod(fish))
+	titan_grew.emit(fish)
+
+
+## The automatic "Marco!" beat starts for `seeker` now (live, or grown): the next
+## call in marco_auto_interval (the host's timer; every machine's pip).
+func _start_auto_beat(seeker: FishController) -> void:
+	if not uses_auto_marco(seeker):
+		return
+	_marco_total[seeker] = settings.marco_auto_interval
+	_marco_left[seeker] = settings.marco_auto_interval
+	if authority:
+		_auto_left[seeker] = _auto_gap()
+		_auto_tell.erase(seeker)
+
+
+func _auto_gap() -> float:
+	var jitter := settings.marco_auto_jitter
+	return settings.marco_auto_interval * (1.0 + _rng.randf_range(-jitter, jitter))
+
+
+## The host: each whale calls "Marco!" by itself on its beat (marco_tell_time warns first).
+func _tick_auto(delta: float) -> void:
+	for seeker in seekers():
+		if not is_seeking(seeker) or not uses_auto_marco(seeker):
+			continue
+		if not _auto_left.has(seeker):
+			_start_auto_beat(seeker)
+		var left: float = _auto_left[seeker] - delta
+		var tell := settings.marco_tell_time
+		if tell > 0.0 and left <= tell and not bool(_auto_tell.get(seeker, false)):
+			_auto_tell[seeker] = true
+			_play_at("mp/marco_tell", seeker.global_position)
+			marco_tell_started.emit(seeker, tell)
+		if left <= 0.0:
+			_call_marco(seeker)
+			_auto_left[seeker] = _auto_gap()
+			_auto_tell.erase(seeker)
+		else:
+			_auto_left[seeker] = left
+
+
+## Seconds to `seeker`'s next automatic call (host; -1 when it has none).
+func auto_marco_left(seeker: FishController) -> float:
+	return float(_auto_left.get(seeker, -1.0))
+
+
+## Whether the body of `hider` is in the part of `seeker` that tags (whale_tag_zone).
+func _in_tag_zone(seeker: FishController, hider: FishController) -> bool:
+	if settings.whale_tag_zone == 0 or seeker.character != FishCharacter.FishClass.TITAN:
+		return true
+	var local := seeker.global_transform.affine_inverse() * hider.global_position
+	return local.z < -seeker.hitbox_length / 6.0  # the front third (nose is -Z)
+
+
+## Listens for `fish`'s tail strokes: its model's power_stroke signal once the
+## animation has one, else a stand-in timer (whale_stroke_gap).
+func _watch_strokes(fish: FishController) -> void:
+	var model: Node = fish.get("_visual")
+	if model == null or _stroke_model.get(fish) == model:
+		return
+	_stroke_model[fish] = model
+	_stroke_real[fish] = model.has_signal("power_stroke")
+	if _stroke_real[fish]:
+		model.connect("power_stroke", _on_power_stroke.bind(fish))
+
+
+func _tick_strokes(delta: float) -> void:
+	for fish in seekers():
+		if not is_seeking(fish) or fish.character != FishCharacter.FishClass.TITAN:
+			continue
+		_watch_strokes(fish)
+		if bool(_stroke_real.get(fish, false)):
+			continue
+		var left: float = float(_stroke_left.get(fish, settings.whale_stroke_gap)) - delta
+		if left <= 0.0:
+			var speed := fish.swim_velocity().length()
+			if speed > 1.0:
+				var at := fish.global_transform.translated_local(Vector3(0.0, 0.0, fish.hitbox_length * 0.5))
+				_on_power_stroke(clampf(speed / 15.0, 0.3, 1.0), at, fish)
+			left = settings.whale_stroke_gap
+		_stroke_left[fish] = left
+
+
+## A fluke down-stroke (`strength` 0..1, at the flukes `at`): hiders near it are
+## pushed away (whale_wake_push, whale_wake_radius), the hider's own machine
+## applying it for a person on another one (wake_pushed).
+func _on_power_stroke(strength: float, at: Transform3D, fish: FishController) -> void:
+	if not authority or not is_seeking(fish) or settings.whale_wake_push <= 0.0 or settings.whale_wake_radius <= 0.0:
+		return
+	for hider in live_hiders():
+		if is_hidden(hider):
+			continue
+		var away := hider.global_position - at.origin
+		var distance := away.length()
+		if distance >= settings.whale_wake_radius or distance < 0.001:
+			continue
+		var impulse := away / distance * settings.whale_wake_push * strength * (1.0 - distance / settings.whale_wake_radius)
+		if hider.puppet:
+			wake_pushed.emit(hider, impulse)
+		else:
+			hider.apply_push(impulse)
+
+
+## A guest: the host's whale pushed our own fish.
+func apply_net_wake(impulse: Vector3) -> void:
+	if is_instance_valid(_local) and not _local.puppet and not is_hidden(_local):
+		_local.apply_push(impulse)
 
 
 # --- Decoys -----------------------------------------------------------------
@@ -1141,11 +1648,18 @@ func _fool(seeker: FishController, fake: FishController) -> void:
 ## Fake Fish answers "Polo!" on every seeker's scope, with a big blur and an
 ## exposure bump; the hiders see a ring round the caller for a moment.
 func marco(seeker: FishController) -> bool:
-	if not is_seeking(seeker) or marco_ready(seeker) < 1.0:
-		return false
+	if not is_seeking(seeker) or marco_ready(seeker) < 1.0 or uses_auto_marco(seeker):
+		return false  # a whale's call is the automatic beat: the button is retired
 	if not authority:
 		local_button.emit("marco")  # the host calls it (and tells everyone)
 		return true
+	_call_marco(seeker)
+	return true
+
+
+## The call itself (the host's): the effects everywhere, then every live hider
+## and Fake Fish answers on every seeker's scope and bumps in their view.
+func _call_marco(seeker: FishController) -> void:
 	_marco_effects(seeker)
 	var answering: Array[FishController] = []
 	for hider in live_hiders():
@@ -1158,23 +1672,42 @@ func marco(seeker: FishController) -> bool:
 			var seen: Dictionary = _exposure.get(other, {})
 			seen[hider] = maxf(float(seen.get(hider, 0.0)), settings.polo_exposure)
 			_exposure[other] = seen
-	return true
+			if is_whale(other):  # through its own eyes: only what's near enough shows
+				var through: Dictionary = _whale_exposure.get(other, {})
+				var bump := settings.whale_polo_exposure * whale_falloff(hider.global_position.distance_to(other.global_position))
+				through[hider] = maxf(float(through.get(hider, 0.0)), bump)
+				_whale_exposure[other] = through
+
+
+## The call's sound: a whale's own voice by species, else the plain "Marco!".
+func _voice_of(seeker: FishController) -> String:
+	if uses_auto_marco(seeker) and seeker.character == FishCharacter.FishClass.TITAN:
+		return "mp/voice_" + FishCharacter.species_key(FishCharacter.FishClass.TITAN, seeker.species)
+	return SOUNDS.marco
+
+
+## A guest: the host says `seeker`'s call is about to come (the tell, `time` s ahead).
+func apply_net_tell(seeker: FishController, time: float) -> void:
+	_play_at("mp/marco_tell", seeker.global_position)
+	marco_tell_started.emit(seeker, time)
 
 
 ## What every machine sees of a "Marco!": its cooldown, the ring, the call.
 func _marco_effects(seeker: FishController) -> void:
-	_marco_left[seeker] = settings.marco_cooldown
+	_marco_total[seeker] = settings.marco_auto_interval if uses_auto_marco(seeker) else settings.marco_cooldown
+	_marco_left[seeker] = _marco_total[seeker]
 	_marco_ring[seeker] = settings.marco_reveal_time
-	_play_at(SOUNDS.marco, seeker.global_position)
+	_play_at(_voice_of(seeker), seeker.global_position)
 	marco_called.emit(seeker)
 	marco_scan_started.emit(seeker.global_position, seeker)
 
 
 ## How ready `seeker`'s "Marco!" is (0 just used .. 1 ready).
 func marco_ready(seeker: FishController) -> float:
-	if settings.marco_cooldown <= 0.0:
+	var total := float(_marco_total.get(seeker, settings.marco_cooldown))
+	if total <= 0.0:
 		return 1.0
-	return 1.0 - clampf(float(_marco_left.get(seeker, 0.0)) / settings.marco_cooldown, 0.0, 1.0)
+	return 1.0 - clampf(float(_marco_left.get(seeker, 0.0)) / total, 0.0, 1.0)
 
 
 ## Seconds the hiders still see `seeker`'s Marco ring.
@@ -1558,6 +2091,11 @@ func _wire_helpers() -> void:
 		porthole_system.call("setup", self, holes)
 		if porthole_system.has_signal("dried_out"):
 			porthole_system.connect("dried_out", dried_out)
+	hideaway_system = _optional(HIDEAWAY_SYSTEM_PATH, "Hideaways")
+	if hideaway_system:
+		var spots: Array = arena.call("hideaway_spots") if arena and arena.has_method("hideaway_spots") else []
+		hideaway_system.call("setup", self, spots)
+		hideaway_system.connect("flushed", func(fish: FishController, _index: int, impulse: Vector3) -> void: wake_pushed.emit(fish, impulse))
 
 
 ## A helper that may not be written yet: an instance of `path`'s script, added
@@ -1712,10 +2250,7 @@ func apply_net_caught(hider: FishController, how: String, by: FishController) ->
 		_play_at(SOUNDS.tag, hider.global_position)
 	caught.emit(hider, how, by)
 	if settings.variant == MarcoPoloSettings.Variant.CONVERSION:
-		role[hider] = Role.SEEKER
-		apply_role(hider, Role.SEEKER)
-		_hold_fish(hider, settings.convert_hold)
-		role_changed.emit(hider, Role.SEEKER)
+		_convert(hider)
 	else:
 		_eliminate(hider)
 	_announce_local_role()

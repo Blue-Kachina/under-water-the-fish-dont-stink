@@ -24,6 +24,12 @@ extends Node
 ## sees, then the newest loud blip, sweeps when there's nothing, calls Marco
 ## when it's been quiet a while and now and then waits outside a porthole.
 ## Seekers spread out: each heads for a blip no other bot seeker has claimed.
+## A whale seeker (settings.whale_seeker) sees through game.whale_sees and its own
+## cone and range, never calls Marco! (it's automatic), and hunts the streaks the
+## calls leave (MarcoScan.streak_heads): a head and a heading, not an exact spot,
+## so it swims ahead along the heading at bot_streak_lead and gives up on a head it
+## has reached. Hiders hold still around a whale's calls (bot_freeze_*) and swim
+## between them.
 ## Decoy (FakeFish's pilot): straight on along its heading at fake_speed, away
 ## from walls and furniture, striding badly on purpose with a flip or two.
 
@@ -82,6 +88,16 @@ var _last_seen_velocity := Vector3.ZERO
 var _last_news := 0.0
 var _look_left := 0.0
 var _waiting := 0.0
+## Whale seeker: streak heads it has been to ({pos, until}); hider: the last
+## auto-Marco countdown seen, and how long ago the whale called (s).
+var _visited: Array[Dictionary] = []
+var _visit_time := 0.0
+var _prev_auto_left := -1.0
+## Hider: the hideaway it's heading for (an index, -1 none), the one it just left and for how long (s).
+var _hideaway := -1
+var _ban := -1
+var _ban_left := 0.0
+var _since_call := INF
 # Decoy: when it next flips.
 var _next_flip := 0.0
 
@@ -163,6 +179,18 @@ func _hide(delta: float) -> void:
 	if system and system.is_hidden(fish):
 		_in_porthole(system)
 		return
+	_ban_left -= delta
+	var hides := game.hideaway_system
+	if hides and bool(hides.call("is_hidden", fish)):
+		if float(hides.call("gauge", fish)) < settings.bot_hideaway_leave:
+			plan = Plan.SETTLE  # hands off: still inside, quiet
+			_plan_left = maxf(_plan_left, 1.0)
+			return
+		if _ban_left <= 0.0:
+			_ban = int(hides.call("hideaway_of", fish))  # Stale Water's high: out before it flushes it noisily
+			_ban_left = 6.0
+			plan = Plan.HIDE
+			_spot = _pick_spot(_nearest_seeker())
 	var threat := _nearest_seeker()
 	var threat_distance := INF if threat == null else threat.global_position.distance_to(fish.global_position)
 	var live := game.phase == MarcoPoloMatch.Phase.LIVE
@@ -178,6 +206,8 @@ func _hide(delta: float) -> void:
 			plan = Plan.HIDE
 			_spot = _pick_spot(threat)
 			return
+	if live and _hold_for_call(threat, delta):
+		return
 	_plan_left -= delta
 	match plan:
 		Plan.IDLE:
@@ -219,6 +249,26 @@ func _hide(delta: float) -> void:
 			_line_up(system, delta)
 
 
+## A whale's automatic Marco!: hold still just before and after each call (hands
+## off, so it sinks and goes quiet), carry on in between. True while holding.
+func _hold_for_call(whale: FishController, delta: float) -> bool:
+	_since_call += delta
+	if whale == null or not game.uses_auto_marco(whale):
+		_prev_auto_left = -1.0
+		return false
+	var left := game.auto_marco_left(whale)
+	if _prev_auto_left >= 0.0 and left > _prev_auto_left + 0.3:
+		_since_call = 0.0
+	_prev_auto_left = left
+	var tell := settings.marco_tell_time
+	if left >= 0.0 and left < settings.bot_freeze_before + tell or _since_call < settings.bot_freeze_after:
+		input.forward = 0.0
+		input.roll = clampf(fish.global_basis.x.y * 3.0, -1.0, 1.0)
+		_stride_seen = -1
+		return true
+	return false
+
+
 ## The hider's spot: furthest from the seekers among the arena's hider spawns,
 ## curtains, furniture-sheltered floor and (sometimes) a free porthole.
 func _pick_spot(threat: FishController) -> Vector3:
@@ -245,6 +295,23 @@ func _pick_spot(threat: FishController) -> Vector3:
 		if score > best_score:
 			best_score = score
 			best = at
+	_hideaway = -1
+	var hides := game.hideaway_system
+	if hides and settings.hideaways_on and float(hides.call("gauge", fish)) < 0.4 \
+			and rng.randf() < settings.bot_hideaway_chance + (0.3 if threat and game.is_whale(threat) else 0.0):
+		var pick := -1
+		var pick_score := -INF
+		for i in int(hides.call("count")):
+			if i == _ban and _ban_left > 0.0 or not bool(hides.call("has_room", i)):
+				continue
+			var at: Vector3 = hides.call("position_of", i)
+			var score := at.distance_to(from) - at.distance_to(fish.global_position) * 0.5
+			if score > pick_score:
+				pick_score = score
+				pick = i
+		if pick >= 0 and pick_score > best_score - 40.0:
+			_hideaway = pick
+			return hides.call("position_of", pick)
 	var system := game.porthole_system as PortholeSystem
 	if system and rng.randf() < settings.bot_porthole_chance + settings.bot_boldness * 0.3:
 		var choice: Porthole
@@ -374,6 +441,9 @@ func _coming_at(other: FishController, cosine: float) -> bool:
 # --- Seeker -----------------------------------------------------------------
 
 func _seek(delta: float) -> void:
+	if game.is_whale(fish):
+		_seek_whale(delta)
+		return
 	_look_left -= delta
 	if _look_left <= 0.0:
 		_look_left = settings.bot_look_every
@@ -401,6 +471,76 @@ func _seek(delta: float) -> void:
 	_sweep(delta)
 
 
+## A whale: what it sees, else the best streak head, else a sweep (its calls are automatic).
+func _seek_whale(delta: float) -> void:
+	_look_left -= delta
+	if _look_left <= 0.0:
+		_look_left = settings.bot_look_every
+		_look()
+	var boost_range := settings.bot_whale_boost_range
+	if is_instance_valid(_target):
+		_claims[self] = _last_seen
+		var guess := _last_seen + _last_seen_velocity * 0.3
+		_swim_whale(guess, delta, fish.global_position.distance_to(guess) < boost_range)
+		if fish.global_position.distance_to(guess) < 2.0 and _time - _last_news > 0.6:
+			_target = null
+		return
+	_target = null
+	_visit_time = _visit_time if _visit_time > 0.0 else 0.0
+	var head := _best_streak()
+	if not head.is_empty():
+		var at: Vector3 = head.at
+		_claims[self] = at
+		_waiting = 0.0
+		var d := fish.global_position.distance_to(at)
+		if d < 6.0:
+			_visit_time += delta
+			if _visit_time >= settings.bot_streak_visit * 0.25:
+				_visited.append({"pos": at, "until": _time + settings.bot_streak_visit})
+				_visit_time = 0.0
+		else:
+			_visit_time = 0.0
+		_swim_whale(at, delta, d < boost_range and float(head.strength) > 0.5)
+		return
+	_claims.erase(self)
+	_sweep(delta)
+
+
+## Swim as a whale: wide turns take the whole stick, the strokes are the strides.
+func _swim_whale(goal: Vector3, delta: float, hurry: bool) -> void:
+	_swim_at(goal, delta, hurry)
+
+
+## The streak head worth going to: the guessed spot ahead of it, young, strong,
+## near, not one it has been to and not another seeker's. {at, strength} or {}.
+func _best_streak() -> Dictionary:
+	var best := {}
+	var best_score := -INF
+	_visited = _visited.filter(func(v: Dictionary) -> bool: return float(v.until) > _time)
+	for head in game.streak_heads_of(fish):
+		var age := float(head.age)
+		if age > settings.bot_streak_age:
+			continue
+		var heading: Vector3 = head.heading
+		var at: Vector3 = head.pos + heading * settings.bot_streak_lead * minf(age, 3.0)
+		var skip := false
+		for v in _visited:
+			if (v.pos as Vector3).distance_to(at) < settings.bot_claim_radius:
+				skip = true
+		for other: Object in _claims:
+			if other != self and is_instance_valid(other) and game.seekers().size() > 1 and (_claims[other] as Vector3).distance_to(at) < settings.bot_claim_radius:
+				skip = true
+		if skip:
+			continue
+		var score := float(head.strength) * 2.0 - at.distance_to(fish.global_position) * 0.03 - age * 0.15
+		if score > best_score:
+			best_score = score
+			best = {"at": at, "strength": float(head.strength)}
+	if not best.is_empty():
+		_last_news = _time
+	return best
+
+
 ## What its own eyes show: a hider (or a Fake Fish) in sight at a layer it notices.
 func _look() -> void:
 	var best: FishController
@@ -408,8 +548,8 @@ func _look() -> void:
 	var watched: Array[FishController] = game.live_hiders()
 	watched.append_array(game.decoys())
 	for hider in watched:
-		var seen := game.exposure(fish, hider)
-		if seen < settings.layer_skeleton or not game.in_sight(fish, hider):
+		var seen := game.whale_sees(fish, hider)
+		if seen < settings.layer_skeleton or not game.whale_in_sight(fish, hider):
 			continue
 		# A faint skeleton is easy to miss; the pulse from cardio on isn't.
 		if seen < settings.layer_cardio and hider != _target and rng.randf() > settings.bot_notice_chance:

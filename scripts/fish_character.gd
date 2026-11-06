@@ -13,7 +13,7 @@ class_name FishCharacter
 
 ## The order goes over the network (and into anything stored by index): add new
 ## classes at the end, never reorder.
-enum FishClass { SKIRMISHER, HUNTER, GLIDER, LANCER, CHARMER, BULWARK, SCORCHER, DRIFTER, BRAWLER, BREACHER, ALCHEMIST }
+enum FishClass { SKIRMISHER, HUNTER, GLIDER, LANCER, CHARMER, BULWARK, SCORCHER, DRIFTER, BRAWLER, BREACHER, ALCHEMIST, TITAN }
 
 ## Per class: `key` (saves and our clips), `name` (the role name the picker
 ## shows), `rl_hitbox` (the RL hitbox it uses, as RL replays key it), `aliases`
@@ -97,6 +97,17 @@ const CLASSES := {
 		"back": {"radius": 15.0, "rest": 39.105, "at": Vector3(-33.75, 29.5, 21.505)},
 		"ride": 18.147,
 	},
+	# The adult whales (planning_marco_whales.md): 5x the longest hider, built as a real class
+	# but kept out of the pickers (`hidden`, pickable_classes()) until a mode offers them.
+	# Its own long, round box; the wheels are unused (no belly: `ride` 0) and only there for
+	# the table's shape.
+	FishClass.TITAN: {
+		"key": "titan", "name": "Titans", "rl_hitbox": "plank", "aliases": ["adult_whale"], "hidden": true,
+		"hitbox": Vector3(670.0, 240.0, 190.0), "offset": Vector3(30.0, 0.0, 0.0),
+		"front": {"radius": 12.5, "rest": 31.924, "at": Vector3(250.0, 80.0, 0.0)},
+		"back": {"radius": 17.0, "rest": 27.924, "at": Vector3(-250.0, 80.0, 0.0)},
+		"ride": 0.0,
+	},
 }
 ## How far a tyre reaches out past its suspension mount (uu): the belly is this
 ## much wider than the wheels' mounts on each side.
@@ -176,7 +187,23 @@ const SPECIES := {
 		{"key": "ragged", "name": "Ragged Sea Hare"},
 		{"key": "tinctoria", "name": "Tinctoria"},
 	],
+	FishClass.TITAN: [
+		{"key": "humpback", "name": "Humpback Whale"},
+		{"key": "orca", "name": "Orca"},
+		{"key": "beluga", "name": "Beluga"},
+		{"key": "sperm", "name": "Sperm Whale"},
+		{"key": "blue", "name": "Blue Whale"},
+	],
 }
+
+
+## The classes a picker offers: every class but the hidden ones (the Titans).
+static func pickable_classes() -> Array:
+	var out := []
+	for fish_class: FishClass in CLASSES:
+		if not CLASSES[fish_class].get("hidden", false):
+			out.append(fish_class)
+	return out
 
 
 ## "Brawlers": the class's role name, as the picker lists it.

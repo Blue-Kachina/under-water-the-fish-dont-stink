@@ -90,6 +90,15 @@ func _run(shots: bool) -> void:
 	stub.pinged.emit(me, Vector3(-15.0, 0.0, 5.0), 0.4, true)
 	stub.pinged.emit(other, Vector3(5.0, 0.0, 5.0), 1.0, false)
 	check(map.blips.size() == 2, "its own pings are blips, another seeker's aren't (%d)" % map.blips.size())
+	var scan := MarcoScan.new()
+	stub.add_child(scan)
+	scan.bind(stub)
+	scan._heads = {me.get_instance_id(): {other.get_instance_id(): {"pos": Vector3(12.0, 0.0, -18.0), "heading": Vector3(1.0, 0.0, -0.3).normalized(), "time": scan._clock, "strength": 0.8, "fish": other.get_instance_id()}}}
+	var scope_heads := map.streak_heads()
+	check(scope_heads.size() == 1 and absf(float(scope_heads[0].age)) < 1.0, "the scope reads the seeker's streak heads (%d)" % scope_heads.size())
+	check(scan.streak_heads(other).is_empty(), "another seeker has none")
+	map.queue_redraw()
+	map._marks.queue_redraw()
 	if shots:
 		await _shot("scope")
 		stub.phase = 0

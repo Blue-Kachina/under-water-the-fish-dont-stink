@@ -182,6 +182,25 @@ func phase() -> int:
 	return int(_get_value("phase", COUNTDOWN))
 
 
+## {left, interval} (s) of `seeker`'s automatic Marco! beat, or {} when it has the
+## manual button. Reads the match's auto_marco_left(seeker) when it has one, else its
+## own timer table (planning_marco_whales.md §4).
+func auto_beat(seeker: Node) -> Dictionary:
+	if not bool(_call("uses_auto_marco", [seeker], false)):
+		return {}
+	var interval := float(_setting("marco_auto_interval", 3.0))
+	var left := -1.0
+	if is_instance_valid(match_node) and match_node.has_method("auto_marco_left"):
+		left = float(match_node.call("auto_marco_left", seeker))
+	else:
+		var table: Variant = _get_value("_auto_left", null)
+		if table is Dictionary and (table as Dictionary).has(seeker):
+			left = float((table as Dictionary)[seeker])
+	if left < 0.0:
+		return {}
+	return {"left": left, "interval": interval}
+
+
 func spectating() -> bool:
 	return bool(_call("is_spectating", [], false))
 
@@ -360,6 +379,11 @@ class View extends Control:
 		var ready := clampf(float(hud._call("marco_ready", [me], 1.0)), 0.0, 1.0)
 		var centre := origin + Vector2(54.0 * s, 54.0 * s)
 		var r := 36.0 * s
+		var auto_beat := hud.auto_beat(me)
+		if not auto_beat.is_empty():
+			_draw_beat_pip(s, centre, r, auto_beat)
+			_draw_seeker_counts(s, origin)
+			return
 		draw_arc(centre, r, 0.0, TAU, 48, Color(UITheme.DEEP, 0.9), 7.0 * s, true)
 		var tint := MarcoPoloHud.SEEKER_COLOR if ready >= 1.0 else UITheme.MUTED
 		if ready > 0.0:
@@ -373,6 +397,9 @@ class View extends Control:
 		if ready < 1.0:
 			UITheme.draw_text(self, Rect2(centre + Vector2(-r, 10.0 * s), Vector2(r * 2.0, 18.0 * s)), "%ds" % ceili(left),
 					UITheme.condensed(600), roundi(13.0 * s), UITheme.MUTED)
+		_draw_seeker_counts(s, origin)
+
+	func _draw_seeker_counts(s: float, origin: Vector2) -> void:
 		var hiders: Array = hud._call("live_hiders", [], [])
 		var text_x := origin.x + 104.0 * s
 		UITheme.draw_text(self, Rect2(text_x, origin.y + 18.0 * s, 120.0 * s, 34.0 * s), str(hiders.size()), UITheme.display(700),
@@ -381,6 +408,29 @@ class View extends Control:
 				UITheme.condensed(700), roundi(14.0 * s), UITheme.MUTED, HORIZONTAL_ALIGNMENT_LEFT)
 		UITheme.draw_text(self, Rect2(text_x, origin.y + 74.0 * s, 120.0 * s, 18.0 * s), "TAGS  %d" % hud._tags, UITheme.condensed(700),
 				roundi(15.0 * s), MarcoPoloHud.SEEKER_COLOR, HORIZONTAL_ALIGNMENT_LEFT)
+
+	## A whale's beat pip (the manual Marco! button is retired): a ring that fills
+	## toward the next automatic call and flashes when it goes out. `beat` is
+	## {left, interval} (s); a tell, when the match has one, makes it pulse.
+	func _draw_beat_pip(s: float, centre: Vector2, r: float, beat: Dictionary) -> void:
+		var interval := maxf(float(beat.interval), 0.05)
+		var left := clampf(float(beat.left), 0.0, interval)
+		var fill := 1.0 - left / interval
+		var flash_time := float(hud._setting("beat_pip_flash", 0.35))
+		var flash := clampf((left - (interval - flash_time)) / maxf(flash_time, 0.01), 0.0, 1.0)
+		var tint := MarcoPoloHud.SEEKER_COLOR.lerp(Color.WHITE, flash)
+		draw_arc(centre, r, 0.0, TAU, 48, Color(UITheme.DEEP, 0.9), 7.0 * s, true)
+		if fill > 0.0:
+			draw_arc(centre, r, -PI * 0.5, -PI * 0.5 + TAU * fill, 48, Color(tint, 0.85), 7.0 * s, true)
+		if flash > 0.0:
+			draw_arc(centre, r + 10.0 * s * (1.0 - flash), 0.0, TAU, 48, Color(tint, 0.6 * flash), 2.5 * s, true)
+		# Dots round the ring for the beat: a pip that lights as the call nears.
+		var tip := -PI * 0.5 + TAU * fill
+		draw_circle(centre + Vector2(cos(tip), sin(tip)) * r, (4.0 + 3.0 * flash) * s, tint)
+		UITheme.draw_text(self, Rect2(centre - Vector2(r, 12.0 * s), Vector2(r * 2.0, 24.0 * s)), "MARCO!", UITheme.condensed(800),
+				roundi(17.0 * s), tint)
+		UITheme.draw_text(self, Rect2(centre + Vector2(-r, 10.0 * s), Vector2(r * 2.0, 18.0 * s)), "%.1fs" % left,
+				UITheme.condensed(600), roundi(13.0 * s), UITheme.MUTED)
 
 	## The totals from the rounds before (they don't move during a round): a
 	## hider sees everyone's, a seeker only their own.

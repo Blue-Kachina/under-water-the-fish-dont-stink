@@ -20,6 +20,11 @@ extends Node
 ##   host's camera looks out of it; out again.
 ## - A tag on the host eliminates the guest everywhere.
 ## - ROUND_OVER: every machine has the host's totals.
+## - The whales (planning_marco_whales.md): with whale_seeker on, the seeker
+##   is the Titans class on every machine (hitbox and model), a person's pick
+##   (request_whale_pick) reaches everyone, the whale's automatic Marco!
+##   reaches every machine, its wake pushes a person's fish on their machine,
+##   and the next round puts it back as its own fish.
 ## - The host leaving sends the guests back to Marco Polo of their own.
 
 var role := "host"
@@ -59,6 +64,8 @@ func _finish() -> void:
 
 
 func _run() -> void:
+	mp.porthole_jump_entry = false  # the guests' porthole phases swim in nose first (_drive_in)
+	mp.whale_seeker = false  # the first rounds are the fish seeker's rules; the whales have their own phases below
 	mp.arena = "Sunken Temple" if main.ENVIRONMENTS.has("Sunken Temple") else "Ocean"
 	main.set_mode(main.MARCO_POLO)
 	await _ticks(10)
@@ -201,11 +208,105 @@ func _host() -> void:
 	await _seconds(0.5)
 	await _phase("round_over", {"totals": totals}, true, "all")
 
+	await _host_whales(game, coop, fa, fb)
+	await _host_titans(game, fa, fb)
+
 	print("host: leaving")
 	await _phase("leaving", {}, false, "all")
 	await _seconds(0.5)
 	NetSession.leave()
 	await _seconds(2.0)
+
+
+## Four Titans at once (Join the Seekers): the seeker plus three caught hiders grow, on every machine.
+func _host_titans(game: MarcoPoloMatch, fa: FishController, fb: FishController) -> void:
+	print("host: four titans")
+	mp.variant = MarcoPoloSettings.Variant.CONVERSION
+	mp.whale_join_hold = 1.0
+	mp.whale_grow_time = 0.3
+	mp.round_time = 120.0
+	await _phase("titans_on", {})
+	game.start_round(maxi(game.seeker_order().find(fish), 0))
+	if not await _wait(func() -> bool: return game.phase == MarcoPoloMatch.Phase.LIVE, 15.0):
+		check(false, "LIVE (titans)")
+		return
+	var victims: Array[FishController] = [fa, fb]
+	for f in game.live_hiders():
+		if not victims.has(f) and victims.size() < 3:
+			victims.append(f)
+	for v in victims:
+		game.tag(fish, v)
+	var count := func() -> int:
+		var n := 0
+		for f in game.players:
+			if f.character == FishCharacter.FishClass.TITAN:
+				n += 1
+		return n
+	await _wait(func() -> bool: return count.call() >= 4 and game.whale_pick_window_left(victims[0]) <= 0.0, 10.0)
+	await _seconds(1.0)
+	check(count.call() == 4, "four Titans here (%d)" % count.call())
+	await _phase("titans4", {}, false)
+	var perf := await _measure(4.0)
+	print("    perf with %d Titans (host): %s" % [count.call(), perf])
+	await _seconds(1.0)
+	await _phase("titans_done", {})
+
+
+## Average fps and the frame's process / physics time (ms) over `seconds`.
+func _measure(seconds: float) -> String:
+	var frames := 0
+	var process := 0.0
+	var physics := 0.0
+	var started := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - started < int(seconds * 1000.0):
+		await get_tree().process_frame
+		frames += 1
+		process += Performance.get_monitor(Performance.TIME_PROCESS)
+		physics += Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)
+	var n := maxf(frames, 1)
+	return "%.0f fps, process %.2f ms, physics %.2f ms" % [frames / seconds, process / n * 1000.0, physics / n * 1000.0]
+
+
+## The whales online: the swap, a guest's pick, the automatic Marco!, the wake, the swap back.
+func _host_whales(game: MarcoPoloMatch, coop: CoopSession, fa: FishController, fb: FishController) -> void:
+	print("host: whales")
+	await _phase("whales_on", {})
+	mp.whale_seeker = true
+	mp.marco_auto = true
+	mp.marco_auto_interval = 1.0
+	mp.whale_wake_push = 4.0
+	mp.hide_time = 4.0
+	var titan := int(FishCharacter.FishClass.TITAN)
+	var base := int(fa.character)
+	var order := game.seeker_order()
+	game.start_round(maxi(order.find(fa), 0))
+	await _ticks(5)
+	check(game.seekers() == [fa] and fa.character == titan and fa.hitbox_length > 4.0 and not fb.character == titan,
+			"a is a Titan here (%.1f m), b is not" % fa.hitbox_length)
+	await _phase("whale_round", {"seeker": int(_pids.a), "base": base})
+	await _phase("whale_pick", {}, true, "a")
+	await _wait(func() -> bool: return fa.species == 3 and fa.skin == 1, 3.0)
+	check(fa.species == 3 and fa.skin == 1 and bool(game.whale_pick_of(fa).locked), "a's locked pick is here: species %d skin %d" % [fa.species, fa.skin])
+	await _phase("whale_picked", {"seeker": int(_pids.a)})
+	if not await _wait(func() -> bool: return game.phase == MarcoPoloMatch.Phase.LIVE, 10.0):
+		check(false, "LIVE (whales)")
+		return
+	var called := []
+	game.marco_called.connect(func(who: FishController) -> void: called.append(who))
+	await _phase("auto", {}, false)
+	await _seconds(3.5)
+	check(called.size() >= 2 and called.all(func(who: FishController) -> bool: return who == fa), "the whale called Marco! by itself (%d calls in 3.5 s)" % called.size())
+	await _phase("auto_done", {})
+	await _phase("b_near", {"seeker": int(_pids.a)}, true, "b")
+	await _seconds(0.3)
+	var at := fa.global_transform.translated_local(Vector3(0.0, 0.0, fa.hitbox_length * 0.5))
+	game._on_power_stroke(1.0, at, fa)
+	await _phase("wake", {}, true, "b")
+	game.start_round(maxi(game.seeker_order().find(fish), 0))
+	await _ticks(5)
+	check(game.seekers() == [fish] and fa.character == base and is_equal_approx(fa.body_scale, 1.0) and fish.character == titan,
+			"the next round: a is its own fish again (class %d), the host is the Titan" % fa.character)
+	await _phase("swapped_back", {"seeker": 100, "base": base, "a": int(_pids.a)})
 
 
 # --- Guests ----------------------------------------------------------------
@@ -232,6 +333,73 @@ func _guest() -> void:
 			"":
 				check(false, "the host carried on")
 				return
+			"whales_on":
+				mp.whale_seeker = true
+				mp.marco_auto = true
+				mp.marco_auto_interval = 1.0
+				mp.hide_time = 4.0
+			"whale_round":
+				var seeker := coop.marco_polo_net.fish_by_id(int(data.seeker))
+				await _wait(func() -> bool: return seeker != null and seeker.character == FishCharacter.FishClass.TITAN, 3.0)
+				check(seeker != null and game.seekers() == [seeker] and seeker.character == FishCharacter.FishClass.TITAN and seeker.hitbox_length > 4.0,
+						"the whale: a Titan here too (%.1f m)" % (seeker.hitbox_length if seeker else 0.0))
+				for f in game.players:
+					if f != seeker:
+						check(f.character != FishCharacter.FishClass.TITAN, "%s isn't a Titan" % f.name)
+			"whale_pick":
+				check(game.whale_pick_window_left() >= 0.0, "our pick window is open (%.1f s)" % game.whale_pick_window_left())
+				game.request_whale_pick(3, 1, true)
+			"whale_picked":
+				var seeker := coop.marco_polo_net.fish_by_id(int(data.seeker))
+				await _wait(func() -> bool: return seeker != null and seeker.species == 3 and seeker.skin == 1, 3.0)
+				check(seeker != null and seeker.species == 3 and seeker.skin == 1 and seeker.character == FishCharacter.FishClass.TITAN,
+						"the pick shows here: species %d skin %d" % [seeker.species if seeker else -1, seeker.skin if seeker else -1])
+			"auto":
+				var count := [0]
+				game.marco_scan_started.connect(func(_o: Vector3, _s: FishController) -> void: count[0] += 1)
+				if role == "a":
+					check(not game.marco(fish), "the whale's own button does nothing")
+				await _seconds(3.5)
+				check(count[0] >= 2, "the automatic Marco! reached us (%d scans in 3.5 s)" % count[0])
+			"auto_done":
+				pass
+			"b_near":
+				var seeker := coop.marco_polo_net.fish_by_id(int(data.seeker))
+				if role == "b" and seeker:
+					fish.controls_locked = true
+					fish.global_position = seeker.global_position - seeker.global_basis.z * (seeker.hitbox_length * 0.5 + 5.0)
+					fish.linear_velocity = Vector3.ZERO
+					fish.freeze = false
+			"wake":
+				await _seconds(0.25)
+				check(fish.linear_velocity.length() > 0.8, "the whale's wake pushed us (%.2f m/s)" % fish.linear_velocity.length())
+			"titans_on":
+				mp.variant = MarcoPoloSettings.Variant.CONVERSION
+				mp.whale_join_hold = 1.0
+				mp.whale_grow_time = 0.3
+				mp.round_time = 120.0
+			"titans4":
+				var titans := func() -> int:
+					var n := 0
+					for f in game.players:
+						if f.character == FishCharacter.FishClass.TITAN:
+							n += 1
+					return n
+				await _wait(func() -> bool: return titans.call() >= 4, 10.0)
+				check(titans.call() == 4, "four Titans here too (%d)" % titans.call())
+				var perf := await _measure(4.0)
+				print("    perf with %d Titans (%s): %s" % [titans.call(), role, perf])
+			"titans_done":
+				pass
+			"swapped_back":
+				var seeker := coop.marco_polo_net.fish_by_id(int(data.seeker))
+				await _wait(func() -> bool: return seeker != null and seeker.character == FishCharacter.FishClass.TITAN, 3.0)
+				check(seeker != null and seeker.character == FishCharacter.FishClass.TITAN, "the host's the Titan here now")
+				var fa_fish := fish if role == "a" else coop.fish_of(int(data.a))
+				await _wait(func() -> bool: return fa_fish != null and int(fa_fish.character) == int(data.base), 3.0)
+				check(fa_fish != null and int(fa_fish.character) == int(data.base) and is_equal_approx(fa_fish.body_scale, 1.0),
+						"a is its own fish again here (class %d)" % (fa_fish.character if fa_fish else -1))
+				fish.controls_locked = false
 			"joined":
 				var host_fish := coop.fish_of(100)
 				check(host_fish != null and host_fish.puppet and host_fish in game.players, "the host's fish is a puppet here")

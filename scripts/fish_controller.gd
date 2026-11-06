@@ -467,6 +467,7 @@ var character := FishCharacter.FishClass.SKIRMISHER:
 	set(value):
 		character = value
 		_species = 0  # each class has its own species; set species after (or set_look)
+		_skin = 0
 		if not _setting_look:
 			_apply_character()
 ## Which of the character's species (FishCharacter.SPECIES) its model wears: looks
@@ -479,13 +480,24 @@ var species: int:
 		_species = clampi(value, 0, FishCharacter.species_count(character) - 1)
 		_apply_character()
 var _species := 0
+## Which variant of its species the model wears, where the class has them (the
+## Titans' skins: FishModel.build's skin). Set it after the character, or by set_look.
+var skin: int:
+	get:
+		return _skin
+	set(value):
+		if value != _skin:
+			_skin = maxi(value, 0)
+			_apply_character()
+var _skin := 0
 var _setting_look := false
 
 
 ## Become `fish_class` wearing its species `with_species`, rebuilding the model once.
-func set_look(fish_class: FishCharacter.FishClass, with_species: int) -> void:
+func set_look(fish_class: FishCharacter.FishClass, with_species: int, with_skin := 0) -> void:
 	_setting_look = true
 	character = fish_class
+	_skin = maxi(with_skin, 0)
 	_setting_look = false
 	species = with_species
 ## A box, like Rocket League's car hitboxes: flat on the floor, flat on top to
@@ -579,6 +591,23 @@ var speed_scale := 1.0
 var stride_scale := 1.0
 ## Likewise on the bow wave's length and girth (Unnatural's Bow Grow Bow).
 var bow_scale := 1.0
+## A mode's bigger body (Marco Polo's Titans): the class's hitbox, belly, wheels
+## and centre of mass times body_scale, the model with them. hitbox_scale is a
+## further multiplier on the collision box alone (the tag reach), never the model.
+## Not tuning, so never saved with it.
+var body_scale := 1.0:
+	set(value):
+		body_scale = maxf(value, 0.05)
+		_apply_size()
+var hitbox_scale := 1.0:
+	set(value):
+		hitbox_scale = maxf(value, 0.05)
+		_apply_size()
+## Likewise on the top speed (the cap on speed, boost and strokes), the boost's
+## push, and the thrust, brake and reverse push (a heavy body is slow to get going).
+var top_speed_scale := 1.0
+var boost_scale := 1.0
+var accel_scale := 1.0
 ## Likewise on turning in water (turn rate and spin cap) and on the water's
 ## drag (linear and overspeed): Unnatural's Nimble and Glide twists.
 var turn_scale := 1.0
@@ -780,20 +809,33 @@ func _ready() -> void:
 func _apply_character() -> void:
 	if _collision == null:  # set before _ready; applied there
 		return
-	center_of_mass = FishCharacter.com_from_hitbox(character)
-	_wheels = FishCharacter.wheels(character)
 	if _visual:
 		remove_child(_visual)
 		_visual.queue_free()
-	_visual = FishModel.build(character, _species)
+	_visual = FishModel.build(character, _species, _skin)
 	add_child(_visual)
 	_tail = _visual.tail
 	_fin_left = _visual.fin_left
 	_fin_right = _visual.fin_right
 	_apply_team_color()
+	_apply_size()
+
+
+## The class's hitbox, belly, centre of mass and wheels at body_scale (and the
+## hitbox at hitbox_scale too), without rebuilding the model.
+func _apply_size() -> void:
+	if _collision == null or _visual == null:  # set before _ready; applied there
+		return
+	center_of_mass = FishCharacter.com_from_hitbox(character) * body_scale
+	_wheels = FishCharacter.wheels(character)
+	if body_scale != 1.0:
+		for wheel in _wheels:
+			wheel.mount = (wheel.mount as Vector3) * body_scale
+			wheel.radius = float(wheel.radius) * body_scale
+			wheel.rest = float(wheel.rest) * body_scale
 	# Each setter re-applies the hitbox; the last one sees all of them.
-	var size := FishCharacter.hitbox_size(character)
-	var belly := FishCharacter.belly(character)
+	var size := FishCharacter.hitbox_size(character) * body_scale * hitbox_scale
+	var belly := FishCharacter.belly(character) * body_scale
 	hitbox_width = size.x
 	hitbox_height = size.y
 	hitbox_length = size.z
@@ -845,7 +887,7 @@ func _apply_hitbox() -> void:
 	var belly_centre := Vector3(0.0, -(hitbox_height + belly_height) / 2.0, 0.0)
 	var has_belly := belly_height > 0.0
 	var wheel_radius := belly_height / 2.0
-	var axle_offsets := FishCharacter.axles(character)
+	var axle_offsets := FishCharacter.axles(character) * body_scale
 	var axles := [center_of_mass.z - axle_offsets.x, center_of_mass.z + axle_offsets.y]
 	for i in _wheel_collisions.size():
 		_wheel_collisions[i].disabled = not has_belly or rl_suspension
@@ -858,7 +900,7 @@ func _apply_hitbox() -> void:
 	_belly_hitbox_view.position = belly_centre
 	_belly_hitbox_view.visible = show_hitbox and has_belly
 
-	_visual.scale = size / FishCharacter.hitbox_size(character)  # 1 unless the hitbox was changed by hand
+	_visual.scale = size / (FishCharacter.hitbox_size(character) * hitbox_scale)  # body_scale, unless the hitbox was changed by hand
 	_bubbles.position.z = size.z * 0.6  # just behind the tail
 
 
@@ -1178,7 +1220,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	state.angular_velocity += _ball_twist
 	_ball_push = Vector3.ZERO
 	_ball_twist = Vector3.ZERO
-	state.linear_velocity = state.linear_velocity.limit_length(max_boost_speed)
+	state.linear_velocity = state.linear_velocity.limit_length(max_boost_speed * top_speed_scale)
 	state.angular_velocity = state.angular_velocity.limit_length(spin_cap)
 	physics_tick.emit(state)
 	var dt := state.step
@@ -1296,16 +1338,16 @@ func _apply_thrust(velocity: Vector3, forward: Vector3, dt: float) -> Vector3:
 	if not is_dodging:
 		if input_forward > 0.0 and along < max_speed * speed_scale:
 			var thrust_scale := powerslide_thrust_scale if is_powersliding else 1.0
-			accel += forward_accel * speed_scale * input_forward * thrust_scale
+			accel += forward_accel * speed_scale * accel_scale * input_forward * thrust_scale
 		if input_reverse > 0.0:
 			if along > 0.5:
-				accel -= brake_accel * input_reverse
+				accel -= brake_accel * accel_scale * input_reverse
 			elif -along < max_reverse_speed:
-				accel -= reverse_accel * input_reverse
+				accel -= reverse_accel * accel_scale * input_reverse
 
 	_update_boost(dt)
-	if is_boosting and along < max_boost_speed:
-		accel += boost_accel
+	if is_boosting and along < max_boost_speed * top_speed_scale:
+		accel += boost_accel * boost_scale
 
 	return velocity + forward * accel * dt
 
@@ -1733,7 +1775,7 @@ func bell_axis() -> Vector3:
 func _apply_strokes(velocity: Vector3, direction: Vector3) -> Vector3:
 	var strength := _queued_stroke
 	_queued_stroke = 0.0
-	var room := stroke_max_speed - velocity.dot(direction)
+	var room := stroke_max_speed * top_speed_scale - velocity.dot(direction)
 	if strength <= 0.0 or room <= 0.0:
 		return velocity
 	return velocity + direction * minf(stroke_impulse * strength, room)

@@ -51,6 +51,7 @@ func check(ok: bool, what: String) -> void:
 
 
 func _run() -> void:
+	mp.whale_seeker = false  # the porthole rules are checked with a fish seeker (no auto Marco!)
 	mp.hide_time = 0.3
 	mp.round_time = 120.0
 	mp.round_over_time = 0.3

@@ -117,31 +117,50 @@ func _probe() -> void:
 	await _frames(150)
 	var slow_x := _extent(10.0)
 	var fast_x := _extent(20.0)
-	check(_count(0.0) == 0, "a still hider leaves no ghost")
+	check(_count(0.0) > 20 and _count(0.0) <= _count(10.0), "a still hider leaves a faint body echo (%d cells)" % _count(0.0))
+	var heads := scan.streak_heads(seeker)
+	check(heads.size() == 3, "streak_heads: one per hider answering, none for the porthole one (%d)" % heads.size())
+	var fast_head: Dictionary = {}
+	for h in heads:
+		if absf((h.pos as Vector3).z - 20.0) < 1.0:
+			fast_head = h
+	check(not fast_head.is_empty() and (fast_head.heading as Vector3).dot(Vector3.RIGHT) > 0.9 and float(fast_head.age) < 3.0 and float(fast_head.strength) > 0.5, "the fast hider's head points the way it went")
 	check(_count(10.0) > 20, "a slow hider leaves its shape (%d cells, %.2f m long)" % [_count(10.0), slow_x.y - slow_x.x])
 	check(fast_x.y - fast_x.x > slow_x.y - slow_x.x + 1.5,
 			"a fast hider's streak is longer (%.2f m against %.2f m)" % [fast_x.y - fast_x.x, slow_x.y - slow_x.x])
 	check(_count(30.0) == 0, "a hider in a porthole leaves none")
 	check(scan._ghosts.visible and scan._ghosts.multimesh.visible_instance_count > 0, "the ghosts are drawn in the seeker's view")
+	stub.settings.set("ghost_still_echo", 0.0)
+	slow.global_position.x = 0.0
+	scan.clear()
+	moving[slow] = Vector3(0.8, 0.0, 0.0)
+	stub.marco_scan_started.emit(seeker.global_position, seeker)
+	await _frames(150)
+	check(_count(0.0) == 0, "ghost_still_echo 0: a still hider leaves none (today's behaviour)")
+	stub.settings.set("ghost_still_echo", 0.3)
+	moving.clear()
+	scan.clear()
+	slow.global_position.x = 0.0
+	fast.global_position.x = 0.0
+	moving[slow] = Vector3(0.8, 0.0, 0.0)
+	moving[fast] = Vector3(9.0, 0.0, 0.0)
+	stub.marco_scan_started.emit(seeker.global_position, seeker)
+	await _frames(150)
+	fast_x = _extent(20.0)
 	moving.clear()
 
 	print("fading:")
-	var mid := (fast_x.x + fast_x.y) * 0.5
-	var start_cells := 0
-	var end_cells := 0
-	for i in 600:
+	# A cell lives ghost_fade_min..ghost_fade_max seconds (longer for hotter cells) from its last touch,
+	# so a streak goes as a whole inside that window; which end goes first depends on the heat.
+	var fade_min := float(scan._setting("ghost_fade_min", 3.0))
+	var fade_max := float(scan._setting("ghost_fade_max", 8.0))
+	var gone_at := -1.0
+	for i in 1500:
 		await get_tree().process_frame
-		var found := scan.cells_in(AABB(Vector3(-200.0, -20.0, 17.0), Vector3(400.0, 40.0, 6.0)))
-		start_cells = 0
-		end_cells = 0
-		for at in found:
-			if at.x < mid:
-				start_cells += 1
-			else:
-				end_cells += 1
-		if start_cells < end_cells * 0.5:
+		if scan.cells_in(AABB(Vector3(-200.0, -20.0, 17.0), Vector3(400.0, 40.0, 6.0))).is_empty():
+			gone_at = i / 60.0
 			break
-	check(start_cells < end_cells * 0.5, "a streak's start fades first (%d cells left behind the middle, %d ahead)" % [start_cells, end_cells])
+	check(gone_at > fade_min * 0.8 and gone_at < fade_max + 6.0, "a streak lives its fade window (gone after %.1f s, window %.1f to %.1f s plus the pulse time)" % [gone_at, fade_min, fade_max])
 	await _frames(int(60.0 * (float(scan._setting("ghost_fade_max", 5.0)) + 0.5)))
 	check(scan.cells.is_empty(), "and they all fade out")
 
@@ -187,16 +206,23 @@ func _shots() -> void:
 	add_child(wall)
 	var camera := Camera3D.new()
 	add_child(camera)
-	camera.look_at_from_position(Vector3(1.0, 3.0, -4.5), Vector3(1.0, -0.5, 3.0))
+	camera.look_at_from_position(Vector3(-1.0, 4.0, -7.5), Vector3(-1.0, -0.5, 4.0))
 	camera.current = true
 	var seeker := _spawn(FishCharacter.FishClass.HUNTER, Vector3(-4.0, 1.0, 9.0))
-	var slow := _spawn(FishCharacter.FishClass.BULWARK, Vector3(-1.0, 0.0, 0.0))
-	var fast := _spawn(FishCharacter.FishClass.SKIRMISHER, Vector3(-4.0, 0.0, 4.0))
-	slow.rotation.y = -PI * 0.5
-	fast.rotation.y = -PI * 0.5
-	stub.hiders = [slow, fast]
-	moving[slow] = Vector3(0.6, 0.0, 0.0)
-	moving[fast] = Vector3(10.0, 0.0, 0.0)
+	var slow := _spawn(FishCharacter.FishClass.BULWARK, Vector3(-4.0, 0.0, 0.0))
+	var fast := _spawn(FishCharacter.FishClass.SKIRMISHER, Vector3(-6.0, 0.0, 3.5))
+	var still := _spawn(FishCharacter.FishClass.CHARMER, Vector3(2.0, 0.0, 1.5))
+	var behind := _spawn(FishCharacter.FishClass.SKIRMISHER, Vector3(-6.0, 0.0, 7.5))
+	for f in [slow, fast, behind]:
+		f.rotation.y = -PI * 0.5
+	var big_wall := CSGBox3D.new()
+	big_wall.size = Vector3(5.0, 4.0, 0.5)
+	big_wall.position = Vector3(1.0, 0.5, 5.5)
+	add_child(big_wall)
+	stub.hiders = [slow, fast, still, behind]
+	moving[slow] = Vector3(0.8, 0.0, 0.0)
+	moving[fast] = Vector3(6.0, 0.0, 0.0)
+	moving[behind] = Vector3(4.0, 0.0, 0.0)
 	stub.view_role = MarcoScan.SEEKER
 	await _frames(5)
 	stub.marco_scan_started.emit(seeker.global_position, seeker)
@@ -204,17 +230,24 @@ func _shots() -> void:
 	await _shot("pulse_early")
 	await _frames(14)
 	await _shot("pulse_mid")
-	await _frames(60)
+	await _frames(70)
+	await _shot("streaks_building")
+	await _frames(40)
 	moving.clear()
-	await _frames(10)
-	await _shot("ghosts_fresh")
-	slow.visible = false
-	fast.visible = false
-	await _frames(90)
-	await _shot("ghosts_mid_fade")
-	await _frames(90)
-	await _shot("ghosts_late_fade")
-	print("marco_scan_probe: shots in %s" % ProjectSettings.globalize_path(out_dir))
+	for f in [slow, fast, still, behind]:
+		f.visible = false  # only the streaks stay
+	var window := float(scan._setting("ghost_window", 1.5))
+	# Ages count from when the window closed.
+	var closed := scan.pulses.is_empty() or float(scan.pulses[0].age) > 0.0
+	await _frames(maxi(int((window + 2.0) * 60.0) - 130, 1))
+	await _shot("streaks_age_0s")
+	await _frames(60)
+	await _shot("streaks_age_1s")
+	await _frames(180)
+	await _shot("streaks_age_4s")
+	await _frames(240)
+	await _shot("streaks_age_8s")
+	print("marco_scan_probe: shots in %s (closed %s)" % [ProjectSettings.globalize_path(out_dir), closed])
 
 
 func _shot(shot_name: String) -> void:

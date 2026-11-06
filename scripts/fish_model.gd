@@ -19,10 +19,14 @@ const RAY_SKIN := preload("res://shaders/ray_skin.gdshader")
 const FIN_MEMBRANE := preload("res://shaders/fin_membrane.gdshader")
 const STRIDE_OVERLAY := preload("res://shaders/stride_overlay.gdshader")
 const FISH_EYE := preload("res://shaders/fish_eye.gdshader")
+const TITAN_MODEL := "res://scripts/fish_models/titan_model.gd"
 
 var fish_class := FishCharacter.FishClass.SKIRMISHER
 ## Which of the class's species it wears (FishCharacter.SPECIES).
 var species := 0
+## Which variant of its species it wears, where the class has them (the
+## Titans' skins, TitanModel's SKINS; 0 the species' own look).
+var skin := 0
 var tail: Node3D
 var fin_left: Node3D
 var fin_right: Node3D
@@ -132,13 +136,60 @@ var _bell_pulses: Array[ShaderMaterial] = []
 ## (the jelly's oral arms) rather than beating with strides (FishController).
 var trails_tail := false
 
+## A Titan's fluke power stroke (planning_marco_whales.md §7): sent once per
+## down-stroke, as the flukes reach their fastest, with its `strength` (0..1,
+## Gait.power_stroke_speed counts as 1) and where the flukes are (`at`, world
+## space; -Z its forward). The wake push, the water FX and the whomp listen.
+signal power_stroke(strength: float, at: Transform3D)
+## The Titans' motion (_titan_swim; TitanModel sets it): the swim's fluke beat
+## reshaped into a fast power stroke and a slow recovery, then passed down a
+## chain of joints (Gait.bend_segments) so it travels down the body as a wave
+## and reaches the flukes last; the head pitches against it, the body surges on
+## each power stroke, the flippers trim and the body banks in turns. Its values
+## are the class's Gait's Titan-only ones.
+var titan_motion := false
+## How far in front of the bend the head's counter-bend reaches (m), and the
+## flipper trim nodes (left, right) between the fin pivots and the flippers.
+var head_span := 0.0
+var trims: Array[Node3D] = []
+var _segments := 1
+var _bend_turns: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]
+var _bend_head := Vector3.ZERO
+var _surge := 0.0
+var _surge_speed := 0.0
+var _fluke_shaped := 0.0
+var _fluke_drive := 0.0
+var _fluke_written := INF
+var _titan_tail_seen := Vector3.ZERO
+var _joints := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _fluke_speed := 0.0
+## The shaped beat's recent past, one sample per WAVE_STEP s, newest last:
+## each joint reads it bend_lag later than the one in front.
+var _wave := PackedFloat32Array()
+var _wave_clock := 0.0
+const WAVE_STEP := 0.01
+const WAVE_SAMPLES := 200
+var _stroke_peak := 0.0
+var _stroke_sent := false
+var _turn_rate := 0.0
+var _titan_bank := 0.0
+var _titan_bank_speed := 0.0
+var _last_frame := Basis.IDENTITY
+var _last_frame_set := false
+var _titan_default_gait: Gait
 
-static func build(character: FishCharacter.FishClass, species := 0) -> FishModel:
+
+static func build(character: FishCharacter.FishClass, species := 0, skin := 0) -> FishModel:
 	var model := FishModel.new()
 	model.name = "Visual"
 	model.fish_class = character
 	model.species = clampi(species, 0, FishCharacter.species_count(character) - 1)
+	model.skin = maxi(skin, 0)
 	model._size = FishCharacter.hitbox_size(character)
+	# The Titans (adult whales) load by path: titan_model.gd has no class_name.
+	if int(character) == int(FishCharacter.FishClass.get("TITAN", -1)):
+		(load(TITAN_MODEL) as GDScript).build(model)
+		return model
 	match character:
 		FishCharacter.FishClass.SKIRMISHER:
 			ClownfishModel.build(model)
@@ -172,6 +223,8 @@ static func build(character: FishCharacter.FishClass, species := 0) -> FishModel
 ## edge it's moving toward stays put and the trailing side does the stretching
 ## (the bottom, when it isn't moving up or down, so it squashes onto the floor).
 func react(delta: float, velocity: Vector3) -> void:
+	if titan_motion:
+		_titan_swim(delta)
 	apply_bend()
 	if not _bell_pulses.is_empty():
 		# Built bell-first along -Z: upright is a quarter turn nose-up.
@@ -535,9 +588,22 @@ func bend_rider(at: Vector3) -> Node3D:
 func apply_bend() -> void:
 	if _bend_span.y <= _bend_span.x or tail == null:
 		return
-	_bend_turn = Vector3(tail.rotation.x, tail.rotation.y, 0.0) * bend_share
-	for part in _bent:
-		part.set_instance_shader_parameter("bend_turn", _bend_turn)
+	if titan_motion:
+		# _titan_swim set each joint's turn, the head's and the surge; if the
+		# tail was turned by hand since, the body takes that pose as it stands.
+		if not tail.rotation.is_equal_approx(_titan_tail_seen):
+			_titan_pose(tail.rotation.x, tail.rotation.y)
+		_bend_turn = _bend_turns[0]
+		for part in _bent:
+			part.set_instance_shader_parameter("bend_turn", _bend_turns[0])
+			part.set_instance_shader_parameter("bend_turn2", _bend_turns[1])
+			part.set_instance_shader_parameter("bend_turn3", _bend_turns[2])
+			part.set_instance_shader_parameter("bend_head", Vector4(_bend_head.x, _bend_head.y, _bend_head.z, _surge))
+			part.set_instance_shader_parameter("bend_shape", Vector2(_segments, head_span))
+	else:
+		_bend_turn = Vector3(tail.rotation.x, tail.rotation.y, 0.0) * bend_share
+		for part in _bent:
+			part.set_instance_shader_parameter("bend_turn", _bend_turn)
 	tail.position = bend_point(_tail_rest)
 	for i in _riders.size():
 		var rest := _rider_rest[i]
@@ -554,6 +620,8 @@ func bend_point(at: Vector3) -> Vector3:
 ## The bend's turn and move at `at` (model space, at rest): the slice there
 ## turns with the spine; in front of the bend, nothing moves.
 func bend_transform(at: Vector3) -> Transform3D:
+	if titan_motion:
+		return _chain_transform(at)
 	var span := _bend_span.y - _bend_span.x
 	var angle := _bend_turn.length()
 	if span <= 0.0 or angle < 1e-5 or at.z <= _bend_span.x:
@@ -566,6 +634,186 @@ func bend_transform(at: Vector3) -> Transform3D:
 	var spine := Vector3(0.0, 0.0, _bend_span.x + sin(turn) / curve) + side * (1.0 - cos(turn)) / curve
 	var turned := Basis(axis, turn)
 	return Transform3D(turned, spine + turned * Vector3(at.x, at.y, at.z - _bend_span.x - s))
+
+
+## bend_transform for a Titan: the chain of arcs behind the bend's start, the
+## head's counter-bend in front of it, the surge (fish_bend.gdshaderinc's Titan
+## branch does the same sum; keep in step).
+func _chain_transform(at: Vector3) -> Transform3D:
+	var start := Vector3(0.0, 0.0, _bend_span.x)
+	var span := _bend_span.y - _bend_span.x
+	var result := Transform3D(Basis.IDENTITY, at)
+	if at.z > _bend_span.x and span > 0.0:
+		var seg := span / _segments
+		var s_all := minf(at.z - _bend_span.x, span)
+		var spine := start
+		var turned := Basis.IDENTITY
+		for j in _segments:
+			var s := clampf(s_all - j * seg, 0.0, seg)
+			if s <= 0.0:
+				break
+			var arc := _arc(_bend_turns[j], seg, s, Vector3.BACK)
+			spine += turned * (arc[0] as Vector3)
+			turned = turned * (arc[1] as Basis)
+		result = Transform3D(turned, spine + turned * Vector3(at.x, at.y, at.z - _bend_span.x - s_all))
+	elif at.z < _bend_span.x and head_span > 0.0:
+		var s := minf(_bend_span.x - at.z, head_span)
+		var arc := _arc(_bend_head, head_span, s, Vector3.FORWARD)
+		var turned: Basis = arc[1]
+		result = Transform3D(turned, start + (arc[0] as Vector3) + turned * Vector3(at.x, at.y, at.z - _bend_span.x + s))
+	result.origin.z -= _surge
+	return result
+
+
+## One arc of the chain: `s` m into an arc `length` m long turning by rotation
+## vector `turn` overall, heading along `heading`: [how far its spine has come,
+## how it has turned].
+static func _arc(turn: Vector3, length: float, s: float, heading: Vector3) -> Array:
+	var angle := turn.length()
+	if angle < 1e-5 or length <= 0.0:
+		return [heading * s, Basis.IDENTITY]
+	var axis := turn / angle
+	var turned := angle * s / length
+	var curve := angle / length
+	return [heading * sin(turned) / curve + axis.cross(heading) * (1.0 - cos(turned)) / curve, Basis(axis, turned)]
+
+
+## The Titans' motion (titan_motion): reads the swim's fluke beat (the tail
+## pivot's pitch, as the swim set it this frame) and turns it into the body's
+## wave, the flukes' lagging beat, the head's counter-pitch, the surge, the
+## flipper trim and the bank; sends power_stroke on each down-stroke.
+func _titan_swim(delta: float) -> void:
+	if delta <= 0.0 or tail == null:
+		return
+	var gait := _titan_gait()
+	_segments = clampi(gait.bend_segments, 1, 3)
+	var length := _size.z
+	# Power and recovery: the beat followed quickly down, slowly back up. The
+	# swim sets the tail's pitch each frame and this replaces it with the
+	# flukes' own; if nothing set it since, the last beat holds.
+	if not is_equal_approx(tail.rotation.x, _fluke_written):
+		_fluke_drive = tail.rotation.x
+	var drive := _fluke_drive * gait.fluke_amplitude
+	var follow := gait.fluke_snap
+	if drive < _fluke_shaped:
+		follow /= maxf(gait.fluke_power_ratio, 0.1)
+	var was := _fluke_shaped
+	_fluke_shaped = lerpf(_fluke_shaped, drive, 1.0 - exp(-follow * delta))
+	# The wave: the shaped beat travels down the body, each joint taking it
+	# bend_lag after the one in front and the flukes last (a delay, so the beat
+	# keeps its size all the way down).
+	if _wave.is_empty():
+		_wave.resize(WAVE_SAMPLES)
+		_wave.fill(_fluke_shaped)
+	var since := _wave_clock
+	_wave_clock += delta
+	while _wave_clock >= WAVE_STEP:
+		_wave_clock -= WAVE_STEP
+		var t := clampf((WAVE_STEP - since) / delta, 0.0, 1.0) if delta > 0.0 else 1.0
+		since -= WAVE_STEP
+		_wave.remove_at(0)
+		_wave.append(lerpf(was, _fluke_shaped, t))
+	var lag := maxf(gait.bend_lag, 0.0)
+	var fluke_was := _joints[_segments]
+	for j in _segments + 1:
+		_joints[j] = _wave_at(j * lag)
+	_fluke_speed = (_joints[_segments] - fluke_was) / delta
+	# The bend grows toward the tail: each joint's share of it rises with its
+	# place (1, 4, 9).
+	var weights := 0.0
+	for j in _segments:
+		weights += (j + 1) * (j + 1)
+	var pitch := 0.0
+	var yaw := tail.rotation.y * bend_share
+	for j in 3:
+		if j >= _segments:
+			_bend_turns[j] = Vector3.ZERO
+			continue
+		var share := (j + 1) * (j + 1) / weights
+		_bend_turns[j] = Vector3(_joints[j] * bend_share * share, yaw * share, 0.0)
+		pitch += _bend_turns[j].x
+	var fluke := _joints[_segments]
+	tail.rotation.x = fluke
+	_fluke_written = tail.rotation.x
+	_titan_tail_seen = tail.rotation
+	# The head pitches against the body's bend.
+	_bend_head = Vector3(gait.head_counter * pitch, 0.0, 0.0)
+	# The power stroke: once per down-stroke, as the flukes reach their fastest.
+	var speed := _fluke_speed
+	if speed > 0.0:
+		if speed > _stroke_peak:
+			_stroke_peak = speed
+		elif not _stroke_sent and _stroke_peak > gait.power_stroke_speed * 0.15 and speed < _stroke_peak * 0.95:
+			_stroke_sent = true
+			var strength := clampf(_stroke_peak / maxf(gait.power_stroke_speed, 0.01), 0.0, 1.0)
+			_surge_speed += strength * gait.body_surge * length * 12.0
+			if is_inside_tree():
+				power_stroke.emit(strength, tail.global_transform)
+	else:
+		_stroke_peak = 0.0
+		_stroke_sent = false
+	# The surge springs back.
+	var surge_rate := 6.0
+	_surge_speed += (-surge_rate * surge_rate * _surge - 2.0 * surge_rate * _surge_speed) * delta
+	_surge += _surge_speed * delta
+	# Turning: how fast the fish yaws (its own bank aside), smoothed.
+	var parent := get_parent_node_3d()
+	if parent and is_inside_tree():
+		var frame := parent.global_basis.orthonormalized()
+		if _last_frame_set:
+			var turned := (_last_frame.inverse() * frame).get_euler().y
+			if absf(turned) < 0.5:
+				_turn_rate = lerpf(_turn_rate, turned / delta, 1.0 - exp(-4.0 * delta))
+		_last_frame = frame
+		_last_frame_set = true
+	var turning := clampf(_turn_rate * 0.6, -1.0, 1.0)
+	# A slow, heavy bank into the turn.
+	var bank_rate := 3.0
+	_titan_bank_speed += ((turning * gait.turn_bank - _titan_bank) * bank_rate * bank_rate - 2.0 * bank_rate * _titan_bank_speed) * delta
+	_titan_bank += _titan_bank_speed * delta
+	rotation.z = _titan_bank
+	# The flippers: held level against the body's pitch, out and banked into
+	# turns (the inside one down).
+	for i in trims.size():
+		trims[i].rotation = Vector3(-0.6 * pitch, 0.0, 0.45 * turning) * gait.flipper_trim
+
+
+## A Titan posed from its tail pivot as it stands (turned by hand, without
+## react()): the pitch and yaw shared down the joints, the head countering, no
+## wave or surge.
+func _titan_pose(pitch: float, yaw: float) -> void:
+	var gait := _titan_gait()
+	_segments = clampi(gait.bend_segments, 1, 3)
+	var weights := 0.0
+	for j in _segments:
+		weights += (j + 1) * (j + 1)
+	for j in 3:
+		var share := (j + 1) * (j + 1) / weights if j < _segments else 0.0
+		_bend_turns[j] = Vector3(pitch, yaw, 0.0) * bend_share * share
+	_bend_head = Vector3(gait.head_counter * pitch * bend_share, 0.0, 0.0)
+	_surge = 0.0
+	_surge_speed = 0.0
+	_titan_tail_seen = tail.rotation
+
+
+## The shaped fluke beat as it was `delay` s ago (_wave).
+func _wave_at(delay: float) -> float:
+	var newest := _wave[WAVE_SAMPLES - 1]
+	if delay <= _wave_clock:
+		return lerpf(_fluke_shaped, newest, delay / maxf(_wave_clock, 1e-6))
+	var back := minf((delay - _wave_clock) / WAVE_STEP, WAVE_SAMPLES - 1.001)
+	var i := WAVE_SAMPLES - 1 - int(back)
+	return lerpf(_wave[i], _wave[i - 1], back - floorf(back))
+
+
+## The Gait a Titan's motion reads: the one the swim gave it, or the class's
+## defaults (model shots, schools, replays without one).
+func _titan_gait() -> Gait:
+	if bell_gait:
+		return bell_gait
+	if _titan_default_gait == null:
+		_titan_default_gait = GaitSettings.default_for(fish_class)
+	return _titan_default_gait
 
 
 ## Whether `part` bends with the body (bend_part).

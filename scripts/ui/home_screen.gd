@@ -622,7 +622,7 @@ func _detail_text(text: String) -> Label:
 
 ## The next (+1) or previous (-1) fish.
 func _cycle_fish(direction: int) -> void:
-	var fish_classes := FishCharacter.CLASSES.keys()
+	var fish_classes := FishCharacter.pickable_classes()
 	var at := fish_classes.find(_character())
 	var next: FishCharacter.FishClass = fish_classes[posmod(at + direction, fish_classes.size())]
 	character_changed.emit(next)

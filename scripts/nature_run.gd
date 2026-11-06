@@ -433,7 +433,8 @@ func _add_school(around: Transform3D, first: bool) -> void:
 		var distance := rng.randf_range(settings.spawn_distance_min, maxf(settings.spawn_distance_min, settings.spawn_distance_max))
 		at = _hidden_point(around.origin, distance)
 	var heading := Vector3(rng.randf_range(-1.0, 1.0), 0.0, rng.randf_range(-1.0, 1.0)).normalized()
-	var kind: FishCharacter.FishClass = FishCharacter.CLASSES.keys()[rng.randi_range(0, FishCharacter.CLASSES.size() - 1)]
+	var kinds := FishCharacter.pickable_classes()
+	var kind: FishCharacter.FishClass = kinds[rng.randi_range(0, kinds.size() - 1)]
 	var school := spawn_school(_next_school_id, rng.randi() & 0x7fffffff, kind, at, heading)
 	_next_school_id += 1
 	school_spawned.emit(school, at, heading)

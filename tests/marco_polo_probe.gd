@@ -40,6 +40,7 @@ func check(ok: bool, what: String) -> void:
 
 
 func _run() -> void:
+	mp.whale_seeker = false  # this probe is the fish seeker's rules; whale_spike_probe and whale_sight_probe have the whale's
 	mp.arena = "Ocean"
 	mp.hide_time = 0.5
 	mp.round_time = 60.0

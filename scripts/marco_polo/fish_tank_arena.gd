@@ -19,6 +19,8 @@ extends MarcoArena
 
 ## The back panel's cells (m): it's built in rows this tall, holes in cells this wide.
 const CELL := 4.0
+## How far the gravel and pebbles are calmed toward grey (0 shop colours, 1 grey-green).
+const GRAVEL_CALM := 0.8
 const PANEL_THICK := 1.5
 const HOLE_RADIUS := 0.8
 ## The chest: shut this long, then open (burping) this long (s).
@@ -115,12 +117,19 @@ func _build_floor() -> void:
 		var at := Vector3(_dice.randf_range(-size.x * 0.5, size.x * 0.5), s * 0.15, _dice.randf_range(-size.z * 0.5, size.z * 0.5))
 		var basis := Basis(Vector3.UP, _dice.randf() * TAU).scaled(Vector3(s, s * 0.6, s * 0.85))
 		multimesh.set_instance_transform(i, Transform3D(basis, at))
-		multimesh.set_instance_color(i, (colours[_dice.randi() % colours.size()] as Color) * _dice.randf_range(0.7, 1.05))
+		multimesh.set_instance_color(i, _calm(colours[_dice.randi() % colours.size()] as Color) * _dice.randf_range(0.7, 1.05))
 	var view := MultiMeshInstance3D.new()
 	view.multimesh = multimesh
 	view.material_override = material
 	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(view)
+
+
+## The shop-gravel colours toned down to match the shader's calm (loud pebbles are noise
+## at a whale's distance, and its floor silt shows the floor off).
+func _calm(colour: Color) -> Color:
+	var grey := colour.get_luminance()
+	return Color(grey, grey, grey).lerp(colour, 1.0 - GRAVEL_CALM * 0.7) * lerpf(1.0, 0.72, GRAVEL_CALM)
 
 
 ## Glass at the front and sides, a black frame round it, and the room beyond.
@@ -141,15 +150,15 @@ func _build_glass() -> void:
 		var quad := QuadMesh.new()
 		quad.size = Vector2(pane[2], height)
 		var inward: Vector3 = pane[1]
-		add_visual(quad, Transform3D(Basis.looking_at(-inward, Vector3.UP), pane[0]), glass)
+		tag_shell(add_visual(quad, Transform3D(Basis.looking_at(-inward, Vector3.UP), pane[0]), glass), -inward)
 	# The frame: black trim along every edge.
 	for x: float in [-half.x, half.x]:
 		for z: float in [-half.z, half.z]:
 			_trim(Vector3(x, height * 0.5, z), Vector3(1.2, height + 1.0, 1.2))
 	for y: float in [0.0, height]:
-		_trim(Vector3(0.0, y, half.z), Vector3(size.x + 1.2, 1.4, 1.2))
-		_trim(Vector3(half.x, y, 0.0), Vector3(1.2, 1.4, size.z + 1.2))
-		_trim(Vector3(-half.x, y, 0.0), Vector3(1.2, 1.4, size.z + 1.2))
+		_trim(Vector3(0.0, y, half.z), Vector3(size.x + 1.2, 1.4, 1.2), Vector3.BACK)
+		_trim(Vector3(half.x, y, 0.0), Vector3(1.2, 1.4, size.z + 1.2), Vector3.RIGHT)
+		_trim(Vector3(-half.x, y, 0.0), Vector3(1.2, 1.4, size.z + 1.2), Vector3.LEFT)
 	# The living room, out of focus.
 	var room := ShaderMaterial.new()
 	room.shader = preload("res://shaders/marco_living_room.gdshader")
@@ -165,10 +174,12 @@ func _build_glass() -> void:
 		add_visual(quad, Transform3D(Basis.looking_at(-inward, Vector3.UP), wall[0]), material)
 
 
-func _trim(at: Vector3, box: Vector3) -> void:
+func _trim(at: Vector3, box: Vector3, outward := Vector3.ZERO) -> void:
 	var mesh := BoxMesh.new()
 	mesh.size = box
-	add_visual(mesh, Transform3D(Basis(), at), _plastic)
+	var view := add_visual(mesh, Transform3D(Basis(), at), _plastic)
+	if outward != Vector3.ZERO:
+		tag_shell(view, outward)
 
 
 ## The filter box's back panel: black plastic in rows, round holes in some cells.
@@ -191,9 +202,9 @@ func _build_back_panel() -> void:
 			if b - a > 0.05:
 				var mesh := BoxMesh.new()
 				mesh.size = Vector3(b - a, CELL, PANEL_THICK)
-				add_visual(mesh, Transform3D(Basis(), Vector3((a + b) * 0.5, y0 + CELL * 0.5, z)), _plastic)
+				tag_shell(add_visual(mesh, Transform3D(Basis(), Vector3((a + b) * 0.5, y0 + CELL * 0.5, z)), _plastic), Vector3.FORWARD)
 			if x < size.x * 0.5:
-				add_visual(hole_mesh, Transform3D(Basis(), Vector3(x, y0, z)), null)
+				tag_shell(add_visual(hole_mesh, Transform3D(Basis(), Vector3(x, y0, z)), null), Vector3.FORWARD)
 			a = x + CELL * 0.5
 	for hole: Vector2 in PANEL_HOLES:
 		add_porthole(Vector3(hole.x, hole.y, -size.z * 0.5), Vector3.BACK, HOLE_RADIUS, Porthole.Look.ROUND, _plastic)
@@ -203,7 +214,7 @@ func _build_back_panel() -> void:
 func _build_hood() -> void:
 	var hood := BoxMesh.new()
 	hood.size = Vector3(size.x + 2.0, 2.5, size.z + 2.0)
-	add_visual(hood, Transform3D(Basis(), Vector3(0.0, size.y + 4.5, 0.0)), _plastic)
+	tag_shell(add_visual(hood, Transform3D(Basis(), Vector3(0.0, size.y + 4.5, 0.0)), _plastic), Vector3.UP)
 	var strip := BoxMesh.new()
 	strip.size = Vector3(size.x - 6.0, 0.2, 3.0)
 	var lit := StandardMaterial3D.new()
@@ -211,7 +222,7 @@ func _build_hood() -> void:
 	lit.emission_enabled = true
 	lit.emission = Color(0.85, 1.0, 0.85)
 	lit.emission_energy_multiplier = 3.0
-	add_visual(strip, Transform3D(Basis(), Vector3(0.0, size.y + 3.2, -4.0)), lit)
+	tag_shell(add_visual(strip, Transform3D(Basis(), Vector3(0.0, size.y + 3.2, -4.0)), lit), Vector3.UP)
 	for x: float in [-26.0, 0.0, 26.0]:
 		var lamp := SpotLight3D.new()
 		lamp.light_color = Color(0.85, 1.0, 0.8)
@@ -231,7 +242,7 @@ func _build_hood() -> void:
 	water.roughness = 0.1
 	water.emission_enabled = true
 	water.emission = Color(0.2, 0.3, 0.22)
-	add_visual(surface, Transform3D(Basis(), Vector3(0.0, size.y, 0.0)), water)
+	tag_shell(add_visual(surface, Transform3D(Basis(), Vector3(0.0, size.y, 0.0)), water), Vector3.UP)
 
 
 # --- Furniture ---------------------------------------------------------------------------
@@ -486,6 +497,9 @@ func _build_bridge() -> void:
 		shapes.append([box_shape(Vector3(p0.distance_to(p1) + 0.1, 0.8, 4.0)), Transform3D(Basis(Vector3.BACK, slope), mid + Vector3.UP * 0.3)])
 	add_solid(mesh, Transform3D(Basis(Vector3.UP, 0.15), at), shapes, null)
 	add_outline_rect(Vector2(at.x, at.z), Vector2(length, 4.0), -0.15)
+	# The two low ends of the arch: a whale can't get under them, so they're hideaways.
+	add_hideaway_spot("Under the bridge (west)", at + Vector3(-5.0, 1.0, 1.0), 3.5)
+	add_hideaway_spot("Under the bridge (east)", at + Vector3(5.0, 1.0, -1.0), 3.5)
 
 
 func _build_rocks() -> void:

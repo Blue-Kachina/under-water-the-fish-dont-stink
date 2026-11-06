@@ -18,6 +18,9 @@ extends Node
 const REVEAL_SHADER := preload("res://shaders/marco_reveal.gdshader")
 const AURA_SHADER := preload("res://shaders/marco_aura.gdshader")
 const SKETCH_SHADER := preload("res://shaders/marco_sketch.gdshader")
+const TITAN_VIEW_PATH := "res://scripts/marco_polo/titan_view.gd"
+const WAKE_FX_PATH := "res://scripts/marco_polo/titan_wake_fx.gd"
+const PICK_CARD_PATH := "res://scripts/marco_polo/whale_pick_card.gd"
 ## MarcoPoloMatch.Role.SEEKER (Role { HIDER, SEEKER }).
 const SEEKER := 1
 ## Copied once from a real material onto its reveal one, when the real has them.
@@ -36,6 +39,12 @@ var self_fish: FishController
 var _looks := {}  # FishController -> Reveal
 ## The "Marco!" scan pulse and its ghosts (made in bind).
 var scan: MarcoScan
+## The local whale seeker's thicker murk (scripts/marco_polo/titan_view.gd, loaded by path).
+var titan_view: Node
+## The whale pick card (whale_pick_card.gd, loaded by path).
+var pick_card: Node
+## The water a whale's tail pushes (titan_wake_fx.gd, loaded by path).
+var wake_fx: Node
 
 
 ## Hooks the looks to a MarcoPoloMatch (typed as Node so this parses on its own).
@@ -47,6 +56,27 @@ func bind(mp_match: Node) -> void:
 		scan = MarcoScan.new()
 		add_child(scan)
 	scan.bind(mp_match)
+	if titan_view == null and ResourceLoader.exists(TITAN_VIEW_PATH):
+		var script := load(TITAN_VIEW_PATH) as GDScript
+		if script and script.can_instantiate():
+			titan_view = script.new() as Node
+			titan_view.name = "TitanView"
+			add_child(titan_view)
+			titan_view.call("bind", mp_match)
+	if wake_fx == null and ResourceLoader.exists(WAKE_FX_PATH):
+		var fx_script := load(WAKE_FX_PATH) as GDScript
+		if fx_script and fx_script.can_instantiate():
+			wake_fx = fx_script.new() as Node
+			wake_fx.name = "TitanWakeFx"
+			add_child(wake_fx)
+			wake_fx.call("bind", mp_match)
+	if pick_card == null and ResourceLoader.exists(PICK_CARD_PATH):
+		var card_script := load(PICK_CARD_PATH) as GDScript
+		if card_script and card_script.can_instantiate():
+			pick_card = card_script.new() as Node
+			pick_card.name = "WhalePickCard"
+			add_child(pick_card)
+			pick_card.call("bind", mp_match)
 	# Polled every frame too; the signals just make a swap land on the frame it happens.
 	for entry: Dictionary in mp_match.get_signal_list():
 		if entry.name in ["local_role_changed", "role_changed", "round_started", "spectate_target_changed", "eliminated_fish"]:

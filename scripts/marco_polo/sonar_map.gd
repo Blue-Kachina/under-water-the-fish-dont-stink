@@ -74,6 +74,18 @@ func _setting(setting: String, fallback: Variant) -> Variant:
 	return fallback
 
 
+## The local seeker's streak heads from the scan (see MarcoScan.streak_heads), or [].
+func streak_heads() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if not is_instance_valid(match_node) or not match_node.has_meta("marco_scan"):
+		return out
+	var scan: Variant = match_node.get_meta("marco_scan")
+	var me: Variant = _call("local_fish", [], null)
+	if scan is MarcoScan and is_instance_valid(scan) and me is Node:
+		return (scan as MarcoScan).streak_heads(me as Node)
+	return out
+
+
 func arena() -> Node:
 	var at: Variant = match_node.get("arena") if is_instance_valid(match_node) else null
 	return at as Node if at is Node and is_instance_valid(at) else null
@@ -159,6 +171,7 @@ class Marks extends Control:
 			_draw_sweep()
 			_draw_fizz()
 			_draw_blips()
+			_draw_streaks()
 			_draw_seekers(true)
 		else:
 			_draw_portholes()
@@ -243,6 +256,33 @@ class Marks extends Control:
 				draw_arc(spot, r + 4.0, 0.0, TAU, 20, Color(tint, tint.a * 0.8), 1.5, true)
 			if age < 0.4:
 				draw_arc(spot, r + age * 40.0, 0.0, TAU, 20, Color(tint, 0.6 * (1.0 - age / 0.4)), 1.5, true)
+
+	## The local seeker's streak heads (MarcoScan.streak_heads): a blue diamond with
+	## a tick the way the hider went, fading over ghost_scope_blip s, so the map
+	## and the world agree.
+	func _draw_streaks() -> void:
+		var life := float(map._setting("ghost_scope_blip", 3.0))
+		var strength := float(map._setting("ghost_scope_strength", 1.0))
+		if life <= 0.0 or strength <= 0.0:
+			return
+		for head: Dictionary in map.streak_heads():
+			var age := float(head.age)
+			if age > life:
+				continue
+			var spot := map.to_map(head.pos as Vector3)
+			if not map.on_map(spot, 3.0):
+				continue
+			var fade := clampf(1.0 - age / life, 0.0, 1.0) * strength
+			var tint := Color(0.45, 0.72, 1.0, clampf(fade, 0.0, 1.0))
+			var r := lerpf(3.0, 6.0, float(head.strength))
+			draw_circle(spot, r * 1.8, Color(tint, tint.a * 0.2))
+			var diamond := PackedVector2Array([spot + Vector2(0, -r), spot + Vector2(r, 0), spot + Vector2(0, r), spot + Vector2(-r, 0)])
+			draw_colored_polygon(diamond, tint)
+			var heading: Vector3 = head.heading
+			if heading.length() > 0.1:
+				var ahead := map.to_map((head.pos as Vector3) + heading * 3.0) - spot
+				if ahead.length() > 0.1:
+					draw_line(spot, spot + ahead.normalized() * (r + 6.0), Color(0.9, 0.97, 1.0, tint.a), 1.5, true)
 
 	## The seekers: arrows (on the scope, the others in Join the Seekers and you
 	## in the middle); on a hider's map, a ring round one who just called Marco.

@@ -685,7 +685,7 @@ func _build_game_options() -> void:
 			"game/character":
 				meta["kind"] = "enum"
 				var choices := []
-				for fish_class: FishCharacter.FishClass in FishCharacter.CLASSES:
+				for fish_class: FishCharacter.FishClass in FishCharacter.pickable_classes():
 					choices.append([FishCharacter.display_name(fish_class), fish_class])
 				meta["choices"] = choices
 			"game/species":

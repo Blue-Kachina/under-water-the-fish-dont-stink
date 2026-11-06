@@ -21,6 +21,11 @@ const SEEKER_START_GROUP := &"mp_seeker_start"
 const PORTHOLE_GROUP := &"mp_porthole"
 ## The murk's sight distance is where this much of a lit fish's colour is left.
 const SIGHT_LEFT := 0.05
+## The arena is in this group while it lets the follow cam sit outside its walls
+## (FollowCamera.wall_cutaway): see shell_rids() and cut_away().
+const CUTAWAY_GROUP := &"camera_cutaway"
+## How far past a wall's inner face the camera has to be before that wall is hidden (m).
+const CUTAWAY_PAST := 0.05
 
 ## The water's inside: x across, y up from the floor, z along.
 var size := Vector3(90.0, 30.0, 70.0)
@@ -36,14 +41,27 @@ var _env: Environment
 ## What configure_environment() changed, to put back: property -> value.
 var _saved := {}
 var _portholes: Array[Porthole] = []
+## Spaces a hider can reach and the whale cannot, placed on purpose (planning_marco_whales.md
+## §8): {name, position (local), radius (m)}. The match turns each into a Hideaway volume
+## (porthole-style rules: limited occupancy, Stale Water, a noisy exit); whale_reach_probe
+## counts a pocket near one as allowed.
+var _hideaway_spots: Array[Dictionary] = []
 var _curtains: Array[BubbleCurtain] = []
 var _outlines: Array[PackedVector2Array] = []
 var _hider_spawns: Array[Transform3D] = []
 var _seeker_start := Transform3D.IDENTITY
+## The wall and ceiling visuals by the way they face out (Vector3.RIGHT, LEFT, BACK, FORWARD, UP),
+## and the sides hidden now (see cut_away).
+var _shell_pieces := {}
+var _cut_sides: Array[Vector3] = []
+var _shell_bodies: Array[RID] = []
 
 
 func _ready() -> void:
+	add_to_group(CUTAWAY_GROUP)
 	_build()
+
+
 
 
 ## Builds the arena (each arena's own).
@@ -85,6 +103,7 @@ func fog_base() -> Array:
 
 
 func _exit_tree() -> void:
+	cut_away(global_position, false)
 	if _env:
 		for property: String in _saved:
 			_env.set(property, _saved[property])
@@ -103,6 +122,19 @@ func hider_spawns() -> Array[Transform3D]:
 ## Where the seeker counts, facing away from where the hiders scatter (world).
 func seeker_start() -> Transform3D:
 	return global_transform * _seeker_start
+
+
+## Marks a hideaway at `at` (local to the arena), `radius` m round it.
+func add_hideaway_spot(spot_name: String, at: Vector3, radius: float) -> void:
+	_hideaway_spots.append({"name": spot_name, "position": at, "radius": radius})
+
+
+## The hideaway spots in world space: [{name, position, radius}].
+func hideaway_spots() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for spot in _hideaway_spots:
+		out.append({"name": spot.name, "position": global_transform * (spot.position as Vector3), "radius": spot.radius})
+	return out
 
 
 func portholes() -> Array[Porthole]:
@@ -257,12 +289,55 @@ func add_multimesh(mesh: Mesh, transforms: Array[Transform3D], material: Materia
 func add_shell_colliders(thick := 2.0) -> void:
 	var half := size * 0.5
 	add_box_collider(Transform3D(Basis(), Vector3(0.0, -thick * 0.5, 0.0)), Vector3(size.x + thick * 2.0, thick, size.z + thick * 2.0))
-	add_box_collider(Transform3D(Basis(), Vector3(0.0, size.y + thick * 0.5, 0.0)), Vector3(size.x + thick * 2.0, thick, size.z + thick * 2.0))
-	add_box_collider(Transform3D(Basis(), Vector3(half.x + thick * 0.5, half.y, 0.0)), Vector3(thick, size.y, size.z))
-	add_box_collider(Transform3D(Basis(), Vector3(-half.x - thick * 0.5, half.y, 0.0)), Vector3(thick, size.y, size.z))
-	add_box_collider(Transform3D(Basis(), Vector3(0.0, half.y, half.z + thick * 0.5)), Vector3(size.x, size.y, thick))
-	add_box_collider(Transform3D(Basis(), Vector3(0.0, half.y, -half.z - thick * 0.5)), Vector3(size.x, size.y, thick))
+	# The ceiling and the walls are what the follow cam can go out through (not the floor).
+	_shell_bodies.append(add_box_collider(Transform3D(Basis(), Vector3(0.0, size.y + thick * 0.5, 0.0)), Vector3(size.x + thick * 2.0, thick, size.z + thick * 2.0)).get_rid())
+	_shell_bodies.append(add_box_collider(Transform3D(Basis(), Vector3(half.x + thick * 0.5, half.y, 0.0)), Vector3(thick, size.y, size.z)).get_rid())
+	_shell_bodies.append(add_box_collider(Transform3D(Basis(), Vector3(-half.x - thick * 0.5, half.y, 0.0)), Vector3(thick, size.y, size.z)).get_rid())
+	_shell_bodies.append(add_box_collider(Transform3D(Basis(), Vector3(0.0, half.y, half.z + thick * 0.5)), Vector3(size.x, size.y, thick)).get_rid())
+	_shell_bodies.append(add_box_collider(Transform3D(Basis(), Vector3(0.0, half.y, -half.z - thick * 0.5)), Vector3(size.x, size.y, thick)).get_rid())
 	add_outline_rect(Vector2.ZERO, Vector2(size.x, size.z))
+
+
+# --- Cutaway: the follow cam outside the walls ---------------------------------------
+
+## Marks `piece` as part of the wall or ceiling facing `outward` (RIGHT, LEFT, BACK,
+## FORWARD, UP): it's hidden while the camera is out past that side.
+func tag_shell(piece: Node3D, outward: Vector3) -> void:
+	outward += Vector3.ZERO  # no -0 components: the sides are dictionary keys
+	if not _shell_pieces.has(outward):
+		_shell_pieces[outward] = []
+	(_shell_pieces[outward] as Array).append(piece)
+
+
+## The collision of the walls and the ceiling, for a camera query to ignore.
+func shell_rids() -> Array[RID]:
+	return _shell_bodies
+
+
+## Hides the walls the camera (at world `eye`) is outside of, or none with `on` off.
+func cut_away(eye: Vector3, on: bool) -> void:
+	var local := eye - global_position
+	var half := size * 0.5
+	var sides: Array[Vector3] = []
+	if on:
+		if local.x > half.x + CUTAWAY_PAST:
+			sides.append(Vector3.RIGHT)
+		if local.x < -half.x - CUTAWAY_PAST:
+			sides.append(Vector3.LEFT)
+		if local.z > half.z + CUTAWAY_PAST:
+			sides.append(Vector3.BACK)
+		if local.z < -half.z - CUTAWAY_PAST:
+			sides.append(Vector3.FORWARD)
+		if local.y > size.y + CUTAWAY_PAST:
+			sides.append(Vector3.UP)
+	if sides == _cut_sides:
+		return
+	_cut_sides = sides
+	for outward: Vector3 in _shell_pieces:
+		var shown := not sides.has(outward)
+		for piece: Node3D in _shell_pieces[outward]:
+			if is_instance_valid(piece):
+				piece.visible = shown
 
 
 ## A porthole at `at` (arena space) opening along `axis` (out into the water),

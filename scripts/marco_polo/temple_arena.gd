@@ -17,6 +17,10 @@ extends MarcoArena
 
 ## GreekKit's pieces are life-size; the temple's are this much bigger.
 const SCALE := 2.0
+## Share of floor slabs missing (sand shows) and cracked and heaved at one edge: a whale's silt
+## shows the floor off, so it is calmer than play-test 1's jagged plates.
+const SLAB_GONE := 0.03
+const SLAB_HEAVED := 0.04
 ## The tholos's columns, a little smaller.
 const THOLOS_SCALE := 1.6
 ## The walls' courses (m): each course's height, a block's length, the wall's thickness.
@@ -50,7 +54,10 @@ const PORTHOLES := [
 	[Vector3(30.0, 7.2, 35.0), "poseidon"],
 ]
 
-var _blocks: Array = []  # per variant: Array[Transform3D]
+## The ashlar blocks by the side they face out (Vector3.ZERO: the ruins, never hidden),
+## each a list per variant: Array[Transform3D]. A wall's blocks are their own MultiMesh
+## so the follow cam can hide that wall (MarcoArena.cut_away).
+var _blocks := {}
 var _dice := RandomNumberGenerator.new()
 
 
@@ -65,9 +72,6 @@ func _init() -> void:
 
 func _build() -> void:
 	_dice.seed = 1907
-	for n in VARIANTS:
-		var list: Array[Transform3D] = []
-		_blocks.append(list)
 	add_shell_colliders()
 	_build_floor()
 	_build_walls()
@@ -149,7 +153,19 @@ func _wall_block(origin: Vector3, inward: Vector3, along: Vector3, span: Vector2
 	var proud := _dice.randf_range(-0.12, 0.05)
 	var centre := origin + along * (span.x + span.y) * 0.5 + Vector3.UP * y - inward * (WALL_THICK * 0.5 + proud)
 	var basis := Basis(along, Vector3.UP, inward).scaled_local(Vector3(length, tall, WALL_THICK))
-	_blocks[_dice.randi() % VARIANTS].append(Transform3D(basis, centre))
+	_add_block(-inward, _dice.randi() % VARIANTS, Transform3D(basis, centre))
+
+
+## Adds a block to the `side` it faces out (Vector3.ZERO: none), ashlar `variant`.
+func _add_block(side: Vector3, variant: int, xform: Transform3D) -> void:
+	side += Vector3.ZERO  # no -0 components: the sides are dictionary keys
+	if not _blocks.has(side):
+		var lists: Array = []
+		for n in VARIANTS:
+			var list: Array[Transform3D] = []
+			lists.append(list)
+		_blocks[side] = lists
+	(_blocks[side][variant] as Array[Transform3D]).append(xform)
 
 
 func _porthole_slab(origin: Vector3, inward: Vector3, along: Vector3, entry: Array) -> void:
@@ -158,7 +174,7 @@ func _porthole_slab(origin: Vector3, inward: Vector3, along: Vector3, entry: Arr
 	var base := origin + along * x + Vector3.UP * (at.y - COURSE) - inward * WALL_THICK * 0.5
 	var slab := GreekKit.cached("temple/slab", func() -> MeshKit:
 		return TempleKit.holed_slab(SLAB_WIDTH - 0.06, COURSE * 2.0 - 0.05, WALL_THICK, HOLE_RADIUS * 1.08, 31), TempleKit.wall_stone())
-	add_visual(slab, Transform3D(Basis(along, Vector3.UP, inward), base), null, true)
+	tag_shell(add_visual(slab, Transform3D(Basis(along, Vector3.UP, inward), base), null, true), -inward)
 	add_porthole(at, inward, HOLE_RADIUS, Porthole.Look.NICHE, GreekKit.marble())
 	var god: String = entry[1]
 	if god != "":
@@ -176,14 +192,14 @@ func _build_floor() -> void:
 		for k in nz:
 			var at := Vector3(-size.x * 0.5 + (i + 0.5) * slab, -0.3, -size.z * 0.5 + (k + 0.5) * slab)
 			var roll := _dice.randf()
-			if roll < 0.05:
+			if roll < SLAB_GONE:
 				continue  # a slab gone: sand shows
 			var basis := Basis()
 			var lift := 0.0
-			if roll < 0.13:
+			if roll < SLAB_GONE + SLAB_HEAVED:
 				# Cracked and heaved up at one edge.
-				basis = Basis(Vector3.UP, _dice.randf() * TAU) * Basis(Vector3.RIGHT, _dice.randf_range(0.06, 0.14))
-				lift = 0.2
+				basis = Basis(Vector3.UP, _dice.randf() * TAU) * Basis(Vector3.RIGHT, _dice.randf_range(0.015, 0.035))
+				lift = 0.07
 				add_box_collider(Transform3D(basis, at + Vector3.UP * (0.15 + lift)), Vector3(slab - 0.2, 0.3, slab - 0.2))
 			flat.append(Transform3D(basis.scaled_local(Vector3(slab - 0.08, 0.32, slab - 0.08)), at + Vector3.UP * lift))
 	var unit := GreekKit.cached("temple/floor_slab", func() -> MeshKit: return TempleKit.ashlar(Vector3.ONE, 77), GreekKit.marble())
@@ -222,7 +238,7 @@ func _build_roof() -> void:
 		for k in 6:
 			var x := -size.x * 0.5 + (k + 0.5) * size.x / 6.0
 			var basis := Basis(Vector3.RIGHT, Vector3.UP, Vector3.BACK).scaled_local(Vector3(size.x / 6.0 - 0.1, 1.3, spacing - 0.15))
-			_blocks[(n + k) % VARIANTS].append(Transform3D(basis, Vector3(x, size.y - 0.1, z)))
+			_add_block(Vector3.UP, (n + k) % VARIANTS, Transform3D(basis, Vector3(x, size.y - 0.1, z)))
 
 
 func _shaft_material() -> ShaderMaterial:
@@ -245,14 +261,16 @@ void fragment() {
 
 
 func _flush_blocks() -> void:
-	for n in VARIANTS:
-		var unit := GreekKit.cached("temple/ashlar/%d" % n, func() -> MeshKit: return TempleKit.ashlar(Vector3.ONE, 50 + n), TempleKit.wall_stone())
-		var list: Array = _blocks[n]
-		# Ashlar meshes stand on y 0: every transform is a block's foot.
-		var lifted: Array[Transform3D] = []
-		for xform: Transform3D in list:
-			lifted.append(xform)
-		add_multimesh(unit, lifted, null, true)
+	for side: Vector3 in _blocks:
+		for n in VARIANTS:
+			var unit := GreekKit.cached("temple/ashlar/%d" % n, func() -> MeshKit: return TempleKit.ashlar(Vector3.ONE, 50 + n), TempleKit.wall_stone())
+			var list: Array[Transform3D] = _blocks[side][n]
+			if list.is_empty():
+				continue
+			# Ashlar meshes stand on y 0: every transform is a block's foot.
+			var view := add_multimesh(unit, list, null, true)
+			if side != Vector3.ZERO:
+				tag_shell(view, side)
 
 
 # --- The temple front ------------------------------------------------------------------
@@ -339,7 +357,7 @@ func _ruined_wall(from: Vector3, to: Vector3, tall: float, seed_value: int) -> v
 				if span.y - span.x > 0.3:
 					var centre := from + along * (span.x + span.y) * 0.5 + Vector3.UP * c * course
 					var basis := Basis(along, Vector3.UP, inward).scaled_local(Vector3(span.y - span.x - 0.05, course - 0.04, thick))
-					_blocks[dice.randi() % VARIANTS].append(Transform3D(basis, centre))
+					_add_block(Vector3.ZERO, dice.randi() % VARIANTS, Transform3D(basis, centre))
 					highest = maxf(highest, (c + 1) * course)
 			a = b
 	var middle := from + line * 0.5

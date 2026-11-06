@@ -84,6 +84,14 @@ static func default_for(fish_class: FishCharacter.FishClass) -> Gait:
 		# A slower stroke_time cost ~15% of the distance in gait_probe.
 		gait.stroke_axis = Gait.StrokeAxis.VERTICAL
 		gait.visual = Gait.Visual.FLUKE
+	elif fish_class == FishCharacter.FishClass.TITAN:
+		# The adult whales (planning_marco_whales.md §7): the calves' up-and-down
+		# flukes, slower (a long, heavy beat), with the Titan-only motion values
+		# at their defaults (multi-joint wave, power/recovery strokes, the head's
+		# counter-pitch, surge, flipper trim, bank).
+		gait.stroke_axis = Gait.StrokeAxis.VERTICAL
+		gait.visual = Gait.Visual.FLUKE
+		gait.stroke_time = 1.4
 	return gait
 
 

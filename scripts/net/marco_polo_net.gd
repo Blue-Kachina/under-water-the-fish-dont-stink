@@ -62,13 +62,21 @@ func hook(match_node: MarcoPoloMatch) -> void:
 		game.pinged.connect(_on_pinged)
 		game.fooled.connect(_on_fooled)
 		game.bots_changed.connect(_on_bots_changed)
+		game.whale_picked.connect(_on_whale_picked)
+		game.wake_pushed.connect(_on_wake_pushed)
+		game.marco_tell_started.connect(func(seeker: FishController, time: float) -> void: coop.send_from(self, 0, "_mp_tell", [id_of(seeker), time], true))
 		var holes := game.porthole_system
 		if holes and holes.has_signal("entered"):
 			holes.connect("entered", func(fish: FishController, hole: Node) -> void: _send_hidden(fish, true, hole))
 			holes.connect("exited", func(fish: FishController, hole: Node) -> void: _send_hidden(fish, false, hole))
+		var hideaways := game.hideaway_system
+		if hideaways:
+			hideaways.connect("entered", func(fish: FishController, index: int) -> void: _send_hideaway(fish, true, index))
+			hideaways.connect("exited", func(fish: FishController, index: int) -> void: _send_hideaway(fish, false, index))
 	else:
 		game.local_burst.connect(_on_local_burst)
 		game.local_button.connect(_on_local_button)
+		game.local_whale_pick.connect(_on_local_whale_pick)
 		var holes := game.porthole_system
 		if holes and holes.has_signal("enter_requested"):
 			holes.connect("enter_requested", _on_porthole_enter)
@@ -79,7 +87,7 @@ func unhook() -> void:
 	if game and is_instance_valid(game):
 		for connection in get_incoming_connections():
 			var sig: Signal = connection.signal
-			if sig.get_object() == game or sig.get_object() == game.porthole_system:
+			if sig.get_object() == game or sig.get_object() == game.porthole_system or sig.get_object() == game.hideaway_system:
 				sig.disconnect(connection.callable)
 	for net: NetFish in _bot_nets.values():
 		if is_instance_valid(net.fish):
@@ -97,9 +105,14 @@ func world() -> Dictionary:
 	var out := []
 	for fish: FishController in game.eliminated:
 		out.append(id_of(fish))
+	var picks := {}
+	for fish in game.seekers():
+		var pick := game.whale_pick_of(fish)
+		if bool(pick.locked):
+			picks[id_of(fish)] = [int(pick.species), int(pick.skin)]
 	return {"mode": "marco_polo", "arena": game.settings.arena, "variant": int(game.settings.variant), "bots": _bot_list(),
 			"round": game.round_index, "rounds": game.rounds_in_match(), "phase": game.phase, "phase_left": game.phase_left,
-			"time_left": game.time_left, "roles": roles, "eliminated": out, "totals": _by_id(game.totals())}
+			"time_left": game.time_left, "roles": roles, "eliminated": out, "totals": _by_id(game.totals()), "whale_picks": picks}
 
 
 ## A guest: the host's match as it was when we joined.
@@ -112,6 +125,11 @@ func apply_world(state: Dictionary) -> void:
 		var fish := fish_by_id(int(id))
 		if fish:
 			roles[fish] = int(given[id])
+	var picks: Dictionary = state.get("whale_picks", {})
+	for id: Variant in picks:
+		var fish := fish_by_id(int(id))
+		if fish:
+			game.apply_net_whale_pick(fish, int((picks[id] as Array)[0]), int((picks[id] as Array)[1]))
 	game.apply_net_state(int(state.round), roles, _fish_list(state.get("eliminated", [])), int(state.phase), float(state.phase_left),
 			float(state.time_left), _from_id(state.get("totals", {})), int(state.get("rounds", 1)))
 
@@ -267,7 +285,7 @@ func _send_views() -> void:
 		var seen := false
 		if game.role_of(fish) == MarcoPoloMatch.Role.SEEKER:
 			for hider in game.live_hiders():
-				exposures[id_of(hider)] = game.exposure(fish, hider)
+				exposures[id_of(hider)] = game.whale_sees(fish, hider)  # a whale's eyes, else the layers as ever
 		else:
 			exposures[id_of(fish)] = game.max_exposure(fish)
 			tally = game.round_tally(fish)
@@ -325,6 +343,18 @@ func _on_pinged(seeker: FishController, at: Vector3, loudness: float, polo: bool
 		coop.send_from(self, peer, "_mp_ping", [at, loudness, polo], false)
 
 
+## The host: a whale's pick is final: everyone wears it.
+func _on_whale_picked(fish: FishController, species: int, skin: int) -> void:
+	coop.send_from(self, 0, "_mp_whale_pick", [id_of(fish), species, skin], true)
+
+
+## The host: a whale's wake pushes a person's fish: their own machine applies it.
+func _on_wake_pushed(hider: FishController, impulse: Vector3) -> void:
+	var peer := _peer_of(hider)
+	if peer != 0:
+		coop.send_from(self, peer, "_mp_wake", [impulse], false)
+
+
 func _on_fooled(seeker: FishController, _fake: FishController) -> void:
 	coop.send_from(self, 0, "_mp_fooled", [id_of(seeker)], true)
 
@@ -332,6 +362,10 @@ func _on_fooled(seeker: FishController, _fake: FishController) -> void:
 func _on_bots_changed() -> void:
 	_number_bots()
 	coop.send_from(self, 0, "_mp_bots", [_bot_list()], true)
+
+
+func _send_hideaway(fish: FishController, hidden: bool, index: int) -> void:
+	coop.send_from(self, 0, "_mp_hideaway", [id_of(fish), hidden, index], true)
 
 
 func _send_hidden(fish: FishController, hidden: bool, hole: Node) -> void:
@@ -346,6 +380,11 @@ func _on_local_burst(amount: float) -> void:
 
 func _on_local_button(action: String) -> void:
 	coop.send_from(self, 1, "_mp_button", [coop.pid_of(game.local_fish()), action], true)
+
+
+## Our whale pick on the card (shown or locked): the host decides it.
+func _on_local_whale_pick(species: int, skin: int, locked: bool) -> void:
+	coop.send_from(self, 1, "_mp_whale_request", [coop.pid_of(game.local_fish()), species, skin, locked], true)
 
 
 ## Our fish got into porthole `hole` here: the host says yes (_mp_hidden) or no (_mp_porthole_denied).
@@ -375,6 +414,13 @@ func _mp_button(pid: int, action: String) -> void:
 		game.marco(fish)
 	elif action == "fake":
 		game.throw_fake(fish)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _mp_whale_request(pid: int, species: int, skin: int, locked: bool) -> void:
+	var fish := fish_by_id(pid)
+	if is_host() and fish and pid / 100 == multiplayer.get_remote_sender_id():
+		game.apply_whale_request(fish, species, skin, locked)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -458,6 +504,19 @@ func _mp_marco(seeker_id: int) -> void:
 		game.apply_net_marco(seeker)
 
 
+@rpc("authority", "call_remote", "reliable")
+func _mp_whale_pick(id: int, species: int, skin: int) -> void:
+	var fish := fish_by_id(id)
+	if game and not is_host() and fish:
+		game.apply_net_whale_pick(fish, species, skin)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _mp_wake(impulse: Vector3) -> void:
+	if game and not is_host():
+		game.apply_net_wake(impulse)
+
+
 @rpc("authority", "call_remote", "unreliable")
 func _mp_ping(at: Vector3, loudness: float, polo: bool) -> void:
 	if game and not is_host():
@@ -471,6 +530,14 @@ func _mp_fooled(seeker_id: int) -> void:
 		game.apply_net_fooled(seeker, null)
 
 
+## A whale's call is about to come (marco_tell_time): the blowhole tell on every machine.
+@rpc("authority", "call_remote", "reliable")
+func _mp_tell(seeker_id: int, time: float) -> void:
+	var seeker := fish_by_id(seeker_id)
+	if game and not is_host() and seeker:
+		game.apply_net_tell(seeker, time)
+
+
 @rpc("authority", "call_remote", "reliable")
 func _mp_hidden(id: int, hidden: bool, hole: int) -> void:
 	var fish := fish_by_id(id)
@@ -478,6 +545,16 @@ func _mp_hidden(id: int, hidden: bool, hole: int) -> void:
 		game.apply_net_hidden(fish, hidden)
 		if game.porthole_system and game.porthole_system.has_method("apply_net_hidden"):
 			game.porthole_system.call("apply_net_hidden", fish, hidden, hole)
+
+
+## A hider went into (or out of) hideaway `index` on the host (Stale Water runs there).
+@rpc("authority", "call_remote", "reliable")
+func _mp_hideaway(id: int, hidden: bool, index: int) -> void:
+	var fish := fish_by_id(id)
+	if game and not is_host() and fish:
+		game.apply_net_hidden(fish, hidden)
+		if game.hideaway_system:
+			game.hideaway_system.call("apply_net_hidden", fish, hidden, index)
 
 
 @rpc("authority", "call_remote", "reliable")

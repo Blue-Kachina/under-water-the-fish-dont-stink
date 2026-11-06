@@ -254,6 +254,19 @@ const ROWS := [
 	["mp/fish_out_of_water", 1, "3d", "The gauge fills: FISH OUT OF WATER! The fish flops out gasping."],
 	["mp/airstone", 2, "3d loop voices=6", "An aquarium airstone / bubble curtain fizzing."],
 	["mp/chest_burp", 2, "3d voices=2", "The aquarium's treasure chest pops open and burps bubbles."],
+	# The Titan (adult whale) seeker.
+	["mp/whomp", 1, "3d voices=4 cd=0.2", "A Titan's fluke power stroke: a deep whomp, louder with stride strength."],
+	["mp/whomp_boost", 1, "3d voices=3 cd=0.15", "A Titan's hard boost beat."],
+	["mp/voice_humpback", 1, "3d", "A humpback Titan's auto Marco! call: a short sung phrase."],
+	["mp/voice_blue", 1, "3d", "A blue whale Titan's auto Marco! call: a low moan."],
+	["mp/voice_orca", 1, "3d", "An orca Titan's auto Marco! call: a click train."],
+	["mp/voice_beluga", 1, "3d", "A beluga Titan's auto Marco! call: chirps and clicks."],
+	["mp/voice_sperm", 1, "3d", "A sperm whale Titan's auto Marco! call: slow, heavy clicks."],
+	["mp/marco_tell", 2, "3d", "Blowhole bubbles just before a Titan's call (marco_tell_time)."],
+	["mp/whale_grow", 1, "3d", "A caught hider grows into a Titan."],
+	["mp/pick_cycle", 3, "voices=1 cd=0.05", "The whale pick card: species or skin changes."],
+	["mp/pick_lock", 2, "", "The whale pick card: the pick locks in."],
+	["mp/wake_swirl", 3, "3d voices=2 cd=0.3", "Optional: a Titan's vortex ring passes close."],
 
 	# Shared effects.
 	["fx/explosion", 1, "3d layers voices=4 cd=0.03", "An explosion (torpedoes, depth charges, the lure)."],

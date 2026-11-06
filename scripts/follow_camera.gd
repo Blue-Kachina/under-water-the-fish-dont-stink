@@ -92,6 +92,18 @@ var heading_climb := 0.5
 var extra_distance := 0.0
 var extra_height := 0.0
 var extra_angle := 0.0
+## How much of the followed fish's size (a Titan's hitbox length over a fish's) the
+## camera's height and distance follow: 1 = in full (it keeps the same view of a
+## body five times as big), 0 = not at all. A mode sets it (Marco Polo's whale_cam_follow).
+var body_follow := 1.0
+## The body scale the view has now: it eases to the followed fish's, so a swap
+## to a Titan (or back) glides instead of snapping.
+var _body_zoom := 1.0
+## The longest fish's hitbox (m): bodies up to it are viewed as ever.
+const BODY_ZOOM_BASE := 1.35
+## ...and past it the view backs off by the size ratio to this power (1 = in
+## proportion; under 1 a 5x body doesn't push the camera 5x as far).
+const BODY_ZOOM_POWER := 0.75
 ## The survivor cam's modes (see the class description).
 var free_cam := false
 const FOLLOW_SETTLE := 0
@@ -199,6 +211,17 @@ var zoom := 1.0:
 
 @export_group("Collision")
 @export_range(0.0, 1.0, 0.05) var collision_margin := 0.5
+## In an arena with solid walls and a cutaway shell (MarcoArena): where a wall or the
+## ceiling would pull the camera in to less than wall_cutaway_ratio of its distance
+## (a corner, nose to the wall), it sits out past the wall instead and that wall
+## is hidden, as ball cam does in the match tank.
+@export var wall_cutaway := true
+@export_range(0.1, 1.0, 0.05) var wall_cutaway_ratio := 0.7
+## How fast it moves out past the wall and back in (1/s).
+@export_range(0.5, 20.0, 0.5) var wall_cutaway_speed := 6.0
+
+## How far out past the walls the camera is (0 inside .. 1 out), see wall_cutaway.
+var _cutaway := 0.0
 
 ## The camera's own orientation, and how fast it's turning (world-space angular
 ## velocity). It turns on a critically damped spring toward where it wants to
@@ -268,6 +291,15 @@ func snap() -> void:
 	_lag_speed = Vector3.ZERO
 	_roll_speed = 0.0
 	_leaving_surface = false
+	_body_zoom = _zoom_for(subject)
+
+
+## How much further the view sits back for `subject`'s size: its hitbox length
+## over a fish's (BODY_ZOOM_BASE), from 1 up, as far as body_follow says.
+func _zoom_for(subject: Variant) -> float:
+	if not ("hitbox_length" in subject):
+		return 1.0
+	return lerpf(1.0, pow(maxf(float(subject.hitbox_length) / BODY_ZOOM_BASE, 1.0), BODY_ZOOM_POWER), body_follow)
 
 
 ## What the camera follows: the target if set, otherwise the fish. Untyped:
@@ -352,6 +384,10 @@ func _process(delta: float) -> void:
 		var pose: Variant = pose_override.call(subject)
 		if pose is Transform3D:
 			global_transform = pose
+			_cutaway = 0.0
+			var cut := get_tree().get_first_node_in_group(MarcoArena.CUTAWAY_GROUP) as MarcoArena
+			if cut != null:
+				cut.cut_away(pose.origin, false)  # looking out of a porthole: all the walls back
 			return
 
 	_ball_cam_button(delta)
@@ -440,8 +476,10 @@ func _process(delta: float) -> void:
 		var lagged := _spring_step(lag_error[axis], _lag_speed[axis], 2.0 * LAG_RATE, delta)
 		_lag[axis] = lag_target[axis] + lagged.x
 		_lag_speed[axis] = lagged.y
-	var anchor := fish_xform.origin + view.y * (height + extra_height)
-	var eye := fish_xform.origin + view * Vector3(0.0, height + extra_height, distance + extra_distance) + _lag
+	var body_zoom := _zoom_for(subject)
+	_body_zoom = body_zoom if is_equal_approx(_body_zoom, body_zoom) else lerpf(_body_zoom, body_zoom, 1.0 - exp(-4.0 * delta))
+	var anchor := fish_xform.origin + view.y * (height + extra_height) * _body_zoom
+	var eye := fish_xform.origin + view * Vector3(0.0, height + extra_height, distance + extra_distance) * _body_zoom + _lag
 	var look_basis := view * Basis(Vector3.RIGHT, deg_to_rad(angle + extra_angle))
 
 	# Keep clear of solid walls (not the see-through tank): sweep a sphere from the fish up to the anchor (which
@@ -450,7 +488,9 @@ func _process(delta: float) -> void:
 	# than a ray, so the wide view can't poke through a wall the camera runs
 	# alongside. The look direction stays the same while pulled in.
 	anchor = _sweep(fish_xform.origin, anchor, ANCHOR_CLEARANCE)
+	var wanted := eye
 	eye = _sweep(anchor, eye, collision_margin)
+	eye = _cut_away(anchor, wanted, eye, delta)
 	eye.y = maxf(eye.y, floor_height + collision_margin)
 	if _punch > 0.001 or _kick.length_squared() > 0.000001:
 		# A punch: a sharp shake (and a small turn with it) plus a kick, dying away.
@@ -673,17 +713,39 @@ static func _quaternion_from(rotation_vector: Vector3) -> Quaternion:
 	return Quaternion(rotation_vector / angle, angle)
 
 
+## Where the eye goes: `pulled` (the sweep's, `wanted` pulled in at what it hit), or,
+## when the arena's walls or ceiling alone pulled it in to under wall_cutaway_ratio
+## of the way, eased out to where it would have been past them with those walls hidden.
+func _cut_away(anchor: Vector3, wanted: Vector3, pulled: Vector3, delta: float) -> Vector3:
+	var arena := get_tree().get_first_node_in_group(MarcoArena.CUTAWAY_GROUP) as MarcoArena
+	var out := 0.0
+	if wall_cutaway and arena != null:
+		var length := anchor.distance_to(wanted)
+		var beyond := _sweep(anchor, wanted, collision_margin, arena.shell_rids())
+		var walled := beyond.distance_to(anchor) - pulled.distance_to(anchor) > 0.01
+		if walled and length > 0.01 and pulled.distance_to(anchor) < length * wall_cutaway_ratio:
+			out = 1.0
+		_cutaway = move_toward(_cutaway, out, delta * wall_cutaway_speed)
+		var eye := pulled.lerp(beyond, smoothstep(0.0, 1.0, _cutaway))
+		arena.cut_away(eye, _cutaway > 0.0)
+		return eye
+	_cutaway = 0.0
+	if arena != null:
+		arena.cut_away(wanted, false)
+	return pulled
+
+
 ## How far a sphere of `radius` gets from `from` toward `to` before touching
-## anything solid (the fish and ball don't count). A ray along the same line
-## backs it up: a sphere that starts out already touching a surface can be
-## reported as free to move straight through it.
-func _sweep(from: Vector3, to: Vector3, radius: float) -> Vector3:
+## anything solid (the fish and ball don't count; nor does `skip`). A ray along
+## the same line backs it up: a sphere that starts out already touching a
+## surface can be reported as free to move straight through it.
+func _sweep(from: Vector3, to: Vector3, radius: float, skip: Array[RID] = []) -> Vector3:
 	var motion := to - from
 	var length := motion.length()
 	if length < 0.0001:
 		return from
 	var space := get_world_3d().direct_space_state
-	var exclude: Array[RID] = []
+	var exclude: Array[RID] = skip.duplicate()
 	# Other fish (a bot) don't push the camera in either.
 	for body: Variant in [fish, target] + get_tree().get_nodes_in_group(FishController.GROUP):
 		if is_instance_valid(body) and body is CollisionObject3D:

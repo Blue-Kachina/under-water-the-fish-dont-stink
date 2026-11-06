@@ -93,6 +93,38 @@ enum BellRhythm { ALTERNATE, EACH_STRIDE }
 ## Bell pulse only: how long the bell takes to relax open on its own after a
 ## power stroke that no recovery stroke follows (s).
 @export_range(0.1, 5.0, 0.05, "or_greater") var bell_recovery_time := 0.9
+## Titans only (the adult whales' models): how much bigger each fluke beat is
+## than the swim's own, so a big tail moves a lot of water. 1: as the swim sets it.
+@export_range(0.0, 3.0, 0.05, "or_greater") var fluke_amplitude := 1.3
+## Titans only: how many times slower the up-stroke (recovery) is than the
+## down-stroke (power). 1: the same speed both ways.
+@export_range(1.0, 6.0, 0.05, "or_greater") var fluke_power_ratio := 2.2
+## Titans only: how quickly the flukes follow the swim's beat on the power
+## stroke (1/s; the recovery follows fluke_power_ratio times slower). Lower: a
+## softer, rounder beat that doesn't reach as far.
+@export_range(1.0, 60.0, 0.5, "or_greater") var fluke_snap := 14.0
+## Titans only: how many joints the body bends at behind its middle, so each
+## beat travels down it as a wave (1: one even curve, as the other fish).
+@export_range(1, 3, 1) var bend_segments := 3
+## Titans only: how long the beat takes to pass from each joint to the one
+## behind it (s): the wave's travel down the body. Longer: a lazier, more
+## whip-like beat. 0: the whole body bends at once.
+@export_range(0.0, 0.5, 0.005, "or_greater") var bend_lag := 0.12
+## Titans only: how much the head pitches against each beat, of the body's
+## bend (the nose lifts as the flukes drive down). 0: the head stays still.
+@export_range(0.0, 1.0, 0.01) var head_counter := 0.25
+## Titans only: how far the whole body surges forward on a power stroke and
+## eases back, of its length.
+@export_range(0.0, 0.1, 0.001, "or_greater") var body_surge := 0.012
+## Titans only: how far the flippers trim against the beat and bank in turns
+## (0: they hold still, besides the swim's own flutter).
+@export_range(0.0, 3.0, 0.05, "or_greater") var flipper_trim := 1.0
+## Titans only: how far the body rolls into a turn at full turn (rad).
+@export_range(0.0, 1.2, 0.01) var turn_bank := 0.25
+## Titans only: the fluke speed (rad/s) that counts as a full-strength power
+## stroke (FishModel.power_stroke's strength 1; the wake, FX and sound scale
+## with it).
+@export_range(0.1, 20.0, 0.1, "or_greater") var power_stroke_speed := 3.0
 
 
 ## Whether this gait changes nothing (today's fish).
