@@ -45,7 +45,10 @@ func _run() -> void:
 	var run: NatureRun = main.nature_run
 	_press(PADS[0], LocalCoop.JOIN_BUTTON)
 	await _ticks(5)
-	check(local.count() == 2 and run.players.size() == 2, "Back/View on another controller joins the run")
+	check(local.count() == 2 and run.players.size() == 1, "Back/View on another controller opens their character screen (not in the run yet)")
+	_press(PADS[0], JOY_BUTTON_A)  # Dive in
+	await _ticks(5)
+	check(local.count() == 2 and run.players.size() == 2, "Dive in joins the run")
 	var split: SplitScreen = main.get_node_or_null("SplitScreen")
 	check(split != null and split.count() == 2, "the window splits in two")
 	check(camera.get_viewport() == split.view(0) and camera.current, "the first player's camera moved into the first view")
@@ -55,6 +58,8 @@ func _run() -> void:
 	check(local.count() == 2, "pressing it again doesn't join twice")
 	for pad in PADS.slice(1):
 		_press(pad, LocalCoop.JOIN_BUTTON)
+		await _ticks(3)
+		_press(pad, JOY_BUTTON_A)
 		await _ticks(3)
 	await _ticks(5)
 	check(local.count() == 4 and run.players.size() == 4 and split.count() == 4, "four players, four views")

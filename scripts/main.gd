@@ -221,6 +221,8 @@ func _ready() -> void:
 	_pause_menu.opened.connect(func() -> void: _hold_local_players(NetSession.is_online()))
 	_pause_menu.closed.connect(func() -> void: _hold_local_players(false))
 	_pause_menu.coop_requested.connect(_open_coop)
+	_pause_menu.change_character_requested.connect(_change_character)
+	_pause_menu.change_character_allowed = func() -> bool: return current_mode not in [UNNATURAL, REPLAYS]  # Unnatural's later
 	_pause_menu.main_menu_allowed = func() -> bool: return not NetSession.is_online()
 	_pause_menu.can_open = func() -> bool: return not _home.is_open()
 	_pause_menu.main_menu_requested.connect(func() -> void: _home.open(true))
@@ -228,9 +230,7 @@ func _ready() -> void:
 	_home.name = "HomeScreen"
 	_home.main = self
 	_home.settings_panel = _panel
-	_home.mode_chosen.connect(func(mode: String) -> void:
-		_home.close()
-		start_mode(mode))
+	_home.mode_chosen.connect(_open_mode_setup)
 	_home.replays_requested.connect(func() -> void:
 		_home.close()
 		set_mode(REPLAYS))
@@ -262,6 +262,48 @@ func _ready() -> void:
 		_home.open()  # the game starts on the home screen (not in test probes)
 
 
+## A mode was picked on the home screen: its setup screen (options and character)
+## opens over the picker; Dive in starts the mode, Back returns to the picker.
+func _open_mode_setup(mode: String) -> void:
+	if has_node("ModeSetup"):
+		return
+	var setup := ModeSetups.build(self, mode)
+	setup.name = "ModeSetup"
+	setup.confirmed.connect(func() -> void:
+		var to_start := ModeSetups.apply(self, setup)
+		_home.close()
+		start_mode(to_start))
+	add_child(setup)
+
+
+## The pause menu's Change Character: the current role's characters over the pause
+## menu; Apply plays as the pick and resumes, Back returns to the menu.
+func _change_character() -> void:
+	if has_node("ModeSetup"):
+		return
+	var setup := ModeSetups.build_character(self, ModeSetups.current_role(self))
+	setup.name = "ModeSetup"
+	setup.confirmed.connect(func() -> void:
+		ModeSetups.apply_character(self, setup)
+		_pause_menu.close())
+	add_child(setup)
+
+
+## Wears `character` in `species` for the match about to start (the setup screen's
+## pick): no respawn of its own, as starting the mode does that.
+func apply_look(character: FishCharacter.FishClass, species: int) -> void:
+	if current_mode == REPLAYS:
+		return
+	var settings := ConfigFile.new()
+	settings.load(SETTINGS_PATH)
+	_fish.set_look(character, species)
+	_panel.set_character(character)
+	_panel.set_species(_fish.species)
+	settings.set_value("playground", "character", FishCharacter.CLASSES[character].key)
+	store_species(settings, character, _fish.species)
+	settings.save(SETTINGS_PATH)
+
+
 ## Online co-op (the pause menu's or the home screen's Co-op).
 func _open_coop() -> void:
 	if has_node("CoopMenu"):
@@ -271,9 +313,8 @@ func _open_coop() -> void:
 	add_child(menu)
 
 
-## Starts `mode` straight away (the home screen's mode picker): a match mode's
-## match too, with no card to wait on (but Marco Polo, whose card picks the
-## variant and arena). Picking the mode that's on starts it afresh.
+## Starts `mode` straight away (the setup screen's Dive in): a match mode's match
+## too, with no card to wait on. Picking the mode that's on starts it afresh.
 func start_mode(mode: String) -> void:
 	if mode not in MODES:
 		return
@@ -287,8 +328,8 @@ func start_mode(mode: String) -> void:
 			reset_play()
 	else:
 		set_mode(mode)
-	if _match_card and mode != MARCO_POLO and mode != WHAT_STINKS:
-		play_match()
+	if _match_card:
+		play_match()  # its options were picked on the setup screen (Marco Polo's too)
 
 
 ## The environment `mode` plays in: Marco Polo's is its card's arena pick

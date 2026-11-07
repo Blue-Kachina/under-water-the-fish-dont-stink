@@ -2,7 +2,7 @@ class_name PauseMenu
 extends CanvasLayer
 ## Start (Esc, F1) pauses the game and shows this menu: Resume, the mode's reset
 ## (Start used to reset; R still does), Settings (the settings screen,
-## DebugPanel), Co-op online, Main menu (the home screen) and Quit. Start
+## DebugPanel), Change Character (ModeSetups), Co-op online, Main menu (the home screen) and Quit. Start
 ## again, B or Resume carries on. In the dark-water look (UITheme).
 ##
 ## Runs while the tree is paused. Its buttons act on release, so the A press
@@ -18,6 +18,8 @@ signal closed
 signal coop_requested
 ## Main menu was picked: back to the home screen.
 signal main_menu_requested
+## Change Character was picked.
+signal change_character_requested
 
 ## The settings screen (DebugPanel): shown by Settings, hidden on resuming.
 var settings_panel: Node
@@ -31,11 +33,14 @@ var pauses := func() -> bool: return true
 var main_menu_allowed := func() -> bool: return true
 ## Whether Start opens it now (not over the home screen).
 var can_open := func() -> bool: return true
+## Whether Change Character can be picked now (grayed out in Unnatural for now).
+var change_character_allowed := func() -> bool: return true
 
 var _menu: PanelContainer
 var _resume: Button
 var _reset: Button
 var _settings: Button
+var _change_character: Button
 var _main_menu: Button
 var _hints: ControllerHints
 var _focus_before: Control
@@ -85,6 +90,7 @@ func _ready() -> void:
 		if settings_panel:
 			settings_panel.set_open(true)
 			_menu.visible = false, s)
+	_change_character = _button(column, "Change Character", func() -> void: change_character_requested.emit(), s)
 	_button(column, "Co-op online", func() -> void: coop_requested.emit(), s)
 	_main_menu = _button(column, "Main menu", func() -> void:
 		close()
@@ -186,6 +192,7 @@ func _update_buttons() -> void:
 	_reset.visible = not text.is_empty()
 	_reset.text = text
 	_main_menu.disabled = not main_menu_allowed.call()
+	_change_character.disabled = not change_character_allowed.call()
 	_hints.visible = _menu.visible
 	if _menu.visible and get_viewport().gui_get_focus_owner() == null:
 		_resume.grab_focus()  # e.g. after the focused reset option goes

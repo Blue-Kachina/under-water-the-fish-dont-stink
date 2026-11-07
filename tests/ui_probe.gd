@@ -4,7 +4,8 @@ extends Node
 ##   each parses into strokes inside its 24-unit grid.
 ## - The home screen: opens paused with Play focused, LB/RB change the fish;
 ##   Play opens the mode picker with the last mode played featured and every
-##   other mode once; X shows a mode's rules; a pick starts the mode straight
+##   other mode once; X shows a mode's rules; a pick opens the mode's setup
+##   screen (B returns to the picker), whose Dive in starts the mode straight
 ##   away (no card) and closes the home screen; B closes the picker.
 ## - Class details (Y): a panel over the menu, the fish still in view; the
 ##   menu can't be reached under it, LB/RB still change the fish; it fits
@@ -187,7 +188,7 @@ func _check_home() -> void:
 	await _button(JOY_BUTTON_B)
 	await _frames(2)
 
-	# Fish Sticks asks which: 1v1 or Free Play.
+	# Fish Sticks opens its setup screen: 1v1 or Free Play (the Mode row), and the fish.
 	home.open_picker()
 	await _frames(2)
 	var sticks: ModePicker.Tile
@@ -197,11 +198,12 @@ func _check_home() -> void:
 	sticks.grab_focus()
 	await _button(JOY_BUTTON_A)
 	await _frames(2)
-	check(picker._variants.visible and picker._variant_buttons[0].has_focus(), "A on Fish Sticks: asks 1v1 or Free Play")
-	await _button(JOY_BUTTON_DPAD_RIGHT)
-	check(picker._variant_buttons[1].has_focus(), "right: Free Play")
+	var setup: ModeSetup = main.get_node_or_null("ModeSetup")
+	check(setup != null and setup.rows.size() == 1 and setup.rows[0].label == "Mode", "A on Fish Sticks: its setup screen, with a Mode row")
+	check(main.current_mode != main.ONE_V_ONE and main.current_mode != main.FREE_PLAY, "and nothing's started yet")
 	await _button(JOY_BUTTON_B)
-	check(not picker._variants.visible and picker.visible and sticks.has_focus(), "B: back on the Fish Sticks tile")
+	await _frames(2)
+	check(main.get_node_or_null("ModeSetup") == null and picker.visible and sticks.has_focus(), "B: back on the Fish Sticks tile")
 	await _button(JOY_BUTTON_B)
 	await _frames(2)
 
@@ -214,7 +216,10 @@ func _check_home() -> void:
 	nature.grab_focus()
 	await _button(JOY_BUTTON_A)
 	await _frames(3)
-	check(main.current_mode == main.NATURE and main.nature_run != null and main._match_card == null, "a pick starts the mode straight away")
+	check(main.get_node_or_null("ModeSetup") != null and main.current_mode != main.NATURE, "A on Nature: its setup screen first")
+	await _button(JOY_BUTTON_A)  # Dive in
+	await _frames(3)
+	check(main.current_mode == main.NATURE and main.nature_run != null and main._match_card == null, "Dive in starts the mode straight away")
 	check(not home.is_open() and not get_tree().paused, "and the home screen's gone, the game running")
 	main.set_mode(main.FREE_PLAY, false)
 	await _frames(3)

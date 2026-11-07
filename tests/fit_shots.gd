@@ -33,14 +33,31 @@ func _run() -> void:
 	await _frames(10)
 	home.open_picker()
 	await _frames(6)
-	home._picker._choose(main.UNNATURAL)
+	# Each mode's setup screen, over the picker (its options, then the Hunter form for What Stinks?).
+	for mode: String in [main.UNNATURAL, "Fish Sticks", main.MARCO_POLO, main.WHAT_STINKS, main.NATURE]:
+		home._picker._choose(mode)
+		await _frames(8)
+		await _shot("setup_" + mode.to_lower().replace(" ", "_").replace("?", ""))
+		var setup: ModeSetup = main.get_node("ModeSetup")
+		if mode == main.MARCO_POLO or mode == main.WHAT_STINKS:
+			setup._focus = 1
+			setup.refresh()
+			await _frames(4)
+			await _shot("setup_%s_options" % mode.to_lower().replace(" ", "_").replace("?", ""))
+		setup.cancel()
+		await _frames(3)
+	# Every Hunter form's preview on What Stinks?'s setup screen.
+	WhatStinksSettings.shared().start_as = WhatStinksSettings.StartAs.HUNTER
+	home._picker._choose(main.WHAT_STINKS)
 	await _frames(6)
-	await _shot("picker_run_length")
-	home._picker._hide_variants()
-	home._picker._choose("Fish Sticks")
-	await _frames(6)
-	await _shot("picker_fish_sticks")
-	home._picker._hide_variants()
+	var forms: ModeSetup = main.get_node("ModeSetup")
+	for i in forms.pool.size():
+		forms.pool_index = i
+		forms.refresh()
+		await _frames(8)
+		await _shot("setup_form_%s" % forms.pool[i].form)
+	forms.cancel()
+	await _frames(3)
 	home._picker._cancel()
 	home.close()
 

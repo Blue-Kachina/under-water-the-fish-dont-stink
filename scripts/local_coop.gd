@@ -90,7 +90,7 @@ func _input(event: InputEvent) -> void:
 	# The first player's own controller never joins as someone else.
 	# (With one controller plugged in, that's the only one.)
 	if button == JOIN_BUTTON and owner == null and pad != _primary_pad and _joinable_pad(pad) and can_join():
-		join(pad)
+		join(pad, true)
 		get_viewport().set_input_as_handled()
 	elif owner and owner.index > 0 and button in [JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT] and not get_tree().paused:
 		_next_character(owner, 1 if button == JOY_BUTTON_DPAD_RIGHT else -1)
@@ -137,7 +137,9 @@ func _slot_for_pad(pad: int) -> PlayerSlot:
 
 ## A new player on controller `pad` (the joining press): their fish, camera,
 ## HUD and looks, in a new view. Returns their slot (null if there's no room).
-func join(pad: int) -> PlayerSlot:
+## `pick_character`: their character screen (ModeSetup, their pad only) comes first,
+## the fish waiting out of the run until they dive in; Back leaves again.
+func join(pad: int, pick_character := false) -> PlayerSlot:
 	if slots.size() >= MAX_PLAYERS:
 		return null
 	var first := slots[0]
@@ -183,21 +185,40 @@ func join(pad: int) -> PlayerSlot:
 	slot.camera.make_current()
 	view.add_child(slot.hud)
 	view.add_child(slot.arcade)
-	if is_instance_valid(run):
-		slot.fish.set_meta("coop_index", slot.index)
-		run.add_player(slot.fish)
-		_wire(slot)
-		slot.camera.snap()
+	if pick_character:
+		slot.fish.controls_locked = true
+		var setup := ModeSetups.build_join(slot.fish.display_name, pad, slot.fish.character, slot.fish.species)
+		setup.confirmed.connect(func() -> void:
+			if slots.has(slot):
+				ModeSetups.wear(setup, slot.fish)
+				slot.fish.controls_locked = false
+				_enter_run(slot))
+		setup.cancelled.connect(func() -> void:
+			if slots.has(slot):
+				leave(slot))
+		_home.add_child(setup)
+	else:
+		_enter_run(slot)
 	_refresh_cameras()
 	players_changed.emit(slots.size())
 	return slot
+
+
+## `slot`'s fish into the run (once its character's picked).
+func _enter_run(slot: PlayerSlot) -> void:
+	if is_instance_valid(run):
+		slot.fish.set_meta("coop_index", slot.index)
+		slot.fish.set_meta("entered_run", true)
+		run.add_player(slot.fish)
+		_wire(slot)
+		slot.camera.snap()
 
 
 ## A player (not the first) leaves: their fish and views go.
 func leave(slot: PlayerSlot) -> void:
 	if slot.index == 0 or slot not in slots:
 		return
-	if is_instance_valid(run):
+	if is_instance_valid(run) and slot.fish.has_meta("entered_run"):  # not one still on its character screen
 		_unwire(slot)
 		run.remove_player(slot.fish)
 	slots.erase(slot)

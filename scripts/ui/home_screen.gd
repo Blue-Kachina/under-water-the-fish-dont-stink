@@ -835,6 +835,9 @@ class FishShowcase extends SubViewportContainer:
 	var _pivot := Node3D.new()
 	var _camera := Camera3D.new()
 	var _model: FishModel
+	## A Hunter form's fish (show_form), in place of _model.
+	var _fish: FishController
+	var _shown_form := ""
 	var _shown := -1
 	var _shown_species := -1
 	var _time := 0.0
@@ -876,24 +879,57 @@ class FishShowcase extends SubViewportContainer:
 		_view.add_child(_camera)
 
 	func show_fish(character: FishCharacter.FishClass, species := 0) -> void:
-		if character == _shown and species == _shown_species:
+		if character == _shown and species == _shown_species and _fish == null:
 			return
 		_shown = character
 		_shown_species = species
-		if _model:
-			_model.queue_free()
+		_drop_shown()
 		_model = FishModel.build(character, species)
 		_pivot.add_child(_model)
 		_reach = _model._size.length() * 1.85
 		_place_camera()
 
+	## A What Stinks? Hunter form as it plays. Most forms are a class's own model, but
+	## the bosses' share the Monster's and take their body from the form's dress hook,
+	## which wants a fish: a frozen one here, at the form's own size.
+	func show_form(key: String) -> void:
+		var form := HunterForms.sheet(key)
+		if key == "drowned_shark" or form["class"] != FishCharacter.FishClass.MONSTER:
+			show_fish(form["class"], int(form["species"]))
+			return
+		if _fish and _shown_form == key:
+			return
+		_shown = -1
+		_shown_species = -1
+		_drop_shown()
+		_shown_form = key
+		_fish = load("res://scenes/fish.tscn").instantiate()
+		_fish.set("controls", null)
+		_fish.set("freeze", true)
+		_pivot.add_child(_fish)
+		_fish.set_look(form["class"], int(form["species"]), 0)
+		HunterSize.new().apply(_fish, form)  # a fresh one: 1x, not the size picked for the match
+		HunterForms.dress(_fish, key)
+		_reach = maxf(_fish.hitbox_length, 1.0) * 2.2  # the long ones (the King's 16 m) still fit
+		_place_camera()
+
+	func _drop_shown() -> void:
+		if _model:
+			_model.queue_free()
+			_model = null
+		if _fish:
+			_fish.queue_free()
+			_fish = null
+		_shown_form = ""
+
 	func _process(delta: float) -> void:
-		if not is_visible_in_tree() or _model == null:
+		if not is_visible_in_tree() or (_model == null and _fish == null):
 			return
 		_time += delta
 		steer(_right_stick(), delta)
 		_pivot.position.y = sin(_time * 1.3) * 0.04
-		_model.react(delta, _model.global_basis * Vector3(0.0, 0.0, -3.0))
+		if _model:
+			_model.react(delta, _model.global_basis * Vector3(0.0, 0.0, -3.0))
 
 	## One frame of the right stick (x right, y down, as the pads read): orbits
 	## the camera, or lets the fish turn once it's been left alone a moment.
