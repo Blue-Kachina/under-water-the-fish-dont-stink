@@ -16,19 +16,18 @@ extends Boss
 
 ## Its jaws snapped shut at `at`, biting `bit` players.
 signal chomped(at: Vector3, bit: int)
+## A beat of its chomp's animation (ChompKit.CUES: anticipate, gape, hold, strike, contact,
+## shake, recover, rest) at its mouth `at`: the hook for sounds and anything else that should
+## land on the beat (a puppet's too: it plays the host's beats).
+signal chomp_cue(cue: StringName, at: Vector3)
 
 enum Mode { HUNT, TELEGRAPH, CHARGE }
 
 ## Its body as proxies: at least this many, spread along it (more as it grows).
 const MIN_PARTS := 3
 const ROT := Color(0.36, 0.42, 0.34)
-## How far its jaw drops open (rad), and how far its upper jaw pushes forward
-## then (of the mouth's length).
-const GAPE := 0.95
-const PROTRUDE := 0.25
-const FLESH := Color(0.42, 0.07, 0.08)
-const TOOTH := Color(0.86, 0.83, 0.72)
-const EYE_RED := Color(0.55, 0.04, 0.02)
+## Its eyes' red: dark, nearly dried blood, so they smoulder rather than shine.
+const EYE_RED := Color(0.26, 0.012, 0.01)
 
 var mode := Mode.HUNT
 var charges := 0
@@ -51,16 +50,10 @@ var _bit_this_charge := false
 ## Its chomp's beats (ChompKit), and a puppet's: the host's phase index.
 var _bite: ChompKit.Bite
 var _net_bite := 0
-## The jaw rig (in the model's space): the hinge, the lower jaw on it, the
-## upper teeth and palate, the cheeks between them, and the mouth's shape.
-var _hinge: Node3D
-var _upper: Node3D
-var _palate: MeshInstance3D
-var _cheeks: MeshInstance3D
-var _cheek_mesh := ImmediateMesh.new()
-var _flesh := StandardMaterial3D.new()
+## The jaw rig (HunterJaw, in the model's space: the body's own underside lifted
+## off as the lower jaw, and the mouth's shape).
+var _jaw := HunterJaw.new()
 var _mouth := {}
-var _shown_jaw := -1.0
 
 
 func _ready() -> void:
@@ -70,6 +63,7 @@ func _ready() -> void:
 	_charge_left = settings.shark_charge_every
 	_call_left = settings.shark_call_every * 0.5
 	_bite = ChompKit.Bite.new(settings)
+	_bite.cue.connect(_on_cue)
 	_model = FishModel.build(FishCharacter.FishClass.HUNTER)
 	_model.scale = Vector3.ONE * settings.shark_size
 	add_child(_model)
@@ -85,7 +79,7 @@ func _ready() -> void:
 		var material := (node as MeshInstance3D).material_override as ShaderMaterial
 		if material and material.shader == FishModel.FISH_EYE:
 			material.set_shader_parameter("iris", EYE_RED)
-			material.set_shader_parameter("iris_inner", EYE_RED.darkened(0.5))
+			material.set_shader_parameter("iris_inner", EYE_RED.darkened(0.6))
 			material.set_shader_parameter("sheen", 0.1)
 			material.set_shader_parameter("pupil", 0.5)
 			material.set_shader_parameter("pupil_stretch", 0.3)
@@ -95,7 +89,8 @@ func _ready() -> void:
 	_glow.light_energy = 0.0
 	add_child(_glow)
 	if _model is FishModel:
-		_build_jaw(_model as FishModel)
+		_jaw.build(_model as FishModel, ROT)
+		_mouth = _jaw.mouth
 	# Enough proxies, each as thick as the body, to cover it nose to tail.
 	var radius := (half_width + half_height) * 0.5
 	var count := maxi(MIN_PARTS, ceili(_length * 0.7 / radius) + 1)
@@ -214,6 +209,7 @@ func _update_chomp(delta: float, prey: FishController) -> void:
 	if not _bite.busy() and mode == Mode.CHARGE:
 		jaw = move_toward(jaw, 1.0, delta * 5.0)
 		_bite.open = jaw
+		_bite.smear = ChompKit.POSE_WIND.lerp(ChompKit.POSE_LUNGE, 0.5).lerp(Vector3.ONE, 1.0 - jaw)  # a charge runs long
 		if not _bit_this_charge and _reaching() > 0:
 			_bit_this_charge = true
 			_bite.strike_now(settings.shark_chomp_reach)
@@ -235,10 +231,14 @@ func chomp_winding() -> bool:
 
 
 ## Its head with the bite: the snout lifting as it winds up and dropping as it
-## strikes, and sawing side to side once its jaws are shut (the model turns).
+## strikes, and sawing side to side once its jaws are shut (the model turns). The
+## chomp's stylised smear (ChompKit.Bite.smear) squashes and stretches the whole
+## body about its middle: swelling as it winds up, wrung long in the lunge, slammed
+## flat on impact.
 func _pose_head() -> void:
 	if _model:
 		_model.rotation = Vector3(_bite.lift * settings.chomp_lift, _bite.saw * settings.chomp_saw, 0.0)
+		_model.scale = Vector3.ONE * settings.shark_size * (Vector3.ONE.lerp(_bite.smear, settings.chomp_smear))
 
 
 ## How many players are at its mouth, in its bite.
@@ -274,152 +274,31 @@ func _snap() -> void:
 
 # --- The jaw ------------------------------------------------------------------
 
-## Its jaw, hinged at the mouth's corners under its head (the model's space, so
-## it grows and moves with it): the lower jaw (skin under, raw flesh over, a
-## row of teeth), the upper teeth and palate it bares, and cheeks of flesh
-## stretched between as it opens.
-func _build_jaw(model: FishModel) -> void:
-	_mouth = SharkModel.mouth_geometry(model)
-	var front: Vector3 = _mouth.front
-	var back: Vector3 = _mouth.back
-	var width: float = _mouth.width
-	var length: float = _mouth.length
-	_flesh.albedo_color = FLESH
-	_flesh.roughness = 0.35
-	_flesh.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var skin := StandardMaterial3D.new()
-	skin.albedo_color = ROT.darkened(0.15)
-	skin.roughness = 0.6
-	skin.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var tooth := StandardMaterial3D.new()
-	tooth.albedo_color = TOOTH
-	tooth.roughness = 0.25
-	_hinge = Node3D.new()
-	_hinge.name = "Jaw"
-	_hinge.position = Vector3(0.0, back.y, back.z)
-	model.add_child(_hinge)
-	var thick := length * 0.012
-	# The lower jaw: a U-shaped plate under the head, raw flesh on top.
-	var floor_top := _plate(front - back, width, 0.0, true)
-	var under := _plate(front - back, width, -thick, false)
-	for pair: Array in [[floor_top, _flesh], [under, skin]]:
-		var node := MeshInstance3D.new()
-		node.mesh = pair[0]
-		node.material_override = pair[1]
-		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		_hinge.add_child(node)
-	# Its teeth: triangles along the rim, pointing up (lower) and down (upper).
-	_upper = Node3D.new()
-	_upper.name = "UpperTeeth"
-	_upper.position = _hinge.position
-	model.add_child(_upper)
-	var spike := CylinderMesh.new()
-	spike.top_radius = 0.0
-	spike.bottom_radius = length * 0.006
-	spike.height = length * 0.022
-	spike.radial_segments = 4
-	spike.rings = 1
-	spike.material = tooth
-	var count := 15
-	for n in count:
-		var u := lerpf(-0.88, 0.88, n / float(count - 1))
-		var at := _rim(front - back, width, u)
-		var low := MeshInstance3D.new()
-		low.mesh = spike
-		low.position = at * Vector3(0.94, 1.0, 0.94) + Vector3(0.0, spike.height * 0.45, 0.0)
-		low.rotation.z = -u * 0.25
-		_hinge.add_child(low)
-		var high := MeshInstance3D.new()
-		high.mesh = spike
-		high.position = at * Vector3(0.96, 1.0, 0.96) + Vector3(0.0, -spike.height * 0.4, 0.0)
-		high.rotation = Vector3(PI, 0.0, u * 0.25)
-		high.scale = Vector3.ONE * lerpf(1.15, 0.8, absf(u))
-		_upper.add_child(high)
-	# The roof of its mouth, bared when it opens.
-	_palate = MeshInstance3D.new()
-	_palate.mesh = _plate(front - back, width * 0.97, -length * 0.002, false)
-	_palate.material_override = _flesh
-	_palate.position = _hinge.position
-	_palate.visible = false
-	model.add_child(_palate)
-	_cheeks = MeshInstance3D.new()
-	_cheeks.mesh = _cheek_mesh
-	var cheek := StandardMaterial3D.new()  # rebuilt each opening without normals: unshaded, darker
-	cheek.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	cheek.albedo_color = FLESH.darkened(0.45)
-	cheek.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_cheeks.material_override = cheek
-	_cheeks.position = _hinge.position
-	_cheeks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	model.add_child(_cheeks)
-	_pose_jaw()
-
-
-## A point on the mouth's rim `u` round it (-1 one corner, 0 the front, 1 the
-## other), from the hinge: `reach` from the hinge to the front (model space).
-static func _rim(reach: Vector3, width: float, u: float) -> Vector3:
-	var a := u * PI * 0.5
-	return Vector3(width * sin(a), reach.y * cos(a), reach.z * cos(a))
-
-
-## The mouth's floor (or roof): a fan from the hinge's middle out to the rim,
-## `drop` m below it, facing up (`up`) or down.
-static func _plate(reach: Vector3, width: float, drop: float, up: bool) -> ArrayMesh:
-	var tool := SurfaceTool.new()
-	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var steps := 20
-	var middle := Vector3(0.0, drop, 0.0)
-	for n in steps:
-		var a := _rim(reach, width, lerpf(-1.0, 1.0, n / float(steps))) + Vector3(0.0, drop, 0.0)
-		var b := _rim(reach, width, lerpf(-1.0, 1.0, (n + 1) / float(steps))) + Vector3(0.0, drop, 0.0)
-		for corner: Vector3 in ([middle, b, a] if up else [middle, a, b]):
-			tool.add_vertex(corner)
-	tool.generate_normals()
-	return tool.commit()
-
-
-## The jaw as open as `jaw` says: the lower jaw dropped on its hinge, the upper
-## teeth pushed forward and bared, the cheeks stretched between.
+## Its jaw as open as the chomp says (HunterJaw), flung past wide on the gape's overshoot.
 func _pose_jaw() -> void:
-	if _hinge == null or is_equal_approx(jaw, _shown_jaw):
+	_jaw.set_overshoot(_bite.over)
+	_jaw.pose(jaw)
+
+
+## A beat of its chomp (ChompKit.CUES): the pad's growl and thumps for the players near
+## (chomp_cue_rumble), then chomp_cue for sounds and the like. The landing's own impact
+## (camera, hit-stop, rumble, blood) is _snap's.
+func _on_cue(beat: StringName) -> void:
+	if not is_instance_valid(run) or _model == null:
 		return
-	_shown_jaw = jaw
-	var open := smoothstep(0.0, 1.0, jaw)
-	var angle := -GAPE * open
-	_hinge.rotation.x = angle
-	var front: Vector3 = _mouth.front
-	var back: Vector3 = _mouth.back
-	var reach := front - back
-	_upper.position = Vector3(0.0, back.y, back.z) + Vector3(0.0, reach.z * 0.1, reach.z * PROTRUDE) * open
-	_upper.scale = Vector3(1.0, maxf(open, 0.02), 1.0)
-	_upper.visible = open > 0.03
-	for node in _hinge.get_children():
-		if node is MeshInstance3D and (node as MeshInstance3D).mesh is CylinderMesh:
-			(node as Node3D).scale = Vector3(1.0, maxf(open, 0.02), 1.0)
-	_palate.visible = open > 0.03
-	# The cheeks: flesh fanned from the upper rim down to the dropped jaw, along
-	# the back of each side.
-	_cheek_mesh.clear_surfaces()
-	if open <= 0.03:
-		return
-	var width: float = _mouth.width
-	_cheek_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-	var rows := 5
-	for side: float in [-1.0, 1.0]:
-		var cols := 6
-		for c in cols:
-			var u0 := side * lerpf(1.0, 0.45, c / float(cols))
-			var u1 := side * lerpf(1.0, 0.45, (c + 1) / float(cols))
-			for r in rows:
-				var a0 := angle * r / float(rows)
-				var a1 := angle * (r + 1) / float(rows)
-				var p00 := _rim(reach, width, u0).rotated(Vector3.RIGHT, a0)
-				var p01 := _rim(reach, width, u0).rotated(Vector3.RIGHT, a1)
-				var p10 := _rim(reach, width, u1).rotated(Vector3.RIGHT, a0)
-				var p11 := _rim(reach, width, u1).rotated(Vector3.RIGHT, a1)
-				for corner: Vector3 in [p00, p10, p01, p10, p11, p01]:
-					_cheek_mesh.surface_add_vertex(corner)
-	_cheek_mesh.surface_end()
+	var at := mouth_point()
+	var pad := settings.chomp_cue_rumble
+	var near := maxf(settings.shark_chomp_range, 1.0) * 2.5
+	match beat:
+		&"anticipate":
+			ChompKit.rumble_near(run, at, near, 0.25 * pad, _bite.duration(ChompKit.Phase.ANTICIPATE) + 0.1)  # the growl begins
+		&"gape":
+			ChompKit.rumble_near(run, at, near, 0.6 * pad, 0.12)  # the jaw cracks open
+		&"hold":
+			ChompKit.rumble_near(run, at, near, 0.4 * pad, _bite.duration(ChompKit.Phase.HOLD) + 0.05)  # held, shuddering
+		&"shake":
+			ChompKit.rumble_near(run, at, near, 0.7 * pad, settings.chomp_shake)  # it saws at what it caught
+	chomp_cue.emit(beat, at)
 
 
 ## A ring of sardines round `around`.

@@ -137,6 +137,7 @@ func _physics_process(delta: float) -> void:
 	_held = held
 	var landed := bite.update(delta)
 	if _jaw:
+		_jaw.set_overshoot(bite.over)  # the gape's fling past wide (forms with their own jaws ignore it)
 		_jaw.pose(bite.open)
 	if is_instance_valid(_model):
 		var settings := UnnaturalSettings.shared()

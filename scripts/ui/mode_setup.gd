@@ -262,15 +262,17 @@ func _refresh() -> void:
 		child.queue_free()
 	if _is_fish(_focus):
 		_build_fish_pane()
-		_hint.text = "LB / RB  %s" % pool_label.to_lower()
+		var parts: Array[String] = []
+		if pool.size() > 1:
+			parts.append("LB / RB  %s" % pool_label.to_lower())
 		if not pool[pool_index].species.is_empty():
-			_hint.text += "   ·   LT / RT  %s" % species_label.to_lower()
-		_hint.text += "   ·   D-pad up / down  setting"
+			parts.append("LT / RT  %s" % species_label.to_lower())
+		if _items.size() > 1:
+			parts.append("D-pad up / down  setting")
+		_hint.text = "   ·   ".join(parts)
 	else:
 		_build_row_pane(_row_of(_focus))
 		_hint.text = "LB / RB or left / right  change the value   ·   D-pad up / down  setting"
-	if _items.size() <= 1:
-		_hint.text = _hint.text.get_slice("·", 0).strip_edges()
 
 
 ## Redraws after the caller changed the pool or the rows (e.g. a role switch).
@@ -312,7 +314,8 @@ func _build_fish_pane() -> void:
 	var strip := HBoxContainer.new()
 	strip.add_theme_constant_override("separation", roundi(8.0 * s))
 	strip.alignment = BoxContainer.ALIGNMENT_CENTER
-	strip.add_child(_arrow("‹", "LB", cycle_pool.bind(-1), 64.0))
+	if count > 1:
+		strip.add_child(_arrow("‹", "LB", cycle_pool.bind(-1), 64.0))
 	var chips := HBoxContainer.new()
 	chips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	chips.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -333,7 +336,8 @@ func _build_fish_pane() -> void:
 		chip.pressed.connect(cycle_pool.bind(d))
 		chips.add_child(chip)
 	strip.add_child(chips)
-	strip.add_child(_arrow("›", "RB", cycle_pool.bind(1), 64.0))
+	if count > 1:
+		strip.add_child(_arrow("›", "RB", cycle_pool.bind(1), 64.0))
 	_pane.add_child(strip)
 	var entry: Dictionary = pool[pool_index]
 	if entry.species.is_empty():
@@ -421,7 +425,7 @@ func cycle_pool(step: int) -> void:
 	pool_index = posmod(pool_index + step, pool.size())
 	species_index = clampi(_remembered_slot(), 0, maxi(pool[pool_index].species.size() - 1, 0))
 	pool_changed.call(pool_index, species_index)
-	_refresh()
+	refresh()
 
 
 ## The species slot to open a newly shown class on: its owner's say (pool entry "slot"), else the first.
@@ -437,7 +441,7 @@ func cycle_species(step: int) -> void:
 		return
 	species_index = posmod(species_index + step, count)
 	pool_changed.call(pool_index, species_index)
-	_refresh()
+	refresh()
 
 
 func cycle_row(step: int) -> void:
@@ -448,7 +452,15 @@ func cycle_row(step: int) -> void:
 	row.index = posmod(int(row.index) + step, count)
 	var changed: Callable = row.changed
 	changed.call(int(row.index))
-	_refresh()
+	refresh()
+
+
+## Every option's setting again, as picked (a mode's entering can restore stored tuning
+## over them, so the caller re-applies once it's in).
+func reapply() -> void:
+	for row: Dictionary in rows:
+		var setter: Callable = row.set
+		setter.call(int(row.index))
 
 
 func confirm() -> void:

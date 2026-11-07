@@ -752,7 +752,7 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.0, 500.0, 1.0, "or_greater") var shark_contact := 15.0
 ## Its own eyes, gone red: how bright they glow (0: dull red, no glow), and how
 ## much more (times) they flare while it winds up a charge or a chomp.
-@export_range(0.0, 20.0, 0.1, "or_greater") var shark_eye_glow := 2.5
+@export_range(0.0, 20.0, 0.1, "or_greater") var shark_eye_glow := 0.7
 @export_range(0.0, 10.0, 0.1, "or_greater") var shark_eye_flare := 2.0
 ## Every shark_charge_every s it glows red for shark_telegraph s, then charges
 ## at shark_charge_speed (m/s) for shark_charge_time s.
@@ -952,6 +952,14 @@ static func shared() -> UnnaturalSettings:
 ## The bite lands on the tick the jaws are this shut (0.9: 90%), from where the
 ## mouth is then: the lunge counts, and a side-step during the hold dodges it.
 @export_range(0.5, 1.0, 0.01) var chomp_contact := 0.9
+## The Drowned Shark's chomp drawn Battletoads style (ChompKit.Bite.smear): how much
+## its body squashes and stretches with the beats (0: not at all, 1: swelling as it
+## winds up, tall as the jaw drops, wrung long in the lunge, slammed flat on impact).
+@export_range(0.0, 2.0, 0.05) var chomp_smear := 1.0
+## The pad's rumble on the chomp's beats (times chomp_rumble): a growl building through
+## the wind-up and hold, a thump as the jaws drop and a rolling shudder as it saws.
+## The landing's own impact is chomp_rumble. 0: only the landing.
+@export_range(0.0, 2.0, 0.05) var chomp_cue_rumble := 0.5
 ## A chomp that lands, on the victim: their camera shakes chomp_cam_shake m (at
 ## chomp_damage_ref damage; more for more, up to twice) and kicks chomp_cam_kick
 ## m toward the boss; the boss and the victim freeze for chomp_hit_stop s (no

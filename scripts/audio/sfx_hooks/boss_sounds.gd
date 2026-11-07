@@ -29,6 +29,8 @@ func _ready() -> void:
 	if boss is DrownedShark:
 		_mode = (boss as DrownedShark).mode
 		(boss as DrownedShark).chomped.connect(func(at: Vector3, _bit: int) -> void: Sfx.play_at("boss/chomp", at))
+		# The chomp's beats: a creak as it draws back, the jaw cracking open, the lunge's whoosh.
+		(boss as DrownedShark).chomp_cue.connect(_on_shark_cue)
 	elif not (boss is GulperBoss or boss is FallenAngelBoss):
 		set_process(false)
 
@@ -53,3 +55,14 @@ func _process(_delta: float) -> void:
 		elif mode == DrownedShark.Mode.CHARGE:
 			Sfx.play_at("boss/shark_charge", boss.global_position)
 	_mode = mode
+
+
+## A beat of the Drowned Shark's chomp: the draw back, the jaw cracking open, the lunge.
+func _on_shark_cue(beat: StringName, at: Vector3) -> void:
+	match beat:
+		&"anticipate":
+			Sfx.play_at("boss/shark_bite_wind", at)
+		&"gape":
+			Sfx.play_at("boss/shark_jaw_open", at)
+		&"strike":
+			Sfx.play_at("boss/shark_snap", at)

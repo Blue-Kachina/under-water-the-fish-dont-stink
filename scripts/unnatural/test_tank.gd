@@ -192,7 +192,7 @@ func _update_boss(delta: float) -> void:
 func _spawn_boss() -> void:
 	_boss_back = -1.0
 	var kind := BOSSES[clampi(_boss_pick, 0, BOSSES.size() - 1)]
-	if kind == "" or is_instance_valid(boss):
+	if kind == "" or is_instance_valid(boss) or UnnaturalRun.DISABLED_BOSSES.has(kind):
 		return
 	var settings := run.settings
 	var made: Boss = DrownedShark.new() if kind == "miniboss" else UnnaturalRun.make_final_boss(kind)

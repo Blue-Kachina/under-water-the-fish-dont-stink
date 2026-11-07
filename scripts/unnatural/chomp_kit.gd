@@ -33,6 +33,14 @@ extends RefCounted
 ## - chomp_zombie(): a player's chomp on a zombie or a boss (Drowned Jaws).
 
 enum Phase { IDLE, ANTICIPATE, GAPE, HOLD, STRIKE, SHAKE, RECOVER }
+## Each phase's cue (Bite.cue), in Phase's order; "contact" also fires on the landing tick.
+const CUES: Array[StringName] = [&"rest", &"anticipate", &"gape", &"hold", &"strike", &"shake", &"recover"]
+## The head's scale (width, height, length) at the chomp's key poses: drawn back and swollen,
+## stretched tall as the jaw drops, wrung out long as it lunges, slammed flat on impact.
+const POSE_WIND := Vector3(1.04, 1.06, 0.93)
+const POSE_WIDE := Vector3(0.94, 1.14, 1.05)
+const POSE_LUNGE := Vector3(0.86, 0.88, 1.3)
+const POSE_IMPACT := Vector3(1.18, 1.14, 0.78)
 
 const BLOOD := Color(0.75, 0.04, 0.05, 0.55)
 const BUBBLE := Color(0.75, 0.9, 1.0, 0.5)
@@ -54,6 +62,11 @@ static var _views := {}
 ## One chomp's timing (see the class note). update() each tick; it returns
 ## true on the tick the bite lands (the contact frame).
 class Bite:
+	## A beat of the chomp, for whatever should sync to it (sounds, rumble, flashes): `name` is
+	## one of CUES, fired as the Bite enters that beat (so on a puppet too, as it plays the
+	## host's beats), and `contact` on the tick the jaws land.
+	signal cue(name: StringName)
+
 	var settings: UnnaturalSettings
 	var phase := Phase.IDLE
 	## Seconds into the phase.
@@ -68,6 +81,10 @@ class Bite:
 	var lift := 0.0
 	var saw := 0.0
 	var step := 0.0
+	## The stylised pose (Battletoads' squash and stretch): the head's scale (width, height,
+	## length: ONE at rest) and how far past wide the jaw swings (0 at rest, jaws' worth).
+	var smear := Vector3.ONE
+	var over := 0.0
 	## The bite's reach (m): its pull-back and lunge are shares of it.
 	var reach := 6.0
 	## Whether this bite has landed (its contact frame passed).
@@ -140,6 +157,7 @@ class Bite:
 		_from_open = open
 		if next == Phase.STRIKE:
 			landed = false
+		cue.emit(CUES[next])
 
 	## A tick: returns true on the tick it lands (the jaws chomp_contact shut).
 	func update(delta: float) -> bool:
@@ -149,6 +167,8 @@ class Bite:
 			clamp_shut = 0.0
 			lift = move_toward(lift, 0.0, delta * 4.0)
 			saw = 0.0
+			over = 0.0
+			smear = smear.lerp(Vector3.ONE, minf(delta * 12.0, 1.0))
 			return false
 		t += delta
 		var length := duration(phase)
@@ -161,16 +181,24 @@ class Bite:
 				open = lerpf(_from_open, 0.12, s)
 				lift = smoothstep(0.0, 1.0, s)
 				_move_to(-back * smoothstep(0.0, 1.0, s))
+				smear = Vector3.ONE.lerp(POSE_WIND, smoothstep(0.0, 1.0, s))  # drawn back, swelling
 			Phase.GAPE:
 				open = lerpf(maxf(_from_open, 0.12), 1.0, 1.0 - pow(1.0 - s, 3.0))
 				lift = 1.0
+				smear = POSE_WIND.lerp(POSE_WIDE, 1.0 - pow(1.0 - s, 3.0))  # stretched tall as it drops
+				over = 0.28 * sin(s * PI)  # the jaw flings past wide, then settles
 			Phase.HOLD:
 				open = 1.0
 				lift = lerpf(1.0, 0.7, s)
+				var tremble := sin(t * 70.0) * 0.012 * (0.5 + s)  # quivering, ready to go
+				smear = POSE_WIDE + Vector3(-tremble, tremble, tremble * 0.5)
+				over = absf(tremble) * 3.0
 			Phase.STRIKE:
 				open = _from_open * (1.0 - s * s)
 				lift = lerpf(0.7, -0.3, s)
 				_move_to(lerpf(-back, lunge, s))
+				smear = POSE_WIDE.lerp(POSE_LUNGE, s * s)  # wrung out long
+				over = 0.0
 				if not landed and open <= 1.0 - settings.chomp_contact:
 					landed = true
 					contact = true
@@ -179,16 +207,26 @@ class Bite:
 				clamp_shut = 1.0
 				lift = lerpf(-0.3, 0.0, s)
 				saw = sin(s * TAU * 2.5) * (1.0 - s)
+				# Slammed flat, then a damped wobble back out.
+				var spring := exp(-4.5 * s) * cos(s * 16.0)
+				smear = Vector3.ONE + (POSE_IMPACT - Vector3.ONE) * spring
+				over = 0.0
 			Phase.RECOVER:
 				open = 0.0
 				clamp_shut = 1.0 - smoothstep(0.0, 1.0, s)
 				saw = 0.0
 				lift = 0.0
+				smear = smear.lerp(Vector3.ONE, minf(delta * 14.0, 1.0))
+				over = 0.0
+		if contact and t < length:
+			cue.emit(&"contact")
 		if t >= length:
 			if phase == Phase.STRIKE and not landed:
 				open = 0.0
 				landed = true
 				contact = true
+			if contact:
+				cue.emit(&"contact")  # before the next beat's cue
 			_enter(Phase.IDLE if phase == Phase.RECOVER else (phase + 1) as Phase)
 			if phase == Phase.IDLE:
 				_offset = 0.0
@@ -264,6 +302,19 @@ static func miss(run: UnnaturalRun, mouth: Vector3, reach: float, power := 1.0) 
 	var fx := _fx(run)
 	fx.burst(fx.bubbles, mouth, 0.6 * power)
 	Sfx.play_at("boss/chomp_miss", mouth, clampf(power, 0.3, 1.5))
+
+
+## A rumble of `strength` for `seconds` on every local player within `reach` m of `at`
+## (fading with distance): a chomp's beats, as opposed to its landing (impact).
+static func rumble_near(run: UnnaturalRun, at: Vector3, reach: float, strength: float, seconds: float) -> void:
+	if strength <= 0.0 or seconds <= 0.0:
+		return
+	for fish in run.local_players():
+		if not run.is_up(fish):
+			continue
+		var gap := fish.global_position.distance_to(at)
+		if gap <= reach:
+			_rumble(fish, strength * (1.0 - 0.6 * gap / maxf(reach, 0.01)), seconds)
 
 
 ## A zombie's lunge landing on player `fish` from `from` (lunge_impact): a

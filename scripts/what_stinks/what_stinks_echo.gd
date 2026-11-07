@@ -324,7 +324,7 @@ func click(hunter: FishController, force := false) -> int:
 
 
 func _show_ring(hunter: FishController) -> void:
-	if hunter == game.local_fish():
+	if settings.click_ring and hunter == game.local_fish():
 		_ring.global_position = hunter.global_position
 		_ring_age = 0.0
 		_ring_reach = cone_range(hunter)

@@ -149,7 +149,7 @@ func _shark() -> void:
 	for code in hud.numbers._crit:
 		big += 1 if code == DamageNumbers.BITTEN else 0
 	check(big >= 1, "the bite's damage shows big, in red")
-	check(shark._hinge and shark._hinge.rotation.x < -0.3 or shark.jaw < 0.5, "its jaw turns on its hinge")
+	check(shark._jaw._lower and shark._jaw._lower.rotation.x < -0.3 or shark.jaw < 0.5, "its jaw turns on its hinge")
 	await _ticks(60)
 	check(shark.jaw < 0.2, "then shuts")
 	# A player who leaves its reach during the hold takes no bite: a clack on nothing.

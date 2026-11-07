@@ -42,6 +42,16 @@ uniform vec2 nostril = vec2(0.05, -0.6);  // m: x either side, z
 uniform vec3 eye_at = vec3(0.1, 0.05, -0.5);  // m, the right eye
 uniform float eye_size = 0.018;  // m, its radius
 uniform float grain = 0.35;  // denticle bump strength
+// A chomping jaw (HunterJaw): the body's own underside under the mouth is cut away while the
+// jaw is open (jaw_cut 1, back to z = jaw_end m: the hinge line) and the lower jaw is a copy of
+// that piece (jaw_part 1: its skin, 2: its inside, in raw flesh), hinged at jaw_hinge (y, z)
+// and dropped jaw_angle rad. All 0 on a shark that has no jaw: the skin is untouched.
+uniform float jaw_part = 0.0;
+uniform float jaw_cut = 0.0;
+uniform float jaw_end = 0.0;
+uniform vec2 jaw_hinge = vec2(0.0);
+uniform float jaw_angle = 0.0;
+uniform vec4 jaw_flesh : source_color = vec4(0.36, 0.07, 0.07, 1.0);
 
 varying vec3 rest;
 varying vec2 ring;  // (sin, cos) round the slice, top (0, 1)
@@ -49,6 +59,13 @@ varying vec2 ring;  // (sin, cos) round the slice, top (0, 1)
 void vertex() {
 	rest = VERTEX;
 	ring = vec2(UV2.x, UV.y);
+	if (jaw_part > 0.5) {
+		float c = cos(jaw_angle);
+		float s = sin(jaw_angle);
+		vec2 d = VERTEX.yz - jaw_hinge;
+		VERTEX.yz = jaw_hinge + vec2(c * d.x - s * d.y, s * d.x + c * d.y);
+		NORMAL.yz = vec2(c * NORMAL.y - s * NORMAL.z, s * NORMAL.y + c * NORMAL.z);
+	}
 	fish_bend(VERTEX, NORMAL);
 }
 
@@ -123,6 +140,9 @@ void fragment() {
 	float x = p.x / mouth_width;
 	float curve = mouth_z + mouth_back * x * x;
 	float in_width = 1.0 - smoothstep(0.95, 1.05, x);
+	if (jaw_cut > 0.5 && jaw_part < 0.5 && up < -0.45 && x < 1.0 && rest.z > curve && rest.z < jaw_end) {
+		discard;  // the lower jaw's skin has come away with the jaw
+	}
 	float mouth = cut(rest.z - curve, 0.0026) * in_width * below;
 	float overhang = smoothstep(-0.025, 0.0, rest.z - curve) * (1.0 - smoothstep(0.0, 0.004, rest.z - curve)) * in_width * below;
 	color *= 1.0 - 0.25 * overhang;
@@ -146,4 +166,11 @@ void fragment() {
 	CLEARCOAT_ROUGHNESS = 0.35;
 	RIM = 0.25;
 	RIM_TINT = 0.6;
+	if (jaw_part > 1.5) {
+		// The jaw's inside: raw, wet flesh, darker toward the throat.
+		float depth = clamp((rest.z - curve) / max(jaw_end - curve, 1e-4), 0.0, 1.0);
+		ALBEDO = jaw_flesh.rgb * mix(1.15, 0.45, depth) * mix(0.85, 1.1, skin_fbm(rest * 26.0));
+		METALLIC = 0.0;
+		ROUGHNESS = 0.3;
+	}
 }

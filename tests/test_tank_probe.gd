@@ -129,6 +129,9 @@ func _run() -> void:
 		settings.tank_boss = pick
 		await _ticks(30)
 		var out: Boss = run.bosses[0] if run.bosses.size() == 1 else null
+		if UnnaturalRun.DISABLED_BOSSES.has(TestTank.BOSSES[pick]):
+			check(run.bosses.is_empty(), "%s is switched off: nothing comes in" % titles[pick])
+			continue
 		var right := out != null and (out is DrownedShark if pick == 1 else (out is BloodLeviathan and TestTank.BOSSES[pick] != ""))
 		check(right and out == tank.boss and not out.parts.is_empty(), "%s comes in (%d parts)" % [titles[pick], out.parts.size() if out else 0])
 	var gone: Boss = tank.boss

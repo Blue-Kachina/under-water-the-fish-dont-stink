@@ -206,7 +206,9 @@ static func shared() -> WhatStinksSettings:
 ## Seconds between Clicks.
 @export_range(0.1, 60.0, 0.1, "or_greater") var click_cooldown := 3.0
 ## The Hunter clicks by itself when ready (the Titan's auto Marco); off: only on click_button.
-@export var click_auto := true
+@export var click_auto := false
+## A Click draws an expanding sonar ring in the water (the Hunter's own view).
+@export var click_ring := false
 @export_enum("air_roll", "powerslide", "jump", "boost") var click_button := "air_roll"
 ## Sniff (hold): the cone narrows to this share, echo builds x sniff_mult, and the Hunter swims at sniff_speed of its speed.
 @export_range(0.05, 1.0, 0.01) var sniff_cone_mult := 0.4
@@ -262,6 +264,17 @@ static func shared() -> WhatStinksSettings:
 @export_group("Camera")
 ## The view is the follow cam (Unnatural's Settle style, from its panel) and the ball cam button locks on a school: a tap toggles lock-on and looks at the nearest school ahead, holding opens the school wheel. Off: the follow cam only.
 @export var lock_on := true
+## A bite while locked on a school takes its fish from that school alone (the locked Hunter's bite), up to capacity x lock_bite_mult x its line-up...
+@export var lock_bite := true
+@export_range(0.1, 10.0, 0.1, "or_greater") var lock_bite_mult := 3.0
+## ...reaching this many bite reaches from the mouth (further: the plain bite)...
+@export_range(0.5, 5.0, 0.1, "or_greater") var lock_bite_range := 1.5
+## ...the share a poor line-up still takes (0: could take none, but a bite takes at least 1)...
+@export_range(0.0, 1.0, 0.01) var lock_bite_floor := 0.25
+## ...and how much the line-up counts each of: facing the school, being close, rushing at it.
+@export_range(0.0, 5.0, 0.05, "or_greater") var lock_w_angle := 0.4
+@export_range(0.0, 5.0, 0.05, "or_greater") var lock_w_close := 0.3
+@export_range(0.0, 5.0, 0.05, "or_greater") var lock_w_speed := 0.3
 ## Prey get the lock-on and the school wheel too (to pick a school to head for). Off: the Hunter only.
 @export var lock_on_prey := true
 ## How long (s) the ball cam button is held to open the school wheel.

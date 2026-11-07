@@ -233,6 +233,21 @@ static func mouth_geometry(m: FishModel) -> Dictionary:
 			"length": m._size.z}
 
 
+## The body's underside under model-space point (`x`, `z`) on `m`: {"pos": the surface point,
+## "uv"/"uv2": what the skin shader paints from there (as _body_mesh gives its vertices)}. `x` is
+## clamped to the body's half width there (HunterJaw lofts the lower jaw from this skin).
+static func underside(m: FishModel, x: float, z: float) -> Dictionary:
+	var sp: Dictionary = SPECIES[clampi(m.species, 0, SPECIES.size() - 1)]
+	var shape := _shape(sp, m._size)
+	var ends: Vector2 = shape.ends
+	var along := clampf((z - ends.x) / (ends.y - ends.x), 0.0, 1.0)
+	var slice := _slice(shape, along)
+	var power := 2.0 / slice[4]
+	var side := clampf(absf(x) / maxf(slice[0], 0.0001), 0.0, 1.0)
+	var around := PI - signf(x) * asin(pow(side, 1.0 / power))
+	return {"pos": _ring_point(slice, around, z), "uv": Vector2(along, cos(around)), "uv2": Vector2(sin(around), 0.0)}
+
+
 ## The species' body in metres for _slice: the ends, widest half sizes and its
 ## shape numbers.
 static func _shape(sp: Dictionary, size: Vector3) -> Dictionary:

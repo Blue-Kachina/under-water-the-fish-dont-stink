@@ -67,9 +67,9 @@ func _run() -> void:
 	var seen := {}
 	for n in 60:
 		seen[run.pick_final_boss()] = true
-	check(seen.size() == 4 and not seen.has("boss"), "chance 1: each alternate, never the King (%s)" % [seen.keys()])
+	check(seen.size() == 3 and not seen.has("boss") and not seen.has("whale"), "chance 1: each alternate, never the King (%s)" % [seen.keys()])
 	settings.final_boss = 3
-	check(run.pick_final_boss() == "whale", "final_boss forces one")
+	check(run.pick_final_boss() != "whale", "the disabled Whale Fall is never picked")
 	settings.final_boss = 0
 	settings.alternate_boss_chance = 0.4
 

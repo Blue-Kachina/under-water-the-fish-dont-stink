@@ -154,6 +154,8 @@ signal choices_changed(fish: FishController)
 
 ## Players spawn side by side, this far apart (m).
 const SPAWN_SPACING := 3.0
+## Final bosses switched off (never picked, not in the Test Tank); the code stays so one can come back.
+const DISABLED_BOSSES: Array[String] = ["whale"]
 ## A zombie this near a player's middle (m, plus its own radius) touches it.
 const PLAYER_RADIUS := 0.75
 ## How often strays are moved back near the players (s).
@@ -1806,10 +1808,12 @@ func _add_boss(boss: Boss, at: Vector3, boss_hp: float, id := 0) -> void:
 ## alternate by alternate_boss_chance; final_boss picks one for testing).
 func pick_final_boss() -> String:
 	var picked := ["", "boss", "gulper", "whale", "lamprey", "angel"]
-	if settings.final_boss > 0 and settings.final_boss < picked.size():
+	if settings.final_boss > 0 and settings.final_boss < picked.size() and not DISABLED_BOSSES.has(picked[settings.final_boss]):
 		return picked[settings.final_boss]
 	if rng.randf() < settings.alternate_boss_chance:
-		return ["gulper", "whale", "lamprey", "angel"][rng.randi_range(0, 3)]
+		var alternates: Array = ["gulper", "whale", "lamprey", "angel"].filter(
+				func(kind: String) -> bool: return not DISABLED_BOSSES.has(kind))
+		return alternates[rng.randi_range(0, alternates.size() - 1)]
 	return "boss"
 
 

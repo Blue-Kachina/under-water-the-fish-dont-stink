@@ -10,8 +10,9 @@ const RIG := preload("res://scripts/what_stinks/forms/whalefall_rig.gd")
 
 
 ## Offered on the match card only once this is true (the form plays end to end: model, swim, bite, camera, hitbox).
+## Switched off for now (2026-11-07): the idea doesn't fit yet; flip back to true to bring it back.
 static func ready() -> bool:
-	return true
+	return false
 
 
 ## Hagfish knot: against the shark's chomp (reach 3.5 m, far half width 1.6 m, 4 fish, wind-up 0.75 s, every

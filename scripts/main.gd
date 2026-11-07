@@ -222,7 +222,8 @@ func _ready() -> void:
 	_pause_menu.closed.connect(func() -> void: _hold_local_players(false))
 	_pause_menu.coop_requested.connect(_open_coop)
 	_pause_menu.change_character_requested.connect(_change_character)
-	_pause_menu.change_character_allowed = func() -> bool: return current_mode not in [UNNATURAL, REPLAYS]  # Unnatural's later
+	# Not Unnatural's (later), nor a Marco Polo whale seeker's (its whale card picks).
+	_pause_menu.change_character_allowed = func() -> bool: return current_mode not in [UNNATURAL, REPLAYS] and not ModeSetups.whale_seeker_now(self)
 	_pause_menu.main_menu_allowed = func() -> bool: return not NetSession.is_online()
 	_pause_menu.can_open = func() -> bool: return not _home.is_open()
 	_pause_menu.main_menu_requested.connect(func() -> void: _home.open(true))
@@ -272,7 +273,7 @@ func _open_mode_setup(mode: String) -> void:
 	setup.confirmed.connect(func() -> void:
 		var to_start := ModeSetups.apply(self, setup)
 		_home.close()
-		start_mode(to_start))
+		start_mode(to_start, ModeSetups.settle.bind(setup)))
 	add_child(setup)
 
 
@@ -315,7 +316,10 @@ func _open_coop() -> void:
 
 ## Starts `mode` straight away (the setup screen's Dive in): a match mode's match
 ## too, with no card to wait on. Picking the mode that's on starts it afresh.
-func start_mode(mode: String) -> void:
+## `settle` runs once the mode's switched to and before its match starts: entering a
+## Nature-family mode restores stored tuning over the mode's settings, so the setup
+## screen's picks go in again then.
+func start_mode(mode: String, settle := Callable()) -> void:
 	if mode not in MODES:
 		return
 	if mode == current_mode and current_environment == mode_environment(mode):
@@ -328,6 +332,8 @@ func start_mode(mode: String) -> void:
 			reset_play()
 	else:
 		set_mode(mode)
+	if settle.is_valid():
+		settle.call()
 	if _match_card:
 		play_match()  # its options were picked on the setup screen (Marco Polo's too)
 
@@ -390,28 +396,27 @@ func set_environment(env_name: String) -> void:
 
 
 ## Plays as `character` from now on (and remembers it), in the species last picked
-## for it: the fish respawns as it. Not in Replays mode, where the live fish
-## sits out.
+## for it. Worn at once, mid-match (only Unnatural restarts its run). Not in
+## Replays mode, where the live fish sits out.
 func set_character(character: FishCharacter.FishClass) -> void:
 	if current_mode == REPLAYS:
 		return
 	var settings := ConfigFile.new()
 	settings.load(SETTINGS_PATH)
-	_fish.set_look(character, saved_species(settings, character))
-	if match_1v1:
-		match_1v1.kickoff()  # back to a kickoff as the new character
-	elif nature_run:
-		nature_run.start()
-	elif hunt_match:
-		hunt_match.kickoff()
-	elif marco_polo or what_stinks:
-		pass  # the new look plays from the next round (each round respawns everyone)
-	elif unnatural_run:
-		unnatural_run.start()
+	var species := saved_species(settings, character)
+	var kept := _kept_look_meta()
+	if kept != "":
+		_fish.set_meta(kept, [int(character), species, 0])  # worn once the Hunter's / whale's body comes off
 	else:
+		_fish.set_look(character, species)
+	if unnatural_run:
+		unnatural_run.start()  # its loadout comes from the class (Change Character is off there for now)
+	elif not (match_1v1 or nature_run or hunt_match or marco_polo or what_stinks):
 		_fish.set_spawn(_environment.spawn_transform())
+	# Otherwise it's worn now, mid-match: 1v1, Nature and Hunt keep nothing of the class (no
+	# restart), and Marco Polo / What Stinks keep it for when this role's body comes off.
 	_panel.set_character(character)
-	_panel.set_species(_fish.species)
+	_panel.set_species(species)
 	settings.set_value("playground", "character", FishCharacter.CLASSES[character].key)
 	settings.save(SETTINGS_PATH)
 
@@ -421,12 +426,28 @@ func set_character(character: FishCharacter.FishClass) -> void:
 func set_species(species: int) -> void:
 	if current_mode == REPLAYS:
 		return
-	_fish.species = species
-	_panel.set_species(_fish.species)
 	var settings := ConfigFile.new()
 	settings.load(SETTINGS_PATH)
-	store_species(settings, _fish.character, _fish.species)
+	var kept := _kept_look_meta()
+	if kept != "":
+		var base: Array = _fish.get_meta(kept)  # the player's own look, under the Hunter's / whale's body
+		_fish.set_meta(kept, [int(base[0]), species, 0])
+		store_species(settings, int(base[0]) as FishCharacter.FishClass, species)
+	else:
+		_fish.species = species
+		store_species(settings, _fish.character, _fish.species)
+	_panel.set_species(species)
 	settings.save(SETTINGS_PATH)
+
+
+## The meta a match keeps the player's own look in while it has them in another
+## body (What Stinks?'s Hunter, Marco Polo's whale), or "" when they wear their own.
+func _kept_look_meta() -> String:
+	if bool(_fish.get_meta("ws_swapped", false)):
+		return "ws_base_look"
+	if bool(_fish.get_meta("mp_swapped", false)):
+		return "mp_base_look"
+	return ""
 
 
 ## The species last picked for `fish_class` in `settings` (playground/species_<class

@@ -265,9 +265,11 @@ func biggest_school(point: Vector3) -> School:
 ## the places, by their own distance. Eats the school fish it picked (School.eat,
 ## the survivors panic and scatter) and returns what went:
 ## {"fish": [FishController...], "school_fish": int, "mass": float (their size worth), "spots": PackedVector3Array}.
-func eat_at(bite_point: Vector3, capacity: int, inside: Callable, extra: Array = []) -> Dictionary:
+func eat_at(bite_point: Vector3, capacity: int, inside: Callable, extra: Array = [], only: School = null) -> Dictionary:
 	var found: Array = []  # [gap, school (or null), index, fish (or null)]
 	for school in schools:
+		if only != null and school != only:
+			continue
 		for i in school.fish_count():
 			# A joined player's place is the player's fish (in `extra`), not a school fish.
 			if not school.is_alive(i) or school.is_claimed(i):

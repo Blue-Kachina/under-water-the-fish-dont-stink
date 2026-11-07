@@ -40,7 +40,8 @@ static func build(main: Node, mode: String) -> ModeSetup:
 			setup.rows.append(_row("Start as", [["Seeker", "Hunt the hiders first."], ["Hider", "Hide while a bot seeks."]], int(mp.start_as),
 					func(i: int) -> void:
 						mp.start_as = i as MarcoPoloSettings.StartAs
-						ModeSetups._use_role(setup, "hider" if i == MarcoPoloSettings.StartAs.HIDER else "seeker")))
+						ModeSetups._use_role(setup, "hider" if i == MarcoPoloSettings.StartAs.HIDER else "seeker"),
+					func(i: int) -> void: mp.start_as = i as MarcoPoloSettings.StartAs))
 			var arenas: Array = MarcoPoloSettings.ARENAS.filter(func(arena_name: String) -> bool: return main.ENVIRONMENTS.has(arena_name))
 			setup.rows.append(_row("Arena", arenas, maxi(arenas.find(mp.arena), 0), func(i: int) -> void: mp.arena = arenas[i]))
 			role = "hider" if mp.start_as == MarcoPoloSettings.StartAs.HIDER else "seeker"
@@ -51,7 +52,8 @@ static func build(main: Node, mode: String) -> ModeSetup:
 			setup.rows.append(_row("Start as", [["Hunter", "Eat the crowd first."], ["Prey", "Stay in the swim while a bot hunts."]], int(ws.start_as),
 					func(i: int) -> void:
 						ws.start_as = i as WhatStinksSettings.StartAs
-						ModeSetups._use_role(setup, "hunter" if i == WhatStinksSettings.StartAs.HUNTER else "prey")))
+						ModeSetups._use_role(setup, "hunter" if i == WhatStinksSettings.StartAs.HUNTER else "prey"),
+					func(i: int) -> void: ws.start_as = i as WhatStinksSettings.StartAs))
 			var size := HunterSize.shared()
 			var sizes: Array = WhatStinksSettings.SIZE_CHOICES.duplicate()
 			if not sizes.has(size.size_mult):
@@ -74,7 +76,7 @@ static func build_character(main: Node, role: String) -> ModeSetup:
 	var tile: Dictionary = main.MODE_TILES.get(main.current_mode, {})
 	setup.accent = tile.colors[1] if tile.has("colors") else UITheme.AQUA
 	setup.set_meta("mode", main.current_mode)
-	_use_role(setup, role)
+	_use_role(setup, role, true)
 	return setup
 
 
@@ -105,6 +107,12 @@ static func current_role(main: Node) -> String:
 	return RoleCharacters.DEFAULT
 
 
+## Whether the player is a Marco Polo seeker that's a whale: they pick it on the whale
+## card (whale_pick_card.gd) as the round starts, not from the fish classes.
+static func whale_seeker_now(main: Node) -> bool:
+	return main.current_mode == MARCO_POLO and MarcoPoloSettings.shared().whale_seeker and current_role(main) == "seeker"
+
+
 ## Applies a confirmed picker screen: its options are set already (they apply as
 ## they change); the character is worn and remembered for its role. Returns the
 ## mode to start.
@@ -112,7 +120,11 @@ static func apply(main: Node, setup: ModeSetup) -> String:
 	var mode: String = setup.get_meta("mode")
 	var role: String = setup.get_meta("role", RoleCharacters.DEFAULT)
 	var entry: Dictionary = setup.pool[setup.pool_index]
-	if entry.has("form"):
+	if entry.has("whale"):
+		# A whale seeker: the whale card picks it; the fish under it (worn as a hider) is the hider's last.
+		var hider := RoleCharacters.character("hider")
+		main.apply_look(hider, RoleCharacters.species("hider", hider))
+	elif entry.has("form"):
 		# A What Stinks? hunter: the form, and the fish worn as prey is the prey's last.
 		WhatStinksSettings.shared().form = entry.form
 		RoleCharacters.store_form(role, entry.form)
@@ -125,14 +137,28 @@ static func apply(main: Node, setup: ModeSetup) -> String:
 	return str(setup.get_meta("variant")) if mode == FISH_STICKS else mode
 
 
-## Applies a confirmed Change Character screen (a hunter's is the form, from the
-## next round; a fish plays as it from now, as the mode allows).
-static func apply_character(main: Node, setup: ModeSetup) -> void:
-	var role: String = setup.get_meta("role", RoleCharacters.DEFAULT)
+## The picks of a confirmed picker screen again, once its mode's been entered (see
+## Main.start_mode): the options, and a hunter's form.
+static func settle(setup: ModeSetup) -> void:
+	setup.reapply()
 	var entry: Dictionary = setup.pool[setup.pool_index]
 	if entry.has("form"):
 		WhatStinksSettings.shared().form = entry.form
+
+
+## Applies a confirmed Change Character screen: a hunter's form or a fish plays as
+## the pick from now, mid-round (a seeker whale's or a hunter's body keeps the pick
+## for when it comes off).
+static func apply_character(main: Node, setup: ModeSetup) -> void:
+	var role: String = setup.get_meta("role", RoleCharacters.DEFAULT)
+	var entry: Dictionary = setup.pool[setup.pool_index]
+	if entry.has("whale"):
+		return  # the whale card's to pick
+	if entry.has("form"):
+		WhatStinksSettings.shared().form = entry.form
 		RoleCharacters.store_form(role, entry.form)
+		if main.what_stinks and is_instance_valid(main.what_stinks):
+			main.what_stinks.refresh_form(main.get_node("Fish"))  # a Hunter wears it now
 		return
 	var species := ModeSetup.species_of(entry, setup.species_index)
 	RoleCharacters.store(role, entry.character, species)
@@ -148,16 +174,23 @@ static func wear(setup: ModeSetup, fish: FishController) -> void:
 
 ## Offers `role`'s characters: the fish pool opening on the one last played in it,
 ## or a hunter's forms.
-static func _use_role(setup: ModeSetup, role: String) -> void:
+static func _use_role(setup: ModeSetup, role: String, current := false) -> void:
 	setup.set_meta("role", role)
 	if role == "hunter":
 		setup.pool = _form_pool()
 		setup.pool_label = "Hunter"
 		setup.species_label = "Form"
 		var last := RoleCharacters.form("hunter")
+		if current or last == "":
+			last = WhatStinksSettings.shared().form  # the form in play (mid-match), not the one last remembered
 		var ready: Array[String] = HunterForms.ready_keys()
-		var at := ready.find(HunterForms.playable(last if last != "" else WhatStinksSettings.shared().form))
+		var at := ready.find(HunterForms.playable(last))
 		setup.pool_index = maxi(at, 0)
+		setup.species_index = 0
+	elif role == "seeker" and MarcoPoloSettings.shared().whale_seeker:
+		setup.pool = [_whale_entry()]
+		setup.pool_label = "Whale"
+		setup.pool_index = 0
 		setup.species_index = 0
 	else:
 		setup.pool = ModeSetup.fish_pool(role)
@@ -167,6 +200,12 @@ static func _use_role(setup: ModeSetup, role: String) -> void:
 		setup.pool_index = pick.x
 		setup.species_index = pick.y
 	setup.refresh()
+
+
+## A whale seeker's one item: no fish to choose, the whale card does it.
+static func _whale_entry() -> Dictionary:
+	return {"name": "Your whale", "character": FishCharacter.FishClass.TITAN, "whale": true, "slot": 0, "species": [],
+			"preview_species": 0, "line": "As the round starts a card shows your whale: left / right the species, up / down the skin, A locks it in."}
 
 
 static func _form_pool() -> Array:
@@ -179,8 +218,10 @@ static func _form_pool() -> Array:
 	return forms
 
 
-static func _row(label: String, options: Array, index: int, changed: Callable) -> Dictionary:
-	return {"label": label, "options": _options(options), "index": index, "changed": changed}
+## `setter`: just the setting (for re-applying it after Nature's tuning restore has had its
+## say); `changed` when it also has side effects (a role switch).
+static func _row(label: String, options: Array, index: int, changed: Callable, setter := Callable()) -> Dictionary:
+	return {"label": label, "options": _options(options), "index": index, "changed": changed, "set": setter if setter.is_valid() else changed}
 
 
 ## [name, desc] pairs (or bare names) as ModeSetup's options.

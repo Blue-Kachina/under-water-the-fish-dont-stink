@@ -472,8 +472,7 @@ func _become_hunter(fish: FishController) -> void:
 		fish.set_look(form["class"], int(form["species"]), 0)
 	size.apply(fish, form)
 	HunterForms.dress(fish, str(form.get("key", "")))
-	fish.boost_enabled = true
-	fish.boost_amount = 100.0
+	fish.boost_enabled = false
 	fish.team = 1
 	_drop_bite(fish)
 	var bite := HunterBite.new()
@@ -486,6 +485,16 @@ func _become_hunter(fish: FishController) -> void:
 	bites[fish] = bite
 	if fish == _local and is_instance_valid(camera):
 		size.frame(camera, fish, form)
+
+
+## A Hunter's form changed mid-round (the pause menu's Change Character): the new
+## form's body now, from a fresh model (the old form's rig goes with it).
+func refresh_form(fish: FishController) -> void:
+	if not is_hunter(fish):
+		return
+	var form := settings.form_sheet()
+	fish.set_look(form["class"], int(form["species"]), 0)
+	_become_hunter(fish)
 
 
 func _drop_bite(fish: FishController) -> void:
@@ -740,7 +749,47 @@ func _on_chomp(_mouth: Vector3, reach: float, _radius: float, capacity: int, hun
 		return
 	if phase != Phase.LIVE:
 		return
+	var locked := _locked_bite(hunter, bite, capacity, reach)
+	if not locked.is_empty():
+		var mouth := bite.mouth_point()
+		var span: float = locked["range"]
+		_judge_bite(hunter, bite, mouth, int(locked["capacity"]), func(at: Vector3) -> bool: return at.distance_to(mouth) <= span, locked["school"])
+		return
 	_judge_bite(hunter, bite, bite.mouth_point() + forward * reach * 0.5, capacity, bite.in_bite)
+
+
+## A bite while locked on a school (the local Hunter's lock-on): it takes fish from that school alone,
+## the nearest to the mouth within lock_bite_range x reach, however many its line-up earns: how squarely
+## it faces the school, how close it is and how fast it closes. Empty: not locked or too far (the plain bite).
+func _locked_bite(hunter: FishController, bite: HunterBite, capacity: int, reach: float) -> Dictionary:
+	if not settings.lock_bite or lock_cam == null or hunter != _local:
+		return {}
+	var focus := lock_cam.focus_of(hunter)
+	var school := focus.get_parent() as School if focus != null else null
+	if school == null or not field.schools.has(school):
+		return {}
+	var mouth := bite.mouth_point()
+	var span := reach * settings.lock_bite_range
+	var nearest := INF
+	var centre := Vector3.ZERO
+	var seen := 0
+	for i in school.fish_count():
+		if school.is_alive(i) and not school.is_claimed(i):
+			var at := school.fish_position(i)
+			nearest = minf(nearest, at.distance_to(mouth))
+			centre += at
+			seen += 1
+	if seen == 0 or nearest > span:
+		return {}
+	var to_school := (centre / seen - mouth).normalized()
+	var facing := clampf((-hunter.global_basis.z.dot(to_school) - 0.2) / 0.8, 0.0, 1.0)
+	var close := 1.0 - clampf(nearest / maxf(span, 0.001), 0.0, 1.0)
+	var top := maxf(hunter.max_boost_speed * hunter.top_speed_scale, 0.1)
+	var rush := clampf(hunter.linear_velocity.dot(to_school) / (top * 0.6), 0.0, 1.0)
+	var weights := settings.lock_w_angle + settings.lock_w_close + settings.lock_w_speed
+	var score := (facing * settings.lock_w_angle + close * settings.lock_w_close + rush * settings.lock_w_speed) / maxf(weights, 0.001)
+	var share := lerpf(settings.lock_bite_floor, 1.0, score)
+	return {"school": school, "range": span, "capacity": maxi(1, roundi(capacity * settings.lock_bite_mult * share))}
 
 
 ## The host: a guest's Hunter reports a landed bite from `mouth` along `forward`. The reach, radius and
@@ -763,11 +812,11 @@ func judge_net_bite(hunter: FishController, mouth: Vector3, forward: Vector3) ->
 
 
 ## A landed bite at `point` taking up to `capacity` of what `inside` holds (the host's).
-func _judge_bite(hunter: FishController, bite: HunterBite, point: Vector3, capacity: int, inside: Callable) -> void:
+func _judge_bite(hunter: FishController, bite: HunterBite, point: Vector3, capacity: int, inside: Callable, only: School = null) -> void:
 	var extra: Array = []
 	if settings.bite_takes_players:
 		extra.append_array(live_prey())
-	var taken := field.eat_at(point, capacity, inside, extra)
+	var taken := field.eat_at(point, capacity, inside, extra, only)
 	var penalty := settings.chew_delay
 	var prey: Array = taken["fish"]
 	bite_result.emit(hunter, taken["taken"], prey)

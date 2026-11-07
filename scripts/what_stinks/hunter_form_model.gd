@@ -9,7 +9,7 @@ extends RefCounted
 ## The jaw is kept in meta "hunter_jaw" for HunterBite to open.
 
 const ROT := Color(0.36, 0.42, 0.34)
-const EYE_RED := Color(0.55, 0.04, 0.02)
+const EYE_RED := DrownedShark.EYE_RED
 
 
 static func build(m: FishModel) -> void:
@@ -23,11 +23,11 @@ static func build(m: FishModel) -> void:
 		var material := (node as MeshInstance3D).material_override as ShaderMaterial
 		if material and material.shader == FishModel.FISH_EYE:
 			material.set_shader_parameter("iris", EYE_RED)
-			material.set_shader_parameter("iris_inner", EYE_RED.darkened(0.5))
+			material.set_shader_parameter("iris_inner", EYE_RED.darkened(0.6))
 			material.set_shader_parameter("sheen", 0.1)
 			material.set_shader_parameter("pupil", 0.5)
 			material.set_shader_parameter("pupil_stretch", 0.3)
-			material.set_shader_parameter("glow", 2.5)
+			material.set_shader_parameter("glow", 0.7)
 	var jaw := HunterJaw.new()
 	jaw.build(m, ROT)
 	m.set_meta("hunter_jaw", jaw)
