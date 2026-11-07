@@ -190,6 +190,9 @@ static func build(character: FishCharacter.FishClass, species := 0, skin := 0) -
 	if int(character) == int(FishCharacter.FishClass.get("TITAN", -1)):
 		(load(TITAN_MODEL) as GDScript).build(model)
 		return model
+	if character == FishCharacter.FishClass.MONSTER:
+		HunterFormModel.build(model)
+		return model
 	match character:
 		FishCharacter.FishClass.SKIRMISHER:
 			ClownfishModel.build(model)

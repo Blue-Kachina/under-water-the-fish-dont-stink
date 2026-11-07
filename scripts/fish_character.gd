@@ -13,7 +13,7 @@ class_name FishCharacter
 
 ## The order goes over the network (and into anything stored by index): add new
 ## classes at the end, never reorder.
-enum FishClass { SKIRMISHER, HUNTER, GLIDER, LANCER, CHARMER, BULWARK, SCORCHER, DRIFTER, BRAWLER, BREACHER, ALCHEMIST, TITAN }
+enum FishClass { SKIRMISHER, HUNTER, GLIDER, LANCER, CHARMER, BULWARK, SCORCHER, DRIFTER, BRAWLER, BREACHER, ALCHEMIST, TITAN, MONSTER }
 
 ## Per class: `key` (saves and our clips), `name` (the role name the picker
 ## shows), `rl_hitbox` (the RL hitbox it uses, as RL replays key it), `aliases`
@@ -108,6 +108,17 @@ const CLASSES := {
 		"back": {"radius": 17.0, "rest": 27.924, "at": Vector3(-250.0, 80.0, 0.0)},
 		"ride": 0.0,
 	},
+	# The playable boss forms (what_stinks.md): a hidden class like the Titans, one species per
+	# form. The box is a shark's body (the Drowned Shark, the only form so far), narrower than
+	# the Hunters' fin span; its model is built on the Hunters' box (HunterFormModel). A form
+	# with another shape needs its own box (hitbox per species, later).
+	FishClass.MONSTER: {
+		"key": "monster", "name": "Monsters", "rl_hitbox": "plank", "aliases": ["boss_form"], "hidden": true,
+		"hitbox": Vector3(120.5, 56.0, 40.0), "offset": Vector3(10.0, 0.0, 0.0),
+		"front": {"radius": 12.5, "rest": 31.924, "at": Vector3(40.0, 30.0, 0.0)},
+		"back": {"radius": 17.0, "rest": 27.924, "at": Vector3(-40.0, 30.0, 0.0)},
+		"ride": 0.0,
+	},
 }
 ## How far a tyre reaches out past its suspension mount (uu): the belly is this
 ## much wider than the wheels' mounts on each side.
@@ -193,6 +204,9 @@ const SPECIES := {
 		{"key": "beluga", "name": "Beluga"},
 		{"key": "sperm", "name": "Sperm Whale"},
 		{"key": "blue", "name": "Blue Whale"},
+	],
+	FishClass.MONSTER: [
+		{"key": "drowned_shark", "name": "Drowned Shark"},
 	],
 }
 

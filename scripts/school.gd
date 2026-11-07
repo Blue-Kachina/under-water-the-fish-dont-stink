@@ -57,6 +57,9 @@ const DETAIL_INTERVAL := 0.2
 const MAX_STEPS := 4
 
 ## Full models built this frame, across all schools: building one takes a few ms.
+## A fish that had claimed a place here lost it (its fish was eaten or battered).
+signal claim_lost(fish: FishController)
+
 static var _built_frame := -1
 ## The players' cameras (split-screen has several): detail fish go to the
 ## fish nearest any of them. Empty: the viewport's camera.
@@ -104,6 +107,16 @@ var _wander := PackedVector3Array()
 var _tail := PackedFloat32Array()
 var _alive := PackedByteArray()
 var _neighbours: Array[PackedInt32Array] = []
+## After eat() (What Stinks?): each scattering fish's heading (zero: it isn't),
+## and the seconds the school has left to reform (scatter fades out over them).
+var _scatter_dir := PackedVector3Array()
+var _scatter_left := 0.0
+var _scatter_total := 1.0
+
+## Places players have joined (What Stinks?, claim()): fish index -> a claim
+## dictionary. The school writes the player's fish's transform from the place;
+## the fish only reads (and leans, set_lean()).
+var _claims := {}
 
 var _time := 0.0
 var _since_step := 0.0
@@ -220,6 +233,8 @@ func _physics_process(delta: float) -> void:
 		_step(step)
 		steps += 1
 	_since_step = minf(_since_step, step)
+	if not _claims.is_empty():
+		_write_claimed(step)
 
 
 func _process(delta: float) -> void:
@@ -234,10 +249,13 @@ func _step(delta: float) -> void:
 	_steps += 1
 	_last_position = _position.duplicate()
 	_last_facing = _facing.duplicate()
+	_scatter_left = maxf(_scatter_left - delta, 0.0)
+	_strip_claims()
 	_update_alarm(delta)
 	_move_leader(delta)
 	_refresh_neighbours()
 	_move_fish(delta)
+	_apply_claims(delta)
 
 
 ## Which of its fish are left (1) or battered (0), by index.
@@ -251,6 +269,7 @@ func apply_alive_mask(mask: PackedByteArray) -> void:
 	for i in mini(mask.size(), _alive.size()):
 		if mask[i] == 0 and _alive[i] == 1:
 			_alive[i] = 0
+			_drop_claim(i)
 			if _detailed.has(i):
 				_detailed[i].index = -1
 				_detailed[i].visible = false
@@ -390,6 +409,7 @@ func tightness() -> float:
 func batter(index: int) -> Vector3:
 	var at := fish_position(index)
 	_alive[index] = 0
+	_drop_claim(index)
 	if _detailed.has(index):
 		var freed: SchoolFish = _detailed[index]
 		freed.index = -1
@@ -408,7 +428,235 @@ func batter(index: int) -> Vector3:
 	return at
 
 
+## Eats the fish in `indices` (What Stinks?'s Hunter; the live ones only): like
+## batter(), they're gone, but the survivors panic harder: the school goes to full
+## alarm, survivors within burst_radius x `radius_mult` of a fish eaten burst away
+## `strength_mult` x harder, and each of those then scatters along one of `groups`
+## headings for `reform_time` s (fading out), before its slot pulls it back: the
+## school splits in a few groups and reforms. Returns where each eaten fish was
+## (the same order as the live ones in `indices`).
+func eat(indices: Array, strength_mult := 2.0, radius_mult := 2.0, groups := 3, reform_time := 6.0) -> PackedVector3Array:
+	var spots := PackedVector3Array()
+	var eaten: Array[int] = []
+	for entry: Variant in indices:
+		var index := int(entry)
+		if index < 0 or index >= _alive.size() or _alive[index] == 0:
+			continue
+		spots.append(fish_position(index))
+		eaten.append(index)
+		_alive[index] = 0
+		_drop_claim(index)
+		if _detailed.has(index):
+			var freed: SchoolFish = _detailed[index]
+			freed.index = -1
+			freed.visible = false
+			_detailed.erase(index)
+	if eaten.is_empty():
+		return spots
+	alarm = 1.0
+	_net_alarm = 1.0
+	var reach := settings.burst_radius * radius_mult
+	var headings: Array[Vector3] = []
+	for g in maxi(groups, 1):
+		headings.append(Vector3.FORWARD.rotated(Vector3.UP, rng.randf() * TAU + g * TAU / maxi(groups, 1)))
+	for i in _position.size():
+		if _alive[i] == 0:
+			continue
+		var nearest := INF
+		var from := Vector3.ZERO
+		for spot in spots:
+			var gap := _position[i].distance_to(spot)
+			if gap < nearest:
+				nearest = gap
+				from = spot
+		if nearest >= reach:
+			continue
+		var offset := _position[i] - from
+		var out := offset / nearest if nearest > 0.001 else Vector3.UP
+		_velocity[i] += out * settings.burst_strength * strength_mult * (1.0 - nearest / reach)
+		var heading: Vector3 = headings[rng.randi() % headings.size()]
+		_scatter_dir[i] = Vector3(heading.x, heading.y + out.y * 0.3, heading.z).normalized()
+	_scatter_total = maxf(reform_time, 0.1)
+	_scatter_left = _scatter_total
+	return spots
+
+
+# --- Joined players (What Stinks?, what_stinks.md section 5) ------------------
+
+## Gives fish `index` (alive, unclaimed) to the player's `fish`: it stays a real
+## school fish, drawn and moved by the school, and the player's fish takes its
+## transform each frame (a claimed fish's motion is the controller's to read,
+## never to write). The player eases in from `from` over `ease_time` s. False if
+## the place isn't free. The host picks the index (claim_nearest()); a guest is
+## told it.
+func claim(index: int, fish: FishController, ease_time := 0.6, from := Vector3.INF) -> bool:
+	if index < 0 or index >= _alive.size() or _alive[index] == 0 or _claims.has(index) or claim_of(fish) >= 0:
+		return false
+	var start: Vector3 = from if from.is_finite() else fish.global_position
+	var rel := start - fish_position(index)
+	_claims[index] = {"fish": fish, "rel": rel, "age": 0.0, "ease": maxf(ease_time, 0.0),
+			"lean": Vector2.ZERO, "lean_now": Vector2.ZERO, "range": 0.0, "ofs": rel}
+	# Starts where the player is, so the first frame doesn't jump (the next step strips and re-applies it).
+	_position[index] += rel
+	_last_position[index] += rel
+	return true
+
+
+## The live, unclaimed fish nearest `near` (-1 with none).
+func nearest_free(near: Vector3) -> int:
+	var best := -1
+	var best_gap := INF
+	for i in _position.size():
+		if _alive[i] == 0 or _claims.has(i):
+			continue
+		var gap := fish_position(i).distance_squared_to(near)
+		if gap < best_gap:
+			best_gap = gap
+			best = i
+	return best
+
+
+## Claims the free fish nearest `near` (the player's position) for `fish`; its
+## index, or -1.
+func claim_nearest(fish: FishController, near: Vector3, ease_time := 0.6) -> int:
+	var index := nearest_free(near)
+	if index >= 0 and claim(index, fish, ease_time, near):
+		return index
+	return -1
+
+
+## The index `fish` has claimed here, or -1.
+func claim_of(fish: FishController) -> int:
+	for index: int in _claims:
+		if _claims[index]["fish"] == fish:
+			return index
+	return -1
+
+
+func is_claimed(index: int) -> bool:
+	return _claims.has(index)
+
+
+## The player's fish at place `index`, or null.
+func claimed_by(index: int) -> FishController:
+	return _claims[index]["fish"] if _claims.has(index) else null
+
+
+func claimed_count() -> int:
+	return _claims.size()
+
+
+## The claimed places, by index.
+func claimed_indices() -> Array:
+	return _claims.keys()
+
+
+## How far `fish` has eased in: 0 where it joined, 1 in its place.
+func claim_progress(fish: FishController) -> float:
+	var index := claim_of(fish)
+	if index < 0:
+		return 0.0
+	return _ease_share(_claims[index])
+
+
+## Leans `fish`'s place: `stick` (x right, y up, -1..1) of `range_m` metres,
+## in the place's own frame. The player's input, nothing else.
+func set_lean(fish: FishController, stick: Vector2, range_m: float) -> void:
+	var index := claim_of(fish)
+	if index >= 0:
+		_claims[index]["lean"] = stick.limit_length(1.0)
+		_claims[index]["range"] = maxf(range_m, 0.0)
+
+
+## Lets go of `fish`'s place (the school fish stays, an ordinary one again).
+## Returns where and how the player's fish was: {"position", "velocity", "basis"}
+## (empty if it hadn't one).
+func release_claim(fish: FishController) -> Dictionary:
+	var index := claim_of(fish)
+	if index < 0:
+		return {}
+	var out := {"position": fish_position(index), "velocity": _velocity[index], "basis": Basis(_facing[index])}
+	_claims.erase(index)
+	return out
+
+
+## A player's place that's gone (eaten, battered): forgotten, and the fish told.
+func _drop_claim(index: int) -> void:
+	if not _claims.has(index):
+		return
+	var fish: FishController = _claims[index]["fish"]
+	_claims.erase(index)
+	claim_lost.emit(fish)
+
+
+func _ease_share(claim: Dictionary) -> float:
+	var ease_time: float = claim["ease"]
+	return 1.0 if ease_time <= 0.0 else smoothstep(0.0, 1.0, clampf(float(claim["age"]) / ease_time, 0.0, 1.0))
+
+
+## Takes last step's offsets off the claimed fish, so the school's own sim
+## (neighbours, slots) never sees them.
+func _strip_claims() -> void:
+	for index: int in _claims:
+		_position[index] -= _claims[index]["ofs"]
+		_claims[index]["ofs"] = Vector3.ZERO
+
+
+## Puts each claimed fish where its player is: the school's own place, plus
+## what's left of the way in from where it joined, plus its lean.
+func _apply_claims(delta: float) -> void:
+	for index: int in _claims.keys():
+		if index >= _alive.size() or _alive[index] == 0:
+			_drop_claim(index)
+			continue
+		var claim: Dictionary = _claims[index]
+		claim["age"] = float(claim["age"]) + delta
+		var rate := 1.0 - exp(-8.0 * delta)
+		claim["lean_now"] = (claim["lean_now"] as Vector2).lerp(claim["lean"], rate)
+		var lean: Vector2 = claim["lean_now"]
+		var basis := Basis(_facing[index])
+		var offset: Vector3 = (claim["rel"] as Vector3) * (1.0 - _ease_share(claim)) + (basis.x * lean.x + basis.y * lean.y) * float(claim["range"])
+		claim["ofs"] = offset
+		_position[index] += offset
+
+
+## Writes each player's fish onto its place, drawn between the last step and this one.
+func _write_claimed(step: float) -> void:
+	var blend := clampf(_since_step / step, 0.0, 1.0)
+	for index: int in _claims:
+		var fish := _claims[index]["fish"] as FishController
+		if not is_instance_valid(fish):
+			continue
+		var facing := _last_facing[index].slerp(_facing[index], blend)
+		fish.global_transform = Transform3D(Basis(facing), _last_position[index].lerp(_position[index], blend))
+		fish.linear_velocity = _velocity[index]
+
+
+## Startles the whole school (a player's Spook): every fish bolts off along one
+## of `groups` headings, `strength_mult` x the usual burst, for `reform_time` s
+## (fading out), then its place pulls it back: the school splits and re-forms.
+func startle(strength_mult := 2.5, groups := 3, reform_time := 4.0) -> void:
+	alarm = 1.0
+	_net_alarm = 1.0
+	var headings: Array[Vector3] = []
+	for g in maxi(groups, 1):
+		headings.append(Vector3.FORWARD.rotated(Vector3.UP, rng.randf() * TAU + g * TAU / maxi(groups, 1)))
+	var middle := _middle()
+	for i in _position.size():
+		if _alive[i] == 0:
+			continue
+		var heading: Vector3 = headings[rng.randi() % headings.size()]
+		var out := _position[i] - middle
+		out = out.normalized() if out.length_squared() > 0.0001 else Vector3.UP
+		var dir := Vector3(heading.x, heading.y + out.y * 0.3, heading.z).normalized()
+		_velocity[i] += dir * settings.burst_strength * strength_mult
+		_scatter_dir[i] = dir
+	_scatter_total = maxf(reform_time, 0.1)
+	_scatter_left = _scatter_total
+
+
 func _move_fish(delta: float) -> void:
+	var scatter := smoothstep(0.0, 1.0, _scatter_left / _scatter_total) if _scatter_left > 0.0 else 0.0
 	var extent := Vector3(settings.spread, settings.spread, settings.spread * settings.spread_length) * tightness()
 	var top_speed := settings.school_speed * settings.catch_up + 1.0
 	var reach := settings.separation
@@ -426,6 +674,8 @@ func _move_fish(delta: float) -> void:
 		var drift := Vector3(sin(spin + phase.x), 0.6 * sin(spin * 0.8 + phase.y), sin(spin * 0.9 + phase.z)) * settings.wander
 		var place := frame * (_slot[i] * extent + drift)
 		var wanted := -frame.basis.z * settings.school_speed + (place - at) * settings.slot_pull
+		if scatter > 0.0 and _scatter_dir[i] != Vector3.ZERO:
+			wanted = wanted.lerp(_scatter_dir[i] * top_speed, scatter)
 		if wanted.length() > top_speed:
 			wanted = wanted.normalized() * top_speed
 		var push := Vector3.ZERO
@@ -656,7 +906,7 @@ func _resize(count: int) -> void:
 			_detailed[gone].index = -1
 			_detailed[gone].visible = false
 			_detailed.erase(gone)
-		for list: Variant in [_position, _last_position, _velocity, _slot, _slot_back, _wander, _tail, _alive]:
+		for list: Variant in [_position, _last_position, _velocity, _slot, _slot_back, _wander, _tail, _alive, _scatter_dir]:
 			list.resize(gone)
 		_facing.resize(gone)
 		_last_facing.resize(gone)
@@ -674,6 +924,7 @@ func _resize(count: int) -> void:
 		_wander.append(Vector3(rng.randf(), rng.randf(), rng.randf()) * TAU)
 		_tail.append(rng.randf() * TAU)
 		_alive.append(1)
+		_scatter_dir.append(Vector3.ZERO)
 		_neighbours.append(PackedInt32Array())
 	for i in _buffers.size():
 		_buffers[i].resize(count * 12)

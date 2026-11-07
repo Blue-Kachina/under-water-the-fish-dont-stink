@@ -40,7 +40,7 @@ const PREVIEW_DIR := "res://assets/ui/previews"
 ## The sections in order: [id, title]. Game, Display and Controls are
 ## UISettings and Controls; the rest are tuning targets.
 const SECTIONS := [["game", "Game"], ["display", "Display"], ["audio", "Audio"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"],
-		["gaits", "Gaits"], ["ball", "Ball"], ["nature", "Nature"], ["unnatural", "Unnatural"], ["powerups", "Powerups"], ["marco_polo", "Marco Polo"]]
+		["gaits", "Gaits"], ["ball", "Ball"], ["nature", "Nature"], ["unnatural", "Unnatural"], ["powerups", "Powerups"], ["marco_polo", "Marco Polo"], ["what_stinks", "What Stinks?"], ["hunter_size", "Hunter Size"]]
 ## Who each tuning section is for ("Used by ...").
 const USED_BY := {
 	"camera": "the follow camera, in every mode",
@@ -50,6 +50,8 @@ const USED_BY := {
 	"nature": "Nature, Hunt and Unnatural",
 	"unnatural": "Unnatural and the Test Tank",
 	"marco_polo": "Marco Polo",
+	"what_stinks": "What Stinks?",
+	"hunter_size": "What Stinks?'s Hunter",
 	"powerups": "Unnatural's powerups",
 }
 ## The Game, Display and Controls options: key -> [title, group, description, used by].
@@ -103,6 +105,7 @@ const TABS := {
 			["Performance", ["Performance"]]],
 	"marco_polo": [["Match", ["Match"]], ["Noise & Sight", ["Noise", "Exposure", "Layers", "Sonar"]], ["Marco! scan", ["Marco! scan"]], ["Roles", ["Seeker", "Hider"]],
 			["Scoring", ["Scoring"]], ["Fake Fish & Portholes", ["Fake Fish", "Portholes"]], ["Bots", ["Bots"]]],
+	"what_stinks": [["Match", ["Match"]], ["Hunter & Bite", ["Hunter", "Bite"]], ["Schools & Arena", ["Schools", "Arena"]], ["Join & Spook", ["Join"]], ["Echo", ["Echo"]], ["Stomach", ["Stomach"]], ["Scoring", ["Scoring"]], ["Camera", ["Camera"]], ["Bots", ["Bots"]]],
 	"powerups": [["General", []], ["Weapons", []], ["Common", []], ["Uncommon", []], ["Rare", []], ["Epic", []], ["Legendary", []], ["Boss", []],
 			["Cursed", []]],
 	"controls": [["Keyboard & Mouse", []], ["Controller", []]],
@@ -209,7 +212,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 7  # over the pause menu and the home screen
 	_targets = {"fish": fish, "gaits": GaitSettings.shared(), "camera": follow_camera, "ball": ball_settings, "nature": NatureSettings.shared(),
-			"unnatural": UnnaturalSettings.shared(), "powerups": PowerupSettings.shared(), "marco_polo": MarcoPoloSettings.shared()}
+			"unnatural": UnnaturalSettings.shared(), "powerups": PowerupSettings.shared(), "marco_polo": MarcoPoloSettings.shared(),
+			"what_stinks": WhatStinksSettings.shared(), "hunter_size": HunterSize.shared()}
 	for section: String in _targets:
 		_defaults[section] = _snapshot(_targets[section])
 	_build_ui()

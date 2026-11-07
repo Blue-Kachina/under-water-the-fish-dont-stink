@@ -40,7 +40,7 @@ const SCHOOL_RATE := 10.0
 ## Tuning changes are sent this long (s) after the last one, not every slider step.
 const TUNING_DELAY := 0.25
 ## The tuning that's the host's (the camera stays each player's own).
-const TUNING_SECTIONS := ["fish", "gaits", "nature", "unnatural", "powerups", "marco_polo"]
+const TUNING_SECTIONS := ["fish", "gaits", "nature", "unnatural", "powerups", "marco_polo", "what_stinks", "hunter_size"]
 ## How often (s) guests time the round trip to the host, and send any change of
 ## their players (joining, leaving, a new fish).
 const PING_INTERVAL := 1.0
@@ -55,6 +55,9 @@ var unnatural_net := UnnaturalNet.new()
 ## The Marco Polo match in the session (instead of `run`), and its messages.
 var mpm: MarcoPoloMatch
 var marco_polo_net := MarcoPoloNet.new()
+## The What Stinks? match in the session (instead of `run`), and its messages.
+var wsm: WhatStinksMatch
+var what_stinks_net := WhatStinksNet.new()
 ## pid -> {"pid", "peer", "name", "character", "species" (its key), "index"}.
 var roster := {}
 ## The last status line (for the menu).
@@ -94,6 +97,8 @@ func _ready() -> void:
 	add_child(unnatural_net)
 	marco_polo_net.coop = self
 	add_child(marco_polo_net)
+	what_stinks_net.coop = self
+	add_child(what_stinks_net)
 	var session := get_parent()
 	session.session_started.connect(_on_session_started)
 	session.session_ended.connect(_on_session_ended)
@@ -110,6 +115,8 @@ func attach_main(game: Node) -> void:
 	main.unnatural_ended.connect(_on_unnatural_ended)
 	main.marco_polo_started.connect(_on_marco_polo_started)
 	main.marco_polo_ended.connect(_on_marco_polo_ended)
+	main.what_stinks_started.connect(_on_what_stinks_started)
+	main.what_stinks_ended.connect(_on_what_stinks_ended)
 	main._local.players_changed.connect(func(_count: int) -> void: _players_changed())
 	main._panel.tuning_changed.connect(func() -> void:
 		if _is_host():
@@ -134,6 +141,8 @@ func _is_host() -> bool:
 func _game_run() -> Node:
 	if mpm and is_instance_valid(mpm):
 		return mpm
+	if wsm and is_instance_valid(wsm):
+		return wsm
 	if urun and is_instance_valid(urun):
 		return urun
 	if run and is_instance_valid(run):
@@ -149,6 +158,11 @@ func _in_unnatural() -> bool:
 ## Whether this machine is in Marco Polo (the mode a session it hosts is in).
 func _in_marco_polo() -> bool:
 	return main != null and main.get("current_mode") == "Marco Polo"
+
+
+## Whether this machine is in What Stinks? (the mode a session it hosts is in).
+func _in_what_stinks() -> bool:
+	return main != null and main.get("current_mode") == "What Stinks?"
 
 
 func _set_status(text: String) -> void:
@@ -171,8 +185,11 @@ func _on_session_started() -> void:
 				else "Hosting on port %d: waiting for friends" % NetSession.port)
 		var unnatural := _in_unnatural()
 		var marco_polo := _in_marco_polo()
+		var what_stinks := _in_what_stinks()
 		if marco_polo:
 			main.host_marco_polo()
+		elif what_stinks:
+			main.host_what_stinks()
 		elif unnatural:
 			main.host_unnatural_run()
 		else:
@@ -181,6 +198,8 @@ func _on_session_started() -> void:
 			_add_to_roster(entry, 1)
 		if marco_polo:
 			_hook_marco_polo(main.marco_polo)
+		elif what_stinks:
+			_hook_what_stinks(main.what_stinks)
 		elif unnatural:
 			_hook_unnatural(main.unnatural_run)
 		else:
@@ -199,9 +218,11 @@ func _on_session_ended(reason: String) -> void:
 	var was_guest := _welcomed and run and not run.authority
 	var was_unnatural_guest := _welcomed and urun and is_instance_valid(urun) and not urun.authority
 	var was_marco_polo_guest := _welcomed and mpm and is_instance_valid(mpm) and not mpm.authority
+	var was_what_stinks_guest := _welcomed and wsm and is_instance_valid(wsm) and not wsm.authority
 	_unhook()
 	_unhook_unnatural()
 	_unhook_marco_polo()
+	_unhook_what_stinks()
 	for pid: int in _remote.keys():
 		_drop_remote(pid)
 	roster.clear()
@@ -223,6 +244,10 @@ func _on_session_ended(reason: String) -> void:
 	elif was_marco_polo_guest:
 		_switching = true
 		main.solo_marco_polo()  # back to Marco Polo against bots, the match ours
+		_switching = false
+	elif was_what_stinks_guest:
+		_switching = true
+		main.solo_what_stinks()  # back to What Stinks? against bots, the match ours
 		_switching = false
 
 
@@ -528,6 +553,9 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if is_active() and wsm and is_instance_valid(wsm):
+		_what_stinks_tick(delta)
+		return
 	if is_active() and mpm and is_instance_valid(mpm):
 		_marco_polo_tick(delta)
 		return
@@ -602,6 +630,62 @@ func _marco_polo_tick(delta: float) -> void:
 			_send_all("_fish_state", [pid, now, fish.global_position, fish.global_basis.get_rotation_quaternion(),
 					fish.linear_velocity, fish.replay_fx(), _teleports.get(fish, 0)], false)
 	marco_polo_net.tick(delta)
+
+
+## What Stinks?: the puppets follow their players (a school's joined fish is moved by the school,
+## not the net; the eaten are hidden), ours goes out, then WhatStinksNet's.
+func _what_stinks_tick(delta: float) -> void:
+	for net: NetFish in _remote.values():
+		if net.has_state() and is_instance_valid(net.fish):
+			net.fish.visible = not wsm.eaten.has(net.fish)
+			if not wsm.join.is_joined(net.fish):
+				net.apply()
+	_send_left -= delta
+	if _send_left <= 0.0:
+		_send_left += 1.0 / SEND_RATE
+		var now := _now()
+		var fish: FishController = wsm.local_fish()
+		var pid := pid_of(fish)
+		if pid >= 0:
+			_send_all("_fish_state", [pid, now, fish.global_position, fish.global_basis.get_rotation_quaternion(),
+					fish.linear_velocity, fish.replay_fx(), _teleports.get(fish, 0)], false)
+	what_stinks_net.tick(delta)
+
+
+func _on_what_stinks_started(match_node: WhatStinksMatch) -> void:
+	if is_active() and (_welcomed or _is_host()):
+		_hook_what_stinks(match_node)
+
+
+func _on_what_stinks_ended() -> void:
+	_unhook_what_stinks()
+	if is_active() and not _switching:
+		NetSession.leave("Left What Stinks?, so the session ended" if _is_host() else "Left the session")
+
+
+## Wires a What Stinks? match up to the session (WhatStinksNet), puppets joining it.
+func _hook_what_stinks(match_node: WhatStinksMatch) -> void:
+	if wsm == match_node or match_node == null:
+		return
+	_unhook_what_stinks()
+	wsm = match_node
+	what_stinks_net.hook(wsm)
+	for net: NetFish in _remote.values():
+		if is_instance_valid(net.fish) and net.fish.get_parent() != wsm:
+			net.fish.reparent(wsm)
+		wsm.add_player(net.fish)
+	_sync_puppets()
+
+
+func _unhook_what_stinks() -> void:
+	what_stinks_net.unhook()
+	if wsm == null or not is_instance_valid(wsm):
+		wsm = null
+		return
+	for net: NetFish in _remote.values():
+		if is_instance_valid(net.fish):
+			wsm.remove_player(net.fish)
+	wsm = null
 
 
 static func _now() -> float:
@@ -733,6 +817,8 @@ func _host_tuning() -> Dictionary:
 func _world_of_mode() -> Dictionary:
 	if mpm and is_instance_valid(mpm):
 		return marco_polo_net.world()
+	if wsm and is_instance_valid(wsm):
+		return what_stinks_net.world()
 	if urun and is_instance_valid(urun):
 		return unnatural_net.world()
 	return _world()
@@ -840,6 +926,15 @@ func _welcome(host_roster: Dictionary, tuning: Dictionary, world: Dictionary) ->
 		_switching = false
 		_hook_marco_polo(main.marco_polo)
 		marco_polo_net.apply_world(world)
+		_set_status("Playing with %d others" % (roster.size() - _local_players().size()))
+		return
+	if world.get("mode", "nature") == "what_stinks":
+		_apply_tuning(tuning)  # before the match: it reads the host's settings as it starts
+		_switching = true
+		main.guest_what_stinks()  # our own player in the host's match
+		_switching = false
+		_hook_what_stinks(main.what_stinks)
+		what_stinks_net.apply_world(world)
 		_set_status("Playing with %d others" % (roster.size() - _local_players().size()))
 		return
 	if world.get("mode", "nature") == "unnatural":

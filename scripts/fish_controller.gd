@@ -611,6 +611,10 @@ var accel_scale := 1.0
 ## Likewise on turning in water (turn rate and spin cap) and on the water's
 ## drag (linear and overspeed): Unnatural's Nimble and Glide twists.
 var turn_scale := 1.0
+## Likewise on the RL air control's pitch and yaw torque, which turn_scale does not
+## reach (that one is for the torque and car steering models, which the default
+## tuning's rl_air_control bypasses): What Stinks?'s Hunter size turns slower the bigger it is.
+var rl_turn_scale := 1.0
 var drag_scale := 1.0
 ## Boost after a reset (RL: 33.3 at a kickoff or a respawn in a match).
 var spawn_boost := 100.0
@@ -1214,7 +1218,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	# Capping the last step's result here, before anything reads it, does the same.
 	if puppet:
 		return  # placed by set_net_state()
-	var spin_cap := RL_MAX_ANGULAR_SPEED if rl_roll_timing else max_angular_speed * (powerslide_turn_multiplier if is_powersliding else 1.0) * turn_scale
+	var spin_cap := RL_MAX_ANGULAR_SPEED * rl_turn_scale if rl_roll_timing else max_angular_speed * (powerslide_turn_multiplier if is_powersliding else 1.0) * turn_scale
 	# The ball's contact push belongs to the step that just ran, before the caps.
 	state.linear_velocity += _ball_push
 	state.angular_velocity += _ball_twist
@@ -2046,8 +2050,8 @@ func _rl_air_control(spin: Vector3, pitch_in: float, yaw_in: float, roll_in: flo
 	var pitch_rate := spin.x
 	var yaw_rate := -spin.y
 	var roll_rate := -spin.z
-	pitch_rate += (RL_PITCH_TORQUE * pitch_in - RL_PITCH_DAMPING * (1.0 - absf(pitch_in)) * pitch_rate) * dt
-	yaw_rate += (RL_YAW_TORQUE * yaw_in - RL_YAW_DAMPING * (1.0 - absf(yaw_in)) * yaw_rate) * dt
+	pitch_rate += (RL_PITCH_TORQUE * rl_turn_scale * pitch_in - RL_PITCH_DAMPING * (1.0 - absf(pitch_in)) * pitch_rate) * dt
+	yaw_rate += (RL_YAW_TORQUE * rl_turn_scale * yaw_in - RL_YAW_DAMPING * (1.0 - absf(yaw_in)) * yaw_rate) * dt
 	roll_rate += (RL_ROLL_TORQUE * roll_in - RL_ROLL_DAMPING * roll_rate) * dt
 	return Vector3(pitch_rate, -yaw_rate, -roll_rate)
 

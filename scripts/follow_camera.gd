@@ -344,6 +344,7 @@ func _ball_cam_button(delta: float) -> void:
 		_ball_cam_held = -1.0
 		return
 	if steady_heading and not hold_opens_wheel:
+		_ball_cam_held = -1.0  # (a hold the mode ended mid-press must not toggle later)
 		# The survivor cam has no ball: the button swaps its modes instead.
 		if _player_input().just_pressed("ball_cam"):
 			free_cam = not free_cam

@@ -30,7 +30,7 @@ func _run() -> void:
 		var title := FishCharacter.display_name(fish_class)
 		check(title != "" and not keys.has(entry.key), "%s: a role name and its own key (%s)" % [title, entry.key])
 		keys[entry.key] = true
-		check(FishCharacter.species_count(fish_class) >= 3, "%s: %d species" % [title, FishCharacter.species_count(fish_class)])
+		check(FishCharacter.species_count(fish_class) >= (1 if entry.get("hidden", false) and entry.key == "monster" else 3), "%s: %d species" % [title, FishCharacter.species_count(fish_class)])
 		check(entry.rl_hitbox in RL_HITBOXES, "%s: on an RL hitbox (%s)" % [title, entry.rl_hitbox])
 		check(FishCharacter.from_key(entry.key) == fish_class, "%s: its key resolves" % title)
 		for alias: String in entry.aliases:

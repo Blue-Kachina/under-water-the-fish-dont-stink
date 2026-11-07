@@ -19,10 +19,12 @@ const GOLD := Color(1.0, 0.82, 0.3)
 const EDGE_INSET := 46.0
 
 var camera: Camera3D
-var run: NatureRun
+## What the wheel lists: a NatureRun, or anything with targets(), focus_of(fish) and set_focus(node, fish) (What Stinks?'s WhatStinksCam).
+var run: Object
 ## Whose wheel it is (their fish): the run's first player if not set.
 var fish: FishController
-var settings := NatureSettings.shared()
+## The wheel's settings: wheel_hold_time and school_arrows (NatureSettings, or WhatStinksSettings).
+var settings: Object = NatureSettings.shared()
 ## Open now, and the slice it's on ([node, name, fish left], or empty).
 var is_open := false
 var picked: Array = []
