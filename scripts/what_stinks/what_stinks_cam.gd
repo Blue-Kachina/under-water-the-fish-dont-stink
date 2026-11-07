@@ -64,7 +64,10 @@ func _process(_delta: float) -> void:
 	UnnaturalRun.steady_camera(camera, true, UnnaturalSettings.shared())  # live from the panel
 	var fish := _fish()
 	if is_instance_valid(fish) and game.is_hunter(fish) and not game.is_spectating():
-		game.size.frame(camera, fish, game.settings.form_sheet())  # the form's distance over the follow cam's
+		var form := game.settings.form_sheet()
+		game.size.frame(camera, fish, form)  # the form's distance over the follow cam's
+		var settle: float = float(form.get("cam_settle", 1.0))  # a lively form's view follows its nose slower, so its stride sweeps don't wobble it
+		camera.set("settle_rate", float(camera.get("settle_rate")) * settle)
 	if not _snapped:
 		_snapped = true
 		if camera.has_method("snap"):

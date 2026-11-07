@@ -33,6 +33,7 @@ A form file is a `RefCounted` with three static functions:
 | `bite_wind`, `bite_every` | The wind-up (s) and the cooldown between bites (s). |
 | `capacity` | Fish one bite takes at size 1 (x size^`bite_capacity_exp`). |
 | `cam` | `Vector2(distance, height)` factors on the camera, on top of the size framing (`HunterSize.frame`). A 40 m oarfish is framed differently from a 7 m whale: raise `x` to pull back. |
+| `cam_settle` | Optional. A multiplier on the follow camera's Settle rate (default 1): under 1 and the view follows the nose slower, so a form whose stride sweeps are big does not wobble it (the Fallen Angel's is 0.65). |
 
 ## What `hunter_size` moves (one dial, `size_mult` 0.25-30; a fish's own `size_mult` meta multiplies on top)
 

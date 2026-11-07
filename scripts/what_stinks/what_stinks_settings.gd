@@ -264,6 +264,13 @@ static func shared() -> WhatStinksSettings:
 @export_group("Camera")
 ## The view is the follow cam (Unnatural's Settle style, from its panel) and the ball cam button locks on a school: a tap toggles lock-on and looks at the nearest school ahead, holding opens the school wheel. Off: the follow cam only.
 @export var lock_on := true
+## Ramming: a Hunter at ram_speed (m/s at size 1, x its size's speed) or faster takes what its front touches, up to
+## capacity x ram_capacity_mult fish, no more than every ram_cooldown s; ram_width is the reach to the side (x its length).
+@export var ram := true
+@export_range(1.0, 200.0, 0.5, "or_greater") var ram_speed := 14.0
+@export_range(0.1, 10.0, 0.1, "or_greater") var ram_capacity_mult := 1.5
+@export_range(0.0, 5.0, 0.05, "or_greater") var ram_cooldown := 0.4
+@export_range(0.05, 2.0, 0.05, "or_greater") var ram_width := 0.5
 ## A bite while locked on a school takes its fish from that school alone (the locked Hunter's bite), up to capacity x lock_bite_mult x its line-up...
 @export var lock_bite := true
 @export_range(0.1, 10.0, 0.1, "or_greater") var lock_bite_mult := 3.0

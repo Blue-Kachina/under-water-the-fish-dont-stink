@@ -19,6 +19,14 @@ var materials: Array[ShaderMaterial] = []
 ## A roll round its length (rad), the whole body turning with it (the Lamprey
 ## Queen corkscrewing on her prey).
 var twist := 0.0
+## The way the head's up leans toward (the world's up for a boss; a Hunter's
+## own up, so its body rolls with it).
+var head_up := Vector3.UP
+## The tailward way `head_up` belongs to (zero: none, and the head's up is
+## `head_up` straightened onto the spine). Given, the head's up is `head_up`
+## turned from this onto the spine's first step, so it never snaps where the
+## trail leaves the head at a steep angle (a Hunter sinking as it rolls).
+var head_back := Vector3.ZERO
 var instances: Array[GeometryInstance3D] = []
 
 
@@ -91,12 +99,12 @@ func follow_chain(chain: PackedVector3Array) -> void:
 	_frames()
 
 
-## Each point's frame, tailward along the spine. The head's up is as near the
-## world's up as it can be; every frame after it carries the one before along
+## Each point's frame, tailward along the spine. The head's up is as near
+## `head_up` as it can be; every frame after it carries the one before along
 ## (a rotation-minimising frame), so the body never twists, even where it
 ## runs straight up or down (a hagfish rising out of its hole).
 func _frames() -> void:
-	var last_up := Vector3.UP
+	var last_up := head_up
 	for s in SPINE_N:
 		var ahead := points[maxi(s - 1, 0)]
 		var behind := points[mini(s + 1, SPINE_N - 1)]
@@ -106,7 +114,11 @@ func _frames() -> void:
 		back = back.normalized()
 		var guess := last_up
 		if s == 0:
-			guess = Vector3.UP if absf(back.y) < 0.95 else Vector3.FORWARD
+			var from := head_back.normalized()
+			if from != Vector3.ZERO and from.dot(back) > -0.999:
+				guess = Quaternion(from, back) * head_up
+			else:
+				guess = head_up if absf(back.dot(head_up)) < 0.95 else Vector3.FORWARD
 		guess = guess - back * guess.dot(back)
 		if guess.length_squared() < 0.0001:
 			guess = Vector3.FORWARD - back * back.z

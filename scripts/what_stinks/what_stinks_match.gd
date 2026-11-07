@@ -33,6 +33,8 @@ signal round_started(index: int, hunters: Array)
 signal role_changed(fish: FishController, role: int)
 ## A bite landed: how many school fish and prey players it took.
 signal bitten(hunter: FishController, school_fish: int, prey: Array)
+## A Hunter's callout: a bite or ram that took fish ("type": NatureScore.BATTERY / MULTI / SPREE, "title", "chain", "spree", "count", "source": "bite" or "ram", "prey": the prey players it took).
+signal callout(hunter: FishController, event: Dictionary)
 signal eaten_fish(fish: FishController, by: FishController)
 ## Upset Stomach: `prey` was in a bite and spat out; the Hunter hurled (queasy at max); it fed on school fish.
 signal spat(prey: FishController, hunter: FishController)
@@ -73,6 +75,11 @@ var shadows: WhatStinksShadows
 var looks: WhatStinksLooks
 ## The follow cam and the school lock-on (WhatStinksCam).
 var lock_cam: WhatStinksCam
+## Fish taken by body rams so far (school fish and prey), and seconds until each Hunter may ram again.
+var rammed_total := 0
+## Per Hunter: its chain and spree (Nature's multi and spree counters, each fish taken counts).
+var combos := {}
+var _ram_left := {}
 ## The world's run here (the host's, or solo).
 var authority := true
 ## Every fish in the match (people's and bots'), never assuming two.
@@ -363,6 +370,8 @@ func _begin_round(index: int, starting: Array[FishController], places: Dictionar
 	round_places = places
 	eaten.clear()
 	_tally.clear()
+	combos.clear()
+	_ram_left.clear()
 	round_eaten = 0
 	round_spat = 0
 	_daze.clear()
@@ -572,10 +581,42 @@ func _live_step(delta: float) -> void:
 		_stomach_step(delta)
 		if phase != Phase.LIVE:
 			return
+	_ram_step(delta)
+	if phase != Phase.LIVE:
+		return
 	if time_left <= 0.0:
 		_end_round(false, "hungry" if stomach() else "clock")
 		return
 	_check_round_end()
+
+
+## A Hunter's body at speed batters what its front touches (ram_speed x its size's speed):
+## school fish and prey players in its hitbox's front are taken like a bite's, with no chew delay.
+func _ram_step(delta: float) -> void:
+	if not settings.ram:
+		return
+	for hunter in hunters:
+		if not is_instance_valid(hunter) or hunter.puppet or hunter.battered or hunter.controls_locked or hurled_out.has(hunter):
+			continue
+		var tracker: NatureScore = combos.get(hunter)
+		if tracker != null:
+			tracker.update(delta, hunter.speed, settings.ram_speed * pow(size.size_of(hunter), size.speed_exp))
+		var left := maxf(float(_ram_left.get(hunter, 0.0)) - delta, 0.0)
+		_ram_left[hunter] = left
+		var bite: HunterBite = bites.get(hunter)
+		if bite == null or left > 0.0 or hunter.speed < settings.ram_speed * pow(size.size_of(hunter), size.speed_exp):
+			continue
+		var forward := -hunter.global_basis.z.normalized()
+		var origin := hunter.global_position
+		var length := hunter.hitbox_length
+		var inside := func(at: Vector3) -> bool:
+			var off := at - origin
+			var along := off.dot(forward)
+			return along >= 0.0 and along <= length * 0.6 and (off - forward * along).length() <= length * settings.ram_width
+		var before := rammed_total
+		_judge_bite(hunter, bite, origin + forward * length * 0.3, maxi(1, roundi(bite.capacity() * settings.ram_capacity_mult)), inside, null, true)
+		if rammed_total > before:
+			_ram_left[hunter] = settings.ram_cooldown
 
 
 func _check_round_end() -> void:
@@ -781,7 +822,7 @@ func _locked_bite(hunter: FishController, bite: HunterBite, capacity: int, reach
 			seen += 1
 	if seen == 0 or nearest > span:
 		return {}
-	var to_school := (centre / seen - mouth).normalized()
+	var to_school := (centre / seen - hunter.global_position).normalized()
 	var facing := clampf((-hunter.global_basis.z.dot(to_school) - 0.2) / 0.8, 0.0, 1.0)
 	var close := 1.0 - clampf(nearest / maxf(span, 0.001), 0.0, 1.0)
 	var top := maxf(hunter.max_boost_speed * hunter.top_speed_scale, 0.1)
@@ -811,13 +852,55 @@ func judge_net_bite(hunter: FishController, mouth: Vector3, forward: Vector3) ->
 	_judge_bite(hunter, bite, mouth + dir * reach * 0.5, bite.capacity(), inside)
 
 
+## The Hunter's callouts for a bite or ram that took `school_fish` and the `prey` players: each fish taken adds
+## to its chain (a Double Dip and up when several go at once or in quick succession) and its spree.
+func _call_out(hunter: FishController, school_fish: int, prey: Array, ram: bool) -> void:
+	var count := school_fish + prey.size()
+	if count <= 0:
+		return
+	var score: NatureScore = combos.get(hunter)
+	if score == null:
+		score = NatureScore.new(NatureSettings.shared())
+		combos[hunter] = score
+	var events: Array = []
+	var collect := func(event: Dictionary) -> void: events.append(event)
+	score.awarded.connect(collect)
+	for i in count:
+		score.on_battery()
+	score.awarded.disconnect(collect)
+	var last: Dictionary = {}
+	for event: Dictionary in events:
+		if event.type == NatureScore.SPREE:
+			continue
+		last = event
+	var source := "ram" if ram else "bite"
+	if not last.is_empty():
+		last = last.duplicate()
+		last["count"] = count
+		last["source"] = source
+		last["prey"] = prey
+		if int(last["chain"]) < 2:
+			last["title"] = "RAMMED" if ram else ("CHOMP" if count == 1 else "BIG CHOMP")
+		callout.emit(hunter, last)
+	for event: Dictionary in events:
+		if event.type == NatureScore.SPREE:
+			var spree: Dictionary = event.duplicate()
+			spree["source"] = source
+			spree["count"] = count
+			spree["prey"] = []
+			callout.emit(hunter, spree)
+
+
 ## A landed bite at `point` taking up to `capacity` of what `inside` holds (the host's).
-func _judge_bite(hunter: FishController, bite: HunterBite, point: Vector3, capacity: int, inside: Callable, only: School = null) -> void:
+func _judge_bite(hunter: FishController, bite: HunterBite, point: Vector3, capacity: int, inside: Callable, only: School = null, ram := false) -> void:
 	var extra: Array = []
 	if settings.bite_takes_players:
 		extra.append_array(live_prey())
 	var taken := field.eat_at(point, capacity, inside, extra, only)
-	var penalty := settings.chew_delay
+	var penalty := 0.0 if ram else settings.chew_delay
+	_call_out(hunter, int(taken["school_fish"]), [] if stomach() else taken["fish"], ram)
+	if ram:
+		rammed_total += int(taken["school_fish"]) + (taken["fish"] as Array).size()
 	var prey: Array = taken["fish"]
 	bite_result.emit(hunter, taken["taken"], prey)
 	if stomach():

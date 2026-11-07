@@ -24,7 +24,7 @@ static func sheet() -> Dictionary:
 		"name": "Fallen Angel", "class": FishCharacter.FishClass.MONSTER, "species": 0,
 		"length_m": 10.0, "speed": 1.2, "accel": 0.65, "turn": 0.7,
 		"bite_reach_m": 6.5, "bite_radius_m": 1.3, "bite_wind": 1.2, "bite_every": 2.2,
-		"capacity": 2.0, "cam": Vector2(1.1, 1.15),
+		"capacity": 2.0, "cam": Vector2(1.1, 1.15), "cam_settle": 0.65,
 		"sound_chomp": "boss/chomp", "sound_lock": "boss/angel_lock", "sound_miss": "boss/chomp_miss",
 	}
 

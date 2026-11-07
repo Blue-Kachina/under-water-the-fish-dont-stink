@@ -22,12 +22,17 @@ extends Resource
 const CAM_BASE := 1.35
 const CAM_POWER := 0.75
 
+## The size a match is played at: locked here, off the match card (play-test 2026-11-07: the form feels
+## right at 0.5x and worse the bigger it gets). The panel's size_mult still moves it, as a debug option.
+const MATCH_SIZE := 0.5
+
 static var _shared: HunterSize
 
 
 static func shared() -> HunterSize:
 	if _shared == null:
 		_shared = HunterSize.new()
+		_shared.size_mult = MATCH_SIZE
 	return _shared
 
 

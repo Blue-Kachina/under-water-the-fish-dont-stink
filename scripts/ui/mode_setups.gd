@@ -54,13 +54,6 @@ static func build(main: Node, mode: String) -> ModeSetup:
 						ws.start_as = i as WhatStinksSettings.StartAs
 						ModeSetups._use_role(setup, "hunter" if i == WhatStinksSettings.StartAs.HUNTER else "prey"),
 					func(i: int) -> void: ws.start_as = i as WhatStinksSettings.StartAs))
-			var size := HunterSize.shared()
-			var sizes: Array = WhatStinksSettings.SIZE_CHOICES.duplicate()
-			if not sizes.has(size.size_mult):
-				sizes.append(size.size_mult)
-				sizes.sort()
-			setup.rows.append(_row("Hunter size", sizes.map(func(mult: float) -> String: return "%sx" % str(snappedf(mult, 0.01))),
-					maxi(sizes.find(size.size_mult), 0), func(i: int) -> void: size.size_mult = float(sizes[i])))
 			role = "hunter" if ws.start_as == WhatStinksSettings.StartAs.HUNTER else "prey"
 	_use_role(setup, role)
 	return setup

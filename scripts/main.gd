@@ -766,13 +766,6 @@ func _what_stinks_card(card: MatchCard) -> void:
 	var forms: Array = ready.map(func(key: String) -> String: return HunterForms.name_of(key))
 	card.choices.append({"title": "Hunter", "options": forms, "index": maxi(ready.find(HunterForms.playable(ws.form)), 0),
 			"changed": func(i: int) -> void: ws.form = ready[i]})
-	var size := HunterSize.shared()
-	var sizes: Array = WhatStinksSettings.SIZE_CHOICES.duplicate()
-	if not sizes.has(size.size_mult):
-		sizes.append(size.size_mult)
-		sizes.sort()
-	card.choices.append({"title": "Size", "options": sizes.map(func(s: float) -> String: return "%sx" % str(snappedf(s, 0.01))),
-			"index": maxi(sizes.find(size.size_mult), 0), "changed": func(i: int) -> void: size.size_mult = float(sizes[i])})
 	if _local and _local.dropped_for_marco_polo > 0:
 		card.note = "No split-screen in What Stinks? (play together online): %d local player%s dropped." \
 				% [_local.dropped_for_marco_polo, "" if _local.dropped_for_marco_polo == 1 else "s"]

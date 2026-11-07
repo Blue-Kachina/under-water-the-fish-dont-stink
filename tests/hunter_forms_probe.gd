@@ -336,16 +336,12 @@ func _in_match() -> void:
 			await _frames(3)
 			var card: MatchCard = main._match_card
 			var titles: Array = card.choices.map(func(c: Dictionary) -> String: return str(c.title))
-			_check(titles.has("Hunter") and titles.has("Size"), "%s: the card has Hunter and Size (%s)" % [tag, str(titles)])
+			_check(titles.has("Hunter") and not titles.has("Size"), "%s: the card has Hunter and no Size (locked at %sx, a panel option) (%s)" % [tag, str(HunterSize.MATCH_SIZE), str(titles)])
 			var hunter_choice: Dictionary = card.choices[titles.find("Hunter")]
 			var shown: Array = hunter_choice.options
 			var want: Array = HunterForms.ready_keys().map(func(k: String) -> String: return HunterForms.name_of(k))
 			_check(shown == want, "%s: the card lists the ready forms only (%s)" % [tag, str(shown)])
 			_check(shown[int(hunter_choice.index)] == HunterForms.name_of(key), "%s: and has this one picked" % tag)
-			var size_choice: Dictionary = card.choices[titles.find("Size")]
-			var size_text := str(size_choice.options[int(size_choice.index)])
-			_check(size_choice.options.size() >= 6 and size_text == "%sx" % str(snappedf(s, 0.01)), "%s: the size picked shows (%s)" % [tag, size_text])
-			(size_choice.changed as Callable).call(int(size_choice.index))
 			main.play_match()
 			await _frames(8)
 			var game: WhatStinksMatch = main.what_stinks

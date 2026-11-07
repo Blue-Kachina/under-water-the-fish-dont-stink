@@ -12,12 +12,16 @@ const SHADOW := Color(0.0, 0.0, 0.0, 0.7)
 const RING := Color(1.0, 0.45, 0.35)
 const ECHO := Color(0.45, 0.85, 1.0)
 const NOISE := Color(1.0, 0.7, 0.3)
+const HEAT := [Color(0.95, 0.95, 0.9), Color(1.0, 0.82, 0.3), Color(1.0, 0.6, 0.2), Color(1.0, 0.4, 0.2), Color(1.0, 0.25, 0.25), Color(1.0, 0.2, 0.55)]
 const BELLY := Color(0.55, 0.9, 0.4)
 const QUEASY := Color(0.75, 0.85, 0.2)
 
 var game: WhatStinksMatch
 var _canvas: Control
 var _font: Font
+var _splash: BroadcastUI.Splash
+## The callout feed: [text, colour, seconds left].
+var _feed: Array = []
 
 
 func bind(match_node: WhatStinksMatch) -> void:
@@ -30,11 +34,42 @@ func bind(match_node: WhatStinksMatch) -> void:
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_canvas.draw.connect(_draw_hud)
 	add_child(_canvas)
+	_splash = BroadcastUI.Splash.new()
+	_splash.visible = false
+	add_child(_splash)
+	game.callout.connect(_on_callout)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	for line: Array in _feed:
+		line[2] -= delta
+	_feed = _feed.filter(func(line: Array) -> bool: return line[2] > 0.0)
 	if _canvas:
 		_canvas.queue_redraw()
+
+
+## The line a phase shows at the top (also what the probe reads).
+## A Hunter's callout (Nature's multis and sprees): the local Hunter's gets the splash from a multi up, everyone's a feed line.
+func _on_callout(hunter: FishController, event: Dictionary) -> void:
+	var own := hunter == game.local_fish()
+	var color: Color = HEAT[clampi(int(event.get("chain", 1)) - 1, 0, HEAT.size() - 1)]
+	var title: String = event.title
+	var count := int(event.get("count", 1))
+	var text := "%s  x%d" % [title, count] if count > 1 and event.type != NatureScore.SPREE else title
+	var who := "" if own else "%s:  " % hunter.display_name.to_upper()
+	for victim: Variant in event.get("prey", []):
+		if is_instance_valid(victim):
+			_feed.append(["%s%s  %s" % [who, "ATE" if not game.stomach() else "SPAT OUT", (victim as FishController).display_name.to_upper()], color, 3.0])
+	if event.type == NatureScore.SPREE:
+		color = HEAT[-1]
+		text = "%s!" % title
+		if own:
+			_splash.play(text, "%d fish without slowing" % int(event.spree), "", color, 2.2)
+	elif own and (int(event.get("chain", 1)) >= 2 or count >= 2):
+		_splash.play("%s!" % title, "x%d" % maxi(int(event.chain), count), "", color, 1.2 + 0.15 * int(event.chain))
+	_feed.append([who + text, color if own else Color(color, 0.85), 3.0])
+	while _feed.size() > 5:
+		_feed.pop_front()
 
 
 ## The line a phase shows at the top (also what the probe reads).
@@ -125,6 +160,12 @@ func _draw_hud() -> void:
 		_draw_hunter_senses(Vector2(area.x * 0.5, area.y - 90.0), local)
 	if not blackout() and game.local_view_role() == WhatStinksMatch.Role.PREY and not game.is_spectating() and game.phase != WhatStinksMatch.Phase.OVER:
 		_draw_prey_panel(area, local)
+	var row := 0
+	for entry: Array in _feed:
+		var shade: Color = entry[1]
+		shade.a = clampf(float(entry[2]) / 0.4, 0.0, 1.0)
+		_text(Vector2(area.x * 0.5, 130.0 + row * 26.0), str(entry[0]), 20, true, shade)
+		row += 1
 	if game.phase == WhatStinksMatch.Phase.ROUND_OVER:
 		_draw_round_card(area)
 	elif game.phase == WhatStinksMatch.Phase.OVER:

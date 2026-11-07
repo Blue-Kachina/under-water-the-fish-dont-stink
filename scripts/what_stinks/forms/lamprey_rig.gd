@@ -93,8 +93,10 @@ func _pose(delta: float) -> void:
 		keep -= 1
 	if keep > 0:
 		_trail = _trail.slice(keep)
-	var back := fish.get_global_transform_interpolated().basis.z
-	rig.follow_trail(head, _trail, back)
+	var body := fish.get_global_transform_interpolated().basis
+	rig.head_up = body.y  # the body rolls with the fish (an air roll), not held to the world's up
+	rig.head_back = body.z
+	rig.follow_trail(head, _trail, body.z)
 	_corkscrew(delta)
 	_swim_look()
 	_pose_riders()

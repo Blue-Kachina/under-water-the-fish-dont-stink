@@ -81,7 +81,7 @@ func _restore() -> void:
 
 func _check_builds() -> void:
 	print("every mode has a screen:")
-	var expected_rows := {ModeSetups.UNNATURAL: 1, ModeSetups.FISH_STICKS: 1, ModeSetups.MARCO_POLO: 3, ModeSetups.WHAT_STINKS: 3}
+	var expected_rows := {ModeSetups.UNNATURAL: 1, ModeSetups.FISH_STICKS: 1, ModeSetups.MARCO_POLO: 3, ModeSetups.WHAT_STINKS: 2}
 	for mode: String in ModePicker.PRIMARY + ModePicker.MORE:
 		var setup := ModeSetups.build(main, mode)
 		var rows: int = expected_rows.get(mode, 0)
@@ -220,7 +220,7 @@ func _check_roles() -> void:
 	ws.start_as = WhatStinksSettings.StartAs.HUNTER
 	var stinks := ModeSetups.build(main, ModeSetups.WHAT_STINKS)
 	check(stinks.pool.size() == HunterForms.ready_keys().size() and stinks.pool[0].has("form"), "What Stinks? as Hunter offers the Hunter forms")
-	check(stinks.rows.size() == 3, "What Stinks? has Variant, Start as and Hunter size")
+	check(stinks.rows.size() == 2, "What Stinks? has Variant and Start as (the Hunter size is locked, a panel option)")
 	stinks.pool_index = mini(1, stinks.pool.size() - 1)
 	ModeSetups.apply(main, stinks)
 	check(ws.form == stinks.pool[stinks.pool_index].form, "applying sets the Hunter form")

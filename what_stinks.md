@@ -52,10 +52,10 @@ stinker. Terminology: a fish that is eaten is **eaten** (never "battered"; that 
   visual root is scaled). `whale_reach_probe` checks that a 6.7 m whale can reach everywhere.
 - **Bosses** live in `scripts/unnatural/bosses/`: `boss.gd`, `blood_leviathan.gd` (the King of
   Herrings, and the base of the alternates), `drowned_shark.gd`, `gulper_boss.gd`,
-  `lamprey_boss.gd`, `whale_fall_boss.gd`, `fallen_angel_boss.gd`. They are AI nodes with spine-bent
-  meshes (`BossMesh`, `SpineRig`) and attacks built on `ChompKit.Bite` (`start`, `strike_now`).
-  **Not checked:** how deeply the AI is tied to the node (no `FishController`). That is the biggest
-  unknown, and Phase 0 is a spike for it.
+  `lamprey_boss.gd`, `fallen_angel_boss.gd` (`whale_fall_boss.gd` is switched off, see Progress). They are
+  AI nodes with spine-bent meshes (`BossMesh`, `SpineRig`) and attacks built on `ChompKit.Bite`
+  (`start`, `strike_now`). **Answered by Phase 0:** the AI is welded to `UnnaturalRun`, so the Hunter
+  forms reuse the meshes, rigs and bite kit on a normal `FishController` instead (section 2).
 - The mode list is the constants `MODES`, `MATCH_MODES`, `NATURE_MODES` in `scripts/main.gd`.
 
 ## The core idea, and why it should work
@@ -116,7 +116,6 @@ Fallback (cheaper, ship first): spectate with the watch wheel Marco Polo already
 | Drowned Shark | `drowned_shark.gd` | Fast-lunge **chomp** (shark chomp exists) |
 | King of Herrings | `blood_leviathan.gd` | **Coil** sweep (King coil exists) |
 | Gulper Mother | `gulper_boss.gd` | **Swallow**: a wide vacuum cone that pulls fish in |
-| Whale Fall | `whale_fall_boss.gd` | **Hagfish knot** (a slime cloud that makes fish scatter) |
 | Lamprey Queen | `lamprey_boss.gd` | **Corkscrew** latch on one target |
 | Fallen Angel | `fallen_angel_boss.gd` | **Lock-on** on a fish it has watched |
 
@@ -125,12 +124,12 @@ Every form shares: one **Bite** (the core verb), **Click** (echo ping, section 4
 **shape** (cone angle, reach, capacity, wind-up), because tuning five unrelated abilities is how
 this plan would go over budget.
 
-**How to build them playable** (decided in Phase 0): extend the Titans path. A boss form is a
-`FishCharacter.TITAN` species with the boss's `BossMesh`/`SpineRig` as its visual and `ChompKit.Bite`
-as its bite, on a normal `FishController`. That keeps online sync, split-screen, bots, camera and the
-HUD identical to everything else. The alternative (making the boss node take player input) is cheaper
-for one boss and ruinous for the second. If Phase 0 shows the AI node can't be driven by a
-controller's input cleanly, we keep the AI-free path and only reuse meshes/rigs/bite kits.
+**How they were built playable** (decided and done in Phase 0/5): every non-Titan form is a species of
+the hidden class `FishClass.MONSTER` on a normal `FishController`, wearing the boss's mesh/rig (a
+`SpineRig` fed from the controller's speed and turn, not the boss AI) and `ChompKit.Bite` as its bite
+(`HunterBite`). That keeps online sync, bots, camera and the HUD identical to everything else. The
+Titan whales stay `TITAN` species. Each form lives in `scripts/what_stinks/forms/<key>.gd` and is only
+offered when its `ready()` is true.
 
 "Bosses need attention to detail" means, per form: model reads right at close range and at the new
 size, camera collides sensibly, swim animation is driven by the controller's speed and turn (not the
@@ -304,7 +303,12 @@ fish, decay, queasy cap, spit daze), **Scoring**, **Arena**, **Bots**. A preset 
 - New folder `scripts/what_stinks/` and net layer `scripts/net/what_stinks_net.gd`. Tests in `tests/`
   (the names below).
 - Update `INVENTORY.md` for the new settings, forms and stats ([[keep-inventory-updated]]).
-- Co-op: **online + bots first**; split-screen is a decision (D7).
+- Co-op: **online + bots only** (D7). Split-screen players are dropped with a note on the setup screen.
+- **As built:** the mode is in `MODES`/`MATCH_MODES`/`NATURE_MODES`, but its picker tile is still in
+  the hidden row (hold SELECT) until it is ready for PRIMARY. The variant, "Start as" and Hunter form
+  picks live on the shared **mode setup screen** (`ModeSetups`, built for every mode on 2026-11-07),
+  not the old match card or pop-up; the Hunter role picks a form instead of a fish, prey wear their
+  last prey fish.
 
 ## Suggestions to make it fun (the "what do you think" parts)
 1. **Make the Hunter's decision the fun**, not its aim. The best moment is staring at one school
@@ -348,9 +352,9 @@ reveal layers on a school slot, the prey's echo ring. `echo_probe`, `echo_shots`
 
 **Phase 4: Upset Stomach.** Satiation, queasy, spit/daze, school respawn, scoring.
 
-**Phase 5: the forms and size.** All 11 forms (5 whales + 6 bosses), the pick card, per-form bite
-shape and the form sheets, `hunter_size` fully wired and tested across the range, the camera
-offsets. This is the phase most likely to take longest; split it per form so each can ship
+**Phase 5: the forms and size.** All 10 forms (5 whales + 5 bosses; Whale Fall was dropped), the pick
+card, per-form bite shape and the form sheets, `hunter_size` fully wired and tested across the range,
+the camera offsets. This is the phase most likely to take longest; split it per form so each can ship
 alone (a form not done is simply not in the card).
 
 **Phase 6: online.** `what_stinks_net.gd`, schools with claimed slots, size/echo sync, a 3-peer
@@ -395,7 +399,8 @@ The original questions are kept below for reference.
 - **Bosses as controller characters** (Phase 0). The single biggest unknown. Mitigation: the spike
   and the fallback of reusing meshes/rigs only.
 - **Size breaks things.** At large `hunter_size` the Hunter won't fit or reach everywhere in the
-  arena (Marco's D19: 6.7 m is the largest that worked in the Aquarium). The Ocean is open, but
+  arena (Marco's D19: 6.7 m is the largest that worked in the Aquarium). Play-test confirmed it feels
+  worse the bigger it gets, so matches are now locked at 0.5x (`HunterSize.MATCH_SIZE`). The Ocean is open, but
   `whale_reach_probe` should run with the new `arena_radius`, and the bite and camera need testing at
   extremes. Cap the arena/size ratio with a warning in the panel.
 - **Slot ownership across the net.** The school's `net_state` is leader + followers; claimed slots
@@ -419,17 +424,24 @@ camera at three sizes; skins via the existing `skins_probe --class=titan`), `hun
 layers on a school slot). Regression: modes, ui, console, marco_polo_probe, nature probes.
 
 ## Progress
-Status 2026-11-07_05:20 (details in the log below, FINAL SUMMARY at the end):
-- Phase 0 spike: DONE. Phase 1 match: DONE. Phase 2 joining: DONE. Phase 3 visibility (echo): DONE. Phase 4 Upset Stomach: DONE. Phase 6 online: DONE (4-Hunter stress, net bench and prey map online not done).
-- Phase 5 forms: registry, card, size DONE. Ready forms: Drowned Shark, Humpback, King of Herrings, Gulper Mother, Whale Fall, Lamprey Queen, Fallen Angel (7 of 11). Orca, Beluga, Sperm, Blue have guessed sheets and are left not ready.
-- Phase 7 (bots and balance report) and Phase 8: NOT started (not asked for in this run).
-- Build: builds/windows/FishPlayground.exe 2026-11-07 05:09, awaiting user play-test.
+Status 2026-11-07 evening (details in the log below; the FINAL SUMMARY is the overnight run's, and
+later entries supersede it):
+- Phase 0 spike: DONE. Phase 1 match: DONE. Phase 2 joining: DONE. Phase 3 visibility (echo): DONE. Phase 4 Upset Stomach: DONE. Phase 6 online: DONE (4-Hunter stress, net bench, prey map and echo/Click/Sniff sync not done).
+- Phase 5 forms: registry, size and setup-screen pick DONE. **Ready forms (6 of 10): Drowned Shark, Humpback, King of Herrings, Gulper Mother, Lamprey Queen, Fallen Angel.** Orca, Beluga, Sperm, Blue have guessed sheets and are left not ready. **Whale Fall is dropped** (see below).
+- Added since the overnight run, from play-tests: instant chomp, follow cam + school lock-on, lock-on bite, body rams, callouts, size locked at 0.5x, Hunter bodies roll with the fish, Drowned Shark jaw rebuilt, mode setup screen.
+- Phase 7 (bots and balance report) and Phase 8: NOT started. No balance numbers exist.
+- Build: last exported 2026-11-07 05:09 by the overnight run; later work is in commits 21bc516..3c04b15 plus uncommitted edits (the camera/roll fixes, rams and callouts). Awaiting user play-test.
+
+**Whale Fall: removed from the mode (2026-11-07).** The form's `ready()` returns false so it is never
+on the picker, and the boss is skipped by `UnnaturalRun.DISABLED_BOSSES` (flipped off, not deleted).
+Its files (`forms/whale_fall.gd`, `whalefall_*.gd`) stay so it can come back; `hunter_forms.md` still
+has a sheet for it. It is not part of any phase or count in this plan.
 
 ## Progress log
 Newest last. Each worker appends one entry: what was built, files, probes, decisions, open issues, hand-off.
 
 ### 2026-11-07_01:38 Phase 0 (spike): DONE, viable, path = titan-species (hidden class)
-- **Verdict.** The AI-node path is NOT viable: `Boss` is welded to `UnnaturalRun` (`run.horde` proxies for its body, `run.players`, `run.hurt`, `run.settings`, `_keep_in_arena`), and `DrownedShark._move` is target-seeking AI. Driving it from a controller would mean a fake run. The Drowned Shark is also NOT a BossMesh/SpineRig boss: it is `FishModel.build(HUNTER)` (the Shark class model, a great white) scaled x15, rotted, red eyes, plus a jaw rig added in `_build_jaw`. Only the 5 final bosses (King, Gulper, Whale Fall, Lamprey, Angel) use BossMesh/SpineRig (Phase 5 problem, see below). So the shark form is a hidden class on a normal `FishController`, as the Titans are. Everything works end to end.
+- **Verdict.** The AI-node path is NOT viable: `Boss` is welded to `UnnaturalRun` (`run.horde` proxies for its body, `run.players`, `run.hurt`, `run.settings`, `_keep_in_arena`), and `DrownedShark._move` is target-seeking AI. Driving it from a controller would mean a fake run. The Drowned Shark is also NOT a BossMesh/SpineRig boss: it is `FishModel.build(HUNTER)` (the Shark class model, a great white) scaled x15, rotted, red eyes, plus a jaw rig added in `_build_jaw`. Only the final bosses (King, Gulper, Lamprey, Angel; Whale Fall was dropped later) use BossMesh/SpineRig (Phase 5 problem, see below). So the shark form is a hidden class on a normal `FishController`, as the Titans are. Everything works end to end.
 - **Built (all new in `scripts/what_stinks/`):**
   - `hunter_form_model.gd` `HunterFormModel`: `FishModel.build` hands `FishClass.MONSTER` here. Builds `SharkModel` on the Hunters' box (so the shape is right), tints it rot via `m._tint` (NOT `set_body_color`: the controller calls `reset_body_color` when it has no team colour, which would undo it), red glowing eyes, and the jaw rig (kept in model meta `hunter_jaw`).
   - `hunter_jaw.gd` `HunterJaw`: `DrownedShark._build_jaw`/`_pose_jaw` lifted out (uses `DrownedShark._rim/_plate` statics). `pose(open)`.
@@ -515,7 +527,7 @@ Newest last. Each worker appends one entry: what was built, files, probes, decis
 - Still not done (as the builder said): 4-Hunter online stress, net perf bench, prey map/ally markers online.
 
 ### 2026-11-07_04:30 Phase 5 (setup: registry, card, size, sheet template): DONE, hunter_forms_probe 224/224
-- **Built.** `HunterForms` registry (`scripts/what_stinks/hunter_forms.gd`): 11 keys in card order (drowned_shark, humpback, orca, beluga, sperm, blue, king_of_herrings, gulper_mother, whale_fall, lamprey_queen, fallen_angel), each preloading its own file `scripts/what_stinks/forms/<key>.gd` (static `ready()`, `sheet()`, `dress(fish, sheet)`). API: `ready_keys()`, `is_ready`, `playable(key)` (falls back to the Shark), `sheet(key)` (defaults filled, plus key/ready), `name_of`, `dress`. `HunterForm.sheet` now reads the registry (the `FORMS` const is gone; `SHARK`/`HUMPBACK` stay as consts the two ready form files return). **Each remaining form worker edits only its own forms/<key>.gd and flips `ready()`; nobody edits the registry, settings or card.**
+- **Built.** `HunterForms` registry (`scripts/what_stinks/hunter_forms.gd`): 11 keys in card order (drowned_shark, humpback, orca, beluga, sperm, blue, king_of_herrings, gulper_mother, whale_fall (not ready, dropped), lamprey_queen, fallen_angel), each preloading its own file `scripts/what_stinks/forms/<key>.gd` (static `ready()`, `sheet()`, `dress(fish, sheet)`). API: `ready_keys()`, `is_ready`, `playable(key)` (falls back to the Shark), `sheet(key)` (defaults filled, plus key/ready), `name_of`, `dress`. `HunterForm.sheet` now reads the registry (the `FORMS` const is gone; `SHARK`/`HUMPBACK` stay as consts the two ready form files return). **Each remaining form worker edits only its own forms/<key>.gd and flips `ready()`; nobody edits the registry, settings or card.**
 - **Card and settings.** The match card's Hunter pick lists only ready forms (Shark, Humpback today) and a new Size pick (0.5x..10x, `WhatStinksSettings.SIZE_CHOICES`, plus the current value if it is not one of them) sets `HunterSize.size_mult`. `WhatStinksSettings.form` enum lists all 11 keys (panel); `form_sheet()` plays an unready pick as the Shark. `FORM_KEYS` is gone. Online: form/size already ride the round message; both peers share the registry.
 - **Size fully wired.** The schools' alarm range now follows the biggest Hunter's size (`WhatStinksField.set_alarm_scale`, replaces the never-called `set_alarm_range`; new/regrown schools take it; `HunterSize.alarm_exp`). Camera: `HunterSize.frame` (size framing + the sheet's `cam` factors) is called when the local Hunter is made each round, as before; probe checks body_follow and the cam factor. `sight_exp` still has no consumer (no Hunter murk view yet; the echo cone uses `echo_size_exp`).
 - **Hook.** `HunterForms.dress` is called from `_become_hunter` after `size.apply` and before the bite is made, so a form that swaps the model is picked up by `HunterBite.setup`.
@@ -531,25 +543,25 @@ Logged by the wrap-up worker for the form workers (they could not write the log)
 - **Humpback** (`forms/humpback.gd`, own sheet dict, no shared file touched): Tail Slap shape reach 2.2 m, far half width 2.6 m (~100 deg cone), capacity 6, wind-up 0.95 s, rest 2.4 s; speed x1.15, accel x0.6, turn x0.5; cam (1.2, 1.1). No real slap animation (the jaw gape and lunge are shared in HunterBite/HunterJaw); a slap from the tail would need a form-supplied bite origin in HunterBite.
 - **Gulper Mother** (registry file is `forms/gulper_mother.gd`; extra `gulper_model/rig/jaw.gd`): `GulperBoss._build_look` rebuilt for a controller, 9 m, 48-segment spine trailing turns, Swallow bite 6.0/4.0/8, 1.0 s, 2.5 s; speed 1.15, accel 0.6, turn 0.5; cam (1.15, 1.1). Not built: the pull of fish toward the mouth (needs a School call), belly lumps. `gulper_form_probe` 79/79.
 - **King of Herrings** (`forms/king_of_herrings.gd`, `king_rig.gd`, `king_jaw.gd`): BloodLeviathan mesh rebuilt without the Boss node, 16 m (boss is ~109 m), lies along the trail the head leaves; Coil sweep 5.5/4.5/7 (39 deg half angle), 1.0 s, 2.8 s; cam (0.8, 1.35) by eye only (a speck end-on in the follow shot, needs a play-test). Hitbox is ~5.3 x 7.4 m against a ~2.6 m body. Only `sound_chomp` has a consumer. No coil hold/squeeze. `king_probe` 81/81.
-- **Whale Fall** (`forms/whale_fall.gd`, `whalefall_model/rig/jaw.gd`): rigid carcass 12 m with 6 hagfish (eye sockets, chest, flank, blowhole), rocks and leans in turns; Hagfish knot 4.5/3.6/6, 0.9 s, 2.6 s, slime cloud at 70% of the cone (rig signal `slimed(at, radius, life)`, model meta `hunter_cloud`); speed 0.9, accel 0.5, turn 0.45; cam (1.25, 1.15). The cloud is visual only (scatter needs a School/mode change); its look was never seen in a shot. `whalefall_probe` 88/88.
 - **Lamprey Queen** (`forms/lamprey_queen.gd`, `lamprey_rig.gd`, `lamprey_jaw.gd`): 14 m, Corkscrew latch reach 3.2 m, radius 1.0 m, capacity 1, wind-up 0.8 s, rest 3.0 s, then a roll at `lamprey_spin` for `latch_s` 1.1 s; cam (0.9, 1.3). The latch is visual only (no pin or drain). Hitbox ~4.7 m wide against a ~1.7 m body. `lamprey_form_probe` 86/86.
 - **Fallen Angel** (`forms/fallen_angel.gd`, `angel_model/rig/jaw.gd`): glass body, crown of six tentacles that opens and flushes orange on the wind-up, lock-on ring at the cone's end; 10 m, speed 1.2, accel 0.65, turn 0.7; Lock-on reach 6.5, far half width 1.3 (~11 deg), capacity 2, wind-up 1.2 s, rest 2.2 s; cam (1.1, 1.15). "A fish it has watched" is not built (needs a lock state in HunterBite or the field). `boss/angel_lock` is an invented sound id. The windowed --shots run crashed with a C++ backtrace at exit after printing results (cause not investigated). `angel_form_probe` 88/88.
 - **Common to all boss forms**: hidden class MONSTER (the shark's box scaled, not form-shaped), `dress` is safe to run twice, a size change rebuilds the rig, sounds are stand-in ids with no consumer yet, no Hunter murk view (`sight_exp` has no consumer). `hunter_forms_probe` never calls `dress` in its per-form section, so each form has its own probe for the dressed body.
+- (A sixth boss form, Whale Fall, was built here and later dropped; see Progress.)
 - **Docs.** `hunter_forms.md` has a section per form; `INVENTORY.md` section 8 lists forms and bite shapes; `tools/gen_setting_docs.gd` now includes `what_stinks` and `hunter_size` (regenerated `scripts/ui/setting_docs.gd`, +142 lines).
 
-### 2026-11-07_05:20 FINAL SUMMARY (overnight run, phases 0-4, 6, and 5 as far as it went)
+### 2026-11-07_05:20 FINAL SUMMARY (overnight run, phases 0-4, 6, and 5 as far as it went; superseded where later entries say so: 6 forms are ready now, not 7, and the Size pick is gone)
 **Built.** A playable What Stinks? mode: one Hunter (a monster form, person or bot) against prey hiding in an Ocean of fish schools. Phase 0 hidden class MONSTER + `HunterSize`; Phase 1 `WhatStinksMatch` (rounds, roles, Clean Sweep), `HunterBite`, `School.eat`; Phase 2 joining a school (claim, ease-in, lockstep, lean, Leave, Spook, ally markers); Phase 3 echo (cone, noise, shadows, Click, Sniff, reveal layers); Phase 4 Upset Stomach (belly, spit, queasy, hurl, school respawn, scoring); Phase 6 online (`WhatStinksNet`); Phase 5 11-form registry, card with Size pick, 7 forms ready.
-**Probes (this wrap-up, fresh --import, no script errors in the new code).** what_stinks 56/56, hunter_spike 75/75, hunter_forms 629/629, echo 91/91, stomach 66/66, school_join 104/104 (failed once on "same velocity (2.84 m/s apart)", passed on two reruns: flake), school_eat, school_sync, hunter_bot, gulper_form 79, king 81, whalefall 88, lamprey_form 86, angel_form 88, class_species, skins_probe --class=titan, modes, ui, console, marco_polo (0 failures), nature, nature_schools, nature_battered_fish, nature_score. Net scripts: what_stinks_net.sh, marco_polo_net.sh, coop_net.sh, unnatural_net.sh all passed (what_stinks_net.sh flakes about 1 in 8: a guest's bite on a moving school can take another set of fish; the host's is the truth).
+**Probes (this wrap-up, fresh --import, no script errors in the new code).** what_stinks 56/56, hunter_spike 75/75, hunter_forms 629/629, echo 91/91, stomach 66/66, school_join 104/104 (failed once on "same velocity (2.84 m/s apart)", passed on two reruns: flake), school_eat, school_sync, hunter_bot, gulper_form 79, king 81, lamprey_form 86, angel_form 88, class_species, skins_probe --class=titan, modes, ui, console, marco_polo (0 failures), nature, nature_schools, nature_battered_fish, nature_score. Net scripts: what_stinks_net.sh, marco_polo_net.sh, coop_net.sh, unnatural_net.sh all passed (what_stinks_net.sh flakes about 1 in 8: a guest's bite on a moving school can take another set of fish; the host's is the truth).
 **Failing, not from this work.** roster_probe "every class has a zombie" (missing Titans, and Monsters now too; Titans already failed before). hider_looks_probe prints repeated `titan_view.gd:43` "Nonexistent int constructor" script errors (168 lines) but exits 0; it predates this work.
 **Sim/timing numbers.** None: the bot sim and balance report (Phase 7) were not built, so there are no win rates or round times. The settings defaults (round_time 180 s, school_count 14, satiation numbers, echo build 0.13/s) are first guesses, untested against bots or people. Open item, not tuned.
-**Judgment calls.** Hunter forms are monsters on a normal FishController (hidden class MONSTER), not AI Boss nodes (Boss is welded to UnnaturalRun). Pick card = the match card's Hunter pick (no in-countdown per-Hunter pick, it would need net sync). Registry file names are the form keys (`gulper_mother.gd`, `whale_fall.gd`, `lamprey_queen.gd`, `fallen_angel.gd`, `king_of_herrings.gd`). Added `FishController.rl_turn_scale` because `turn_scale` does nothing off a surface under `rl_air_control` (Marco's `whale_turn_scale` and Unnatural's Nimble have likely been inert in open water; not changed). stomach_probe sets `respawn_school_gap` 30 for its small arena. Orca, Beluga, Sperm and Blue left not ready.
-**Known issues.** Hitbox is the shark's box for every MONSTER form (fat for King, Lamprey, Angel, Whale Fall). Camera factors for the boss forms are by eye from free-camera shots, never play-tested (King looks tiny end-on). Slime cloud, lamprey latch, angel watch and gulper pull have visuals/shapes only, no gameplay effect. No Hunter murk view (`sight_exp` unused), no per-form sounds, no per-form signature moves. Sniff on powerslide also handbrakes (double slow). At shadow_mult 0.2 a loner in a shadow is never revealed by echo alone. Online: echo/Click/Sniff/shadows not synced to guests, guest noise bursts not sent to host, brave_points not built, 4-Hunter stress and net perf bench not done, Steam off. Bot hunter does not use echo or Click.
+**Judgment calls.** Hunter forms are monsters on a normal FishController (hidden class MONSTER), not AI Boss nodes (Boss is welded to UnnaturalRun). Pick card = the match card's Hunter pick (no in-countdown per-Hunter pick, it would need net sync). Registry file names are the form keys (`gulper_mother.gd`, `lamprey_queen.gd`, `fallen_angel.gd`, `king_of_herrings.gd`). Added `FishController.rl_turn_scale` because `turn_scale` does nothing off a surface under `rl_air_control` (Marco's `whale_turn_scale` and Unnatural's Nimble have likely been inert in open water; not changed). stomach_probe sets `respawn_school_gap` 30 for its small arena. Orca, Beluga, Sperm and Blue left not ready.
+**Known issues.** Hitbox is the shark's box for every MONSTER form (fat for King, Lamprey, Angel). Camera factors for the boss forms are by eye from free-camera shots, never play-tested (King looks tiny end-on). Lamprey latch, angel watch and gulper pull have visuals/shapes only, no gameplay effect. No Hunter murk view (`sight_exp` unused), no per-form sounds, no per-form signature moves. Sniff on powerslide also handbrakes (double slow). At shadow_mult 0.2 a loner in a shadow is never revealed by echo alone. Online: echo/Click/Sniff/shadows not synced to guests, guest noise bursts not sent to host, brave_points not built, 4-Hunter stress and net perf bench not done, Steam off. Bot hunter does not use echo or Click.
 **Play first.** Build `builds/windows/FishPlayground.exe` (05:09): picker MORE row (hold SELECT to show hidden modes) -> What Stinks?; play the Shark at size 1, then the Humpback and the boss forms from the match card (try Size 0.5x, 3x, 10x), Upset Stomach variant, join a school as prey, watch the echo reveal as prey vs Hunter. Check the camera and hitbox feel on King, Lamprey, Angel first.
 **Not done.** Phase 7 (bots, balance report, `what_stinks_sim`), Phase 8 polish; forms Orca, Beluga, Sperm, Blue (need a visual/camera review then flip `ready()`); the items under Known issues.
 
 ### 2026-11-07_09:30 Instant chomp (bite_snap): the rigs and probes follow
 **Feedback.** The Hunter's bite felt wrong: a press should be an instant big chomp, not a wind-up into a charge. `HunterBite.snap` (setting `bite_snap`, Bite group, default on) goes straight to ChompKit STRIKE with the jaws wide: contact (`chomped`) lands about 0.06 s after the press and the body gets no lunge. `bite_snap` off keeps the old `bite_wind` chomp. Cooldown (`bite_every`) is the only limiter now; no numbers retuned.
-**What depended on the wind-up and what changed.** HUD bite ring, bot and net sync did not (bot uses `busy()`/cooldown; net `net_start()` goes through `_begin()`, so guests see the snap too). Rigs did: King and Lamprey skin `warn` pulse only ran while `winding()`, now they also flash 0.22 s when a bite lands. Gulper pouch gape and suction followed the slow open, now the pouch balloons to full and the suction streams 0.3 s on landing (gape held 0.15 s). Lamprey disc flares wide on landing and then clamps. Fallen Angel crown and lock-on ring jump to full on landing (the existing lash). Whale Fall's WIND to LASH state machine is read from the jaw per frame, so a snap could slip between two frames: it now also lets go the slime from the `chomped` signal. Edits are in each form's own rig file under `scripts/what_stinks/forms/`.
+**What depended on the wind-up and what changed.** HUD bite ring, bot and net sync did not (bot uses `busy()`/cooldown; net `net_start()` goes through `_begin()`, so guests see the snap too). Rigs did: King and Lamprey skin `warn` pulse only ran while `winding()`, now they also flash 0.22 s when a bite lands. Gulper pouch gape and suction followed the slow open, now the pouch balloons to full and the suction streams 0.3 s on landing (gape held 0.15 s). Lamprey disc flares wide on landing and then clamps. Fallen Angel crown and lock-on ring jump to full on landing (the existing lash). Edits are in each form's own rig file under `scripts/what_stinks/forms/`.
 **Tests.** `what_stinks_probe` gained "snap chomp vs wind-up" (snap: lands 0.06 s after press, no lunge; snap off: lands at 0.82 s, lunges). `gulper_form_probe` now names its bite node "HunterBite" like the match (the rig finds it by name). `hunter_forms_probe` takes `--only=KEY` and its jaw shot also fires mid-strike under snap.
 
 ### 2026-11-07_09:33 Cameras: follow cam + school lock-on (user play-test: only one fixed camera)
@@ -560,3 +572,19 @@ Logged by the wrap-up worker for the form workers (they could not write the log)
 - **Controls.** Ball cam button (Y by default): tap = lock-on on/off (looks at the nearest school ahead as it goes on), hold 0.3 s = school wheel, right stick/IJKL picks, release locks on. Y no longer swaps follow/free cam while a round is live (it does in countdown, round over and spectating).
 - **Probes/tools.** tests/what_stinks_camera_probe (all pass, incl. body + school in frame for Shark, King, Gulper Mother at 0.5x/1x/3x/10x); tests/what_stinks_cam_shots (windowed: follow, post-turn, lock-on and wheel frames per form/size). Eyeballed: Shark 1x and King 1x read well. At 10x body and school are in frame by projection but sit in the murk and the frame is mostly dark water (framing is HunterSize's, not retuned).
 - **Open.** No aim assist toward the locked school (not asked). The controls hint line does not mention lock-on. Online guests use the same code on the host's schools (only what_stinks_net.sh covers it).
+
+### 2026-11-07 (day, reconstructed from commits and the working tree) Lock-on bite, rams, callouts, size lock
+Entries below were written afterwards by reading the code, not by the workers; probe counts were not re-run for this update.
+- **Lock-on bite** (`lock_bite`, `lock_bite_mult` 3.0, in `WhatStinksMatch._locked_bite`): a bite while locked on a school takes its fish from that school alone, up to capacity x `lock_bite_mult` x the line-up, so a locked, well-aimed bite is a big one. Today's fix: the direction to the school is measured from the Hunter's body, not the mouth. `tests/what_stinks_lock_bite_probe` covers it.
+- **Body rams** (`ram`, `ram_speed` 14, `ram_capacity_mult` 1.5, `ram_cooldown` 0.4, `ram_width` 0.5; `_ram_step`): a Hunter at ram speed (x its size's speed) takes what its front touches like a bite, with no chew delay. Uncommitted.
+- **Callouts**: each fish taken (bite or ram) feeds a per-Hunter Nature `NatureScore` chain and spree; the new `callout` signal drives the HUD: a splash for the local Hunter from a double up, and a five-line feed ("ATE name", CHOMP / BIG CHOMP / RAMMED, sprees) for everyone. Uncommitted.
+- **Size locked at 0.5x** (`HunterSize.MATCH_SIZE`): play-test said every form feels right at 0.5x and worse bigger. The Size pick is removed from the setup screen and the old match card; the panel's `size_mult` still moves it for debugging.
+- **Roll and camera** (uncommitted): `SpineRig` gained `head_up`/`head_back` so a boss-form body rolls with the Hunter instead of keeping the world's up (the King and Lamprey rigs were edited to feed them; I did not check the others); form sheets gained `cam_settle` (Angel 0.65) which slows the follow cam's Settle rate so a lively stride doesn't wobble the view. New untracked probes: `hunter_roll_probe`, `hunter_cam_wiggle_probe`.
+- **Open.** Not logged by the workers: whether the lock-on bite and ram numbers are good (never simulated, play-test first).
+
+### 2026-11-07_13:37 Mode setup screen (commit b77cc2b, "half-baked")
+- Every mode now opens a **setup screen** (rail + two-tier hero, `scripts/ui/mode_setup.gd`, `mode_setups.gd`) from the picker, replacing the variant pop-up and the match card's picks. For What Stinks?: Variant, Start as (Hunter/Prey), and the role's character (a Hunter picks one of the ready forms; prey wear their last prey fish, saved per role in `role_characters.gd`). The pause menu has Change Character; a local joiner gets a pad-only setup screen. `tests/mode_setup_probe` updated for What Stinks?. Open items are listed in the mode-setup notes (role swaps mid-match don't switch to the other role's remembered fish; online guests get no join screen).
+
+### 2026-11-07_15:11 Drowned Shark jaw and chomp, Whale Fall off (commit 3c04b15)
+- The Hunter shark and the boss share `HunterJaw`, rebuilt so the lower jaw is the body's own underside swung on a hinge by `shark_skin.gdshader`; `ChompKit.Bite` gained chomp cues, smear and jaw fling; dark red eyes. Sounds: `boss/shark_bite_wind`, `shark_jaw_open`, `shark_snap` (catalog rows; the user records them). The Hunter-form shark does not get the smear yet (the controller owns its scale).
+- **Whale Fall disabled** everywhere (boss and Hunter form), see Progress.
