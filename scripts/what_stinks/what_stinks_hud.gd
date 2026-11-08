@@ -15,6 +15,9 @@ const NOISE := Color(1.0, 0.7, 0.3)
 const HEAT := [Color(0.95, 0.95, 0.9), Color(1.0, 0.82, 0.3), Color(1.0, 0.6, 0.2), Color(1.0, 0.4, 0.2), Color(1.0, 0.25, 0.25), Color(1.0, 0.2, 0.55)]
 const BELLY := Color(0.55, 0.9, 0.4)
 const QUEASY := Color(0.75, 0.85, 0.2)
+const GOLD := Color(1.0, 0.85, 0.25)
+const STRAIN := Color(1.0, 0.15, 0.1)
+const FLUSH := Color(0.8, 0.05, 0.08)
 
 var game: WhatStinksMatch
 var _canvas: Control
@@ -22,11 +25,14 @@ var _font: Font
 var _splash: BroadcastUI.Splash
 ## The callout feed: [text, colour, seconds left].
 var _feed: Array = []
+## A bite that caught the local player flushes the screen's edges red (0 to 1, dying away).
+var _flush := 0.0
 
 
 func bind(match_node: WhatStinksMatch) -> void:
 	game = match_node
 	layer = 5
+	add_to_group(HunterBiteFx.HUDS)
 	_font = ThemeDB.fallback_font
 	_canvas = Control.new()
 	_canvas.name = "Canvas"
@@ -40,7 +46,13 @@ func bind(match_node: WhatStinksMatch) -> void:
 	game.callout.connect(_on_callout)
 
 
+## A red flush round the screen's edges (a bite caught the local player).
+func flash(amount: float) -> void:
+	_flush = maxf(_flush, clampf(amount, 0.0, 1.0))
+
+
 func _process(delta: float) -> void:
+	_flush = move_toward(_flush, 0.0, delta * 1.8)
 	for line: Array in _feed:
 		line[2] -= delta
 	_feed = _feed.filter(func(line: Array) -> bool: return line[2] > 0.0)
@@ -144,6 +156,10 @@ func _draw_hud() -> void:
 	if game == null or not is_instance_valid(game):
 		return
 	var area := _canvas.size
+	if _flush > 0.01:
+		for i in 6:
+			var inset := i * 14.0
+			_canvas.draw_rect(Rect2(Vector2(inset, inset), area - Vector2(inset, inset) * 2.0), Color(FLUSH, _flush * (0.5 - i * 0.07)), false, 14.0)
 	if blackout():
 		_canvas.draw_rect(Rect2(Vector2.ZERO, area), Color.BLACK)
 	_text(Vector2(area.x * 0.5, 44.0), headline(), 28)
@@ -196,13 +212,33 @@ func _bar(rect: Rect2, share: float, color: Color) -> void:
 	_canvas.draw_rect(rect, Color(1, 1, 1, 0.5), false, 1.5)
 
 
-## A ring that fills as the bite comes ready; full and bright when it can bite.
+## A ring that fills as the bite comes ready (full and bright when it can bite), and while the jaws are held
+## open the bite's charge meter: it fills with the charge, snaps to gold at full, and flashes red when the
+## mouth strains (HunterBiteFx.strain). The number is how many fish a release takes now.
 func _draw_bite_ring(at: Vector2, bite: HunterBite) -> void:
-	var every := maxf(float(bite.form["bite_every"]), 0.01)
-	var ready_share := 1.0 if bite.busy() else clampf(1.0 - bite.cooldown / every, 0.0, 1.0)
+	var share := ring_share(bite)
+	var color := RING if share >= 1.0 else RING.darkened(0.35)
+	if bite.holding():
+		color = ring_color(bite)
 	_canvas.draw_arc(at, 34.0, 0.0, TAU, 48, Color(1, 1, 1, 0.2), 6.0, true)
-	_canvas.draw_arc(at, 34.0, -PI * 0.5, -PI * 0.5 + TAU * ready_share, 48, RING if ready_share >= 1.0 else RING.darkened(0.35), 6.0, true)
-	_text(at + Vector2(0, 8), "%d" % bite.capacity(), 22)
+	_canvas.draw_arc(at, 34.0, -PI * 0.5, -PI * 0.5 + TAU * share, 48, color, 6.0, true)
+	_text(at + Vector2(0, 8), "%d" % bite.attack.ring_count(bite), 22)
+
+
+## How full the bite's ring is: the charge while held, else how ready the bite is.
+func ring_share(bite: HunterBite) -> float:
+	if bite.holding():
+		return clampf(bite.charge(), 0.0, 1.0)
+	var every := maxf(float(bite.form["bite_every"]), 0.01)
+	return 1.0 if bite.busy() else clampf(1.0 - bite.cooldown / every, 0.0, 1.0)
+
+
+## The held ring's colour: the bite's red, gold at full charge, flashing red while the mouth strains.
+func ring_color(bite: HunterBite) -> Color:
+	var fx := bite.fx()
+	if fx != null and fx.straining():
+		return STRAIN if int(Time.get_ticks_msec() / 90) % 2 == 0 else GOLD
+	return GOLD if bite.charge() >= 1.0 else RING
 
 
 ## The Hunter's Click (a ring that fills over its cooldown) and Sniff (lit while held), either side of the bite ring.

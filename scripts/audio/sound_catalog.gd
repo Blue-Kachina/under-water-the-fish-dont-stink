@@ -21,7 +21,7 @@ const BUSES := {"ui": "UI", "voice": "Voice", "music": "Music", "amb": "Ambience
 const CATEGORIES := {
 	"ui": "Menus", "fish": "Your fish", "ball": "Ball", "arena": "Arena", "match": "Matches", "hunt": "Hunt",
 	"battered": "Battered", "nature": "Nature", "unnatural": "Unnatural", "pw": "Powerups", "stage": "Stage events",
-	"boss": "Bosses", "mp": "Marco Polo", "fx": "Shared effects", "amb": "Ambience", "voice": "Callouts", "music": "Music",
+	"boss": "Bosses", "hunter": "Hunters", "whale": "Hunter whales", "angel": "Hunter Fallen Angel", "gulper": "Hunter Gulper Mother", "king": "Hunter King of Herrings", "lamprey": "Hunter Lamprey Queen", "mp": "Marco Polo", "fx": "Shared effects", "amb": "Ambience", "voice": "Callouts", "music": "Music",
 }
 
 const ROWS := [
@@ -236,6 +236,31 @@ const ROWS := [
 	["boss/hit", 1, "3d layers voices=2 cd=0.05", "A boss takes damage."],
 	["boss/defeated", 1, "", "A boss is defeated."],
 
+	# What Stinks? Hunters' held bite (two-stage-attack.md section 6). Stand-ins: FALLBACKS, until recorded.
+	["hunter/jaw_open", 1, "3d voices=2", "A Hunter's jaws open on the press: a creak or a whoosh at the mouth (the Drowned Shark's; short, it answers the button on the same frame)."],
+	["hunter/jaw_hold", 2, "loop 3d voices=2", "A Hunter's jaws held open: a growl whose pitch and loudness rise with the charge."],
+	["hunter/charged", 2, "3d voices=2", "The held bite reaches full charge: a click or a ping."],
+	["hunter/strain", 3, "3d voices=2", "A whale's mouth is full and strains against its limit."],
+	["hunter/strike", 2, "3d voices=2", "The release: a swoosh as the jaws (or cones, coil, disc) lunge."],
+	["hunter/chomp", 1, "3d voices=2", "A Hunter's bite lands on fish: the crunch."],
+	["hunter/crunch", 2, "3d pitched voices=4 cd=0.03", "One more fish in the bite: a short crunch, climbing the scale through the chain."],
+	["hunter/miss", 2, "3d voices=2", "A Hunter's jaws shut on nothing."],
+	["whale/gape_open", 2, "3d voices=2", "A whale's huge mouth drops open: a deep groan and the rush of water in."],
+	["whale/engulf", 2, "3d pitched voices=4 cd=0.05", "A fish swims into a whale's open mouth: a small pop, climbing with each."],
+	["whale/gulp", 1, "3d voices=2", "The whale's mouth slams shut on everything in it: a deep gulp."],
+	["whale/spray", 3, "3d voices=2", "Water pushed out of the whale's closing mouth."],
+	["angel/cones_open", 2, "3d voices=2", "The Fallen Angel's buccal cones splay open."],
+	["angel/lock", 2, "loop 3d voices=2", "The Fallen Angel is locked on to its target: a tightening hum."],
+	["angel/lock_lost", 2, "3d", "The lock snaps (the target got away)."],
+	["angel/lash", 1, "3d voices=2", "The cones lash out."],
+	["angel/denied", 2, "3d", "A press with nothing in range: the crown flickers and refuses."],
+	["gulper/suck", 2, "loop 3d voices=2", "The Gulper Mother's pouch sucks fish in: a rising draw."],
+	["gulper/snap", 1, "3d voices=2", "The pouch snaps shut on what it caught."],
+	["king/coil", 2, "loop 3d voices=2", "The King of Herrings coils tighter: a creak that rises."],
+	["king/whip", 1, "3d voices=2", "The King's whip-sweep."],
+	["lamprey/rasp", 2, "loop 3d voices=2", "The Lamprey Queen's teeth spin up: a rasp that speeds up."],
+	["lamprey/drill", 1, "3d voices=2", "The Lamprey Queen's corkscrew dash through a school."],
+
 	# Marco Polo.
 	["mp/marco", 1, "3d", "The seeker calls \"Marco!\" (heard by everyone, from the seeker)."],
 	["mp/polo", 1, "3d voices=6", "A hider (or a Fake Fish) answers \"Polo!\"."],
@@ -339,6 +364,29 @@ const FALLBACKS := {
 	"mp/fake_pop": "fx/pop",
 	"mp/count": "match/countdown",
 	"mp/airstone": "arena/bubble_column_loop",
+	"hunter/jaw_open": "boss/shark_jaw_open",
+	"hunter/jaw_hold": "boss/leviathan_arrive",
+	"hunter/charged": "ui/select",
+	"hunter/strain": "boss/chomp_miss",
+	"hunter/strike": "boss/shark_snap",
+	"hunter/chomp": "boss/chomp",
+	"hunter/crunch": "boss/chomp_thud",
+	"hunter/miss": "boss/chomp_miss",
+	"whale/gape_open": "boss/gulper_suck",
+	"whale/engulf": "boss/gulper_suck",
+	"whale/gulp": "pw/maw_spit",
+	"whale/spray": "boss/leviathan_spit",
+	"angel/cones_open": "boss/angel_lock",
+	"angel/lock": "boss/angel_lock",
+	"angel/lock_lost": "boss/chomp_miss",
+	"angel/lash": "boss/grab",
+	"angel/denied": "ui/denied",
+	"gulper/suck": "boss/gulper_suck",
+	"gulper/snap": "pw/maw_spit",
+	"king/coil": "boss/leviathan_arrive",
+	"king/whip": "boss/chomp",
+	"lamprey/rasp": "boss/grab",
+	"lamprey/drill": "boss/grab",
 }
 
 static var _events := {}

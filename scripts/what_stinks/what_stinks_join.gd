@@ -341,7 +341,8 @@ func _physics_process(delta: float) -> void:
 		for fish: FishController in game.bots:
 			if is_instance_valid(fish) and can_join(fish):
 				var near := joinable_school(fish)
-				if near != null:
+				var bot: Variant = game.bots[fish]
+				if near != null and not (bot is WhatStinksPreyBot and not (bot as WhatStinksPreyBot).accepts(near)):  # a prey bot that just left a school won't rejoin it
 					join(fish, near)
 
 

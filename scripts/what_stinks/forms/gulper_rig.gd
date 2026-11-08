@@ -8,6 +8,8 @@ extends Node3D
 const MODEL := preload("res://scripts/what_stinks/forms/gulper_model.gd")
 const JAW := preload("res://scripts/what_stinks/forms/gulper_jaw.gd")
 const N := SpineRig.SPINE_N
+## The belly's fullness at rest (the boss skin's own default).
+const REST_FULLNESS := 0.3
 
 ## How hard each segment follows the one ahead of it (1/s): higher is a stiffer body.
 @export_range(2.0, 200.0, 1.0, "or_greater") var follow_rate := 50.0
@@ -196,6 +198,10 @@ func _dress(delta: float) -> void:
 		_bite = fish.get_node_or_null("HunterBite") as HunterBite
 		if _bite:
 			_bite.chomped.connect(func(_m: Vector3, _r: float, _d: float, _c: int) -> void: _on_bite_landed())
+	var suction := _bite.attack as SuctionAttack if _bite != null else null
+	if suction != null:  # the belly: full while fish crowd the mouth, a lump sliding down it after the snap
+		skin.set_shader_parameter("fullness", lerpf(REST_FULLNESS, 1.0, suction.fullness))
+		skin.set_shader_parameter("lump", suction.lump_vec(_bite, skin.get_shader_parameter("belly_span")))
 	_suck_left = maxf(_suck_left - delta, 0.0)
 	_suction.emitting = open > 0.3 or _suck_left > 0.0
 	_light.omni_range = 0.3 * fish.hitbox_length

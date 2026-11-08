@@ -23,6 +23,7 @@ var results := {}
 
 
 func _ready() -> void:
+	WhatStinksSettings.shared().bite_mode = WhatStinksSettings.BiteMode.TAP  # these presses are one-shot bites (the hold mode has its own probe: two_stage_bite_probe)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--shots="):
 			shots_dir = arg.trim_prefix("--shots=")

@@ -1,23 +1,24 @@
 extends RefCounted
 ## Hunter form: Sperm Whale (what_stinks.md section 2; the sheet's keys are in hunter_forms.md).
-## Stub: numbers are a first guess from titan_specs.md (length scaled from the humpback's 6.7 m), not checked. Flip ready() once it passes hunter_forms_probe and has been looked at.
+## Engulf like the rest: a narrow hinged lower jaw of teeth under the huge box head. Numbers are a first guess from titan_specs.md (length scaled from the humpback's 6.7 m), for play-testing.
 ## This file is the form's own: its sheet, its ready flag and its dress hook (see HunterForms).
 
 
 ## Offered on the match card only once this is true (the form plays end to end: model, swim, bite, camera, hitbox).
 static func ready() -> bool:
-	return false
+	return true
 
 
 static func sheet() -> Dictionary:
 	return {
 		"name": "Sperm Whale", "class": FishCharacter.FishClass.TITAN, "species": 3,
-		"length_m": 7.7, "speed": 1.3, "accel": 0.7, "turn": 0.55,
-		"bite_reach_m": 3.4, "bite_radius_m": 1.6, "bite_wind": 0.75, "bite_every": 2.0,
-		"capacity": 4.0, "cam": Vector2(1.0, 1.0),
+		"length_m": 7.7, "speed": 1.1, "accel": 0.6, "turn": 0.5,
+		"bite_reach_m": 2.5, "bite_radius_m": 1.7, "bite_wind": 0.75, "bite_every": 2.6,
+		"capacity": 5.0, "cam": Vector2(1.1, 1.05),
+		"attack": "engulf",
 	}
 
 
-## Extras on the Hunter's fish after its look and size are set (none yet). Called every round, so keep it safe to repeat.
-static func dress(_fish: FishController, _sheet: Dictionary) -> void:
-	pass
+## The hinged jaw (WhaleJaw: meta hunter_jaw), the same one every round. Called every round, so keep it safe to repeat.
+static func dress(fish: FishController, _sheet: Dictionary) -> void:
+	WhaleJaw.wear(fish)

@@ -34,6 +34,9 @@ A form file is a `RefCounted` with three static functions:
 | `capacity` | Fish one bite takes at size 1 (x size^`bite_capacity_exp`). |
 | `cam` | `Vector2(distance, height)` factors on the camera, on top of the size framing (`HunterSize.frame`). A 40 m oarfish is framed differently from a 7 m whale: raise `x` to pull back. |
 | `cam_settle` | Optional. A multiplier on the follow camera's Settle rate (default 1): under 1 and the view follows the nose slower, so a form whose stride sweeps are big does not wobble it (the Fallen Angel's is 0.65). |
+| `attack` | The attack style (`HunterAttack.STYLES`): `chomp` (default), `engulf`, `lock`, `suction`, `coil`, `drill`. |
+| `open_s` | Seconds from the press to fully open jaws (default 0.12). A release before the jaws are open from at least `tap_open_min` open strikes at once (tap). |
+| `charge_s` | Seconds of hold to a full charge (default 1.2). There is no max hold. |
 
 ## What `hunter_size` moves (one dial, `size_mult` 0.25-30; a fish's own `size_mult` meta multiplies on top)
 
@@ -51,23 +54,32 @@ proportion (`cam_frame`); the schools' alarm radius x s^`alarm_exp` (all schools
 
 ## The forms
 
-| Key | Name | Class / species | State | Signature (a flavour of Bite: shape only) |
+| Key | Name | Class / species | State | Signature (attack style: press opens, hold charges, release shuts; tap = old snap) |
 |---|---|---|---|---|
-| `drowned_shark` | Drowned Shark | MONSTER / 0 | **ready** | Fast-lunge chomp |
-| `humpback` | Humpback | TITAN / 0 | **ready** | Tail Slap flavour (shape only for now) |
-| `orca` | Orca | TITAN / 1 | stub, sheet guessed, passes the probe when forced ready, not looked at | |
-| `beluga` | Beluga | TITAN / 2 | as orca | |
-| `sperm` | Sperm Whale | TITAN / 3 | as orca | |
-| `blue` | Blue Whale | TITAN / 4 | as orca | |
-| `king_of_herrings` | King of Herrings | MONSTER (own box needed) | stub | Coil sweep |
-| `gulper_mother` | Gulper Mother | stub | stub | Swallow: wide vacuum cone |
-| `whale_fall` | Whale Fall | stub | stub | Hagfish knot: slime cloud |
-| `lamprey_queen` | Lamprey Queen | stub | stub | Corkscrew latch |
-| `fallen_angel` | Fallen Angel | stub | stub | Lock-on |
+| `drowned_shark` | Drowned Shark | MONSTER / 0 | **ready** | **Chomp** (`attack: chomp`): held jaws open wider and reach further, release is the chomp |
+| `humpback` | Humpback | TITAN / 0 | **ready** | **Engulf** (`engulf`): hinged baleen mouth, fish that swim in are held, release eats them |
+| `orca` | Orca | TITAN / 1 | **ready** (first-guess sheet) | Engulf, toothed mouth |
+| `beluga` | Beluga | TITAN / 2 | **ready** (first-guess sheet) | Engulf, toothed mouth |
+| `sperm` | Sperm Whale | TITAN / 3 | **ready** (first-guess sheet) | Engulf, toothed mouth |
+| `blue` | Blue Whale | TITAN / 4 | **ready** (first-guess sheet) | Engulf, baleen mouth |
+| `king_of_herrings` | King of Herrings | MONSTER (own box needed) | **ready** | **Coil** (`coil`): the hold tightens the body, release whips the head through a sector |
+| `gulper_mother` | Gulper Mother | MONSTER | **ready** | **Suction** (`suction`): the hold pulls fish and prey toward the mouth, release snaps a sphere |
+| `whale_fall` | Whale Fall | MONSTER | **disabled** (`ready()` false) | Hagfish knot / lash: not built (out of scope, behind its flag) |
+| `lamprey_queen` | Lamprey Queen | MONSTER | **ready** | **Drill** (`drill`): the hold winds the body back, release is a corkscrew dash through a tube |
+| `fallen_angel` | Fallen Angel | MONSTER | **ready** | **Lock** (`lock`): the press needs a fish in reach, the hold locks it (pace match, auto-face, orbit), release lashes the line through it |
+
+Every number below is a first guess for play-testing. Each style is a file in `scripts/what_stinks/attacks/`
+(`HunterAttack.STYLES` maps the sheet's `attack` key), the shared hold, charge and cost machinery is
+`HunterBite`, and the beats (sound, rumble, hit-stop, sparks) are `HunterBiteFx`. The whole design is
+`two-stage-attack.md`; the style numbers are panel settings (groups Bite, Engulf, Lock, Suction, Coil, Drill).
 
 The five bosses use `BossMesh`/`SpineRig` (one mesh bent by a shader from the spine), which a controller cannot
 drive without a `SpineRig` fed from the fish's velocity and turn: the long pole. Phase 0's fallback is the same
 hidden-class approach with a model node wrapping the BossMesh, built in `dress`.
+
+## Drowned Shark (`forms/drowned_shark.gd`)
+
+**Bite, two-stage (Chomp).** `attacks/chomp_attack.gd`, the default style. The press opens the jaws (`open_s` 0.12), the hold charges (full at `charge_s` 1.2 s, no max hold) and widens the catch: reach x`hold_reach_mult` 1.5, capacity x`hold_capacity_mult` 2.5 at full charge; holding costs swim speed, turn, school alarm and cooldown (Bite group). The release slams shut. A tap is the old instant snap (`bite_mode` tap restores it everywhere). The shark pull-back (spec 4a) is not built. Probe: `two_stage_bite_probe`.
 
 ## Humpback (`forms/humpback.gd`)
 
@@ -78,6 +90,8 @@ the Shark's 1.3 / 0.7 / 0.55). Camera `cam` (1.2, 1.1): further back and a littl
 Probe: `hunter_forms_probe` passes 386/386 with it ready (reach/radius/capacity follow size; camera 2.5 body lengths at every size).
 Not done: a real tail-slap animation (the bite still opens the jaw), stand-in audio ids, a screenshot review of the wide cone.
 
+**Bite, two-stage (Engulf).** All five whales share one style (`attacks/engulf_attack.gd`) and one hinged `WhaleJaw` on the Titan model (opens to `whale_gape_deg` 80, with tongue, roof and throat, baleen for Humpback and Blue, teeth for Orca, Beluga and Sperm; Marco Polo whales stay jawless). The press opens the mouth; school fish inside the mouth box (`engulf_box_len` 1.5 x `engulf_box_width` 0.6 reaches) are held by `School.hold` and ride there; the release eats them (Clean Sweep) or, in Upset Stomach, spits a prey player. A full mouth (`engulf_max_mult` 2 x capacity) stays open and strains. Sheet numbers (size 1, first guesses): Humpback reach 2.2, capacity 6; Orca 3.6 m long, reach 1.2, capacity 4; Beluga 2.2 m, reach 0.75, capacity 3; Sperm 7.7 m, reach 2.5, capacity 5; Blue 12 m, reach 4.0, capacity 9 (all `bite_wind` is the tap's old value). Orca, Beluga, Sperm and Blue are `ready()` since 2026-11-07 (the earlier "stub" status is out of date); their looks and numbers are unreviewed in play. Probe: `whale_engulf_probe` (133), `school_hold_probe`. Not done: guests do not see held fish riding in the mouth; the jaw is a thin belly patch with no upper-jaw lift; the throat swell has not been seen in play.
+
 ## King of Herrings (`forms/king_of_herrings.gd`, `king_rig.gd`, `king_jaw.gd`): ready
 
 - **Body.** Hidden `MONSTER` class (the shark's box), the shark model hidden, `KingRig` child of the visual: BloodLeviathan's mesh (one spine-bent mesh, oarfish skin, crest, oars, jaw, milky eyes, lampreys) rebuilt at the hitbox's length (`GIRTH_OVER_LENGTH` 0.095, stockier than the boss) and laid along the trail the head leaves (`SpineRig.follow_trail`), so it bends through turns. Length 16 m at size 1 (the boss is ~109 m). Rebuilt when the size changes; the trail clears on a teleport.
@@ -87,6 +101,8 @@ Not done: a real tail-slap animation (the bite still opens the jaw), stand-in au
 - **Sound ids (stand-ins, sheet keys).** `sound_chomp` boss/chomp (played at the mouth when the bite lands, by `KingRig`), `sound_arrive` boss/leviathan_arrive, `sound_miss` boss/chomp_miss, `sound_grab` boss/grab (last three have no consumer yet).
 - **Eyes/murk.** Pale milky eyes with a faint glow so they read in the murk; the Hunter murk view itself is not built.
 - **Known.** The hitbox is the MONSTER box scaled to 16 m (5.3 m wide, 7.4 m tall), much fatter than the 2.6 m body: a per-form box is the fix. The shared `hunter_forms_probe` measures model extent from placed mesh boxes and does not call `HunterForms.dress`, so it cannot see this body; `tests/king_probe.tscn` does (81 checks).
+- **Bite, two-stage (Coil).** `attacks/coil_attack.gd`. Press starts the coil, the hold tightens it (the rig curls through `coil_curl_deg` 300 and cocks the head aside), release whips the head round a pivot `coil_pivot` 0.45 reaches behind the mouth. The catch is a flat sector from the pivot, `coil_arc_min` 45 degrees at no charge to `coil_arc_max` 160 at full, `coil_thick` 0.5 reaches thick; contact is the head crossing the middle. Capacity x`coil_capacity_mult` 1.5 with the charge, reach unchanged. The earlier wind-up / snap description above is the tap path. Probe: `coil_whip_probe` (53). Not seen visually (no windowed shots).
+
 
 ## Gulper Mother (`gulper_mother`): ready
 
@@ -104,6 +120,8 @@ Registered file `forms/gulper_mother.gd` (the registry loads it by key; the brie
 | Audio | None yet; stand-ins to use when the forms get sounds: the boss's `gulper` gulp/suck ids. |
 | Not built | The "pull": the cone does not drag school fish or prey toward the mouth during the wind-up (needs a `School` pull call, or a push on prey players; both in shared files). Swallowed fish do not show as lumps in the belly (the shader's `lump`/`fullness` are left at rest). Hit area and bite use the shark's box, not a form-shaped one. |
 
+**Bite, two-stage (Suction).** `attacks/suction_attack.gd` + `School.pull`. While the button is held, school fish in the cone (`suck_cone` 35 degrees) are drawn to the mouth and prey players are pushed (`suck_prey_push`); reach and pull rise with the charge (`suck_reach_mult` 2.5 at full, never under `suck_reach_min` 0.4 of reach). The release catches a sphere of `gulper_mouth_r` 0.7 bite radii at the mouth (tap mode keeps the old frustum). `GulperRig` drives the skin's fullness and slides a belly lump after the snap (`suck_lump_s`, `suck_lump_size`). The "Not built" row above is now built except per-fish lumps (one lump sized by the count) and a rising-pitch loop. Probe: `gulper_suction_probe` (40). Open: the pull may be weak against a fleeing school.
+
 ## Lamprey Queen (`forms/lamprey_queen.gd`, `lamprey_rig.gd`, `lamprey_jaw.gd`): ready
 
 Registered file is `forms/lamprey_queen.gd` (the registry loads it by key; the brief called it `lamprey.gd`). Probe: `tests/lamprey_form_probe.tscn` (86 checks, `--shots=DIR` needs a window), and `hunter_forms_probe` picks it up automatically (467/467).
@@ -115,8 +133,9 @@ Registered file is `forms/lamprey_queen.gd` (the registry loads it by key; the b
 - **Sound ids (stand-ins).** `sound_chomp` boss/grab (played at the mouth when the bite lands), `sound_arrive` boss/leviathan_arrive, `sound_miss` boss/chomp_miss (the last two have no consumer yet).
 - **Eyes/murk.** Small yellow eyes behind the disc with a faint glow; the Hunter murk view is not built.
 - **Known.** The hitbox is the MONSTER box scaled to 14 m (4.7 m wide), fatter than the 1.7 m body; a per-form box is the fix. The latch is a visual roll only: it does not pin the prey or drain it (the bite still takes the fish as any bite). `hunter_forms_probe` does not call `dress`, so `lamprey_form_probe` is the check for the body.
+- **Bite, two-stage (Drill).** `attacks/drill_attack.gd`. The hold winds the body back and speeds the rasp; a release at charge 0.2 or more (`drill_min_charge`) is a corkscrew dash at `drill_dash` 2 x top speed x charge for `drill_time` 0.6 s, taking what the disc passes through (tube `drill_radius_mult` 1.5 bite radii) up to capacity x`drill_capacity_mult` 6 x charge. At full charge the first prey player met latches her (`drill_latch`): the dash ends and she rolls on it. A tap is the old latch roll. The body ram is held off during the dash (`suppresses_ram`). Probe: `drill_probe` (38). Not seen visually.
 
-## Whale Fall (`whale_fall`): ready
+## Whale Fall (`whale_fall`): disabled
 
 Registered file `forms/whale_fall.gd` (the registry loads it by key; the brief called it `whalefall.gd`). Extra files, all in `forms/`: `whalefall_model.gd` (the look), `whalefall_rig.gd` (the body's driver), `whalefall_jaw.gd` (the mouth for `HunterBite`). Probe: `tests/whalefall_probe.tscn` (88 checks; `--shots=DIR` needs a window), plus `hunter_forms_probe` picks the form up when it is ready.
 
@@ -132,6 +151,8 @@ Registered file `forms/whale_fall.gd` (the registry loads it by key; the brief c
 | Eyes, murk | The sockets are the hagfish's holes; a dull green `Gloom` light from the chest (range half the body's length). No murk view for Hunters yet (`sight_exp` has no consumer). |
 | Audio | Stand-ins in the sheet: `sound_slime` boss/leviathan_spit (played at the cloud), `sound_grab` boss/grab and `sound_arrive` boss/leviathan_arrive (no consumer yet). |
 | Not built | Prey held and reeled in by a hagfish (the boss's grab); the cloud does not yet scatter fish or slow prey; the hitbox is the shark's box, not carcass-shaped; no look at the shots (free-camera framing, the carcass's roll onto its side) by eye. |
+
+**Status 2026-11-07.** Disabled (`ready()` false, the boss skipped by `UnnaturalRun.DISABLED_BOSSES`). Its two-stage lash (two-stage-attack.md 4g) was explicitly out of scope and is **not built**; it plays as the default chomp style if forced ready (`whalefall_probe` still fails 7 checks for the disabled form).
 
 ## Fallen Angel (`fallen_angel`): ready
 
@@ -149,3 +170,5 @@ Registered file `forms/fallen_angel.gd` (the registry loads it by key; the brief
 | Eyes, murk | No eyes (the boss has none): the orange head and gut glow through the glass and an orange point light (range 0.6 x length) rides the crown. No murk view for Hunters yet. |
 | Audio | Sheet keys `sound_chomp` boss/chomp, `sound_lock` boss/angel_lock (not an existing id), `sound_miss` boss/chomp_miss: stand-ins, no consumer yet. |
 | Not built | "A fish it has watched": the bite does not track or reward a watched target (a watch-time bonus would need the bite or the field to read a lock state, both shared files). The shapes carry the idea: a narrow cone you have to hold on a fish. The hit area is the shark's box (wider and taller than the glass body). Wings and ring were looked at in free-camera shots only; the Hunter murk look is not built. |
+
+**Bite, two-stage (Lock).** `attacks/lock_attack.gd`. The press only opens when a prey fish is inside `angel_lock_range` 2 reaches and `angel_lock_cone` 40 degrees (else a short denied beat). The hold locks the nearest fish: it matches the school's pace (`angel_close_speed` 14 to reach the stand-off `angel_standoff` 0.7 reaches), auto-faces it (`angel_face_rate`), and the stick orbits (`angel_orbit_speed`). A ring and line sit on the target with an "xN" preview of the count. The release lashes a line through the target (`angel_lash_speed` 40): fish taken = capacity x `angel_count_mult` 3 x the facing share (how squarely the Angel faces the mass of the target's school, with `angel_charge_weight` 0.3 of the share from the charge), at least the target; the camera's lock-on bite on the same school multiplies on top. It breaks if the target leaves `angel_break_range` 3.5 (cooldown `angel_break_cooldown`). The "Lock-on" bite shape row above is the tap path. Probe: `angel_lock_probe` (71). Needs a windowed look at the ring, line and label.

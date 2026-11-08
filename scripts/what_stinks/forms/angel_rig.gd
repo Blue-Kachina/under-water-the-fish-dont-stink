@@ -4,10 +4,16 @@ extends Node3D
 ## wings beat faster with speed and the glass body trails each turn (yaw and pitch of the fish, each segment lagging
 ## the one before). The bite's `open` (AngelJaw) opens the crown out of the top of its head, flushing it orange and
 ## closing a lock-on ring in on the end of the bite's cone; when the bite lands the tentacles lash out along it.
+## In the lock style (LockAttack) the ring sits on the target instead, a thin line runs from the crown to it, the count
+## a release would take ("x5") shows beside it and the fish that would go are ringed; a refused press flickers the crown.
 
 const MODEL := preload("res://scripts/what_stinks/forms/angel_model.gd")
 const JAW := preload("res://scripts/what_stinks/forms/angel_jaw.gd")
 const N := SpineRig.SPINE_N
+## How long a refused press flickers the crown (s).
+const DENIED_TIME := 0.4
+## Most fish ringed at once.
+const MAX_MARKS := 16
 
 ## How hard each segment follows the one ahead of it (1/s): higher is a stiffer body.
 @export_range(2.0, 200.0, 1.0, "or_greater") var follow_rate := 50.0
@@ -37,6 +43,9 @@ var crown_open := 0.0
 var lash := 0.0
 var beat_clock := 0.0
 var halo: MeshInstance3D
+## The lock's pieces: the line from the crown to the target, the count by the ring, the rings on the fish that would be taken.
+var beam: MeshInstance3D
+var count_label: Label3D
 
 var _bite: HunterBite
 var _bites_seen := 0
@@ -51,6 +60,8 @@ var _tentacles: Array[MeshInstance3D] = []
 var _tentacle_skins: Array[ShaderMaterial] = []
 var _light: OmniLight3D
 var _halo_skin: StandardMaterial3D
+var _beam_skin: StandardMaterial3D
+var _marks: Array[MeshInstance3D] = []
 var _fresh := true
 var _age := 0.0
 
@@ -141,6 +152,40 @@ func _build_halo() -> void:
 	halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	halo.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	add_child(halo)
+	beam = MeshInstance3D.new()
+	beam.name = "LockBeam"
+	var rod := CylinderMesh.new()
+	rod.top_radius = 0.5
+	rod.bottom_radius = 0.5
+	rod.height = 1.0
+	rod.radial_segments = 6
+	rod.rings = 1
+	_beam_skin = StandardMaterial3D.new()
+	_beam_skin.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_beam_skin.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_beam_skin.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_beam_skin.no_depth_test = true
+	_beam_skin.albedo_color = Color(1.0, 0.6, 0.25, 0.0)
+	rod.material = _beam_skin
+	beam.mesh = rod
+	beam.top_level = true
+	beam.visible = false
+	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	beam.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	add_child(beam)
+	count_label = Label3D.new()
+	count_label.name = "LockCount"
+	count_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	count_label.no_depth_test = true
+	count_label.fixed_size = true
+	count_label.pixel_size = 0.0014
+	count_label.font_size = 48
+	count_label.outline_size = 10
+	count_label.modulate = Color(1.0, 0.85, 0.5)
+	count_label.top_level = true
+	count_label.visible = false
+	count_label.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	add_child(count_label)
 
 
 func _straighten() -> void:
@@ -256,6 +301,9 @@ func _pose_crown() -> void:
 func _dress(delta: float) -> void:
 	var open := jaw.opened
 	crown_open = move_toward(crown_open, open, delta * 6.0)
+	var lock := _lock()
+	if lock != null and lock.denied_age < DENIED_TIME:
+		crown_open = maxf(crown_open, 0.55 * absf(sin(lock.denied_age * 40.0)) * (1.0 - lock.denied_age / DENIED_TIME))  # a refused press: the crown flickers
 	if _bite != null and is_instance_valid(_bite) and _bite.bites != _bites_seen:
 		_bites_seen = _bite.bites
 		lash = 1.0
@@ -273,9 +321,21 @@ func _dress(delta: float) -> void:
 	_pose_halo()
 
 
-## The lock-on ring: at the far end of the bite's cone, as wide as its edge there, closing in as the crown opens.
+## The bite's lock style, if it has one.
+func _lock() -> LockAttack:
+	if _bite == null or not is_instance_valid(_bite):
+		return null
+	return _bite.attack as LockAttack
+
+
+## The lock-on ring: at the far end of the bite's cone, as wide as its edge there, closing in as the crown opens. In the
+## lock style it moves onto the target, tightening with the charge, with the line, the count and the marks.
 func _pose_halo() -> void:
-	var live := (crown_open > 0.03 or lash > 0.0) and _bite != null and is_instance_valid(_bite)
+	var lock := _lock()
+	var at_target := lock.ring_at(lash_time) if lock != null else Vector3.INF
+	var locked := at_target.is_finite()
+	_pose_lock_extras(lock, locked, at_target)
+	var live := (crown_open > 0.03 or lash > 0.0 or locked) and _bite != null and is_instance_valid(_bite)
 	halo.visible = live
 	if not live:
 		return
@@ -284,7 +344,60 @@ func _pose_halo() -> void:
 	var radius := _bite.radius()
 	var at := _bite.mouth_point() + forward * reach
 	var size := radius * lerpf(1.6, 1.0, smoothstep(0.0, 1.0, crown_open)) * (1.0 + 0.05 * sin(_age * 9.0))
-	halo.global_transform = Transform3D(Basis(fish.global_basis.x.normalized(), forward, fish.global_basis.y.normalized()) * Basis.from_scale(Vector3.ONE * size), at)
+	var fade := 1.0 if lash <= 0.0 else lash
+	if locked:
+		var from := _bite.mouth_point()
+		var line := at_target - from
+		forward = line.normalized() if line.length_squared() > 0.0001 else forward
+		at = at_target
+		var charge := _bite.charge() if lock.active() else 1.0
+		size = _bite.radius() * lerpf(0.9, 0.35, charge) * (1.0 + 0.05 * sin(_age * 9.0))
+		if not lock.active() and lock.lost_age < 0.4:  # the lock snapped: the ring bursts outward and fades
+			size *= 1.0 + 1.5 * lock.lost_age / 0.4
+			fade = 1.0 - lock.lost_age / 0.4
+	var up := forward.cross(fish.global_basis.x.normalized())
+	if up.length_squared() < 0.0001:
+		up = fish.global_basis.y.normalized()
+	var across := up.cross(forward).normalized()
+	halo.global_transform = Transform3D(Basis(across, forward, across.cross(forward).normalized()) * Basis.from_scale(Vector3.ONE * size), at)
 	var color := Color(1.0, 0.88, 0.75).lerp(Color(1.0, 0.45, 0.1), crown_open)
-	color.a = lerpf(0.2, 0.85, crown_open) * (0.75 + 0.25 * sin(_age * 10.0)) * (1.0 if lash <= 0.0 else lash)
+	color.a = lerpf(0.2, 0.85, crown_open) * (0.75 + 0.25 * sin(_age * 10.0)) * fade
 	_halo_skin.albedo_color = color
+
+
+## The line from the crown to the target, the "x5" by the ring and a small ring on each fish that would go with it.
+func _pose_lock_extras(lock: LockAttack, locked: bool, at_target: Vector3) -> void:
+	var held := lock != null and lock.active() and _bite.holding()
+	beam.visible = held
+	count_label.visible = held
+	var want := lock.mates_at.size() if held else 0
+	while _marks.size() < want and _marks.size() < MAX_MARKS:
+		var mark := MeshInstance3D.new()
+		mark.name = "LockMark"
+		mark.mesh = halo.mesh
+		mark.top_level = true
+		mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mark.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+		add_child(mark)
+		_marks.append(mark)
+	for i in _marks.size():
+		_marks[i].visible = i < want
+		if i < want:
+			var spot := lock.mates_at[i]
+			_marks[i].global_transform = Transform3D(Basis.from_scale(Vector3.ONE * _bite.radius() * 0.14 * (1.0 + 0.2 * sin(_age * 8.0 + i))), spot)
+	if not held:
+		return
+	var from := _bite.mouth_point()
+	var line := at_target - from
+	var length := line.length()
+	if length > 0.01:
+		var along := line / length
+		var side := along.cross(Vector3.UP)
+		if side.length_squared() < 0.0001:
+			side = Vector3.RIGHT
+		side = side.normalized()
+		var thick := _bite.radius() * 0.03 * (1.0 + _bite.charge())
+		beam.global_transform = Transform3D(Basis(side, along, side.cross(along).normalized()) * Basis.from_scale(Vector3(thick, length, thick)), from + line * 0.5)
+	_beam_skin.albedo_color = Color(1.0, 0.6, 0.25, lerpf(0.25, 0.7, _bite.charge()))
+	count_label.global_position = at_target + Vector3.UP * _bite.radius() * 0.5
+	count_label.text = "x%d" % lock.count_now

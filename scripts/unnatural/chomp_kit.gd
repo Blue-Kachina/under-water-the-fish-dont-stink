@@ -66,6 +66,8 @@ class Bite:
 	## one of CUES, fired as the Bite enters that beat (so on a puppet too, as it plays the
 	## host's beats), and `contact` on the tick the jaws land.
 	signal cue(name: StringName)
+	## A held-open bite (open_now) reached full charge.
+	signal charged
 
 	var settings: UnnaturalSettings
 	var phase := Phase.IDLE
@@ -89,6 +91,14 @@ class Bite:
 	var reach := 6.0
 	## Whether this bite has landed (its contact frame passed).
 	var landed := false
+	## Opt-in (open_now): HOLD never times out into STRIKE; it loops, straining with the charge,
+	## until release(). The bosses never set it, so their timed chomp is as ever.
+	var held_open := false
+	## Seconds a held-open bite takes to reach full charge, and how charged it is now (0 to 1).
+	var charge_s := 1.0
+	var charge := 0.0
+	var _open_s := 0.0
+	var _pull_s := 0.0
 	var _from_open := 0.0
 	var _offset := 0.0
 	var _net_phase := -1
@@ -100,15 +110,41 @@ class Bite:
 	func start(wind_s: float, bite_reach: float) -> void:
 		wind = maxf(wind_s, 0.02)
 		reach = bite_reach
+		held_open = false
+		_open_s = 0.0
 		_enter(Phase.ANTICIPATE)
 
 	## Straight to the strike (jaws already wide: a charging shark's).
 	func strike_now(bite_reach: float) -> void:
 		reach = bite_reach
+		held_open = false
+		_enter(Phase.STRIKE)
+
+	## The opening beat of a held bite: the jaws gape over `open_s` (after a `pull_s` pull-back, if
+	## any), then HOLD loops until release(). It reaches full charge `charge_for` s into the hold.
+	func open_now(open_s: float, bite_reach: float, charge_for := 1.0, pull_s := 0.0) -> void:
+		reach = bite_reach
+		held_open = true
+		charge = 0.0
+		charge_s = maxf(charge_for, 0.001)
+		_open_s = maxf(open_s, 0.01)
+		_pull_s = maxf(pull_s, 0.0)
+		if _pull_s > 0.0:
+			_enter(Phase.ANTICIPATE)
+		else:
+			_enter(Phase.GAPE)
+
+	## Straight to the strike from wherever the held bite is (released in the gape it strikes from
+	## that partial open: a tap).
+	func release() -> void:
+		if not held_open:
+			return
+		held_open = false
 		_enter(Phase.STRIKE)
 
 	## Called off (it's grabbing instead, or charging).
 	func cancel() -> void:
+		held_open = false
 		_enter(Phase.IDLE)
 		_offset = 0.0
 
@@ -134,6 +170,13 @@ class Bite:
 			_enter(net_phase as Phase)
 
 	func duration(of: Phase) -> float:
+		if _open_s > 0.0 and held_open:
+			if of == Phase.ANTICIPATE:
+				return _pull_s
+			if of == Phase.GAPE:
+				return _open_s
+			if of == Phase.HOLD:
+				return 0.2  # looped: only its tremble's ramp
 		var shape := maxf(settings.chomp_anticipate + settings.chomp_gape + settings.chomp_hold, 0.001)
 		var scale := wind / shape
 		match of:
@@ -190,7 +233,14 @@ class Bite:
 			Phase.HOLD:
 				open = 1.0
 				lift = lerpf(1.0, 0.7, s)
-				var tremble := sin(t * 70.0) * 0.012 * (0.5 + s)  # quivering, ready to go
+				var strain := 0.0
+				if held_open:
+					var was := charge
+					charge = clampf(t / charge_s, 0.0, 1.0)
+					strain = charge * 1.5  # the tremble grows with the charge
+					if was < 1.0 and charge >= 1.0:
+						charged.emit()
+				var tremble := sin(t * 70.0) * 0.012 * (0.5 + s + strain)  # quivering, ready to go
 				smear = POSE_WIDE + Vector3(-tremble, tremble, tremble * 0.5)
 				over = absf(tremble) * 3.0
 			Phase.STRIKE:
@@ -220,6 +270,8 @@ class Bite:
 				over = 0.0
 		if contact and t < length:
 			cue.emit(&"contact")
+		if held_open and phase == Phase.HOLD:
+			return false  # held: waits for release()
 		if t >= length:
 			if phase == Phase.STRIKE and not landed:
 				open = 0.0
@@ -385,6 +437,11 @@ static func reset() -> void:
 
 
 # --- Finding a player's view, and the feel on them ----------------------------
+
+## `fish`'s own view's camera, for modes with no UnnaturalRun (What Stinks?'s prey feeling a bite).
+static func view_camera(fish: FishController) -> Camera3D:
+	return _camera_of(fish)
+
 
 ## `fish`'s own FollowCamera (null: none).
 static func _camera_of(fish: FishController) -> Camera3D:

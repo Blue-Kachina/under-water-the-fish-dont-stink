@@ -20,6 +20,8 @@ enum Variant {
 }
 ## Which rounds come first: the people hunting, or a bot (the people are prey).
 enum StartAs { HUNTER, PREY }
+## How the bite button works: held open and released shut, or one tap (the snap).
+enum BiteMode { HOLD, TAP }
 
 ## The variants' names on the match card.
 const VARIANT_NAMES := ["Clean Sweep", "Upset Stomach"]
@@ -65,8 +67,42 @@ static func shared() -> WhatStinksSettings:
 @export_range(0.0, 10.0, 0.1, "or_greater") var chew_delay := 0.0
 
 @export_group("Bite")
-## The bite chomps the instant its button is pressed: the jaws already wide and slamming shut, no pull-back and no lunge forward. Off: the form's wind-up chomp (bite_wind) with its recoil and lunge.
-@export var bite_snap := true
+## Hold: the button opens the jaws and releasing it shuts them (a quick tap is a snap; holding charges the bite). Tap: today's snap, the chomp lands on the press and the release does nothing.
+@export var bite_mode := BiteMode.HOLD
+## A tap (released before the jaws are fully open) strikes from at least this open (0: from however far they got, 1: as wide as a snap).
+@export_range(0.0, 1.0, 0.05) var tap_open_min := 0.6
+## While the jaws are held open the Hunter swims at this share of its speed (an open mouth is drag)...
+@export_range(0.0, 3.0, 0.05, "or_greater") var hold_speed_mult := 0.8
+## ...turns at this share of its turn rate...
+@export_range(0.0, 3.0, 0.05, "or_greater") var hold_turn_mult := 0.7
+## ...and the schools' alarm radius is x this (a gaping mouth is a tell).
+@export_range(0.0, 5.0, 0.05, "or_greater") var hold_alarm_mult := 1.5
+## Each second held adds this to the bite's cooldown (on top of the form's bite_every)...
+@export_range(0.0, 10.0, 0.05, "or_greater") var hold_cooldown_per_s := 0.5
+## ...up to this total (s).
+@export_range(0.0, 60.0, 0.5, "or_greater") var hold_cooldown_max := 6.0
+## A fully charged chomp takes x this many fish (1: holding buys no capacity)...
+@export_range(0.0, 10.0, 0.05, "or_greater") var hold_capacity_mult := 2.5
+## ...and reaches x this far.
+@export_range(0.0, 5.0, 0.05, "or_greater") var hold_reach_mult := 1.5
+## The bite's frustum is drawn faintly on the HUD while the jaws are held open.
+@export var bite_frustum_preview := true
+## The pad's rumble when the jaws open...
+@export_range(0.0, 3.0, 0.05, "or_greater") var rumble_open := 0.3
+## ...while held (rising with the charge)...
+@export_range(0.0, 3.0, 0.05, "or_greater") var rumble_hold := 0.25
+## ...and when the jaws shut on something.
+@export_range(0.0, 3.0, 0.05, "or_greater") var rumble_contact := 0.7
+## The Hunter freezes this long (ms) when its jaws land (never the global time scale).
+@export_range(0.0, 500.0, 5.0, "or_greater") var hitstop_ms := 80.0
+## The blood, bubbles and tooth sparks at a landing x this (0: none; the camera punch and sounds stay).
+@export_range(0.0, 5.0, 0.05, "or_greater") var bite_fx_mult := 1.0
+## A prey player within this many reaches of an open mouth hears the hold louder and feels a slow heartbeat rumble (0: no warning).
+@export_range(0.0, 10.0, 0.1, "or_greater") var prey_warn_range := 1.5
+## ...of this strength (x rumble_hold; it quickens with the charge)...
+@export_range(0.0, 5.0, 0.05, "or_greater") var prey_warn_rumble := 1.5
+## ...and a prey player a bite catches feels it: camera punch, rumble and red flush x this (a boss chomp's, 1).
+@export_range(0.0, 5.0, 0.05, "or_greater") var prey_impact := 1.0
 ## A bite's survivors panic: burst strength x this (1: as a battery).
 @export_range(0.0, 10.0, 0.1, "or_greater") var eat_burst_mult := 2.5
 ## ...and burst this far (x burst_radius).
@@ -77,6 +113,103 @@ static func shared() -> WhatStinksSettings:
 @export_range(0.0, 60.0, 0.5, "or_greater") var reform_time := 7.0
 ## A bite takes prey players in reach as well as school fish (off: only the school's fish).
 @export var bite_takes_players := true
+
+@export_group("Engulf")
+## The whales' mouth (two-stage-attack.md 4b): the jaw drops this many degrees (real whales open to about 90; the Bite's fling goes past it)...
+@export_range(0.0, 170.0, 1.0, "or_greater") var whale_gape_deg := 80.0
+## ...and stretches this many times as long as it opens (1: no stretch; the cartoon gape)...
+@export_range(0.25, 4.0, 0.05, "or_greater") var whale_smear := 1.25
+## ...and the throat's pleats balloon x this as fish go in (0: they stay flat).
+@export_range(0.0, 5.0, 0.05, "or_greater") var engulf_swell := 1.0
+## An open mouth holds up to this x the form's capacity of fish (and prey players); when it is full it stays open but takes no more.
+@export_range(0.0, 10.0, 0.1, "or_greater") var engulf_max_mult := 2.0
+## The mouth takes what swims into a box this x the bite's reach long...
+@export_range(0.1, 5.0, 0.05, "or_greater") var engulf_box_len := 1.5
+## ...and this x the bite's radius to each side while the jaw is open wide.
+@export_range(0.05, 3.0, 0.05, "or_greater") var engulf_box_width := 0.6
+## A fish that enters is drawn in to its place in the mouth over this long (s)...
+@export_range(0.0, 3.0, 0.05, "or_greater") var engulf_pull_s := 0.35
+## ...at most this many fish go in each second...
+@export_range(0.5, 200.0, 0.5, "or_greater") var engulf_per_s := 14.0
+## ...the pleats squeeze back down over this long (s) after the mouth shuts...
+@export_range(0.0, 5.0, 0.05, "or_greater") var engulf_squeeze_s := 0.6
+## ...and a fish bumping a full mouth's lips is knocked away at this speed (m/s).
+@export_range(0.0, 40.0, 0.5, "or_greater") var engulf_bump := 4.0
+
+@export_group("Suction")
+## The Gulper's suction (two-stage-attack.md 4d): while the pouch is held open, school fish in a cone ahead of the mouth are drawn
+## toward it at up to this speed (m/s) at full charge (0: no suction)...
+@export_range(0.0, 100.0, 0.5, "or_greater") var suck_strength := 16.0
+## ...and prey players in the cone are pushed toward the mouth by this much (m/s per s at full charge; they can swim against it)...
+@export_range(0.0, 100.0, 0.5, "or_greater") var suck_prey_push := 12.0
+## ...the cone is this many degrees either side of the nose...
+@export_range(1.0, 180.0, 1.0) var suck_cone := 35.0
+## ...it reaches this many times the bite's reach at full charge...
+@export_range(0.1, 10.0, 0.05, "or_greater") var suck_reach_mult := 2.5
+## ...and this share of that at no charge (the cone grows with the hold)...
+@export_range(0.0, 1.0, 0.05) var suck_reach_min := 0.4
+## ...and the pull is this share of its strength at no charge.
+@export_range(0.0, 1.0, 0.05) var suck_charge_min := 0.35
+## The release snaps shut on everything within this many bite radii of the mouth...
+@export_range(0.05, 5.0, 0.05, "or_greater") var gulper_mouth_r := 0.7
+## ...the belly shows what it took as a lump sliding down it for this long (s)...
+@export_range(0.0, 20.0, 0.1, "or_greater") var suck_lump_s := 3.0
+## ...and bulges this much (the lump's share of the girth there, scaled by how much was taken; 0: no lump).
+@export_range(0.0, 3.0, 0.05, "or_greater") var suck_lump_size := 0.5
+
+@export_group("Lock")
+## The Fallen Angel's lock (two-stage-attack.md 4c): a press only takes with a fish within this many reaches of the nose (0: it never takes)...
+@export_range(0.0, 10.0, 0.1, "or_greater") var angel_lock_range := 2.0
+## ...and within this many degrees of the nose (the cone ahead; 180: all round)...
+@export_range(1.0, 180.0, 1.0) var angel_lock_cone := 40.0
+## ...then it holds this many reaches from the target (the stand-off)...
+@export_range(0.1, 6.0, 0.05, "or_greater") var angel_standoff := 0.7
+## ...the stick orbits it round the target this fast (rad/s at full stick)...
+@export_range(0.0, 10.0, 0.1, "or_greater") var angel_orbit_speed := 1.6
+## ...it closes in on the stand-off at most this fast (m/s)...
+@export_range(0.0, 200.0, 0.5, "or_greater") var angel_close_speed := 14.0
+## ...and pivots to keep facing the target at most this fast (rad/s)...
+@export_range(0.0, 60.0, 0.1, "or_greater") var angel_face_rate := 6.0
+## ...the lock snaps if the target gets further than this many reaches (or is eaten)...
+@export_range(0.5, 20.0, 0.1, "or_greater") var angel_break_range := 3.5
+## ...and the crown waits this long (s) before it opens again...
+@export_range(0.0, 10.0, 0.1, "or_greater") var angel_break_cooldown := 1.0
+## ...a release takes capacity x this x how squarely it faces the target's school (at least the target)...
+@export_range(0.0, 20.0, 0.1, "or_greater") var angel_count_mult := 3.0
+## ...of which the charge is this share (0: only the angle counts)...
+@export_range(0.0, 1.0, 0.05) var angel_charge_weight := 0.3
+## ...and the lash travels this fast (m/s): each fish's crunch plays when it arrives (0: all at once).
+@export_range(0.0, 400.0, 1.0, "or_greater") var angel_lash_speed := 40.0
+
+@export_group("Coil")
+## The King's coil-whip (two-stage-attack.md 4e): a release sweeps a flat sector round the nose. Its width is this many degrees
+## (all the way across) at no charge...
+@export_range(1.0, 360.0, 1.0) var coil_arc_min := 45.0
+## ...growing to this many degrees at full charge (the coil tightens as it is held)...
+@export_range(1.0, 360.0, 1.0) var coil_arc_max := 160.0
+## ...the whip pivots this share of the bite's reach behind the mouth, and the sector reaches a reach beyond the mouth from there...
+@export_range(0.0, 3.0, 0.05, "or_greater") var coil_pivot := 0.45
+## ...it is this many reaches thick, up and down (flat: a thin one only takes what is level with the head)...
+@export_range(0.05, 5.0, 0.05, "or_greater") var coil_thick := 0.5
+## ...a release at full charge takes this x the form's capacity (1: the charge only widens the arc)...
+@export_range(0.0, 10.0, 0.1, "or_greater") var coil_capacity_mult := 1.5
+## ...and the body curls through this many degrees round itself at full charge (0: it stays straight).
+@export_range(0.0, 720.0, 5.0, "or_greater") var coil_curl_deg := 300.0
+
+@export_group("Drill")
+## The Lamprey Queen's drill (two-stage-attack.md 4f): a release dashes forward corkscrewing at this x her top speed at full
+## charge (x the charge; 0: no dash, the plain bite)...
+@export_range(0.0, 10.0, 0.05, "or_greater") var drill_dash := 2.0
+## ...for this long (s)...
+@export_range(0.0, 5.0, 0.05, "or_greater") var drill_time := 0.6
+## ...taking what the disc passes through, up to the form's capacity x this at full charge (x the charge)...
+@export_range(0.0, 30.0, 0.1, "or_greater") var drill_capacity_mult := 6.0
+## ...in a tube this x the bite's radius across...
+@export_range(0.1, 5.0, 0.05, "or_greater") var drill_radius_mult := 1.5
+## ...a hold shorter than this share of the charge does not dash (the plain bite)...
+@export_range(0.0, 1.0, 0.05) var drill_min_charge := 0.2
+## ...and at full charge the first prey player the disc meets is latched: the dash ends and she rolls on it.
+@export var drill_latch := true
 
 @export_group("Stomach")
 ## Upset Stomach (what_stinks.md 1b). The satiation bar's size (the Hunter wins by filling it)...
@@ -253,12 +386,28 @@ static func shared() -> WhatStinksSettings:
 @export_range(0.0, 200.0, 1.0, "or_greater") var hunter_bot_boost_gap := 25.0
 ## ...and bites when a fish is within this share of the bite's reach.
 @export_range(0.1, 2.0, 0.05) var hunter_bot_bite_share := 0.8
+## A Hunter bot opens its jaws when a fish is within this share of the bite's reach (more than the bite share: it opens on the way in)...
+@export_range(0.1, 4.0, 0.05, "or_greater") var hunter_bot_open_gap := 1.6
+## ...and shuts them once the charge is at least this (or at once if the fish is getting away).
+@export_range(0.0, 1.0, 0.05) var hunter_bot_charge := 0.5
+## Fallen Angel bot: lets the lash go once the facing share is at least this (or the hold runs long).
+@export_range(0.0, 1.0, 0.05) var hunter_bot_lock_align := 0.6
 ## Upset Stomach: a Hunter bot won't bite while a prey it can read (exposure at least this) is in its bite or is the nearest fish (0: reads nothing).
 @export_range(0.0, 1.0, 0.01) var hunter_bot_avoid_exposure := 0.3
 ## ...and a prey bot heads for the school nearest the Hunter (bait: it wants to be taken for food).
 @export var prey_bot_baits := true
 ## A bot Hunter picks the school with the most fish left (it knows the count), not just the nearest fish.
 @export var hunter_bot_prefers_big := true
+## Clean Sweep: a Hunter bot goes for a prey it can read (exposure at least this) before plain fish, and a loner it can't read isn't a target (0: it never reads, every prey is just the nearest fish).
+@export_range(0.0, 1.0, 0.01) var hunter_bot_read_exposure := 0.25
+## A Hunter bot Clicks when the Click is ready and no prey is readable (off: it never clicks).
+@export var hunter_bot_click := true
+## Clean Sweep: a Hunter bot sniffs while it works a school it has found no prey in, for this long (s) per school, then heads for another (0: it never sniffs).
+@export_range(0.0, 60.0, 0.5, "or_greater") var hunter_bot_sniff_s := 4.0
+## A prey bot that is joined leaves and heads for another school when a Hunter reads it at least this much (exposure)...
+@export_range(0.0, 1.0, 0.01) var prey_bot_exposure := 0.45
+## ...for this long (s) (0: it never relocates; it doesn't while baiting in Upset Stomach either).
+@export_range(0.0, 30.0, 0.1, "or_greater") var prey_bot_patience := 2.5
 
 
 @export_group("Camera")

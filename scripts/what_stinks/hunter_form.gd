@@ -14,6 +14,8 @@ extends RefCounted
 ##   bite_wind, bite_every  the wind-up (s: ChompKit.Bite) and the cooldown between bites (s)
 ##   capacity               fish a bite takes at size 1 (x size^bite_capacity_exp)
 ##   cam                    factors on the camera's distance and height, on top of the size framing
+##   attack                 the held bite's style (HunterAttack.make: chomp, engulf, lock, suction, coil, drill, lash); a style not built yet plays as chomp
+##   open_s, charge_s       how fast the jaws open on the press (s) and how long a hold takes to reach full charge (s)
 const SHARK := {
 	"name": "Drowned Shark", "class": FishCharacter.FishClass.MONSTER, "species": 0,
 	"length_m": 7.0, "speed": 1.3, "accel": 0.7, "turn": 0.55,

@@ -76,6 +76,7 @@ func hook(match_node: WhatStinksMatch) -> void:
 		_link(game.round_over, _on_round_over)
 		_link(game.match_over, _on_match_over)
 		_link(game.bite_started, _on_bite_started)
+		_link(game.bite_closed, _on_bite_closed)
 		_link(game.bite_result, _on_bite_result)
 		_link(game.bite_penalty, _on_bite_penalty)
 		_link(game.spit_applied, _on_spit)
@@ -91,6 +92,7 @@ func hook(match_node: WhatStinksMatch) -> void:
 	else:
 		_link(game.local_bite, _on_local_bite)
 		_link(game.bite_started, _on_local_bite_started)
+		_link(game.bite_closed, _on_local_bite_closed)
 		_link(game.echo.local_buttons, _on_local_buttons)
 		_link(game.echo.local_burst, _on_local_burst)
 		_link(game.join.requested, _on_join_requested)
@@ -436,10 +438,16 @@ func _on_match_over(best: FishController) -> void:
 	_send_all("_ws_match_over", [id_of(best)])
 
 
-## A bite of the host's own (or a bot's) began; a guest's is relayed in _ws_bite_start.
+## A bite of the host's own (or a bot's) opened its jaws; a guest's is relayed in _ws_bite_start.
 func _on_bite_started(hunter: FishController) -> void:
 	if not hunter.puppet:
-		_send_all("_ws_bite_started", [id_of(hunter)])
+		_send_all("_ws_bite_open", [id_of(hunter)])
+
+
+## ...and shut them at `charge` (negative: called off); a guest's is relayed in _ws_bite_stop.
+func _on_bite_closed(hunter: FishController, charge: float) -> void:
+	if not hunter.puppet:
+		_send_all("_ws_bite_close", [id_of(hunter), charge])
 
 
 func _on_bite_result(hunter: FishController, taken: Dictionary, prey: Array) -> void:
@@ -521,8 +529,15 @@ func _on_local_bite_started(hunter: FishController) -> void:
 
 
 ## Our Hunter's jaws shut: where, and which way: the host judges what it ate.
-func _on_local_bite(mouth: Vector3, forward: Vector3) -> void:
-	coop.send_from(self, 1, "_ws_bite_land", [_own_pid(), mouth, forward], true)
+## Our Hunter's jaws are shutting (or it was called off: a negative charge): the host's copy of us shuts its own,
+## and judges the landing with no more charge than it saw us hold.
+func _on_local_bite_closed(hunter: FishController, charge: float) -> void:
+	if hunter == game.local_fish():
+		coop.send_from(self, 1, "_ws_bite_stop", [_own_pid(), charge], true)
+
+
+func _on_local_bite(mouth: Vector3, forward: Vector3, charge: float, extra: Dictionary) -> void:
+	coop.send_from(self, 1, "_ws_bite_land", [_own_pid(), mouth, forward, charge, extra], true)
 
 
 func _on_local_buttons(mask: int) -> void:
@@ -572,18 +587,33 @@ func _ws_bite_start(pid: int) -> void:
 	var bite: HunterBite = game.bites.get(fish) if fish else null
 	if bite == null or not game.is_hunter(fish):
 		return
-	bite.net_start()
+	bite.net_open()
 	var sender := multiplayer.get_remote_sender_id()
 	for peer: int in _peers():
 		if peer != sender:
-			coop.send_from(self, peer, "_ws_bite_started", [pid], true)
+			coop.send_from(self, peer, "_ws_bite_open", [pid], true)
+
+
+## A guest let go of the bite button: the charge is capped to what the host saw its puppet hold, then relayed.
+@rpc("any_peer", "call_remote", "reliable")
+func _ws_bite_stop(pid: int, charge: float) -> void:
+	var fish := _sender_fish(pid)
+	var bite: HunterBite = game.bites.get(fish) if fish else null
+	if bite == null or not game.is_hunter(fish) or not is_finite(charge):
+		return
+	var held := bite.net_clamp(charge)
+	bite.net_close(held)
+	var sender := multiplayer.get_remote_sender_id()
+	for peer: int in _peers():
+		if peer != sender:
+			coop.send_from(self, peer, "_ws_bite_close", [pid, held], true)
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _ws_bite_land(pid: int, mouth: Vector3, forward: Vector3) -> void:
+func _ws_bite_land(pid: int, mouth: Vector3, forward: Vector3, charge: float, extra: Dictionary) -> void:
 	var fish := _sender_fish(pid)
 	if fish:
-		game.judge_net_bite(fish, mouth, forward)
+		game.judge_net_bite(fish, mouth, forward, charge, extra)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -661,11 +691,20 @@ func _ws_match_over(winner_id: int) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _ws_bite_started(hunter_id: int) -> void:
+func _ws_bite_open(hunter_id: int) -> void:
 	var fish := fish_by_id(hunter_id)
 	var bite: HunterBite = game.bites.get(fish) if game and fish else null
 	if bite and not is_host():
-		bite.net_start()
+		bite.net_open()
+
+
+## A Hunter's jaws shut on another machine, at the charge the host allowed (negative: called off).
+@rpc("authority", "call_remote", "reliable")
+func _ws_bite_close(hunter_id: int, charge: float) -> void:
+	var fish := fish_by_id(hunter_id)
+	var bite: HunterBite = game.bites.get(fish) if game and fish else null
+	if bite and not is_host():
+		bite.net_close(charge)
 
 
 @rpc("authority", "call_remote", "reliable")

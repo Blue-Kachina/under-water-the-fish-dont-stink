@@ -25,11 +25,11 @@ var _riders: Array = []
 var _trail := PackedVector3Array()
 var _age := 0.0
 var _wave := 0.0
+## How tight the body is coiled now (0 to 1), eased toward what CoilAttack wants.
+var _coil := 0.0
 var _bite: HunterBite
 ## Msec until which the skin flashes after a bite lands (the snap chomp has no wind-up glow).
 var _flash_until := 0
-## The id of the stand-in chomp sound (the form's sheet: "sound_chomp").
-var chomp_sound := ""
 
 
 ## Builds the body for `with_fish` at its hitbox's length now.
@@ -52,7 +52,7 @@ func _process(delta: float) -> void:
 	if not is_instance_valid(fish) or not is_visible_in_tree():
 		return
 	_age += delta
-	_pose()
+	_pose(delta)
 
 
 ## The head's world point: the front of the hitbox, lifted and turned by the bite's pose on the visual.
@@ -62,8 +62,20 @@ func head_point() -> Vector3:
 	return xf * (Basis.from_euler(visual.rotation) * Vector3(0.0, 0.0, -length * 0.5))
 
 
-func _pose() -> void:
+func _pose(delta := 0.0) -> void:
 	var head := head_point()
+	var coil := _coil_attack()
+	if coil != null:
+		# The whip: the head swings round a pivot behind the mouth (the sector's apex), cocked to one side while the coil is held.
+		var swing := coil.sweep_at(_bite)
+		if swing != 0.0:
+			var xf := fish.get_global_transform_interpolated()
+			var pivot := head + xf.basis.z.normalized() * coil.pivot_back(_bite)
+			head = pivot + (head - pivot).rotated(xf.basis.y.normalized(), swing)
+		var target := coil.coil_target(_bite)
+		_coil = move_toward(_coil, target, delta * (2.5 if target > _coil else 9.0))
+	elif _coil > 0.0:
+		_coil = 0.0
 	if not _trail.is_empty() and _trail[_trail.size() - 1].distance_to(head) > length * 0.5:
 		_trail.clear()  # a respawn or a teleport: the body goes with the head, not stretched back to where it was
 	if _trail.is_empty() or _trail[_trail.size() - 1].distance_to(head) > 0.25:
@@ -80,10 +92,33 @@ func _pose() -> void:
 	rig.head_up = body.y  # the body rolls with the fish (an air roll), not held to the world's up
 	rig.head_back = body.z
 	rig.follow_trail(head, _trail, body.z)
+	_curl()
 	rig.twist = (get_parent() as Node3D).rotation.y * 2.0
 	_swim_look()
 	_pose_riders()
 	rig.apply()
+
+
+## The coil: the body behind the neck turns round the fish's up as the coil tightens (the spine's segments each turned a little
+## more, the head's own stretch left straight), through coil_curl_deg at full. Held in `_coil` (0 straight to 1 fully curled).
+func _curl() -> void:
+	var total := deg_to_rad(WhatStinksSettings.shared().coil_curl_deg) * _coil
+	if total <= 0.0001:
+		return
+	var axis := rig.head_up.normalized()
+	var from := rig.points.duplicate()
+	var first := int(SpineRig.SPINE_N * 0.12)
+	var last := int(SpineRig.SPINE_N * 0.75)
+	for s in range(1, SpineRig.SPINE_N):
+		var turned := total * clampf(float(s - first) / float(last - first), 0.0, 1.0)
+		rig.points[s] = rig.points[s - 1] + (from[s] - from[s - 1]).rotated(axis, turned)
+	rig.call("_frames")
+
+
+## The Coil style the bite wears, if it does.
+func _coil_attack() -> CoilAttack:
+	var bite := _find_bite()
+	return bite.attack as CoilAttack if bite != null else null
 
 
 ## The swim: a wave down the body that grows with the speed and the turn (the bend itself is the trail's).
@@ -99,6 +134,8 @@ func _swim_look() -> void:
 	var bite := _find_bite()
 	if bite and bite.bite and bite.bite.winding():
 		warn = (0.5 + 0.5 * sin(_age * 26.0)) * UnnaturalSettings.shared().telegraph_glow
+		if bite.holding():
+			warn *= lerpf(0.4, 1.0, bite.charge())  # the skin burns brighter as the coil tightens
 	# the snap chomp has no wind-up: the strike flashes the skin instead (impact)
 	warn = maxf(warn, clampf(float(_flash_until - Time.get_ticks_msec()) / 220.0, 0.0, 1.0) * UnnaturalSettings.shared().telegraph_glow)
 	skin.set_shader_parameter("warn", warn)
@@ -110,10 +147,6 @@ func _find_bite() -> HunterBite:
 		if _bite and not _bite.has_meta("king_flash"):
 			_bite.set_meta("king_flash", true)
 			_bite.chomped.connect(func(_m: Vector3, _r: float, _d: float, _c: int) -> void: _flash_until = Time.get_ticks_msec() + 220)
-		if _bite and chomp_sound != "" and not _bite.has_meta("king_sfx"):
-			_bite.set_meta("king_sfx", true)
-			_bite.chomped.connect(func(mouth: Vector3, _reach: float, _radius: float, _capacity: int) -> void:
-				Sfx.play_at(chomp_sound, mouth))
 	return _bite
 
 

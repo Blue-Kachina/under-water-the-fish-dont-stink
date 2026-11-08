@@ -1024,3 +1024,446 @@ static func _fin(parent: Node3D, material: ShaderMaterial, root0: Vector3, root1
 	fin.material_override = material
 	parent.add_child(fin)
 	return fin
+
+
+# --- A Hunter's hinged jaw (What Stinks?, two-stage-attack.md 4b) --------------
+
+## Marco Polo's whales never build this: their mouth stays the painted line, shut. WhaleJaw
+## (scripts/what_stinks/whale_jaw.gd) calls hunter_jaw() on the model of a Hunter wearing a Titan, and
+## poses what it makes. The rows and columns the lower jaw's skin is lofted on, per LOD.
+const JAW_ROWS := [36, 18, 9]
+const JAW_COLS := [40, 20, 10]
+const JAW_FLESH := Color(0.66, 0.22, 0.24)
+const JAW_FLESH_DARK := Color(0.2, 0.04, 0.06)
+const JAW_TOOTH := Color(0.92, 0.89, 0.76)
+const JAW_BALEEN := Color(0.15, 0.13, 0.115)
+const JAW_FRINGE := Color(0.36, 0.32, 0.27)
+
+
+## The lower jaw for the Titan model `m` (species m.species), hinged at the mouth's corner. A baleen
+## whale's, an orca's and a beluga's is a patch of the belly under the mouth line: the body's skin is cut
+## away there while the jaw is open (titan_skin's jaw_cut) and a copy of the patch (jaw_part 1, painted
+## from the resting shape so nothing slides) swings down on the hinge. The sperm whale's is its rod, hinged
+## (titan_fin's jaw_angle). The inside (floor with a tongue, roof, a dark throat, the baleen plates or the
+## teeth) is plain geometry on a bend rider at the hinge, hidden while the mouth is shut. Returns:
+## {"sperm": bool, "hinge": Vector3, "mouth": Vector3 (the lips' front, model space), "width": the mouth's half
+## width, "length": its length, "skin": the body's material (jaw_cut, throat_swell; null on the sperm whale),
+## "jaw_skin": the material the jaw's angle goes to, "patches": the skin copies (shown while open),
+## "jaw": the node the inside of the jaw rides (rotate its x), "head": the fixed inside, "swell": the throat's
+## bulge at most (m), "throat_from": where along the body it starts, "teeth": bool, "baleen": bool}.
+static func hunter_jaw(m: FishModel) -> Dictionary:
+	var species := clampi(m.species, 0, SPECIES_KEYS.size() - 1)
+	var look := _look(species, m.skin)
+	var full := m._size.z
+	var l := full * STANDARD
+	var ends := Vector2(-full * 0.5, -full * 0.5 + l)
+	var sperm := float(look.jaw) > 0.0
+	var info := {"sperm": sperm, "teeth": species != 0 and species != 4, "baleen": species == 0 or species == 4,
+			"patches": [] as Array[MeshInstance3D], "skin": null, "jaw_skin": null}
+	if sperm:
+		_hunter_jaw_rod(m, look, l, ends, info)
+	else:
+		_hunter_jaw_patch(m, look, l, ends, full, info)
+	return info
+
+
+## The belly patch version (see hunter_jaw).
+static func _hunter_jaw_patch(m: FishModel, look: Dictionary, l: float, ends: Vector2, full: float, info: Dictionary) -> void:
+	var a_c: float = look.mouth_a
+	var corner := _jaw_row(look, l, ends, a_c)
+	var lip_c: Vector2 = corner.lip
+	var hinge := Vector3(0.0, lip_c.y, float(corner.z))
+	var skin: ShaderMaterial = m._skins[0]
+	var jaw_skin := skin.duplicate() as ShaderMaterial
+	jaw_skin.set_shader_parameter("jaw_part", 1.0)
+	jaw_skin.set_shader_parameter("jaw_hinge", Vector2(hinge.y, hinge.z))
+	jaw_skin.set_shader_parameter("jaw_cut", 0.0)
+	m._skins.append(jaw_skin)
+	skin.set_shader_parameter("jaw_hinge", Vector2(hinge.y, hinge.z))
+	var pleats: float = look.pleats
+	skin.set_shader_parameter("throat_span", Vector2(a_c, maxf(a_c + 0.1, 0.5)))
+	var patches: Array[MeshInstance3D] = []
+	for lod in LODS.size():
+		var node := MeshInstance3D.new()
+		node.name = "WhaleJawSkin%d" % lod
+		node.mesh = _jaw_patch(look, l, ends, int(JAW_ROWS[lod]), int(JAW_COLS[lod]))
+		node.material_override = jaw_skin
+		_set_lod(node, lod, full)
+		node.visible = false
+		m.add_child(node)
+		m.bend_part(node)
+		patches.append(node)
+	_rescale_with(m, patches)
+	var rider := m.bend_rider(hinge)
+	var head := Node3D.new()
+	head.name = "WhaleHead"
+	head.visible = false
+	rider.add_child(head)
+	var jaw := Node3D.new()
+	jaw.name = "WhaleJawInside"
+	jaw.visible = false
+	rider.add_child(jaw)
+	# The floor of the mouth with its tongue, on the jaw.
+	var rows := 18
+	var cols := 24
+	var floor_points: Array = []
+	var floor_colors: Array = []
+	for i in rows + 1:
+		var row := _jaw_row(look, l, ends, a_c * pow(float(i) / rows, 1.7))
+		var points: Array = []
+		var colors: Array = []
+		var share := float(row.along) / a_c
+		for j in cols + 1:
+			var w := float(j) / cols
+			var k := absf(2.0 * w - 1.0)
+			var side := 1.0 if w >= 0.5 else -1.0
+			var hit := _ring_at(row.ring, lerpf(1.0, float(row.line), k))
+			var p: Vector2 = hit[0]
+			var n: Vector2 = hit[1]
+			var tongue := 0.03 * l * pow(1.0 - k, 1.6) * smoothstep(0.0, 0.5, share)
+			p -= n * (0.012 * l + tongue)
+			points.append(Vector3(p.x * side, p.y, float(row.z)) - hinge)
+			colors.append(JAW_FLESH.lerp(JAW_FLESH_DARK, clampf(share * 0.85, 0.0, 0.9)).lightened(0.12 * (1.0 - k) * smoothstep(0.0, 0.5, share)))
+		floor_points.append(points)
+		floor_colors.append(colors)
+	_flesh_node(_grid_tool(floor_points, floor_colors, cols, rows), jaw, "Floor")
+	# The roof, a palate arching up into the head between the lips, and the dark throat at the hinge.
+	var roof_points: Array = []
+	var roof_colors: Array = []
+	var roof_cols := 20
+	var arch_back: Array[Vector3] = []
+	for i in rows + 1:
+		var row := _jaw_row(look, l, ends, a_c * pow(float(i) / rows, 1.7))
+		var lip: Vector2 = row.lip
+		var arch := maxf(minf(0.5 * lip.x, 0.5 * (float(row.top) - lip.y)), 0.0)
+		var points: Array = []
+		var colors: Array = []
+		for j in roof_cols + 1:
+			var u := lerpf(-1.0, 1.0, float(j) / roof_cols)
+			var at := Vector3(u * lip.x, lip.y + arch * (1.0 - u * u), float(row.z)) - hinge
+			points.append(at)
+			colors.append(JAW_FLESH.lerp(JAW_FLESH_DARK, clampf(float(row.along) / a_c * 0.8, 0.0, 0.9)).lightened(0.1 * absf(u)))
+			if i == rows:
+				arch_back.append(at)
+		roof_points.append(points)
+		roof_colors.append(colors)
+	_flesh_node(_grid_tool(roof_points, roof_colors, roof_cols, rows), head, "Roof")
+	# The throat: a fan from a black middle out to the roof's back edge and the belly's cut edge at the corner.
+	var outline: Array[Vector3] = arch_back.duplicate()
+	var steps := 16
+	for j in range(steps + 1):
+		var k := 1.0 - float(j) / steps
+		var hit := _ring_at(corner.ring, lerpf(1.0, float(corner.line), k))
+		var p: Vector2 = hit[0]
+		outline.append(Vector3(p.x, p.y, float(corner.z)) - hinge)
+	for j in range(1, steps + 1):
+		var k := float(j) / steps
+		var hit := _ring_at(corner.ring, lerpf(1.0, float(corner.line), k))
+		var p: Vector2 = hit[0]
+		outline.append(Vector3(-p.x, p.y, float(corner.z)) - hinge)
+	var middle := Vector3.ZERO
+	for p in outline:
+		middle += p
+	middle /= outline.size()
+	var fan := SurfaceTool.new()
+	fan.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in outline.size():
+		var a: Vector3 = outline[i]
+		var b: Vector3 = outline[(i + 1) % outline.size()]
+		for pair: Array in [[middle + Vector3(0.0, 0.0, 0.01 * l), Color(0.01, 0.0, 0.005)], [a, JAW_FLESH_DARK.darkened(0.5)], [b, JAW_FLESH_DARK.darkened(0.5)]]:
+			fan.set_color(pair[1])
+			fan.add_vertex(pair[0])
+	_flesh_node(fan, head, "Throat")
+	if bool(info.baleen):
+		_baleen(look, l, ends, a_c, hinge, head)
+	else:
+		_jaw_teeth(look, l, ends, a_c, hinge, head, jaw, _teeth_spec(look))
+	var swell := 0.05 * l * (1.0 if pleats > 0.0 else 0.45)
+	var front := _jaw_row(look, l, ends, 0.02)
+	info.merge({"hinge": hinge, "mouth": Vector3(0.0, (front.lip as Vector2).y, ends.x + 0.025 * l),
+			"width": lip_c.x, "length": a_c * l, "skin": skin, "jaw_skin": jaw_skin, "patches": patches, "jaw": jaw, "head": head,
+			"swell": swell, "throat_from": a_c}, true)
+
+
+## Tooth count and size by species: [per side, height (L), half width (L)].
+static func _teeth_spec(look: Dictionary) -> Array:
+	if float(look.melon) > 0.0:
+		return [9, 0.014, 0.0028]  # the beluga's small peg teeth
+	return [11, 0.02, 0.0042]  # the orca's big conical teeth
+
+
+## The sperm whale's version (see hunter_jaw): its rod hinged where it meets the head.
+static func _hunter_jaw_rod(m: FishModel, look: Dictionary, l: float, ends: Vector2, info: Dictionary) -> void:
+	var hinge_at: float = look.jaw_hinge
+	var hinge_z := lerpf(ends.x, ends.y, hinge_at)
+	var section := _section(look, hinge_at, l)
+	var top_y: float = section[3] - section[2] + float(look.jaw_sink) * l
+	var hinge := Vector3(0.0, top_y, hinge_z)
+	var length := float(look.jaw) * l
+	var width := float(look.jaw_w) * l
+	var rod: MeshInstance3D = null
+	for node in m.find_children("Jaw", "MeshInstance3D", false, false):
+		rod = node
+	var material: ShaderMaterial = null
+	if rod != null:
+		material = rod.material_override as ShaderMaterial
+		material.set_shader_parameter("jaw_hinge", Vector2(hinge.y, hinge.z))
+	var rider := m.bend_rider(hinge)
+	var head := Node3D.new()
+	head.name = "WhaleHead"
+	head.visible = false
+	rider.add_child(head)
+	var jaw := Node3D.new()
+	jaw.name = "WhaleJawInside"
+	jaw.visible = false
+	rider.add_child(jaw)
+	# The groove under the head the rod lies in: pink, just outside the skin, with a dark pocket at the hinge.
+	var rows := 10
+	var cols := 6
+	var points: Array = []
+	var colors: Array = []
+	for i in rows + 1:
+		var along := hinge_at - float(look.jaw) * (1.0 - float(i) / rows)
+		var z := lerpf(ends.x, ends.y, along)
+		var under := _section(look, along, l)
+		var y: float = under[3] - under[2] - 0.002 * l
+		var row: Array = []
+		var row_colors: Array = []
+		for j in cols + 1:
+			var u := lerpf(-1.0, 1.0, float(j) / cols)
+			row.append(Vector3(u * minf(width * 1.0, 0.7 * float(under[0])), y, z) - hinge)
+			row_colors.append(JAW_FLESH.lerp(JAW_FLESH_DARK, float(i) / rows * 0.8).lightened(0.25 * (1.0 - absf(u))))
+		points.append(row)
+		colors.append(row_colors)
+	_flesh_node(_grid_tool(points, colors, cols, rows), head, "Roof")
+	var pocket := SurfaceTool.new()
+	pocket.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var centre := Vector3(0.0, -0.012 * l, 0.0)
+	for i in 16:
+		var a := TAU * i / 16.0
+		var b := TAU * (i + 1) / 16.0
+		for pair: Array in [[centre, Color(0.01, 0.0, 0.005)], [centre + Vector3(sin(a) * width * 1.35, cos(a) * 0.03 * l, 0.0), JAW_FLESH_DARK.darkened(0.5)],
+				[centre + Vector3(sin(b) * width * 1.35, cos(b) * 0.03 * l, 0.0), JAW_FLESH_DARK.darkened(0.5)]]:
+			pocket.set_color(pair[1])
+			pocket.add_vertex(pair[0])
+	_flesh_node(pocket, head, "Throat")
+	# Teeth along the rod, pointing up into the groove: the rod's own.
+	var teeth := SurfaceTool.new()
+	teeth.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var count := 22
+	for n in count:
+		var z := hinge_z - length * lerpf(0.94, 0.12, float(n) / (count - 1))
+		for side: float in [-1.0, 1.0]:
+			var base := Vector3(side * width * 0.3, top_y - 0.002 * l, z) - hinge
+			_pyramid(teeth, base, Vector3.UP + Vector3(-side * 0.08, 0.0, 0.0), Vector3.RIGHT, 0.0038 * l, 0.024 * l, JAW_TOOTH.darkened(0.15), JAW_TOOTH)
+	_flesh_node(teeth, jaw, "Teeth", true)
+	info.merge({"hinge": hinge, "mouth": Vector3(0.0, top_y, hinge_z - length), "width": width, "length": length, "skin": null,
+			"jaw_skin": material, "patches": [] as Array[MeshInstance3D], "jaw": jaw, "head": head, "swell": 0.0, "throat_from": hinge_at}, true)
+
+
+## Row data for the mouth at `along` the body: its ring, the mouth line's share, the lip's point (right side) and the head's top.
+static func _jaw_row(look: Dictionary, l: float, ends: Vector2, along: float) -> Dictionary:
+	var ring := _ring(look, along, l, 160)
+	var line := _mouth_line(look, along)
+	var hit := _ring_at(ring, line)
+	var section := _section(look, along, l)
+	return {"along": along, "z": lerpf(ends.x, ends.y, along), "ring": ring, "line": line, "lip": hit[0], "top": section[3] + section[1]}
+
+
+## The mouth line's share round the body (0 the back, 1 the belly) `along` it: titan_skin's curve.
+static func _mouth_line(look: Dictionary, along: float) -> float:
+	var t := clampf(along / maxf(float(look.mouth_a), 0.01), 0.0, 1.0)
+	return lerpf(float(look.mouth_tip_s), float(look.mouth_s), t) - float(look.mouth_arch) * sin(PI * t) + 0.025 * smoothstep(0.88, 1.0, t)
+
+
+## The point and outward normal on the right side of `ring` (from _ring) `s` of the way round: [Vector2, Vector2].
+static func _ring_at(ring: Array, s: float) -> Array:
+	var points: PackedVector2Array = ring[0]
+	var normals: PackedVector2Array = ring[1]
+	var shares: PackedFloat32Array = ring[2]
+	var half := points.size() / 2
+	for k in half:
+		if s <= shares[k + 1] or k == half - 1:
+			var f := clampf(inverse_lerp(shares[k], shares[k + 1], s), 0.0, 1.0)
+			return [points[k].lerp(points[k + 1], f), normals[k].lerp(normals[k + 1], f).normalized()]
+	return [Vector2.ZERO, Vector2.DOWN]
+
+
+## The belly patch under the mouth line, from the nose to the corner, lofted on the body's own surface (relief and
+## all) with the body's UVs, so titan_skin paints it as it paints the body.
+static func _jaw_patch(look: Dictionary, l: float, ends: Vector2, rows: int, cols: int) -> ArrayMesh:
+	var a_c: float = look.mouth_a
+	var points := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var uv2s := PackedVector2Array()
+	var centres := PackedVector3Array()
+	var back := PackedFloat32Array()
+	var last := PackedVector3Array()
+	back.resize(cols + 1)
+	last.resize(cols + 1)
+	for i in rows + 1:
+		var along := a_c * pow(float(i) / rows, 1.7)
+		var z := lerpf(ends.x, ends.y, along)
+		var ring := _ring(look, along, l, 160)
+		var half_round: float = ring[3]
+		var line := _mouth_line(look, along)
+		centres.append(Vector3(0.0, _section(look, along, l)[3], z))
+		for j in cols + 1:
+			var w := float(j) / cols
+			var s := lerpf(1.0, line, absf(2.0 * w - 1.0))
+			var hit := _ring_at(ring, s)
+			var p: Vector2 = hit[0]
+			p += (hit[1] as Vector2) * _relief(look, along, s, half_round, l)
+			var at := Vector3(p.x * (1.0 if w >= 0.5 else -1.0), p.y, z)
+			back[j] = ends.x if i == 0 else back[j] + at.distance_to(last[j])
+			last[j] = at
+			points.append(at)
+			uvs.append(Vector2(back[j], s * half_round))
+			uv2s.append(Vector2(s, half_round))
+	var indices := PackedInt32Array()
+	for i in rows:
+		for j in cols:
+			var a := i * (cols + 1) + j
+			var b := a + 1
+			for corner: int in [a, b, a + cols + 1, b, b + cols + 1, a + cols + 1]:
+				indices.append(corner)
+	return _outward_mesh(points, uvs, uv2s, indices, func(n: int) -> Vector3: return centres[n / (cols + 1)])
+
+
+## A vertex coloured grid (grid[row][column] of points, colours alike) as a mesh being built.
+static func _grid_tool(points: Array, colors: Array, cols: int, rows: int) -> SurfaceTool:
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in rows + 1:
+		for j in cols + 1:
+			tool.set_color(colors[i][j])
+			tool.add_vertex(points[i][j])
+	for i in rows:
+		for j in cols:
+			var a := i * (cols + 1) + j
+			for corner: int in [a, a + 1, a + cols + 1, a + 1, a + cols + 2, a + cols + 1]:
+				tool.add_index(corner)
+	return tool
+
+
+## `tool` as a vertex coloured, two sided node of plain flesh (lit, a little glossy) under `parent`.
+static func _flesh_node(tool: SurfaceTool, parent: Node3D, node_name: String, glossy := false) -> MeshInstance3D:
+	tool.generate_normals()
+	var node := MeshInstance3D.new()
+	node.name = node_name
+	node.mesh = tool.commit()
+	var material := StandardMaterial3D.new()
+	material.vertex_color_use_as_albedo = true
+	material.roughness = 0.25 if glossy else 0.3
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	node.material_override = material
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(node)
+	return node
+
+
+## A four sided pyramid on `base`, `h` tall along `dir`, its base `w` half wide along `side`.
+static func _pyramid(tool: SurfaceTool, base: Vector3, dir: Vector3, side: Vector3, w: float, h: float, root: Color, tip: Color) -> void:
+	var up := dir.normalized()
+	var across := side.normalized()
+	var depth := up.cross(across).normalized()
+	var c0 := base - across * w - depth * w
+	var c1 := base + across * w - depth * w
+	var c2 := base + across * w + depth * w
+	var c3 := base - across * w + depth * w
+	var apex := base + up * h
+	for pair: Array in [[c0, c1], [c1, c2], [c2, c3], [c3, c0]]:
+		tool.set_color(root)
+		tool.add_vertex(pair[0])
+		tool.set_color(root)
+		tool.add_vertex(pair[1])
+		tool.set_color(tip)
+		tool.add_vertex(apex)
+
+
+## A quad (a, b, c, d in order) in two triangles.
+static func _quad(tool: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, ca: Color, cb: Color, cc: Color, cd: Color) -> void:
+	for pair: Array in [[a, ca], [b, cb], [c, cc], [a, ca], [c, cc], [d, cd]]:
+		tool.set_color(pair[1])
+		tool.add_vertex(pair[0])
+
+
+## The humpback's and the blue whale's baleen: a curtain of plates hanging from the palate down each side of the
+## mouth, each a thin tapered block, dark at the root and fraying pale at the bottom.
+static func _baleen(look: Dictionary, l: float, ends: Vector2, a_c: float, hinge: Vector3, parent: Node3D) -> void:
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var count := 44
+	var tall := (0.07 if float(look.mouth_arch) > 0.065 else 0.055) * l
+	for n in count:
+		var t := float(n) / (count - 1)
+		var row := _jaw_row(look, l, ends, lerpf(0.1, 0.96, t) * a_c)
+		var lip: Vector2 = row.lip
+		var arch := maxf(minf(0.5 * lip.x, 0.5 * (float(row.top) - lip.y)), 0.0)
+		var depth := tall * sin(PI * lerpf(0.1, 0.9, t))
+		var gap := (a_c * l * 0.86) / count
+		var z0 := float(row.z) - gap * 0.3
+		var z1 := float(row.z) + gap * 0.3
+		for side: float in [-1.0, 1.0]:
+			var y_out := lip.y + arch * (1.0 - 0.94 * 0.94)
+			var y_in := lip.y + arch * (1.0 - 0.58 * 0.58)
+			var o0 := Vector3(side * lip.x * 0.94, y_out, z0) - hinge
+			var o1 := Vector3(side * lip.x * 0.94, y_out, z1) - hinge
+			var i0 := Vector3(side * lip.x * 0.58, y_in, z0) - hinge
+			var i1 := Vector3(side * lip.x * 0.58, y_in, z1) - hinge
+			var drop_o := Vector3(0.0, -depth, 0.0)
+			var drop_i := Vector3(0.0, -depth * 0.55, 0.0)
+			var root := JAW_BALEEN
+			var fringe := JAW_FRINGE
+			_quad(tool, o0, i0, i0 + drop_i, o0 + drop_o, root, root, fringe, fringe)
+			_quad(tool, o1, o1 + drop_o, i1 + drop_i, i1, root, fringe, fringe, root)
+			_quad(tool, o0, o0 + drop_o, o1 + drop_o, o1, root, fringe, fringe, root)
+			_quad(tool, i0, i1, i1 + drop_i, i0 + drop_i, root, root, fringe, fringe)
+			_quad(tool, o0 + drop_o, i0 + drop_i, i1 + drop_i, o1 + drop_o, fringe, fringe, fringe, fringe)
+	_flesh_node(tool, parent, "Baleen", true)
+
+
+## The orca's and the beluga's teeth: a row up each side of the lower jaw (riding it, pointing up) and the upper
+## jaw's (fixed in the head, pointing down), staggered between each other.
+static func _jaw_teeth(look: Dictionary, l: float, ends: Vector2, a_c: float, hinge: Vector3, head: Node3D, jaw: Node3D, spec: Array) -> void:
+	var per_side: int = spec[0]
+	var tall: float = float(spec[1]) * l
+	var wide: float = float(spec[2]) * l
+	var lower := SurfaceTool.new()
+	lower.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var upper := SurfaceTool.new()
+	upper.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for n in per_side:
+		var t := float(n) / maxf(per_side - 1.0, 1.0)
+		var size := lerpf(1.0, 0.7, t)
+		for half in 2:
+			var row := _jaw_row(look, l, ends, lerpf(0.2, 0.9, t + (0.5 / per_side if half == 1 else 0.0)) * a_c)
+			var lip: Vector2 = row.lip
+			for side: float in [-1.0, 1.0]:
+				var base := Vector3(side * lip.x * 0.93, lip.y, float(row.z)) - hinge
+				var lean := Vector3(-side * 0.18, 0.0, 0.0)
+				if half == 0:
+					_pyramid(lower, base - Vector3(0.0, wide * 0.4, 0.0), Vector3.UP + lean, Vector3.FORWARD, wide, tall * size, JAW_TOOTH.darkened(0.2), JAW_TOOTH)
+				else:
+					_pyramid(upper, base + Vector3(0.0, wide * 0.4, 0.0), Vector3.DOWN + lean, Vector3.FORWARD, wide, tall * size * 0.9, JAW_TOOTH.darkened(0.2), JAW_TOOTH)
+	_flesh_node(lower, jaw, "Teeth", true)
+	_flesh_node(upper, head, "UpperTeeth", true)
+
+
+## Has the model's LOD rescale (whoever scales the model calls it) take `parts` along too: they were made after it.
+static func _rescale_with(m: FishModel, parts: Array[MeshInstance3D]) -> void:
+	if not m.has_meta("titan_lod_rescale"):
+		return
+	var old: Callable = m.get_meta("titan_lod_rescale")
+	var rest: Array[Vector4] = []
+	for part in parts:
+		rest.append(Vector4(part.visibility_range_begin, part.visibility_range_begin_margin, part.visibility_range_end, part.visibility_range_end_margin))
+	m.set_meta("titan_lod_rescale", func(k: float) -> void:
+		old.call(k)
+		for i in parts.size():
+			if not is_instance_valid(parts[i]):
+				continue
+			parts[i].visibility_range_begin = rest[i].x * k
+			parts[i].visibility_range_begin_margin = rest[i].y * k
+			parts[i].visibility_range_end = rest[i].z * k
+			parts[i].visibility_range_end_margin = rest[i].w * k)

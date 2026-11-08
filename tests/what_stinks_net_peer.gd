@@ -204,10 +204,16 @@ func _host() -> void:
 	print("host: a bites b's school")
 	check(game.join.is_joined(fb), "b is still joined before the bite")
 	var before := game.field.alive_total()
+	var a_opens := [0]
+	var a_closes: Array = []
+	game.bite_started.connect(func(h: FishController) -> void: a_opens[0] += 1 if h == fa else 0)
+	game.bite_closed.connect(func(h: FishController, charge: float) -> void: a_closes.append(charge) if h == fa else null)
 	await _phase("bite", {"b": int(_pids.b), "school": school.id, "place": place}, true, "a")
 	await _wait(func() -> bool: return game.eaten.has(fb), 6.0)
 	check(game.eaten.has(fb), "a's bite ate b here (its place was in it)")
 	check(game.field.alive_total() < before, "and school fish with it (%d -> %d)" % [before, game.field.alive_total()])
+	check(a_opens[0] == 1 and a_closes.size() == 1, "a's held bite opened and closed on its puppet here (%d open, %d close)" % [a_opens[0], a_closes.size()])
+	check(a_closes.size() == 1 and float(a_closes[0]) > 0.05 and float(a_closes[0]) <= 1.0, "with the charge it held, clamped (%s)" % [a_closes])
 	await _seconds(1.2)
 	await _phase("eaten", {"b": int(_pids.b), "alive": _alive_of(game)})
 	check(not game.join.is_joined(fb), "b is out of its school")
@@ -430,9 +436,11 @@ func _bite(game: WhatStinksMatch, coop: CoopSession, b_pid: int, _joined: bool) 
 	await _seconds(1.0)  # held there: the host's puppet of us gets there
 	var bites := bite.bites
 	print("    [%s] bite setup: fish %s mouth %s prey %s facing %s" % [role, fish.global_position, bite.mouth_point(), prey.global_position, -fish.global_basis.z])
-	Input.action_press("jump")
-	await _wait(func() -> bool: return bite.bites > bites, 4.0)
+	Input.action_press("jump")  # the press opens the jaws; held, they charge; the release shuts them
+	await _seconds(0.6)
+	check(bite.holding() and bite.charge() > 0.2, "our jaws are held open and charging (%.2f)" % bite.charge())
 	Input.action_release("jump")
+	await _wait(func() -> bool: return bite.bites > bites, 4.0)
 	_lock = Transform3D.IDENTITY
 	check(bite.bites > bites, "our bite landed (the jaws shut at %.1f m from b)" % bite.mouth_point().distance_to(prey.global_position))
 

@@ -38,6 +38,7 @@ const DEFAULTS := {
 	"length_m": 7.0, "speed": 1.3, "accel": 0.7, "turn": 0.55,
 	"bite_reach_m": 3.5, "bite_radius_m": 1.6, "bite_wind": 0.75, "bite_every": 2.0,
 	"capacity": 4.0, "cam": Vector2(1.0, 1.0),
+	"attack": "chomp", "open_s": 0.12, "charge_s": 1.2,
 }
 
 ## The form a Hunter falls back to when the one picked is not ready.

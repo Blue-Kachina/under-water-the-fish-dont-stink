@@ -41,9 +41,11 @@ signal spat(prey: FishController, hunter: FishController)
 signal hurled(hunter: FishController)
 signal fed(hunter: FishController, gain: float)
 ## Online. A bite of ours (a guest's Hunter) landed: the mouth and heading, for the host to judge.
-signal local_bite(mouth: Vector3, forward: Vector3)
+signal local_bite(mouth: Vector3, forward: Vector3, charge: float, extra: Dictionary)
 ## The host: a Hunter's bite began; what a landed bite took (school id -> indices, and the prey players); extra seconds on its cooldown; a spat prey's fling.
 signal bite_started(hunter: FishController)
+## The host: a Hunter's jaws shut at `charge` (a negative one: the held bite was called off).
+signal bite_closed(hunter: FishController, charge: float)
 signal bite_result(hunter: FishController, taken: Dictionary, prey: Array)
 signal bite_penalty(hunter: FishController, extra: float)
 signal spit_applied(prey: FishController, hunter: FishController, velocity: Vector3, daze: float)
@@ -293,7 +295,8 @@ func _set_bot(fish: FishController, new_role: int, home: Vector3) -> void:
 		bot.set("fish", fish)
 		bot.set("game", self)
 	else:
-		var wander := WanderBot.new()
+		var wander := WhatStinksPreyBot.new()
+		wander.game = self
 		wander.fish = fish
 		wander.home = home
 		wander.pace = settings.prey_bot_pace
@@ -417,12 +420,7 @@ func _begin_round(index: int, starting: Array[FishController], places: Dictionar
 		if not fish.puppet:
 			fish.controls_locked = true  # held at the start while the prey scatter
 	field.set_threats(hunters)
-	var alarm := 0.0
-	for hunter in hunters:
-		alarm = maxf(alarm, size.alarm_radius(hunter, 1.0))
-	if hunters.is_empty():
-		alarm = 1.0
-	field.set_alarm_scale(alarm)
+	refresh_alarm()
 	for hunter in hunters:
 		satiation[hunter] = settings.satiation_max * settings.satiation_start
 		queasy[hunter] = 0.0
@@ -473,6 +471,7 @@ func _bait_home(homes: Array[Vector3]) -> Vector3:
 
 
 func _become_hunter(fish: FishController) -> void:
+	_drop_bite(fish)  # first: it hands back the speed and turn a held bite cost, before the size is applied
 	var form := settings.form_sheet()
 	if not bool(fish.get_meta("ws_swapped", false)):
 		fish.set_meta("ws_base_look", [int(fish.character), fish.species, fish.skin])
@@ -483,14 +482,24 @@ func _become_hunter(fish: FishController) -> void:
 	HunterForms.dress(fish, str(form.get("key", "")))
 	fish.boost_enabled = false
 	fish.team = 1
-	_drop_bite(fish)
 	var bite := HunterBite.new()
 	bite.name = "HunterBite"
-	bite.snap = settings.bite_snap
+	bite.settings = settings
+	bite.world = self
 	fish.add_child(bite)
 	bite.setup(fish, form, size)
+	bite.fx().prey_source = live_prey
+	bite.fx().may_unlock = func() -> bool: return phase == Phase.LIVE and not hurled_out.has(fish)
 	bite.chomped.connect(_on_chomp.bind(fish, bite))
-	bite.started.connect(func() -> void: bite_started.emit(fish))
+	bite.opened.connect(func() -> void:
+		bite_started.emit(fish)
+		refresh_alarm())
+	bite.released.connect(func(charge: float) -> void:
+		bite_closed.emit(fish, charge)
+		refresh_alarm())
+	bite.aborted.connect(func() -> void:
+		bite_closed.emit(fish, -1.0)
+		refresh_alarm())
 	bites[fish] = bite
 	if fish == _local and is_instance_valid(camera):
 		size.frame(camera, fish, form)
@@ -510,7 +519,9 @@ func _drop_bite(fish: FishController) -> void:
 	var bite: Variant = bites.get(fish)
 	bites.erase(fish)
 	if bite != null and is_instance_valid(bite):
+		(bite as HunterBite).release_fish()
 		(bite as Node).queue_free()
+		refresh_alarm()  # an open mouth no longer counts
 
 
 ## The fish's own class and species again (a Hunter swapped them).
@@ -604,7 +615,7 @@ func _ram_step(delta: float) -> void:
 		var left := maxf(float(_ram_left.get(hunter, 0.0)) - delta, 0.0)
 		_ram_left[hunter] = left
 		var bite: HunterBite = bites.get(hunter)
-		if bite == null or left > 0.0 or hunter.speed < settings.ram_speed * pow(size.size_of(hunter), size.speed_exp):
+		if bite == null or left > 0.0 or hunter.speed < settings.ram_speed * pow(size.size_of(hunter), size.speed_exp) or bite.attack.suppresses_ram(bite):
 			continue
 		var forward := -hunter.global_basis.z.normalized()
 		var origin := hunter.global_position
@@ -717,6 +728,19 @@ func is_dazed(fish: FishController) -> bool:
 	return _daze.has(fish)
 
 
+## The schools' alarm range: the biggest Hunter's size, x hold_alarm_mult for one with its jaws open.
+func refresh_alarm() -> void:
+	if field == null:
+		return
+	var alarm := 0.0
+	for hunter in hunters:
+		var holding: HunterBite = bites.get(hunter)
+		alarm = maxf(alarm, size.alarm_radius(hunter, 1.0) * (settings.hold_alarm_mult if holding != null and holding.holding() else 1.0))
+	if hunters.is_empty():
+		alarm = 1.0
+	field.set_alarm_scale(alarm)
+
+
 func is_hunter(fish: FishController) -> bool:
 	return role_of(fish) == Role.HUNTER
 
@@ -781,22 +805,31 @@ func own_round_tally(fish: FishController) -> float:
 
 ## A Hunter's jaws shut: it takes the `capacity` fish nearest the bite point in
 ## its frustum (school fish and live prey players).
-func _on_chomp(_mouth: Vector3, reach: float, _radius: float, capacity: int, hunter: FishController, bite: HunterBite) -> void:
+func _on_chomp(_mouth: Vector3, reach: float, _radius: float, _capacity: int, hunter: FishController, bite: HunterBite) -> void:
 	if hunter.puppet:
 		return  # a guest's Hunter: judged when its machine reports the landing (judge_net_bite)
 	var forward := -hunter.global_basis.z.normalized()
 	if not authority:
-		local_bite.emit(bite.mouth_point(), forward)  # ours, on a guest: the host judges it
+		local_bite.emit(bite.mouth_point(), forward, bite.strike_charge(), bite.attack.net_extra(bite))  # ours, on a guest: the host judges it
 		return
 	if phase != Phase.LIVE:
 		return
-	var locked := _locked_bite(hunter, bite, capacity, reach)
-	if not locked.is_empty():
-		var mouth := bite.mouth_point()
-		var span: float = locked["range"]
-		_judge_bite(hunter, bite, mouth, int(locked["capacity"]), func(at: Vector3) -> bool: return at.distance_to(mouth) <= span, locked["school"])
-		return
-	_judge_bite(hunter, bite, bite.mouth_point() + forward * reach * 0.5, capacity, bite.in_bite)
+	var rule := bite.attack.catch_rule(bite)  # the style's say on what the bite catches
+	if bool(rule.get("frustum", true)):
+		var locked := _locked_bite(hunter, bite, int(rule["capacity"]), reach)
+		if not locked.is_empty():
+			var mouth := bite.mouth_point()
+			var span: float = locked["range"]
+			rule["point"] = mouth
+			rule["capacity"] = int(locked["capacity"])
+			rule["inside"] = func(at: Vector3) -> bool: return at.distance_to(mouth) <= span
+			rule["only"] = locked["school"]
+	_judge_rule(hunter, bite, rule)
+
+
+## A style's catch rule (HunterAttack.catch_rule) judged.
+func _judge_rule(hunter: FishController, bite: HunterBite, rule: Dictionary) -> void:
+	_judge_bite(hunter, bite, rule["point"], int(rule["capacity"]), rule["inside"], rule.get("only"), false, rule.get("extra", []))
 
 
 ## A bite while locked on a school (the local Hunter's lock-on): it takes fish from that school alone,
@@ -833,9 +866,18 @@ func _locked_bite(hunter: FishController, bite: HunterBite, capacity: int, reach
 	return {"school": school, "range": span, "capacity": maxi(1, roundi(capacity * settings.lock_bite_mult * share))}
 
 
+## The camera lock-on's bonus on a bite at `school` (D8, the Fallen Angel's lock stacks with it): the multiplier
+## the locked bite would give (1 when the camera is not locked on that school, or off).
+func lock_stack_mult(hunter: FishController, bite: HunterBite, school: School) -> float:
+	var locked := _locked_bite(hunter, bite, 100, bite.reach())
+	if locked.is_empty() or locked["school"] != school:
+		return 1.0
+	return maxf(float(locked["capacity"]) / 100.0, 1.0)
+
+
 ## The host: a guest's Hunter reports a landed bite from `mouth` along `forward`. The reach, radius and
 ## capacity are the host's own for that Hunter (the form and size); too soon after the last is ignored.
-func judge_net_bite(hunter: FishController, mouth: Vector3, forward: Vector3) -> void:
+func judge_net_bite(hunter: FishController, mouth: Vector3, forward: Vector3, charge := 0.0, extra := {}) -> void:
 	var bite: HunterBite = bites.get(hunter)
 	if not authority or phase != Phase.LIVE or bite == null or not is_hunter(hunter) or hurled_out.has(hunter) or not forward.is_finite() or not mouth.is_finite():
 		return
@@ -845,11 +887,19 @@ func judge_net_bite(hunter: FishController, mouth: Vector3, forward: Vector3) ->
 	if mouth.distance_to(hunter.global_position) > maxf(hunter.hitbox_length * 2.0, 8.0) + bite.reach():
 		return  # nowhere near where we see that Hunter
 	_net_bite_at[hunter] = now
-	var dir := forward.normalized()
-	var reach := bite.reach()
-	var radius := bite.radius()
-	var inside := func(at: Vector3) -> bool: return HunterBite.in_frustum(mouth, dir, reach, radius, at)
-	_judge_bite(hunter, bite, mouth + dir * reach * 0.5, bite.capacity(), inside)
+	var held := clampf(minf(charge, bite.net_cap), 0.0, 1.0) if is_finite(charge) else 0.0  # no more than the host saw it hold
+	bite.net_cap = 0.0
+	_judge_rule(hunter, bite, bite.attack.net_catch_rule(bite, mouth, forward.normalized(), held, extra))
+
+
+## The Lamprey Queen's drill (DrillAttack): the tube her disc swept this tick judged as a bite of up to `capacity` fish. The run's
+## chew delay is added once, when the dash ends, so the cooldown is left as it was.
+func judge_drill(hunter: FishController, bite: HunterBite, point: Vector3, capacity: int, inside: Callable) -> void:
+	if not authority or phase != Phase.LIVE or hurled_out.has(hunter):
+		return
+	var cooldown := bite.cooldown
+	_judge_bite(hunter, bite, point, capacity, inside)
+	bite.cooldown = cooldown
 
 
 ## The Hunter's callouts for a bite or ram that took `school_fish` and the `prey` players: each fish taken adds
@@ -892,10 +942,13 @@ func _call_out(hunter: FishController, school_fish: int, prey: Array, ram: bool)
 
 
 ## A landed bite at `point` taking up to `capacity` of what `inside` holds (the host's).
-func _judge_bite(hunter: FishController, bite: HunterBite, point: Vector3, capacity: int, inside: Callable, only: School = null, ram := false) -> void:
+func _judge_bite(hunter: FishController, bite: HunterBite, point: Vector3, capacity: int, inside: Callable, only: School = null, ram := false, held: Array = []) -> void:
 	var extra: Array = []
 	if settings.bite_takes_players:
 		extra.append_array(live_prey())
+	for fish: FishController in held:
+		if not extra.has(fish):
+			extra.append(fish)
 	var taken := field.eat_at(point, capacity, inside, extra, only)
 	var penalty := 0.0 if ram else settings.chew_delay
 	_call_out(hunter, int(taken["school_fish"]), [] if stomach() else taken["fish"], ram)
@@ -903,6 +956,11 @@ func _judge_bite(hunter: FishController, bite: HunterBite, point: Vector3, capac
 		rammed_total += int(taken["school_fish"]) + (taken["fish"] as Array).size()
 	var prey: Array = taken["fish"]
 	bite_result.emit(hunter, taken["taken"], prey)
+	if not ram:
+		bite.report_landing(int(taken["school_fish"]) + prey.size())
+	bite.fx().prey_caught(prey, bite.mouth_point())
+	if not ram:
+		bite.attack.on_close(bite, taken)
 	if stomach():
 		_feed(hunter, float(taken["mass"]) * settings.satiation_per_fish)
 		for fish: FishController in prey:
@@ -1138,6 +1196,9 @@ func apply_net_bite(hunter: FishController, taken: Dictionary, prey_list: Array)
 	if not stomach():
 		for fish: FishController in prey_list:
 			_eat(fish, hunter)
+	var guest_bite: HunterBite = bites.get(hunter)
+	if guest_bite != null:
+		guest_bite.fx().prey_caught(prey_list, guest_bite.mouth_point())
 	bitten.emit(hunter, count, prey_list)
 
 
@@ -1157,6 +1218,9 @@ func apply_net_spit(prey: FishController, hunter: FishController, velocity: Vect
 			prey.boost_enabled = false
 		if join != null:
 			join.cooldown[prey] = maxf(float(join.cooldown.get(prey, 0.0)), daze)
+	var spitter: HunterBite = bites.get(hunter)
+	if spitter != null:
+		spitter.fx().prey_caught([prey], spitter.mouth_point())
 	spat.emit(prey, hunter)
 
 

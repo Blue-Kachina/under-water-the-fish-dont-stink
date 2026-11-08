@@ -3,7 +3,8 @@ extends RefCounted
 ## LampreyBoss's look on a normal FishController (the hidden MONSTER class's box, the shark's model hidden):
 ## lamprey_rig.gd lays the boss's one spine-bent mesh along the trail the head leaves, lamprey_jaw.gd flares
 ## its oral disc from the bite. The bite is the Corkscrew latch: a narrow, short cone that takes one fish (her
-## prey), wound up as the disc flares; when it lands the disc clamps and she rolls round her length.
+## prey), wound up as the disc flares; when it lands the disc clamps and she rolls round her length. Held (attack "drill",
+## attacks/drill_attack.gd) the rasp speeds up with the charge and the release is a corkscrew dash that drills through the fish in her path.
 ## This file is the form's own: its sheet, its ready flag and its dress hook (see HunterForms).
 
 const LampreyRig := preload("res://scripts/what_stinks/forms/lamprey_rig.gd")
@@ -25,7 +26,7 @@ static func sheet() -> Dictionary:
 		"name": "Lamprey Queen", "class": FishCharacter.FishClass.MONSTER, "species": 0,
 		"length_m": 14.0, "speed": 1.2, "accel": 0.6, "turn": 0.45,
 		"bite_reach_m": 3.2, "bite_radius_m": 1.0, "bite_wind": 0.8, "bite_every": 3.0,
-		"capacity": 1.0, "cam": Vector2(0.9, 1.3), "latch_s": 1.1,
+		"capacity": 1.0, "cam": Vector2(0.9, 1.3), "latch_s": 1.1, "attack": "drill",
 		"sound_chomp": "boss/grab", "sound_arrive": "boss/leviathan_arrive", "sound_miss": "boss/chomp_miss",
 	}
 
@@ -39,7 +40,6 @@ static func dress(fish: FishController, sheet_now: Dictionary) -> void:
 	var old := visual.get_node_or_null("LampreyRig")
 	if old != null:
 		if absf(float(old.get("length")) - fish.hitbox_length) < fish.hitbox_length * 0.01:
-			old.set("chomp_sound", str(sheet_now.get("sound_chomp", "")))
 			old.set("latch_time", float(sheet_now.get("latch_s", 1.1)))
 			return
 		visual.remove_child(old)
@@ -49,7 +49,6 @@ static func dress(fish: FishController, sheet_now: Dictionary) -> void:
 			(node as Node3D).visible = false  # the shark the class wears
 	var body: Node3D = LampreyRig.new()
 	body.name = "LampreyRig"
-	body.set("chomp_sound", str(sheet_now.get("sound_chomp", "")))
 	body.set("latch_time", float(sheet_now.get("latch_s", 1.1)))
 	visual.add_child(body)
 	body.call("build", fish)

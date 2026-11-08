@@ -2,7 +2,8 @@ extends RefCounted
 ## Hunter form: King of Herrings (what_stinks.md section 2; the sheet's keys are in hunter_forms.md).
 ## BloodLeviathan's look on a normal FishController (the hidden MONSTER class's box, the shark's model hidden):
 ## king_rig.gd lays the boss's one spine-bent mesh along the trail the head leaves, king_jaw.gd gapes its jaw
-## from the bite. The bite is the Coil sweep: a short, very wide cone that takes a big mouthful, slow to wind up.
+## from the bite. The bite is the Coil sweep: a short, very wide cone that takes a big mouthful, slow to wind up. Held (attack "coil",
+## attacks/coil_attack.gd) the body coils tighter with the charge and the release whips a flat arc as wide as the coil was tight.
 ## This file is the form's own: its sheet, its ready flag and its dress hook (see HunterForms).
 
 const KingRig := preload("res://scripts/what_stinks/forms/king_rig.gd")
@@ -26,7 +27,7 @@ static func sheet() -> Dictionary:
 		"bite_reach_m": 5.5, "bite_radius_m": 4.5, "bite_wind": 1.0, "bite_every": 2.8,
 		"capacity": 7.0, "cam": Vector2(0.8, 1.35),
 		"sound_chomp": "boss/chomp", "sound_arrive": "boss/leviathan_arrive", "sound_miss": "boss/chomp_miss",
-		"sound_grab": "boss/grab",
+		"sound_grab": "boss/grab", "attack": "coil",
 	}
 
 
@@ -39,7 +40,6 @@ static func dress(fish: FishController, sheet_now: Dictionary) -> void:
 	var old := visual.get_node_or_null("KingRig")
 	if old != null:
 		if absf(float(old.get("length")) - fish.hitbox_length) < fish.hitbox_length * 0.01:
-			old.set("chomp_sound", str(sheet_now.get("sound_chomp", "")))
 			return
 		visual.remove_child(old)
 		old.queue_free()
@@ -48,7 +48,6 @@ static func dress(fish: FishController, sheet_now: Dictionary) -> void:
 			(node as Node3D).visible = false  # the shark the class wears
 	var body: Node3D = KingRig.new()
 	body.name = "KingRig"
-	body.set("chomp_sound", str(sheet_now.get("sound_chomp", "")))
 	visual.add_child(body)
 	body.call("build", fish)
 	var jaw := KingJaw.new()

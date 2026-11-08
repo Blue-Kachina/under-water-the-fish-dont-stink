@@ -639,6 +639,8 @@ var input_stick := Vector2.ZERO
 var input_roll := 0.0
 var air_roll_held := false
 var jump_held := false
+## The jump button is ignored (no jump, no dodge; jump_held still reads for other uses): a What Stinks? Hunter's button is its bite (HunterBite sets it).
+var ignore_jump := false
 var boost_held := false
 var powerslide_held := false
 ## Direction lock: holds the current heading, and turns stick sweeps into swim strokes.
@@ -1027,7 +1029,7 @@ func _sample_input(delta: float) -> void:
 		jump_held = source.pressed("jump")
 	# Detect the press ourselves: "just pressed" is tracked per frame and isn't
 	# reliable this early in the physics tick.
-	if jump_held and not _jump_was_held:
+	if jump_held and not _jump_was_held and not ignore_jump:
 		_jump_queued = true
 	_jump_was_held = jump_held
 	_detect_strokes(delta)

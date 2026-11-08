@@ -19,6 +19,8 @@ const WAVE_SWIM := 0.5
 const WAVE_TURN := 0.3
 ## How far the disc is clamped when she is latched on (negative: closed tight, as the boss).
 const CLAMP := -0.3
+## How far the held drill winds her body back against the roll at full charge (rad).
+const WIND_BACK := 0.9
 
 var fish: FishController
 var length := 14.0
@@ -37,12 +39,11 @@ var _trail := PackedVector3Array()
 var _age := 0.0
 var _wave := 0.0
 var _flare := 0.0
+var _wind := 0.0
 var _disc_want := 0.0
 var _bite: HunterBite
 ## Msec until which the skin flashes after a bite lands (the snap chomp has no wind-up glow).
 var _flash_until := 0
-## The id of the stand-in chomp sound (the form's sheet: "sound_chomp").
-var chomp_sound := ""
 
 
 ## Builds the body for `with_fish` at its hitbox's length now.
@@ -106,18 +107,34 @@ func _pose(delta: float) -> void:
 ## The latch: while it lasts the disc is clamped and she rolls; after it she rights herself.
 func _corkscrew(delta: float) -> void:
 	var spin_rate := UnnaturalSettings.shared().lamprey_spin
+	var drill := _drill()
+	if drill != null and drill.consume_latch():
+		latch_left = latch_time  # the disc met its prey at the dash's end: she rolls on it
+		disc = 1.0
+		_flare = 1.0
+	# The drill: held, the rasp speeds up and the body winds back against the roll; released, it unwinds into the corkscrew dash.
+	_wind = move_toward(_wind, drill.wind_now(_bite) if drill != null else 0.0, delta * 3.0)
 	if latch_left > 0.0:
 		latch_left -= delta
 		spin += spin_rate * delta
 		disc = move_toward(disc, CLAMP, delta * 6.0)
+	elif drill != null and drill.active():
+		spin += spin_rate * delta
+		disc = move_toward(disc, 1.0, delta * 8.0)
 	else:
 		spin = lerp_angle(spin, 0.0, 1.0 - exp(-2.5 * delta))
 		disc = move_toward(disc, _disc_want, delta * 3.0)
-	rig.twist = spin + (get_parent() as Node3D).rotation.y * 2.0
+	rig.twist = spin - _wind * WIND_BACK + (get_parent() as Node3D).rotation.y * 2.0
 	_flare = maxf(_flare - delta * 0.8, 0.0)
 	skin.set_shader_parameter("disc", disc)
 	skin.set_shader_parameter("disc_len", radius * 1.35 * 1.7)
-	skin.set_shader_parameter("breath", 0.12 + 0.1 * sin(_age * 1.3) + _flare)
+	skin.set_shader_parameter("breath", 0.12 + 0.1 * sin(_age * 1.3) + _flare + 0.2 * _wind * sin(_age * (14.0 + 50.0 * _wind)))
+
+
+## The Drill style the bite wears, if it does.
+func _drill() -> DrillAttack:
+	var bite := _find_bite()
+	return bite.attack as DrillAttack if bite != null else null
 
 
 ## The swim: a wave down the body that grows with the speed and the turn (the bend itself is the trail's).
@@ -148,13 +165,14 @@ func _find_bite() -> HunterBite:
 
 
 ## The disc lands: it clamps and she corkscrews; the gills pulse.
-func _on_chomped(mouth: Vector3, _reach: float, _radius: float, _capacity: int) -> void:
+func _on_chomped(_mouth: Vector3, _reach: float, _radius: float, _capacity: int) -> void:
+	_flash_until = Time.get_ticks_msec() + 220
+	var drill := _drill()
+	if drill != null and drill.active():
+		return  # the drill's run is her corkscrew: she rolls through it, and latches only on prey at its end
 	latch_left = latch_time
 	disc = 1.0  # the disc flares wide as it lands (a snap chomp never opened it), then clamps
 	_flare = 1.0
-	_flash_until = Time.get_ticks_msec() + 220
-	if chomp_sound != "":
-		Sfx.play_at(chomp_sound, mouth)
 
 
 func _pose_riders() -> void:

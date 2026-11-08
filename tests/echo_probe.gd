@@ -355,6 +355,14 @@ func _part_one() -> void:
 	hunter.powerslide_held = false
 	_step(0.1)
 	check(not echo.is_sniffing(hunter) and absf(hunter.speed_scale - base_speed[0]) < 0.0001 and absf(hunter.top_speed_scale - base_speed[1]) < 0.0001 and absf(hunter.boost_scale - base_speed[2]) < 0.0001, "letting go restores the speed and the cone")
+	# An open bite's cost (x hold_speed_mult) coming and going while sniffing must not leave a drift.
+	hunter.powerslide_held = true
+	_step(0.1)
+	hunter.speed_scale *= 0.8
+	hunter.powerslide_held = false
+	_step(0.1)
+	hunter.speed_scale /= 0.8
+	check(absf(hunter.speed_scale - base_speed[0]) < 0.0001, "sniffing across another slowdown leaves no drift (x%.3f)" % (hunter.speed_scale / base_speed[0]))
 	hunter.powerslide_held = true
 	_step(0.1)
 	echo.begin_round(game.players)

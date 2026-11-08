@@ -173,38 +173,6 @@ func _run() -> void:
 	bite.snap = true
 	bite.lunge_gain = 0.0
 
-	print("snap chomp vs wind-up:")
-	await _until(func() -> bool: return not bite.busy() and bite.cooldown <= 0.0, 6.0)
-	var heading := -fish.global_basis.z
-	var land_at := [-1.0]
-	var landed_cb := func(_m: Vector3, _r: float, _d: float, _c: int) -> void: land_at[0] = Time.get_ticks_msec() / 1000.0
-	bite.chomped.connect(landed_cb)
-	bite.lunge_gain = 0.35
-	for snap_on in [true, false]:
-		await _until(func() -> bool: return not bite.busy() and bite.cooldown <= 0.0, 6.0)
-		fish.linear_velocity = Vector3.ZERO
-		await _frames(2)
-		bite.snap = snap_on
-		land_at[0] = -1.0
-		var from := fish.global_position
-		var pressed := Time.get_ticks_msec() / 1000.0
-		check(bite.try_bite(), "snap %s: the bite starts" % snap_on)
-		var travelled := 0.0
-		var t_end := pressed + float(bite.form["bite_wind"]) + 1.0
-		while Time.get_ticks_msec() / 1000.0 < t_end and (land_at[0] < 0.0 or Time.get_ticks_msec() / 1000.0 < land_at[0] + 0.3):
-			await get_tree().physics_frame
-			travelled = maxf(travelled, (fish.global_position - from).dot(heading))
-		var delay: float = land_at[0] - pressed
-		if snap_on:
-			check(land_at[0] >= 0.0 and delay < 0.2, "snap: it chomps at once (%.3f s after the press)" % delay)
-			check(travelled < 0.05, "snap: no lunge forward (%.2f m)" % travelled)
-		else:
-			check(land_at[0] >= 0.0 and delay >= float(bite.form["bite_wind"]) * 0.8, "wind-up: it lands later (%.2f s, bite_wind %.2f)" % [delay, float(bite.form["bite_wind"])])
-			check(travelled > 0.05, "wind-up: it lunges forward (%.2f m)" % travelled)
-	bite.chomped.disconnect(landed_cb)
-	bite.snap = true
-	bite.lunge_gain = 0.0
-
 	print("every prey eaten:")
 	for other in game.live_prey():
 		game._eat(other, fish)

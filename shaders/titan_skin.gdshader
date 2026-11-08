@@ -60,6 +60,18 @@ uniform float mouth_corner = 0.2;  // along the body (nose 0, notch 1)
 uniform float mouth_arch = 0.05;  // the line bows up between (the baleen whales')
 uniform float mouth_width = 0.016;  // m
 uniform float pale_lips = 0.0;  // the sperm whale's white mouth edges
+// A whale Hunter's hinged lower jaw (WhaleJaw; all 0/1 on a Marco Polo whale: the skin is untouched). jaw_cut 1 cuts the
+// belly under the mouth line, back to the mouth's corner, out of the body; the jaw is a copy of that patch (jaw_part 1) hinged at
+// jaw_hinge (y, z) and dropped jaw_angle rad, its length stretched by jaw_stretch (the cartoon gape).
+uniform float jaw_cut = 0.0;
+uniform float jaw_part = 0.0;
+uniform vec2 jaw_hinge = vec2(0.0);
+uniform float jaw_angle = 0.0;
+uniform float jaw_stretch = 1.0;
+// The throat balloons (a whale Hunter's mouth filling: WhaleJaw.fullness): the belly bulges out by throat_swell m, over the
+// stretch of the body (along: nose 0, notch 1) throat_span says.
+uniform float throat_swell = 0.0;
+uniform vec2 throat_span = vec2(0.2, 0.5);
 uniform vec3 eye_pos = vec3(1.0, 0.0, -3.0);  // the right eye, on the skin
 uniform float eye_radius = 0.045;
 uniform vec3 blow_pos = vec3(0.0, 1.0, -3.5);  // the blowhole on top of the head
@@ -70,6 +82,18 @@ varying vec3 rest;
 
 void vertex() {
 	rest = VERTEX;
+	if (throat_swell > 0.0 && jaw_part < 0.5) {
+		float pouch = sin(PI * clamp(((VERTEX.z - nose_z) / body_length - throat_span.x) / max(throat_span.y - throat_span.x, 0.01), 0.0, 1.0));
+		VERTEX += NORMAL * throat_swell * pouch * smoothstep(0.55, 0.85, UV2.x);
+	}
+	if (jaw_part > 0.5) {
+		float c = cos(jaw_angle);
+		float sn = sin(jaw_angle);
+		vec2 d = VERTEX.yz - jaw_hinge;
+		d.y *= jaw_stretch;
+		VERTEX.yz = jaw_hinge + vec2(c * d.x - sn * d.y, sn * d.x + c * d.y);
+		NORMAL.yz = vec2(c * NORMAL.y - sn * NORMAL.z, sn * NORMAL.y + c * NORMAL.z);
+	}
 	fish_bend(VERTEX, NORMAL);
 }
 
@@ -156,6 +180,14 @@ void fragment() {
 	float s = UV2.x;
 	float half_round = max(UV2.y, 1e-4) / body_length;
 	float along = (rest.z - nose_z) / body_length;
+	if (jaw_cut > 0.5 && jaw_part < 0.5 && along < mouth_corner) {
+		// The belly under the mouth line is the open jaw's: gone from the body.
+		float jt = clamp(along / max(mouth_corner, 0.01), 0.0, 1.0);
+		float jaw_line = mix(mouth_tip_s, mouth_s, jt) - mouth_arch * sin(PI * jt) + 0.025 * smoothstep(0.88, 1.0, jt);
+		if (s > jaw_line) {
+			discard;
+		}
+	}
 	float height = 0.0;  // in L
 	float shade = 1.0;
 	// How big a pixel is here (L): fine detail fades out before it can shimmer.

@@ -480,22 +480,22 @@ func _set_sniff(hunter: FishController, on: bool) -> void:
 		return
 	sniffing[hunter] = on
 	if on:
-		_sniff_saved[hunter] = [hunter.speed_scale, hunter.top_speed_scale, hunter.boost_scale]
-		hunter.speed_scale *= settings.sniff_speed
-		hunter.top_speed_scale *= settings.sniff_speed
-		hunter.boost_scale *= settings.sniff_speed
+		_sniff_saved[hunter] = maxf(settings.sniff_speed, 0.01)  # the factor, undone by dividing: other slowdowns (an open bite) come and go meanwhile
+		hunter.speed_scale *= maxf(settings.sniff_speed, 0.01)
+		hunter.top_speed_scale *= maxf(settings.sniff_speed, 0.01)
+		hunter.boost_scale *= maxf(settings.sniff_speed, 0.01)
 	else:
 		_restore_sniff(hunter)
 	sniff_changed.emit(hunter, on)
 
 
 func _restore_sniff(hunter: FishController) -> void:
-	var saved: Array = _sniff_saved.get(hunter, [])
+	var factor := float(_sniff_saved.get(hunter, 0.0))
 	_sniff_saved.erase(hunter)
-	if saved.size() == 3 and is_instance_valid(hunter):
-		hunter.speed_scale = float(saved[0])
-		hunter.top_speed_scale = float(saved[1])
-		hunter.boost_scale = float(saved[2])
+	if factor > 0.0 and is_instance_valid(hunter):
+		hunter.speed_scale /= factor
+		hunter.top_speed_scale /= factor
+		hunter.boost_scale /= factor
 
 
 func _drop_sniff_all() -> void:

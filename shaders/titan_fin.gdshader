@@ -32,6 +32,10 @@ uniform float barnacles = 0.0;
 uniform float scars = 0.0;
 uniform float pattern_seed = 1.3;
 uniform float body_length = 10.0;
+// The sperm whale Hunter's jaw, hinged (WhaleJaw; 0 otherwise): part 3 swings jaw_angle rad about jaw_hinge (y, z), lengthened by jaw_stretch.
+uniform float jaw_angle = 0.0;
+uniform vec2 jaw_hinge = vec2(0.0);
+uniform float jaw_stretch = 1.0;
 
 varying vec3 rest;
 varying vec3 rest_normal;
@@ -39,6 +43,14 @@ varying vec3 rest_normal;
 void vertex() {
 	rest = VERTEX;
 	rest_normal = NORMAL;
+	if (part == 3 && jaw_angle != 0.0) {
+		float c = cos(jaw_angle);
+		float sn = sin(jaw_angle);
+		vec2 d = VERTEX.yz - jaw_hinge;
+		d.y *= jaw_stretch;
+		VERTEX.yz = jaw_hinge + vec2(c * d.x - sn * d.y, sn * d.x + c * d.y);
+		NORMAL.yz = vec2(c * NORMAL.y - sn * NORMAL.z, sn * NORMAL.y + c * NORMAL.z);
+	}
 	fish_bend(VERTEX, NORMAL);
 }
 

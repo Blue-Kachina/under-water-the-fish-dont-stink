@@ -55,6 +55,8 @@ const NEIGHBOUR_REFRESH := 8
 const DETAIL_INTERVAL := 0.2
 ## Never more than this many steps in one physics tick (after a hitch).
 const MAX_STEPS := 4
+## Seconds a pull() lasts without another call.
+const PULL_TTL := 0.15
 
 ## Full models built this frame, across all schools: building one takes a few ms.
 ## A fish that had claimed a place here lost it (its fish was eaten or battered).
@@ -117,6 +119,13 @@ var _scatter_total := 1.0
 ## dictionary. The school writes the player's fish's transform from the place;
 ## the fish only reads (and leans, set_lean()).
 var _claims := {}
+## Fish a whale's mouth holds (What Stinks?, hold()): fish index -> {holder, local, from, age, ease}.
+## An extra state Nature never sets: while a fish is held the school neither moves it nor counts it
+## in its middle (so in its alarm), and the holder says where it is. Empty everywhere else.
+var _held := {}
+## Mouths sucking at the school (What Stinks?, pull()): source id -> {point, dir, cone, speed, reach, mouth, ttl}. Another state
+## Nature never sets: while one is live the fish in its cone are drawn toward the point; each entry lapses when its source stops calling.
+var _pulls := {}
 
 var _time := 0.0
 var _since_step := 0.0
@@ -255,7 +264,11 @@ func _step(delta: float) -> void:
 	_move_leader(delta)
 	_refresh_neighbours()
 	_move_fish(delta)
+	if not _pulls.is_empty():
+		_age_pulls(delta)
 	_apply_claims(delta)
+	if not _held.is_empty():
+		_apply_holds(delta)
 
 
 ## Which of its fish are left (1) or battered (0), by index.
@@ -481,6 +494,123 @@ func eat(indices: Array, strength_mult := 2.0, radius_mult := 2.0, groups := 3, 
 	return spots
 
 
+# --- Held in a mouth (What Stinks?, two-stage-attack.md 4b) -------------------
+
+## Holds live, unclaimed fish `index` in `holder`'s mouth: the school stops moving it (and leaves it
+## out of its middle, so out of its alarm), and it rides at `local` (holder space), drawn in from where
+## it was over `ease_time` s. Eaten when the mouth closes (eat()), or let go (release_hold()).
+## False if it can't be held (dead, claimed, already held, no holder).
+func hold(index: int, holder: Node3D, local: Vector3, ease_time := 0.35) -> bool:
+	if index < 0 or index >= _alive.size() or _alive[index] == 0 or _claims.has(index) or _held.has(index) or not is_instance_valid(holder):
+		return false
+	_held[index] = {"holder": holder, "local": local, "from": fish_position(index), "age": 0.0, "ease": maxf(ease_time, 0.0)}
+	_velocity[index] = Vector3.ZERO
+	return true
+
+
+## Lets go of a held fish: an ordinary school fish again, where it is (its slot pulls it back).
+func release_hold(index: int) -> void:
+	_held.erase(index)
+
+
+## Knocks a free fish: adds `impulse` (m/s) to its velocity (a full mouth's lips bumping it away).
+func nudge(index: int, impulse: Vector3) -> void:
+	if index >= 0 and index < _alive.size() and _alive[index] == 1 and not _held.has(index):
+		_velocity[index] += impulse
+
+
+## A mouth sucks at the school (a Gulper's held bite; call it every tick while it lasts, it lapses a moment after the last call):
+## the fish within `reach` of `point` and within `cone_deg` of `dir` (the way the mouth faces) are drawn toward it, aiming at
+## `speed` m/s (the school's own acceleration limit still applies) and easing in once they are within `mouth` of the point.
+## The pull is strongest at the lips and fades out to nothing at `reach`. `source` tells two mouths apart.
+func pull(source: Object, point: Vector3, dir: Vector3, cone_deg: float, speed: float, reach: float, mouth := 0.0) -> void:
+	if source == null or reach <= 0.0 or speed <= 0.0:
+		return
+	_pulls[source.get_instance_id()] = {"point": point, "dir": dir.normalized(), "cone": cos(deg_to_rad(clampf(cone_deg, 0.0, 180.0))),
+			"speed": speed, "reach": reach, "mouth": maxf(mouth, 0.0), "ttl": PULL_TTL}
+
+
+## Stops `source`'s pull at once.
+func end_pull(source: Object) -> void:
+	if source != null:
+		_pulls.erase(source.get_instance_id())
+
+
+func is_pulled() -> bool:
+	return not _pulls.is_empty()
+
+
+func _age_pulls(delta: float) -> void:
+	for key: Variant in _pulls.keys():
+		var entry: Dictionary = _pulls[key]
+		entry["ttl"] = float(entry["ttl"]) - delta
+		if float(entry["ttl"]) <= 0.0:
+			_pulls.erase(key)
+
+
+## Where a fish at `at` wants to go once the mouths sucking at the school have had their say (`wanted` if none reaches it).
+func _pulled(at: Vector3, wanted: Vector3) -> Vector3:
+	var best := 0.0
+	var aim := Vector3.ZERO
+	for entry: Dictionary in _pulls.values():
+		var point: Vector3 = entry["point"]
+		var off := point - at
+		var gap := off.length()
+		var reach: float = entry["reach"]
+		if gap >= reach or gap < 0.0001:
+			continue
+		if (-off / gap).dot(entry["dir"]) < float(entry["cone"]):
+			continue  # behind or beside the lips: not in the cone
+		var share := 1.0 - gap / reach
+		if share <= best:
+			continue
+		best = share
+		var mouth: float = entry["mouth"]
+		var speed: float = entry["speed"]
+		aim = off / gap * (speed if gap > mouth else minf(speed, gap * 4.0))  # settle at the lips instead of overshooting
+	return wanted if best <= 0.0 else wanted.lerp(aim, minf(best * 2.0, 1.0))
+
+
+func is_held(index: int) -> bool:
+	return _held.has(index)
+
+
+func held_count() -> int:
+	return _held.size()
+
+
+## The held fish, by index.
+func held_indices() -> Array:
+	return _held.keys()
+
+
+## Where held fish `index` rides in its holder's space (INF with none).
+func held_local(index: int) -> Vector3:
+	return _held[index]["local"] if _held.has(index) else Vector3.INF
+
+
+## Places each held fish: eased from where it was to its spot in the holder's mouth, facing the way the holder does.
+func _apply_holds(delta: float) -> void:
+	for index: int in _held.keys():
+		if index >= _alive.size() or _alive[index] == 0:
+			_held.erase(index)
+			continue
+		var held: Dictionary = _held[index]
+		if not is_instance_valid(held["holder"]):
+			_held.erase(index)  # (a freed holder can't be cast: check it as a Variant first)
+			continue
+		var holder := held["holder"] as Node3D
+		if not holder.is_inside_tree():
+			_held.erase(index)
+			continue
+		held["age"] = float(held["age"]) + delta
+		var ease_time: float = held["ease"]
+		var share := 1.0 if ease_time <= 0.0 else smoothstep(0.0, 1.0, clampf(float(held["age"]) / ease_time, 0.0, 1.0))
+		_position[index] = (held["from"] as Vector3).lerp(holder.to_global(held["local"]), share)
+		_velocity[index] = Vector3.ZERO
+		_facing[index] = holder.global_basis.orthonormalized().get_rotation_quaternion()
+
+
 # --- Joined players (What Stinks?, what_stinks.md section 5) ------------------
 
 ## Gives fish `index` (alive, unclaimed) to the player's `fish`: it stays a real
@@ -580,8 +710,9 @@ func release_claim(fish: FishController) -> Dictionary:
 	return out
 
 
-## A player's place that's gone (eaten, battered): forgotten, and the fish told.
+## A fish that's gone (eaten, battered) is no longer held by a mouth, and a player's place on it is forgotten, and the fish told.
 func _drop_claim(index: int) -> void:
+	_held.erase(index)
 	if not _claims.has(index):
 		return
 	var fish: FishController = _claims[index]["fish"]
@@ -663,8 +794,10 @@ func _move_fish(delta: float) -> void:
 	var spin := settings.wander_rate * TAU * _time
 	var steps_back := settings.ripple_delay / delta
 	var last := _history.size() - 1
+	var holding := not _held.is_empty()
+	var pulling := not _pulls.is_empty()
 	for i in _position.size():
-		if _alive[i] == 0:
+		if _alive[i] == 0 or (holding and _held.has(i)):
 			continue
 		var at := _position[i]
 		# Where the leader was this fish's ripple delay ago, and its place around that.
@@ -687,6 +820,8 @@ func _move_fish(delta: float) -> void:
 				var gap := apart.length()
 				if gap < reach and gap > 0.0001:
 					push += apart / gap * settings.separation_strength * (1.0 - gap / reach)
+		if pulling:
+			wanted = _pulled(at, wanted)
 		var before := _velocity[i]
 		var velocity := before.move_toward(wanted, settings.fish_accel * delta) + push * delta
 		_velocity[i] = velocity
@@ -888,7 +1023,7 @@ func _middle() -> Vector3:
 	var sum := Vector3.ZERO
 	var count := 0
 	for i in _position.size():
-		if _alive[i] == 1:
+		if _alive[i] == 1 and (_held.is_empty() or not _held.has(i)):
 			sum += _position[i]
 			count += 1
 	return sum / count if count > 0 else leader_position
