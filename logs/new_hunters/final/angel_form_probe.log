@@ -1,0 +1,108 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+sheet:
+ok    the Fallen Angel reports ready
+ok    and the card would list it
+ok    its sheet: name and class
+ok    the cone is longer and thinner than the shark's chomp
+ok    it opens slower and takes fewer
+ok    a narrow half angle at the far end (radius over reach 0.20)
+size x0.5:
+ok    x0.5: the Angel's rig is on the model
+ok    x0.5: the bite's jaw is the Angel's
+ok    x0.5: dressing twice leaves one rig (1)
+ok    x0.5: the shark's own parts are hidden
+ok    x0.5: body scale 4.15, hitbox 5.00 m
+      model extent (2.87688, 1.180274, 4.974283) m for a hitbox of 5.00 m long
+ok    x0.5: model length 4.97 m is about the hitbox's
+ok    x0.5: its girth sits near the box (2.88 x 1.18 m for 2.32 x 1.66)
+ok    x0.5: straight at rest (tail off the axis by 0.000 of its length)
+ok    x0.5: the head is the box's front
+ok    x0.5: the swim reads speed (1.00 of full at 19.6 m/s)
+ok    x0.5: the wave grows with speed (1.00, was 0.80 at rest, idle size 0.20)
+ok    x0.5: the wings beat faster at speed (2.40 beats a second, idle 0.80)
+      tail trailed 0.88 of its length (x 0.88) in the turn
+ok    x0.5: the body trails a turn (tail 0.88 of its length off the axis)
+ok    x0.5: the bite's mouth is at the front of the body (0.22 m off the nose)
+ok    x0.5: the crown is shut and the ring hidden at rest
+      bite: 1 landed, bite opened to 0.99, the crown to 1.00 (rest 0.00), lash 1.00
+ok    x0.5: one bite lands from one press
+ok    x0.5: the crown opens on the wind-up (1.00)
+ok    x0.5: the lock-on ring sits on the cone's far end while it is open
+ok    x0.5: the tentacles lash when the bite lands (1.00)
+ok    x0.5: reach 3.25 m, radius 0.65 m
+ok    x0.5: the far end takes fish most of the radius off the nose
+ok    x0.5: and the near end is narrow
+ok    x0.5: nothing behind the mouth or past the reach
+      camera: 11.80 m away (2.36 body lengths), zoom 3.70, the body's box spans 10% of the screen width
+ok    x0.5: the body fills a fair share of the screen (10%)
+size x1.0:
+ok    x1.0: the Angel's rig is on the model
+ok    x1.0: the bite's jaw is the Angel's
+ok    x1.0: dressing twice leaves one rig (1)
+ok    x1.0: the shark's own parts are hidden
+ok    x1.0: body scale 8.30, hitbox 10.00 m
+      model extent (5.862153, 2.360548, 9.948566) m for a hitbox of 10.00 m long
+ok    x1.0: model length 9.95 m is about the hitbox's
+ok    x1.0: its girth sits near the box (5.86 x 2.36 m for 4.65 x 3.32)
+ok    x1.0: straight at rest (tail off the axis by 0.000 of its length)
+ok    x1.0: the head is the box's front
+ok    x1.0: the swim reads speed (1.00 of full at 27.7 m/s)
+ok    x1.0: the wave grows with speed (1.00, was 0.74 at rest, idle size 0.20)
+ok    x1.0: the wings beat faster at speed (2.40 beats a second, idle 0.80)
+      tail trailed 0.82 of its length (x 0.82) in the turn
+ok    x1.0: the body trails a turn (tail 0.82 of its length off the axis)
+ok    x1.0: the bite's mouth is at the front of the body (0.45 m off the nose)
+ok    x1.0: the crown is shut and the ring hidden at rest
+      bite: 1 landed, bite opened to 0.99, the crown to 1.00 (rest 0.00), lash 1.00
+ok    x1.0: one bite lands from one press
+ok    x1.0: the crown opens on the wind-up (1.00)
+ok    x1.0: the lock-on ring sits on the cone's far end while it is open
+ok    x1.0: the tentacles lash when the bite lands (1.00)
+ok    x1.0: reach 6.50 m, radius 1.30 m
+ok    x1.0: the far end takes fish most of the radius off the nose
+ok    x1.0: and the near end is narrow
+ok    x1.0: nothing behind the mouth or past the reach
+      camera: 23.45 m away (2.35 body lengths), zoom 7.41, the body's box spans 10% of the screen width
+ok    x1.0: the body fills a fair share of the screen (10%)
+size x3.0:
+ok    x3.0: the Angel's rig is on the model
+ok    x3.0: the bite's jaw is the Angel's
+ok    x3.0: dressing twice leaves one rig (1)
+ok    x3.0: the shark's own parts are hidden
+ok    x3.0: body scale 24.90, hitbox 30.00 m
+      model extent (17.58646, 7.081645, 29.8457) m for a hitbox of 30.00 m long
+ok    x3.0: model length 29.85 m is about the hitbox's
+ok    x3.0: its girth sits near the box (17.59 x 7.08 m for 13.94 x 9.96)
+ok    x3.0: straight at rest (tail off the axis by 0.000 of its length)
+ok    x3.0: the head is the box's front
+ok    x3.0: the swim reads speed (1.00 of full at 48.0 m/s)
+ok    x3.0: the wave grows with speed (1.00, was 0.68 at rest, idle size 0.20)
+ok    x3.0: the wings beat faster at speed (2.40 beats a second, idle 0.80)
+      tail trailed 0.69 of its length (x 0.69) in the turn
+ok    x3.0: the body trails a turn (tail 0.69 of its length off the axis)
+ok    x3.0: the bite's mouth is at the front of the body (1.34 m off the nose)
+ok    x3.0: the crown is shut and the ring hidden at rest
+      bite: 1 landed, bite opened to 0.99, the crown to 1.00 (rest 0.00), lash 1.00
+ok    x3.0: one bite lands from one press
+ok    x3.0: the crown opens on the wind-up (1.00)
+ok    x3.0: the lock-on ring sits on the cone's far end while it is open
+ok    x3.0: the tentacles lash when the bite lands (1.00)
+ok    x3.0: reach 19.50 m, radius 3.90 m
+ok    x3.0: the far end takes fish most of the radius off the nose
+ok    x3.0: and the near end is narrow
+ok    x3.0: nothing behind the mouth or past the reach
+      camera: 70.02 m away (2.33 body lengths), zoom 22.22, the body's box spans 10% of the screen width
+ok    x3.0: the body fills a fair share of the screen (10%)
+in a match:
+ok    round 0: the match card offers the Fallen Angel (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    round 0: a match with the local fish as Hunter
+ok    round 0: the Hunter wears the Angel's rig
+ok    round 0: the bite is the Angel's, with its mouth (reach 6.5 m)
+ok    round 0: and bites from the front, not the middle
+ok    round 1: the match card offers the Fallen Angel (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    round 1: a match with the local fish as Hunter
+ok    round 1: the Hunter wears the Angel's rig
+ok    round 1: the bite is the Angel's, with its mouth (reach 6.5 m)
+ok    round 1: and bites from the front, not the middle
+angel_form_probe: 88 checks, 0 failed

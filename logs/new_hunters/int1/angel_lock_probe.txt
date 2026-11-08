@@ -1,0 +1,81 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    match: the local fish is the Hunter with a bite
+ok    match: the Angel's style is the lock
+ok    match: prey to test with (4)
+      A: the gate
+ok    gate: nothing about: the press is refused, no hold, no cooldown
+ok    gate: nothing about: the denied beat (sound true)
+ok    gate: a fish behind it: the press is refused, no hold, no cooldown
+ok    gate: a fish behind it: the denied beat (sound true)
+ok    gate: a fish off to the side: the press is refused, no hold, no cooldown
+ok    gate: a fish off to the side: the denied beat (sound true)
+ok    gate: a fish ahead but out of range: the press is refused, no hold, no cooldown
+ok    gate: a fish ahead but out of range: the denied beat (sound true)
+ok    gate: nothing was locked
+ok    gate: a fish ahead within range and the cone: the press takes
+ok    gate: and plays the cones' open, not the denied
+      B: the target, the pace, the facing, the orbit
+ok    lock: the press takes
+ok    lock: the target is the nearest fish at the press
+ok    lock: it keeps the target for the whole hold
+ok    lock: it matches the target's pace (0.27 m/s off a 4.0 m/s target)
+ok    lock: it keeps facing the target (0.0 deg off)
+ok    lock: it holds the stand-off (5.2 m of 4.5)
+ok    lock: the stick orbits it round the target (1.31 rad in a second)
+ok    lock: at the stand-off still (5.2 m)
+ok    lock: and still facing it (0.5 deg)
+ok    lock: the HUD ring shows what a release would take (x1)
+ok    lock: the release eats the target
+ok    lock: and lets the lock go
+      C: breaking
+ok    break: locked
+ok    break: the target past angel_break_range snaps the lock
+ok    break: with the lock_lost sound
+ok    break: the crown closes empty with a small cooldown (0.98 s)
+ok    break: nothing was eaten
+ok    break: locked again
+ok    break: a target eaten by someone else snaps it
+      D: the count and the lash
+ok    count (school ahead of the target): locked on a fish of the school
+ok    count (school ahead of the target): the ring shows x3
+ok    count (school ahead of the target): the release took 4 of x3, all from the school
+ok    count (school ahead of the target): (the target went too)
+ok    lash: the catch's distances are listed nearest first (4)
+ok    lash: each crunch is delayed by its distance, the first on the contact tick (last 0.026 s)
+ok    lash: the lash sound and a crunch played on contact
+ok    count (school behind the Angel): locked on a fish of the school
+ok    count (school behind the Angel): the ring shows x1
+ok    count (school behind the Angel): the release took 1 of x1, all from the school
+ok    count (school behind the Angel): (the target went too)
+ok    count: the school ahead of the target earns more than the school behind the Angel (x3 > x1)
+ok    count: striking from the wrong side still takes the target
+      E: stacking with the camera's lock-on (D8)
+ok    stack: locked
+ok    stack: the lock-on bite on the same school multiplies the count (x3.02: 4 -> 12)
+ok    stack: the lock-on on another school adds nothing
+ok    stack: lock_bite off adds nothing
+      F: net report and the bot
+ok    net: locked
+ok    net: the landing reports the target's school and index
+ok    net: the host builds the rule from the report (4 fish)
+ok    net: a report it cannot match falls back to the plain cone
+ok    net: a target far from the reported mouth falls back to the cone
+ok    bot: it lets go exactly when the line-up is past hunter_bot_lock_align (0.60, lined up: true)
+ok    bot: school behind it: it holds on and swings round
+ok    bot: nothing in the gate: no press
+ok    bot: presses only when the gate passes
+      G: sizes, a quick tap, tap mode
+ok    size 0.5: the gate takes and locks the fish ahead
+ok    size 0.5: it holds the stand-off (2.24 m of 2.27)
+ok    size 0.5: and keeps facing it
+ok    size 0.5: the release eats the target
+ok    size 2.0: the gate takes and locks the fish ahead
+ok    size 2.0: it holds the stand-off (9.04 m of 9.10)
+ok    size 2.0: and keeps facing it
+ok    size 2.0: the release eats the target
+ok    tap: a quick press and release still takes the target
+ok    tap: and leaves no lock behind
+ok    tap mode: no lock is taken
+ok    tap mode: the snap eats what is in the frustum
+angel_lock_probe: 71 checks, 0 failed

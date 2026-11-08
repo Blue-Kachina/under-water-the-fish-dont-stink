@@ -1,0 +1,106 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+drowned_shark:
+  PASS  the form shows a swimming fish
+    travelled 10.1 m, gait phase +86.8, camera moved 19.0 m, head 2nd diff 0.00008 m
+  PASS  it swims (moved 10.1 m)
+  PASS  its gait phase advances (+86.8)
+  PASS  the camera follows it (19.0 m)
+  PASS  the throttle and velocity the gait reads are set
+  PASS  the head's drawn path is smooth (0.000012 of its length)
+humpback:
+  PASS  the form shows a swimming fish
+    travelled 9.6 m, gait phase +86.8, camera moved 21.6 m, head 2nd diff 0.00008 m
+  PASS  it swims (moved 9.6 m)
+  PASS  its gait phase advances (+86.8)
+  PASS  the camera follows it (21.6 m)
+  PASS  the throttle and velocity the gait reads are set
+  PASS  the head's drawn path is smooth (0.000012 of its length)
+orca:
+  PASS  the form shows a swimming fish
+    travelled 5.2 m, gait phase +86.8, camera moved 17.3 m, head 2nd diff 0.00004 m
+  PASS  it swims (moved 5.2 m)
+  PASS  its gait phase advances (+86.8)
+  PASS  the camera follows it (17.3 m)
+  PASS  the throttle and velocity the gait reads are set
+  PASS  the head's drawn path is smooth (0.000012 of its length)
+beluga:
+  PASS  the form shows a swimming fish
+    travelled 3.2 m, gait phase +86.8, camera moved 5.9 m, head 2nd diff 0.00003 m
+  PASS  it swims (moved 3.2 m)
+  PASS  its gait phase advances (+86.8)
+  PASS  the camera follows it (5.9 m)
+  PASS  the throttle and velocity the gait reads are set
+  PASS  the head's drawn path is smooth (0.000012 of its length)
+sperm:
+  PASS  the form shows a swimming fish
+    travelled 11.1 m, gait phase +86.8, camera moved 25.0 m, head 2nd diff 0.00009 m
+  PASS  it swims (moved 11.1 m)
+  PASS  its gait phase advances (+86.8)
+  PASS  the camera follows it (25.0 m)
+  PASS  the throttle and velocity the gait reads are set
+  PASS  the head's drawn path is smooth (0.000012 of its length)
+blue:
+  PASS  the form shows a swimming fish
+    travelled 17.3 m, gait phase +86.8, camera moved 57.7 m, head 2nd diff 0.00014 m
+  PASS  it swims (moved 17.3 m)
+  PASS  its gait phase advances (+86.8)
+  PASS  the camera follows it (57.7 m)
+  PASS  the throttle and velocity the gait reads are set
+  PASS  the head's drawn path is smooth (0.000012 of its length)
+king_of_herrings:
+  PASS  the form shows a swimming fish
+    travelled 23.0 m, gait phase +87.0, camera moved 37.1 m, head 2nd diff 0.00019 m
+  PASS  it swims (moved 23.0 m)
+  PASS  its gait phase advances (+87.0)
+  PASS  the camera follows it (37.1 m)
+  PASS  the throttle and velocity the gait reads are set
+  PASS  the head's drawn path is smooth (0.000012 of its length)
+    spine samples 360, worst second difference 0.00469 m (0.000293 of length 16.0 m) at sample 4, tail sway 1.58 m
+  PASS  the spine moves smoothly (0.000293 < 0.0015)
+  PASS  the body bends with the wander (tail sway 1.58 m)
+gulper_mother:
+  PASS  the form shows a swimming fish
+    travelled 13.0 m, gait phase +87.0, camera moved 29.0 m, head 2nd diff 0.00011 m
+  PASS  it swims (moved 13.0 m)
+  PASS  its gait phase advances (+87.0)
+  PASS  the camera follows it (29.0 m)
+  PASS  the throttle and velocity the gait reads are set
+  PASS  the head's drawn path is smooth (0.000012 of its length)
+    spine samples 360, worst second difference 0.00147 m (0.000163 of length 9.0 m) at sample 38, tail sway 7.12 m
+  PASS  the spine moves smoothly (0.000163 < 0.0015)
+  PASS  the body bends with the wander (tail sway 7.12 m)
+lamprey_queen:
+  PASS  the form shows a swimming fish
+    travelled 20.1 m, gait phase +87.0, camera moved 63.7 m, head 2nd diff 0.00017 m
+  PASS  it swims (moved 20.1 m)
+  PASS  its gait phase advances (+87.0)
+  PASS  the camera follows it (63.7 m)
+  PASS  the throttle and velocity the gait reads are set
+  PASS  the head's drawn path is smooth (0.000012 of its length)
+    spine samples 360, worst second difference 0.00418 m (0.000299 of length 14.0 m) at sample 4, tail sway 1.38 m
+  PASS  the spine moves smoothly (0.000299 < 0.0015)
+  PASS  the body bends with the wander (tail sway 1.38 m)
+fallen_angel:
+  PASS  the form shows a swimming fish
+    travelled 14.4 m, gait phase +87.0, camera moved 22.8 m, head 2nd diff 0.00012 m
+  PASS  it swims (moved 14.4 m)
+  PASS  its gait phase advances (+87.0)
+  PASS  the camera follows it (22.8 m)
+  PASS  the throttle and velocity the gait reads are set
+  PASS  the head's drawn path is smooth (0.000012 of its length)
+    spine samples 360, worst second difference 0.00126 m (0.000126 of length 10.0 m) at sample 38, tail sway 6.28 m
+  PASS  the spine moves smoothly (0.000126 < 0.0015)
+  PASS  the body bends with the wander (tail sway 6.28 m)
+king_of_herrings (tree paused):
+  PASS  the form shows a swimming fish
+    travelled 23.0 m, gait phase +87.0, camera moved 51.9 m, head 2nd diff 0.00019 m
+  PASS  it swims (moved 23.0 m)
+  PASS  its gait phase advances (+87.0)
+  PASS  the camera follows it (51.9 m)
+  PASS  the throttle and velocity the gait reads are set
+  PASS  the head's drawn path is smooth (0.000012 of its length)
+    spine samples 360, worst second difference 0.00469 m (0.000293 of length 16.0 m) at sample 4, tail sway 1.58 m
+  PASS  the spine moves smoothly (0.000293 < 0.0015)
+  PASS  the body bends with the wander (tail sway 1.58 m)
+preview_jitter_probe: 76 checks, 0 failed

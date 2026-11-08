@@ -8,6 +8,7 @@ extends RefCounted
 
 const KingRig := preload("res://scripts/what_stinks/forms/king_rig.gd")
 const KingJaw := preload("res://scripts/what_stinks/forms/king_jaw.gd")
+const KingExaggerate := preload("res://scripts/what_stinks/forms/king_exaggerate.gd")
 
 
 ## Offered on the match card only once this is true (the form plays end to end: model, swim, bite, camera, hitbox).
@@ -28,6 +29,7 @@ static func sheet() -> Dictionary:
 		"capacity": 7.0, "cam": Vector2(0.8, 1.35),
 		"sound_chomp": "boss/chomp", "sound_arrive": "boss/leviathan_arrive", "sound_miss": "boss/chomp_miss",
 		"sound_grab": "boss/grab", "attack": "coil",
+		"exaggeration": 1.0, "exaggerate": KingExaggerate.preset(),
 	}
 
 
@@ -53,3 +55,9 @@ static func dress(fish: FishController, sheet_now: Dictionary) -> void:
 	var jaw := KingJaw.new()
 	jaw.rig = body
 	visual.set_meta("hunter_jaw", jaw)
+	var driver: Node = KingExaggerate.new()
+	driver.name = "KingExaggerate"
+	driver.rig = body
+	driver.jaw = jaw
+	body.add_child(driver)
+	driver.setup(fish, sheet_now)

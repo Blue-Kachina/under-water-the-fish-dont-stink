@@ -1,0 +1,51 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+  x1 still: body rolled 387 deg, widest gap 0.0 deg, biggest tip step 0.0083, swing 0.27, siphon x 0.00
+ok    x1 still: the body rolls (387 deg)
+ok    x1 still: the model stays on the body (widest gap 0.0 deg)
+ok    x1 still: the siphon stays on the axis while the stick rolls (x 0.00)
+ok    x1 still: arms stay finite
+ok    x1 still: every arm tip moves smoothly (biggest step 0.0083 of length per frame)
+ok    x1 still: the arms move with the roll (0.27 of length from rest)
+  x1 swimming: body rolled 387 deg, widest gap 0.0 deg, biggest tip step 0.0142, swing 0.54, siphon x 0.00
+ok    x1 swimming: the body rolls (387 deg)
+ok    x1 swimming: the model stays on the body (widest gap 0.0 deg)
+ok    x1 swimming: the siphon stays on the axis while the stick rolls (x 0.00)
+ok    x1 swimming: arms stay finite
+ok    x1 swimming: every arm tip moves smoothly (biggest step 0.0142 of length per frame)
+ok    x1 swimming: the arms move with the roll (0.54 of length from rest)
+  x1 drape: extra drop upright 0.401 m, inverted 0.340 m
+ok    x1: slack arms hang down (0.401 m)
+ok    x1: and inverted too: they follow the world's down, not the body's (0.340 m)
+  x1 loop: nose swept 534 deg, heading gap max 180 deg, biggest tip step 0.0187, speed 18.6
+ok    x1 loop: the nose really loops (534 deg)
+ok    x1 loop: arms smooth and finite through the loop (0.0187)
+ok    x1 loop: the model stays on the body (0.0 deg)
+  x1 inverted: jets added 2.5 m/s, 1 deg off the nose
+ok    x1 inverted: the jets still fire (2.5 m/s)
+ok    x1 inverted: and push along the nose, not toward the world's up (1 deg off)
+  x2 still: body rolled 286 deg, widest gap 0.0 deg, biggest tip step 0.0069, swing 0.25, siphon x 0.00
+ok    x2 still: the body rolls (286 deg)
+ok    x2 still: the model stays on the body (widest gap 0.0 deg)
+ok    x2 still: the siphon stays on the axis while the stick rolls (x 0.00)
+ok    x2 still: arms stay finite
+ok    x2 still: every arm tip moves smoothly (biggest step 0.0069 of length per frame)
+ok    x2 still: the arms move with the roll (0.25 of length from rest)
+  x2 swimming: body rolled 286 deg, widest gap 0.0 deg, biggest tip step 0.0150, swing 0.51, siphon x 0.00
+ok    x2 swimming: the body rolls (286 deg)
+ok    x2 swimming: the model stays on the body (widest gap 0.0 deg)
+ok    x2 swimming: the siphon stays on the axis while the stick rolls (x 0.00)
+ok    x2 swimming: arms stay finite
+ok    x2 swimming: every arm tip moves smoothly (biggest step 0.0150 of length per frame)
+ok    x2 swimming: the arms move with the roll (0.51 of length from rest)
+  x2 drape: extra drop upright 0.804 m, inverted 0.681 m
+ok    x2: slack arms hang down (0.804 m)
+ok    x2: and inverted too: they follow the world's down, not the body's (0.681 m)
+  x2 loop: nose swept 377 deg, heading gap max 180 deg, biggest tip step 0.0184, speed 20.3
+ok    x2 loop: the nose really loops (377 deg)
+ok    x2 loop: arms smooth and finite through the loop (0.0184)
+ok    x2 loop: the model stays on the body (0.0 deg)
+  x2 inverted: jets added 3.5 m/s, 1 deg off the nose
+ok    x2 inverted: the jets still fire (3.5 m/s)
+ok    x2 inverted: and push along the nose, not toward the world's up (1 deg off)
+octopus_roll_probe: 38 checks, 0 failed

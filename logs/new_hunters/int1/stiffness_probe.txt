@@ -1,0 +1,21 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+      king_of_herrings stiffness 0.0: tail off the line 13.82 m, spine accel/frame 0.212 m, worst segment error 0.000 m
+ok    king_of_herrings stiffness 0.0: segments keep their length (0.000 of 0.34 m)
+      king_of_herrings stiffness 0.4: tail off the line 8.43 m, spine accel/frame 0.243 m, worst segment error 0.002 m
+ok    king_of_herrings stiffness 0.4: segments keep their length (0.002 of 0.34 m)
+      king_of_herrings stiffness 1.0: tail off the line 3.91 m, spine accel/frame 0.246 m, worst segment error 0.003 m
+ok    king_of_herrings stiffness 1.0: segments keep their length (0.003 of 0.34 m)
+ok    king_of_herrings: more stiffness, less bend (13.82 > 8.43 > 3.91 m)
+ok    king_of_herrings: the stiffer body is no jerkier (0.243 vs 0.212 m/frame)
+      lamprey_queen stiffness 0.0: tail off the line 12.16 m, spine accel/frame 0.323 m, worst segment error 0.000 m
+ok    lamprey_queen stiffness 0.0: segments keep their length (0.000 of 0.30 m)
+      lamprey_queen stiffness 0.4: tail off the line 7.65 m, spine accel/frame 0.209 m, worst segment error 0.002 m
+ok    lamprey_queen stiffness 0.4: segments keep their length (0.002 of 0.30 m)
+      lamprey_queen stiffness 1.0: tail off the line 3.54 m, spine accel/frame 0.215 m, worst segment error 0.003 m
+ok    lamprey_queen stiffness 1.0: segments keep their length (0.003 of 0.30 m)
+ok    lamprey_queen: more stiffness, less bend (12.16 > 7.65 > 3.54 m)
+ok    lamprey_queen: the stiffer body is no jerkier (0.209 vs 0.323 m/frame)
+stiffness_probe: 10 checks, 0 failed
+WARNING: 17 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

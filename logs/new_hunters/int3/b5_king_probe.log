@@ -1,0 +1,68 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    a KingRig
+ok    the exaggeration driver is on the rig
+ok    dressing again keeps one driver
+ok    the sheet carries its exaggeration preset
+ok    the King wears the coil
+ok    the press winds the coil target to the floor (0.40)
+master 0 (plain):
+      jump 3.20 m at 0: swing 1.37 lag 1.41 stretch 1.00 curl 0.00 coil 0.94 whip -0.64 phase 4
+      jump 3.84 m at 1: swing 0.60 lag 1.41 stretch 1.00 curl 0.00 coil 0.96 whip -0.01 phase 4
+      jump 2.93 m at 2: swing -0.72 lag 1.39 stretch 1.00 curl 0.00 coil 0.95 whip -0.35 phase 5
+      jump 3.16 m at 3: swing -0.80 lag 1.36 stretch 1.00 curl 0.00 coil 0.88 whip -0.94 phase 5
+      jump 2.47 m at 4: swing -0.89 lag 1.32 stretch 1.00 curl 0.00 coil 0.78 whip -0.95 phase 5
+      jump 3.54 m at 5: swing -0.97 lag 1.26 stretch 1.00 curl 0.00 coil 0.63 whip -0.97 phase 5
+      jump 2.40 m at 6: swing -1.05 lag 1.19 stretch 1.00 curl 0.00 coil 0.49 whip -0.97 phase 5
+      jump 3.30 m at 7: swing -1.12 lag 1.10 stretch 1.00 curl 0.00 coil 0.36 whip -0.97 phase 5
+      jump 5.29 m at 8: swing -1.20 lag 1.00 stretch 1.00 curl 0.00 coil 0.24 whip -0.96 phase 5
+      jump 5.05 m at 9: swing -1.28 lag 0.89 stretch 1.00 curl 0.00 coil 0.13 whip -0.94 phase 5
+      jump 4.00 m at 10: swing -1.40 lag 0.77 stretch 1.00 curl 0.00 coil 0.05 whip -0.92 phase 6
+      jump 2.23 m at 11: swing -1.33 lag 0.63 stretch 1.00 curl 0.00 coil 0.00 whip -0.91 phase 6
+      jump 1.73 m at 26: swing -0.24 lag -1.64 stretch 1.00 curl 0.00 coil 0.00 whip 0.60 phase 6
+      jump 2.99 m at 28: swing -0.04 lag -1.68 stretch 1.00 curl 0.00 coil 0.00 whip 0.73 phase 6
+      rest chord 15.37 path 15.99, hold chord 5.96, gape 0.55, max stretch 1.000, eye 1.00
+ok    master 0: no tail stretch, no eye bulge
+ok    master 0: the driver bent nothing
+master 1 (bold):
+      jump 4.80 m at 1: swing 1.31 lag 1.43 stretch 1.41 curl 1.94 coil 1.00 whip -0.02 phase 4
+      jump 2.72 m at 2: swing 0.60 lag 1.43 stretch 1.49 curl 1.51 coil 0.99 whip -0.05 phase 4
+      jump 2.43 m at 3: swing -0.72 lag 1.42 stretch 1.55 curl 1.04 coil 0.95 whip -0.37 phase 5
+      jump 2.49 m at 4: swing -0.80 lag 1.42 stretch 1.55 curl 0.95 coil 0.88 whip -0.96 phase 5
+      jump 3.74 m at 5: swing -0.87 lag 1.42 stretch 1.55 curl 0.82 coil 0.78 whip -1.00 phase 5
+      jump 3.18 m at 6: swing -0.95 lag 1.42 stretch 1.55 curl 0.68 coil 0.66 whip -1.03 phase 5
+      jump 4.98 m at 7: swing -1.03 lag 1.40 stretch 1.59 curl 0.33 coil 0.53 whip -1.06 phase 5
+      jump 5.07 m at 8: swing -1.11 lag 1.35 stretch 1.61 curl 0.11 coil 0.39 whip -1.07 phase 5
+      jump 6.02 m at 9: swing -1.18 lag 1.29 stretch 1.62 curl -0.01 coil 0.27 whip -1.08 phase 5
+      jump 5.13 m at 10: swing -1.26 lag 1.22 stretch 1.58 curl -0.05 coil 0.15 whip -1.08 phase 5
+      jump 4.06 m at 11: swing -1.34 lag 1.13 stretch 1.53 curl -0.04 coil 0.07 whip -1.07 phase 5
+      jump 2.57 m at 12: swing -1.39 lag 1.02 stretch 1.48 curl -0.01 coil 0.01 whip -1.06 phase 6
+      jump 1.51 m at 23: swing -0.70 lag -0.87 stretch 1.30 curl -0.00 coil 0.00 whip 0.05 phase 6
+      jump 2.18 m at 25: swing -0.43 lag -1.22 stretch 1.15 curl -0.00 coil 0.00 whip 0.33 phase 6
+      jump 2.00 m at 27: swing -0.19 lag -1.40 stretch 1.06 curl -0.00 coil 0.00 whip 0.52 phase 6
+      jump 1.57 m at 29: swing -0.04 lag -1.53 stretch 0.99 curl -0.00 coil 0.00 whip 0.66 phase 6
+      dip 0.86, press curl -9.4 deg, hold curl 165.6 deg lift 3.64 m, hold chord 10.06 (plain 5.96), gape 1.21 (plain 0.55), eye 1.70
+      release: max stretch 1.62, path 16.0 -> 21.1 m, worst tail step 6.02 m/frame, eye jump 0.000
+ok    the press dips first: anticipation (coil scale 0.86)
+ok    the coil winds visibly tighter at the hold's peak (+166 deg on top of the plain coil)
+ok    the held coil is smaller than the plain one (mean radius 0.94 vs 1.40 m)
+ok    the gape is wider (1.21 vs 0.55 rad)
+ok    the eyes bulge with the charge (1.70 x)
+ok    the whip tail stretches on the release (1.62 x, smear included)
+ok    and stays bold but readable (1.62 x)
+ok    the body is visibly longer at the whip's peak (21.1 vs 16.0 m)
+ok    no pop: the tail tip moves at most 6.02 m a frame (plain 5.29, limit 8.0 m)
+ok    everything settles to rest
+ok    the kit is idle again
+ok    worst-case scale 2.40 is within the clamp (camera margin 2.0 m for a 2 m radius)
+hit-stop and camera punch:
+      landed -> hit-stop of 3 frames, punches 1
+ok    the landing freezes the rig for a few frames (3)
+ok    the landing sends a camera punch
+tap mode:
+      tap: coil dip 0.83, curl +4 deg, stretch 1.42
+ok    a tap bite winds too
+ok    a tap bite whips (1.42 x)
+abort:
+ok    an aborted hold eases back to rest with no snap
+b5_king_probe: 25 checks, 0 failed

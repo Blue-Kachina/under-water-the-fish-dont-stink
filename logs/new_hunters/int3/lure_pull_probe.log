@@ -1,0 +1,72 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+      A: the field
+ok    range: prey 15 m ahead is in the light (0.64)
+ok    range: beyond the radius is not
+ok    falloff: the pull weakens with distance
+ok    cone: prey behind the Angler is out of the cone
+ok    cone: but right beside the esca counts whatever the angle
+ok    cone: fades out at its edge, full inside
+ok    ramp: nothing at the instant of the press
+ok    ramp: the pull builds with the hold (4.50 m/s^2 at full)
+ok    pull: toward the lure (4.50 m/s^2)
+ok    cap: no pull is harder than lure_cap
+ok    resist: a person swimming straight away cancels most of it (0.45 of 4.50)
+ok    resist: a bot resists less (2.92)
+ok    resist: swimming sideways only helps a little (3.08)
+ok    resist: swimming toward it does not resist
+ok    HUD: a held fish's level rises (0.64)
+ok    dash: boosting cancels the pull outright
+ok    dash: counted as a break in the stats
+ok    dash: and it cannot snap straight back (immunity 1.2 s)
+ok    dash: after the immunity the light draws again
+ok    edge: the pull eases off where it is aiming (no jitter at the mouth)
+ok    aim: the esca from afar, the open mouth when near
+ok    registry: a stopped source is gone
+      B: simulated prey
+ok    bot: drawn from 28 m to the mouth in 10 s (3.1 m left)
+ok    person: drifting idle is drawn in too (3.1 m left)
+ok    person: swimming straight away gets clear (164.2 m from the mouth)
+ok    person: a partial counter-steer is drawn in slower
+ok    dash: a burst away breaks free and stays free (138.3 m, caught-idle would be 14.4)
+      C: a real bite
+ok    style: the attack's key is lure
+ok    idle: no pull, the esca at its normal glow before the press
+ok    press: the field starts (one source registered)
+ok    press: the esca flares up (2.51)
+ok    press: the eyes flash (1.23)
+ok    model: the AnglerModel is lit up (esca 2.52, eyes 1.23)
+ok    model: the field's light is the model's esca
+ok    press: the jaws are to go agape (x1.35)
+ok    hold: the pull ramps up (0.2 m/s^2 early, 3.4 late)
+ok    hold: the bot is drawn toward the Angler
+ok    HUD: the bot reads captivated (0.49)
+ok    hold: an idle person is drawn too (3.3 m/s^2)
+ok    hold: the attack counts who it holds (2)
+ok    resist: swimming away cancels most of it (0.33 vs 3.35)
+ok    HUD: the person resisting reads less captivated (0.20 vs 0.49)
+ok    dash: boosting out of it gets no pull
+ok    dash: and none just after, either (immunity)
+ok    dash: then it draws again
+ok    range: a fish behind the Angler is left alone
+ok    range: so is one 120 m off
+ok    net: a puppet is pushed on its own machine, not here
+ok    bot: its swim target is bent toward the light (weight 0.39)
+ok    bot: a person's steering is never touched
+ok    bot: nothing out of range bends
+ok    flicker: quicker with prey at the mouth (12.6 Hz, was 4.2)
+ok    release: the field ends
+ok    release: the Angler snaps (beat 3)
+ok    release: no more pull
+ok    release: the esca dims (0.24, model 0.24)
+ok    release: the jaws shut once (chomped)
+ok    cooldown: lure_cooldown holds the next bite off (1.05 s left, 0.46 s after the landing)
+ok    cooldown: a press during it is refused
+ok    cooldown: the esca has relit (1.00)
+ok    cooldown: and the lure can be cast again
+ok    abort: a called-off bite ends the field with no strike
+ok    abort: and nothing was bitten
+ok    HUD: the captivated level fades out, not pops
+ok    bot angler: opens the lure on prey inside the light
+ok    bot angler: not on prey far outside it
+lure_pull_probe: 66 checks, 0 failed

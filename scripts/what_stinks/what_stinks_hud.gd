@@ -18,6 +18,7 @@ const QUEASY := Color(0.75, 0.85, 0.2)
 const GOLD := Color(1.0, 0.85, 0.25)
 const STRAIN := Color(1.0, 0.15, 0.1)
 const FLUSH := Color(0.8, 0.05, 0.08)
+const CAPTIVE := Color(1.0, 0.72, 0.2)
 
 var game: WhatStinksMatch
 var _canvas: Control
@@ -160,6 +161,7 @@ func _draw_hud() -> void:
 		for i in 6:
 			var inset := i * 14.0
 			_canvas.draw_rect(Rect2(Vector2(inset, inset), area - Vector2(inset, inset) * 2.0), Color(FLUSH, _flush * (0.5 - i * 0.07)), false, 14.0)
+	_draw_captivated(area)
 	if blackout():
 		_canvas.draw_rect(Rect2(Vector2.ZERO, area), Color.BLACK)
 	_text(Vector2(area.x * 0.5, 44.0), headline(), 28)
@@ -223,6 +225,10 @@ func _draw_bite_ring(at: Vector2, bite: HunterBite) -> void:
 	_canvas.draw_arc(at, 34.0, 0.0, TAU, 48, Color(1, 1, 1, 0.2), 6.0, true)
 	_canvas.draw_arc(at, 34.0, -PI * 0.5, -PI * 0.5 + TAU * share, 48, color, 6.0, true)
 	_text(at + Vector2(0, 8), "%d" % bite.attack.ring_count(bite), 22)
+	if bite.holding() and bite.attack.key == "lure" and "captive_count" in bite.attack:  # the Lantern Angler: fish drawn to the light
+		_text(at + Vector2(0, 52), "%d drawn" % int(bite.attack.get("captive_count")), 14)
+	if bite.holding() and bite.attack.key == "whip":  # the Ember Octopus: arms locked, of the arms it may lock
+		_text(at + Vector2(0, 52), "of %d arms" % int(game.settings.whip_arms), 14)
 
 
 ## How full the bite's ring is: the charge while held, else how ready the bite is.
@@ -332,3 +338,14 @@ func _draw_match_card(area: Vector2) -> void:
 	_text(middle + Vector2(0, -40), "%s wins the match" % (best.display_name if is_instance_valid(best) else "No one"), 36)
 	var local := game.local_fish()
 	_text(middle + Vector2(0, 4), "You have %d" % roundi(float(game.match_totals.get(local, 0.0))), 22)
+
+
+## The Lantern Angler's lure holds the local player: a warm amber vignette that eases in and fades out (LureField.captivated).
+func _draw_captivated(area: Vector2) -> void:
+	var held := LureField.captivated(game.local_fish())
+	if held <= 0.01:
+		return
+	var pulse := 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.012)
+	for i in 6:
+		var inset := i * 16.0
+		_canvas.draw_rect(Rect2(Vector2(inset, inset), area - Vector2(inset, inset) * 2.0), Color(CAPTIVE, held * pulse * (0.55 - i * 0.08)), false, 16.0)

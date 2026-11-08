@@ -1,0 +1,17 @@
+angel_lock_probe exit=0
+whale_engulf_probe exit=1
+whale_reach_probe exit=0
+what_stinks_camera_probe exit=0
+whale_spike_probe exit=1
+what_stinks_lock_bite_probe exit=0
+gulper_suction_probe exit=0
+hunter_bot_probe exit=0
+hunter_roll_probe exit=0
+octopus_form_probe exit=0
+angler_form_probe exit=0
+what_stinks_bots_probe exit=0
+whale_engulf_probe exit=1
+whale_engulf_probe exit=1
+whale_engulf_probe exit=0
+whale_engulf_probe exit=0
+whale_engulf_probe exit=0

@@ -1,0 +1,98 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+sheet:
+ok    name and class
+ok    length, reach, wind-up set
+ok    reports ready
+size x0.5:
+ok    x0.5: the octopus rig is on the model
+ok    x0.5: dressing twice leaves one rig (1)
+ok    x0.5: the shark's own parts are hidden
+ok    x0.5: hitbox 3.00 m
+ok    x0.5: model span 3.27 m = hitbox 3.00 m
+ok    x0.5: arms reach the front of the box (front -1.77 vs box -1.50, mantle 1.50)
+ok    x0.5: the head is ahead of the centre
+ok    x0.5: no jets while still (throttle 0.00 boost false jets 0)
+ok    x0.5: still, the arms drift lazily (total 0.1190, biggest step 0.0010)
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=186
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=292
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=398
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=520
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=625
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=730
+      swim 5 s: speed 17.4 m/s with jets, 16.8 without; jets 3; jets added 7.1 m/s in total; biggest tip step 0.0253
+ok    x0.5: the throttle fires jet pulses (3 in 5 s)
+ok    x0.5: the mantle squeezes with them (0.96)
+ok    x0.5: the jets add speed through the physics (17.4 vs 16.8 m/s)
+ok    x0.5: swimming is smooth (biggest tip step 0.0253 of length per frame)
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=847
+ok    x0.5: stick right aims the exhaust left (x -0.55)
+ok    x0.5: and the fish turns (121 deg)
+      [jet 1.00] throttle 1.00 boost true fwd_in 1.00 t=923
+ok    x0.5: the boost makes a dash jet
+      step cost 0.269 ms
+ok    x0.5: the rig's frame cost is small (0.269 ms)
+size x1.0:
+ok    x1.0: the octopus rig is on the model
+ok    x1.0: dressing twice leaves one rig (1)
+ok    x1.0: the shark's own parts are hidden
+ok    x1.0: hitbox 6.00 m
+ok    x1.0: model span 6.43 m = hitbox 6.00 m
+ok    x1.0: arms reach the front of the box (front -3.45 vs box -3.00, mantle 2.97)
+ok    x1.0: the head is ahead of the centre
+ok    x1.0: no jets while still (throttle 0.00 boost false jets 0)
+ok    x1.0: still, the arms drift lazily (total 0.1122, biggest step 0.0008)
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=1189
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=1303
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=1408
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=1534
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=1642
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=1747
+      swim 5 s: speed 18.0 m/s with jets, 16.8 without; jets 3; jets added 7.3 m/s in total; biggest tip step 0.0259
+ok    x1.0: the throttle fires jet pulses (3 in 5 s)
+ok    x1.0: the mantle squeezes with them (0.96)
+ok    x1.0: the jets add speed through the physics (18.0 vs 16.8 m/s)
+ok    x1.0: swimming is smooth (biggest tip step 0.0259 of length per frame)
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=1869
+ok    x1.0: stick right aims the exhaust left (x -0.55)
+ok    x1.0: and the fish turns (85 deg)
+      [jet 1.00] throttle 1.00 boost true fwd_in 1.00 t=1943
+ok    x1.0: the boost makes a dash jet
+      crawl: weight 1.00, steps 11, height 2.07, biggest tip step 0.0233
+ok    x1.0: near a floor the crawl comes in (1.00)
+ok    x1.0: the arms step (11)
+ok    x1.0: it settles to the crawl height (2.07 m vs 1.80)
+ok    x1.0: crawling is smooth (biggest tip step 0.0233)
+      step cost 0.349 ms
+ok    x1.0: the rig's frame cost is small (0.349 ms)
+size x2.0:
+ok    x2.0: the octopus rig is on the model
+ok    x2.0: dressing twice leaves one rig (1)
+ok    x2.0: the shark's own parts are hidden
+ok    x2.0: hitbox 12.00 m
+ok    x2.0: model span 13.08 m = hitbox 12.00 m
+ok    x2.0: arms reach the front of the box (front -7.08 vs box -6.00, mantle 6.00)
+ok    x2.0: the head is ahead of the centre
+ok    x2.0: no jets while still (throttle 0.00 boost false jets 0)
+ok    x2.0: still, the arms drift lazily (total 0.1136, biggest step 0.0010)
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=2592
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=2715
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=2828
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=2955
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=3073
+      [jet 1.00] throttle 1.00 boost false fwd_in 1.00 t=3182
+      swim 5 s: speed 18.2 m/s with jets, 16.8 without; jets 3; jets added 6.8 m/s in total; biggest tip step 0.0257
+ok    x2.0: the throttle fires jet pulses (3 in 5 s)
+ok    x2.0: the mantle squeezes with them (0.97)
+ok    x2.0: the jets add speed through the physics (18.2 vs 16.8 m/s)
+ok    x2.0: swimming is smooth (biggest tip step 0.0257 of length per frame)
+ok    x2.0: stick right aims the exhaust left (x -0.55)
+ok    x2.0: and the fish turns (60 deg)
+      [jet 1.00] throttle 1.00 boost true fwd_in 1.00 t=3312
+      [jet 1.00] throttle 1.00 boost true fwd_in 1.00 t=3341
+ok    x2.0: the boost makes a dash jet
+      step cost 0.269 ms
+ok    x2.0: the rig's frame cost is small (0.269 ms)
+octopus_form_probe: 58 checks, 0 failed
+WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

@@ -1,0 +1,12 @@
+# D3-angler-attack log
+1. Read plan (phase D3), angler_contract.md, hunter_attack/hunter_bite, chomp/suction attacks, prey bot, FishController.apply_push, School.pull.
+2. Design: LureField (lure_field.gd) = registry of Source objects (esca point, axis, radius, cone, ramp) + pure-ish per-target accel_on(); LureAttack drives it from the held bite (press registers, hold ramps, release drops it) and drives the AnglerModel (esca flare/flicker, eyes, stalk kick) by duck-typing.
+3. Decision: all values read via LureField.cfg(settings,key) with built-in DEFAULTS so the code works before the settings are registered; specs returned in registrations.
+4. Decision: "dash" = fish.boost_held (prey boost); "human" = fish.controls == null; resist from input_forward/reverse relative to the fish heading (thrust away from the lure resists, sideways partly).
+5. Built scripts/what_stinks/lure_field.gd (LureField registry + LureField.Source: reach_weight, ramp, accel_on with resist/dash/immunity/cap, eased captivated level with fade-out after stop, bot blend_target/bias_weight, stats holds/captive_s/breaks).
+6. Built scripts/what_stinks/attacks/lure_attack.gd (LureAttack extends HunterAttack): press registers the field + esca spike (damped spring) + eye flash + stalk kick; hold ramps, pushes non-puppet prey with apply_push, School.pull for school fish, flicker Hz rises with closeness; release ends field, esca dropped dark, snap kick; on_landed adds lure_cooldown and relights over the cooldown; bot_plan; gape_mult() for the jaw wrapper. Duck-types AnglerModel (finds it under fish._visual; writes esca_intensity/eye_glint; kick_stalk).
+7. Finding: a frozen FishController never samples input (_sample_input is in _integrate_forces), so the probe presses jump_held itself and reads _ball_push for pushes. Registry static state must be LureField.reset() between probes.
+8. Finding: first probe run failed because earlier test sources were left registered; fixed in the probe (reset at the start of section C).
+9. tests/lure_pull_probe.tscn: 66 checks, 0 failed (field numbers, simulated prey, real HunterBite + real AnglerModel).
+10. Open: pull strength (lure_pull 7 m/s^2, cap 11) is untested against real prey physics (drag, max_speed 23); play-test it. Joined (school-hiding) prey are held by the join system so only the school-fish pull (School.pull) affects them. Sounds not wired (no stand-ins used by the attack).
+11. Re-verified in a fresh session: --import then lure_pull_probe 66 checks, 0 failed. Returned registrations to orchestrator.

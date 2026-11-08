@@ -40,7 +40,9 @@ func _physics_process(delta: float) -> void:
 		return
 	var index := _school.nearest_free(fish.global_position)
 	var at := _school.fish_position(index)
-	_steer_to(at)
+	LureField.tick(delta)
+	var aim := LureField.blend_target(fish, at)  # an Angler's lure bends the swim target toward its light
+	_steer_to(aim)
 	var gap := fish.global_position.distance_to(at)
 	input.forward = 1.0  # a school keeps moving: no cruising up to it
 	input.boost = gap > 15.0 and fish.boost_enabled  # it rushes for cover

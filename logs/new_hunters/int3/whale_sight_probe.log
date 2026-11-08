@@ -1,0 +1,21 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+  PASS  live, the player is the whale
+the whale's falloff:
+    near 13.2 half 38.9 range 59.9  0m:1.00 7m:1.00 13m:1.00 20m:0.87 26m:0.74 33m:0.62 40m:0.49 46m:0.33 53m:0.17 59m:0.01 66m:0.00
+  PASS  full inside the near sight
+  PASS  half at the half sight (0.50)
+  PASS  none past the range
+  PASS  never rises with distance
+  FAIL  the whale sees less far than a fish (59.9 < 59.9 m)
+the whale's cone:
+  PASS  ahead and in range: in sight (or a wall's in the way)
+  PASS  past the range: out
+  PASS  behind it: out
+  PASS  a hider seeker would still use in_sight (same answer)
+a bot whale hunts:
+    11.7 s, 1 auto calls, up to 2 streak heads, 1 tags
+  PASS  the whale called by itself (1)
+  PASS  the manual Marco! does nothing for a whale
+  PASS  it found a still hider in 11.7 s
+whale_sight_probe: 1 failure(s)

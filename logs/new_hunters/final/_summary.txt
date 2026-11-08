@@ -1,0 +1,7 @@
+angler_match_probe exit=0 faillines=0 scripterr=0
+octopus_form_probe exit=0 faillines=1 scripterr=0
+gulper_suction_probe exit=0 faillines=1 scripterr=0
+whale_engulf_probe exit=1 faillines=2 scripterr=0
+whale_engulf_probe exit=0 faillines=1 scripterr=0
+hunter_forms_probe exit=0 faillines=1 scripterr=0
+two_stage_bite_probe exit=124 faillines=371 scripterr=0

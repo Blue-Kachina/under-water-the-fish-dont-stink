@@ -148,6 +148,7 @@ func setup(env: Node3D, player_fish: FishController, follow_camera: Node = null)
 
 func _ready() -> void:
 	_rng.randomize()
+	LureField.reset()
 	center = environment.spawn_transform().origin if environment.has_method("spawn_transform") else Vector3.ZERO
 	_player_base = {"buoyancy": _local.buoyancy, "boost_enabled": _local.boost_enabled, "bow_scale": _local.bow_scale,
 			"speed_scale": _local.speed_scale, "turn_scale": _local.turn_scale, "rl_turn_scale": _local.rl_turn_scale,
@@ -659,6 +660,7 @@ func _undaze(prey: Variant) -> void:
 
 
 func _end_round(hunters_won: bool, reason := "") -> void:
+	LureField.reset()
 	if reason == "":
 		reason = "all_eaten" if hunters_won else "clock"
 	for prey: Variant in _daze.keys():

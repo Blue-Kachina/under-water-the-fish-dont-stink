@@ -16,10 +16,18 @@ extends HunterAttack
 ## How open the jaws were when the release began, and half the sweep's width then (rad): the pose's.
 var _open0 := 1.0
 var _half := 0.0
+## The coil the release began at (share of full), for _unwind.
+var _level := 0.0
+## Whether the current bite was a held one (its press wound the coil).
+var _wound := false
 
 
 func _init() -> void:
 	key = "coil"
+
+
+func on_open(_bite: HunterBite) -> void:
+	_wound = true
 
 
 func capacity_mult_at(bite: HunterBite, charge: float) -> float:
@@ -37,9 +45,38 @@ func pivot_back(bite: HunterBite) -> float:
 	return bite.size.bite_reach(bite.fish, bite.form) * bite.settings.coil_pivot
 
 
-## How tight the body should be coiled now (0 straight, 1 fully curled): started by the press, tightening with the charge.
+## How tight the body should be coiled now (0 straight, 1 fully curled): started by the press (a quick winding to coil_press_floor, B5: it
+## reads as a wind on the press itself), tightening with the charge. coil_press_floor is a panel setting once registered (0.4 until then).
 func coil_target(bite: HunterBite) -> float:
-	return 0.25 + 0.75 * bite.charge() if bite.holding() else 0.0
+	if not bite.holding():
+		return _unwind(bite)
+	var floor_share := clampf(_press_floor(bite), 0.0, 0.95)
+	return floor_share + (1.0 - floor_share) * bite.charge()
+
+
+## After the release the coil does not drop away in a few frames (the strike is 0.07 s): it unwinds over the strike and the shake, so the whip
+## reads (B5). Zero once the shake is over, or for a bite that was not a held one.
+func _unwind(bite: HunterBite) -> float:
+	var b := bite.bite
+	if b == null or _level <= 0.0:
+		return 0.0
+	var strike := maxf(b.duration(ChompKit.Phase.STRIKE), 0.0001)
+	var shake := maxf(b.duration(ChompKit.Phase.SHAKE), 0.0001)
+	var elapsed := -1.0
+	match b.phase:
+		ChompKit.Phase.STRIKE:
+			elapsed = b.t
+		ChompKit.Phase.SHAKE:
+			elapsed = strike + b.t
+	if elapsed < 0.0:
+		return 0.0
+	return _level * (1.0 - smoothstep(0.0, 1.0, elapsed / (strike + shake)))
+
+
+## The coil the press winds to at once (share of full), a panel setting (coil_press_floor) once registered.
+func _press_floor(bite: HunterBite) -> float:
+	var got: Variant = bite.settings.get("coil_press_floor")
+	return float(got) if got != null else 0.4
 
 
 ## The head's yaw round the pivot now (rad, positive: to the side it was drawn back to): cocked aside while the coil is held, back
@@ -72,6 +109,9 @@ func on_tick(bite: HunterBite, _delta: float) -> void:
 	if b != null and b.phase == ChompKit.Phase.STRIKE and b.t == 0.0:
 		_open0 = maxf(b.open, 0.001)  # the release's first tick: the sweep's start
 		_half = half_at(bite, bite.strike_charge())
+		var floor_share := clampf(_press_floor(bite), 0.0, 0.95)
+		_level = (floor_share + (1.0 - floor_share) * bite.strike_charge()) if _wound else 0.0  # a tap never wound it
+		_wound = false
 
 
 ## The sector from the pivot behind `mouth`, along `forward`, flat in the plane `up` is the normal of.

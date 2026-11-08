@@ -1,0 +1,36 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+  PASS  a match of five fish
+  PASS  the Hunter is a WhatStinksBot
+  PASS  four prey bots, all WhatStinksPreyBots (4)
+prey bots join a school:
+  PASS  at least three of four joined a school (3, within 17 s of the countdown start)
+relocation:
+  PASS  a prey a Hunter reads at 1.0 leaves its school after the patience
+  PASS  it counted one relocation (1)
+  PASS  and joins a school again
+  PASS  a different one (2 schools of its class)
+  PASS  patience 0: it never relocates
+  PASS  Upset Stomach with bait: it stays
+  PASS  Upset Stomach without bait: it leaves again
+the Hunter reads loners (Clean Sweep):
+  PASS  a loner it can't read is not a target
+  PASS  a loner it reads (0.9) is the target, marked readable
+  PASS  below hunter_bot_read_exposure it is nothing
+  PASS  read exposure 0: every prey is just the nearest fish (the old rule)
+click and sniff:
+  PASS  it Clicks when the Click is ready and nothing is readable
+  PASS  and again after the cooldown (2 clicks in all)
+  PASS  hunter_bot_click off: no more clicks
+  PASS  it sniffs over a school (the echo hears the button)
+  PASS  no school is sniffed past hunter_bot_sniff_s (longest 2.01 s of 2.0)
+  PASS  sniff time 0: it never sniffs
+  FAIL  the bot holds its bite: it let go at a charge of 0.50 or more (13 releases: ["0.31", "0.11", "0.00", "0.00", "0.00", "0.03", "0.12", "0.00", "0.13", "0.00", "0.00", "0.00", "0.00"])
+Upset Stomach: no sniffing:
+  PASS  it never sniffs in Upset Stomach
+Angel lock gate (Upset Stomach):
+  PASS  the Angel's style is the lock
+  PASS  a prey it can't read in the gate: it opens ({ "press": true, "hold": false })
+  PASS  (the prey is outside the frustum, so the old gate would not have stopped it)
+  PASS  a stinker it can read: it won't lock on it
+what_stinks_bots_probe: 27 checks, 1 failed

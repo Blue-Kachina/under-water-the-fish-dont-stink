@@ -1,0 +1,13 @@
+# C1-octopus-model log
+
+1. Read planning_new_hunters.md, quality standards, hunter_forms.md, probe tips, reference image (private_content/giant_glowing_octopus.png).
+2. Decision: model is a plain Node3D (`OctopusModel`), not a FishModel; skinned (Skeleton3D, 4 weights/vertex) so other workers get real bones `arm_bones[arm][seg]`.
+3. Decision: orientation -Z = travel direction, head + eyes + arms ahead, mantle trails behind (+Z) and lifts slightly. Matches the reference (arms and mantle on opposite sides of the head). Siphon exhausts toward +Z (stylised: arms-first swimmer).
+4. Decision: suckers are baked into a second skinned mesh (same skeleton), not a MultiMesh. A MultiMesh cannot follow bones without per-frame CPU matrix updates (~500 instances). LOD = `visibility_range_end` on the sucker mesh (hidden beyond N body lengths, dither-faded).
+5. Writing contract (octopus_contract.md) first, then model + shader + probe.
+6. Built octopus_model.gd (loft body + 8 arms x 14 bones x 3 rings, webs, two sucker LODs, eyes, siphon), octopus_skin.gdshader (4 modes: skin/web/sucker/eye), tests/octopus_model_probe (53 checks green), tests/octopus_model_shots (turn/close/pose/studio sets).
+7. FINDING: a MeshInstance3D created in code has an EMPTY skeleton path; it renders in bind pose and ignores all bone poses until `mi.skeleton = NodePath("..")` is set. CPU-skinned probe checks passed while the screen showed no motion, so only a windowed shot caught it.
+8. FINDING: Godot 4 bone pose is absolute (replaces rest), so setters compose `rest_q * delta`.
+9. Review by shots vs reference: first pass arms read as stiff star spikes, mantle glow blown out, suckers faceted nuts, siphon plate. Fixed: S-curved arms with per-arm curl/wobble, thicker taper, mantle tail as analytic bulb (no shoulder), darker copper base with thinner veins, sucker cups 16 sides low profile with pit shading, charge brightness toned down, siphon flared base.
+10. DECISIONS: suckers skinned meshes (hi/lo LOD) rather than MultiMesh; webs small (4-9 dense steps); idle_pose amplitude reduced (0.011/0.014 rad per seg).
+11. OPEN: siphon base still shows a thin crescent edge where it leaves the body (a skirt would fix); no beak mesh (head front pole is a small dimple between the arm bases); veins are ridged value-noise (some closed loops) rather than true branching network; no far LOD for body/arms (14.8k tris is fine); shader is untested under the real arena environment (murk/fog) and with a Compatibility renderer; SSS/backlight values by eye in a dark set only; sucker triangle cost 45k near (LOD 3 body lengths).

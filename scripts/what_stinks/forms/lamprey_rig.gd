@@ -38,6 +38,11 @@ var _riders: Array = []
 var _trail := PackedVector3Array()
 var _age := 0.0
 var _wave := 0.0
+var _offsets := PackedVector3Array()
+var _dir := Vector3.ZERO
+var _last_head := Vector3.ZERO
+## Probe/tooling override of the body_stiffness setting (negative: use the setting).
+var stiffness_override := -1.0
 var _flare := 0.0
 var _wind := 0.0
 var _disc_want := 0.0
@@ -98,6 +103,7 @@ func _pose(delta: float) -> void:
 	rig.head_up = body.y  # the body rolls with the fish (an air roll), not held to the world's up
 	rig.head_back = body.z
 	rig.follow_trail(head, _trail, body.z)
+	_stiffen(delta, head, body.z)
 	_corkscrew(delta)
 	_swim_look()
 	_pose_riders()
@@ -143,7 +149,7 @@ func _swim_look() -> void:
 	var speed := fish.linear_velocity.length()
 	var t := clampf(speed / maxf(length * 0.5, 1.0), 0.0, 1.0)
 	var turn := clampf(absf(fish.angular_velocity.y) / 1.5, 0.0, 1.0)
-	var amp := k * (WAVE_REST + WAVE_SWIM * t + WAVE_TURN * turn) * 5.0
+	var amp := k * (WAVE_REST + WAVE_SWIM * t + WAVE_TURN * turn) * 5.0 * _flex()
 	_wave = lerpf(_wave, amp, 0.1)
 	skin.set_shader_parameter("spine_wave", Vector4(_wave, 0.1 * 88.2 / length, 2.2, 0.18))
 	var warn := 0.0
@@ -322,3 +328,68 @@ static func _lamprey_mesh(span: float, radius_m: float) -> ArrayMesh:
 		var rr := radius_m * BossMesh.taper(along, 0.08, 0.25, 0.25)
 		return Vector4(rr, rr, 0.0, 2.0), 20, 10)
 	return mesh.commit()
+
+
+## body_stiffness (a WhatStinksSettings knob; 0 = the old floppy body, 1 = a rigid bar), read tolerantly so the body still builds
+## before the setting is registered. Default 0.4, i.e. 0.6 of the old flex.
+func _stiffness() -> float:
+	if stiffness_override >= 0.0:
+		return clampf(stiffness_override, 0.0, 1.0)
+	var value: Variant = WhatStinksSettings.shared().get("body_stiffness")
+	return clampf(float(value) if value != null else 0.4, 0.0, 1.0)
+
+
+## The share of the old flex left (1 at no stiffness).
+func _flex() -> float:
+	return 1.0 - _stiffness()
+
+
+## Stiffens the bend the trail made: each spine point is drawn toward the straight line tailward from the head (more so
+## down the body), re-spaced to the segment length, then eased in time (higher stiffness: damped harder) so the
+## body trails the head in a stiffer, calmer curve. The head's own points and the stride wave are left alone.
+func _stiffen(delta: float, head: Vector3, back: Vector3) -> void:
+	var stiff := _stiffness()
+	if _last_head.distance_to(head) > rig.length * 0.5:
+		_offsets.clear()  # a respawn or a teleport: no easing across it
+		_dir = Vector3.ZERO
+	_last_head = head
+	if stiff <= 0.001:
+		_offsets.clear()
+		_dir = Vector3.ZERO
+		return
+	var n := SpineRig.SPINE_N
+	var step := rig.length / float(n - 1)
+	var dir := back.normalized() if back.length_squared() > 0.0001 else Vector3.BACK
+	var ease_rate := lerpf(30.0, 8.0, stiff)
+	var k := 1.0 if delta <= 0.0 or _offsets.size() != n or _dir == Vector3.ZERO else 1.0 - exp(-ease_rate * delta)
+	dir = dir if _dir == Vector3.ZERO else _dir.slerp(dir, k).normalized()
+	_dir = dir
+	var raw := rig.points.duplicate()
+	if _offsets.size() != n:
+		_offsets.resize(n)
+		_offsets.fill(Vector3.ZERO)
+	var curve := PackedVector3Array()
+	curve.resize(n)
+	curve[0] = head
+	for s in range(1, n):
+		var along := float(s) / float(n - 1)
+		var straight := head + dir * (s * step)
+		var pull := (1.0 - (1.0 - stiff) * (1.0 - stiff)) * 0.8 * smoothstep(0.0, 0.35, along)
+		var want: Vector3 = raw[s].lerp(straight, pull)
+		var off: Vector3 = _offsets[s].lerp(want - straight, k)
+		_offsets[s] = off
+		curve[s] = straight + off
+	# Resampled evenly by length along that curve (the blend shortens it a little: it runs on straight past its end).
+	var tail_run := (curve[n - 1] - curve[n - 2]).normalized() if curve[n - 1].distance_squared_to(curve[n - 2]) > 0.000001 else dir
+	curve.append(curve[n - 1] + tail_run * rig.length)
+	var at := 1
+	var walked := 0.0
+	for s in range(1, n):
+		var want_d := s * step
+		while at < n and walked + curve[at].distance_to(curve[at - 1]) < want_d:
+			walked += curve[at].distance_to(curve[at - 1])
+			at += 1
+		var a := curve[at - 1]
+		var b := curve[at]
+		rig.points[s] = a.lerp(b, (want_d - walked) / maxf(a.distance_to(b), 0.0001))
+	rig.call("_frames")

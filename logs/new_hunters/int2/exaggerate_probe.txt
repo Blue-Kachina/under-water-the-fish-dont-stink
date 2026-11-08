@@ -1,0 +1,34 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    master 0: every channel stays exactly 1.0
+ok    master 0: no hit-stop, no camera punch
+ok    master 0: peak 1, camera margin unchanged
+ok    press: anticipation squash dips the jaw below 0.92 first (min 0.774)
+ok    hold: jaw peak in 1.5-2.5x (2.167)
+ok    release: tail whip peak in 1.5-2.5x (1.773)
+ok    release: rings through rest at least twice (overshoot), crossings 15
+ok    settles back to 1.0 and goes idle (1.0000, phase 0)
+ok    smooth: largest per-tick change at 120 Hz (the snap) 0.2520 < 0.3
+ok    smooth: after the snap the ring-out moves < 0.03 per tick (0.0245)
+ok    overshoot past rest is visible but modest (1.050)
+ok    master 2 is bolder than 1 and clamped to max_scale (3.334)
+ok    form multiplier 0.5 is milder (1.583)
+ok    max_scale clamps extreme settings (2.000)
+ok    min_scale floors the squash (0.350)
+ok    contact: hit-stop of 2-3 frames (3)
+ok    hit-stop lasts exactly its frames and time is ~frozen (3 frames, dt 0.00083)
+ok    time returns to normal after the hit-stop
+ok    contact emits one camera punch ([0.7])
+ok    camera punch scales with exaggeration (1.40 vs 0.70)
+ok    stretch along the axis, thinner across it (z 1.30 x 0.94)
+ok    diagonal axis gives a symmetric basis
+ok    smear adds stretch while the part is moving (x1.563)
+ok    apply() sets a uniform node scale
+ok    camera margin grows with the current peak (2.40 -> 0.96)
+ok    potential_peak bounds the worst case (2.40)
+ok    stable at 0.25-0.5 s steps (substepped)
+ok    params_from reads form multiplier + preset, falls back without settings
+ok    custom channels via the preset; unknown channel reads 1.0
+ok    abort eases back to rest without a snap
+ok    reset snaps to rest
+exaggerate_probe: 31 checks, 0 failures

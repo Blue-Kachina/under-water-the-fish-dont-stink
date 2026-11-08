@@ -1,0 +1,576 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    the default bite mode is hold
+ok    kit: a held-open bite stays in HOLD for 20 s
+ok    kit: the charge hit 1 (and charged fired once)
+ok    kit: gape then hold cues, no strike
+ok    kit: release strikes and lands
+ok    kit: the timed bite still strikes by itself (bosses unchanged)
+ok    kit: released in the gape it strikes from a partial open (0.56)
+ok    drowned_shark x0.5: the press opens the jaws in 9 ticks (open_s 0.12 s)
+ok    drowned_shark x0.5: held open, nothing has landed
+ok    drowned_shark x0.5: holding costs speed x0.80 and turn x0.70
+ok    drowned_shark x0.5: an uncharged bite is the plain one (reach 1.75, capacity 1)
+ok    drowned_shark x0.5: full charge after 161 ticks (wanted 158)
+ok    drowned_shark x0.5: reach grew with the charge (2.63 of 1.75)
+ok    drowned_shark x0.5: capacity grew with it (3 from 1)
+ok    drowned_shark x0.5: still held open after 3 s more
+ok    drowned_shark x0.5: the release lands in 9 ticks (strike 9)
+ok    drowned_shark x0.5: it landed at full charge (reach 2.63)
+ok    drowned_shark x0.5: and took the held capacity (3)
+ok    drowned_shark x0.5: the cooldown grew with the hold (3.92 s after 3.8 s held; wanted 3.92)
+ok    drowned_shark x0.5: the hold costs were given back
+ok    drowned_shark x0.5: released(charge) said so once
+ok    drowned_shark x0.5: a tap lands 9 ticks after the release
+ok    drowned_shark x0.5: a tap strikes from at least tap_open_min open, uncharged (0.60)
+ok    drowned_shark x0.5: with the plain reach 1.75 and capacity 1
+ok    drowned_shark x0.5: a tap's cooldown is the form's own (2.01 s)
+ok    drowned_shark x0.5: a press on the cooldown opens nothing
+FAIL  drowned_shark x1.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  drowned_shark x1.0: held open, nothing has landed
+FAIL  drowned_shark x1.0: holding costs speed x0.80 and turn x0.70
+ok    drowned_shark x1.0: an uncharged bite is the plain one (reach 3.50, capacity 4)
+FAIL  drowned_shark x1.0: full charge after 308 ticks (wanted 158)
+FAIL  drowned_shark x1.0: reach grew with the charge (3.50 of 3.50)
+FAIL  drowned_shark x1.0: capacity grew with it (4 from 4)
+FAIL  drowned_shark x1.0: still held open after 30 s more
+FAIL  drowned_shark x1.0: the release lands in 120 ticks (strike 9)
+FAIL  drowned_shark x1.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.00)
+FAIL  drowned_shark x1.0: and stopped at its cap (6.0 s)
+ok    drowned_shark x1.0: the hold costs were given back
+FAIL  drowned_shark x1.0: released(charge) said so once
+FAIL  drowned_shark x1.0: a tap lands 120 ticks after the release
+FAIL  drowned_shark x1.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  drowned_shark x1.0: a tap's cooldown is the form's own (0.00 s)
+ok    drowned_shark x1.0: a press on the cooldown opens nothing
+FAIL  drowned_shark x3.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  drowned_shark x3.0: held open, nothing has landed
+FAIL  drowned_shark x3.0: holding costs speed x0.80 and turn x0.70
+ok    drowned_shark x3.0: an uncharged bite is the plain one (reach 10.50, capacity 21)
+FAIL  drowned_shark x3.0: full charge after 308 ticks (wanted 158)
+FAIL  drowned_shark x3.0: reach grew with the charge (10.50 of 10.50)
+FAIL  drowned_shark x3.0: capacity grew with it (21 from 21)
+FAIL  drowned_shark x3.0: still held open after 3 s more
+FAIL  drowned_shark x3.0: the release lands in 120 ticks (strike 9)
+FAIL  drowned_shark x3.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.00)
+ok    drowned_shark x3.0: the hold costs were given back
+FAIL  drowned_shark x3.0: released(charge) said so once
+FAIL  drowned_shark x3.0: a tap lands 120 ticks after the release
+FAIL  drowned_shark x3.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  drowned_shark x3.0: a tap's cooldown is the form's own (0.00 s)
+ok    drowned_shark x3.0: a press on the cooldown opens nothing
+FAIL  humpback x0.5: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  humpback x0.5: held open, nothing has landed
+FAIL  humpback x0.5: holding costs speed x0.80 and turn x0.70
+ok    humpback x0.5: an uncharged bite is the plain one (reach 1.10, capacity 2)
+FAIL  humpback x0.5: full charge after 308 ticks (wanted 158)
+ok    humpback x0.5: a charged engulf bite is at least the plain one (reach 1.10, capacity 2)
+FAIL  humpback x0.5: still held open after 3 s more
+FAIL  humpback x0.5: the release lands in 120 ticks (strike 9)
+FAIL  humpback x0.5: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.40)
+ok    humpback x0.5: the hold costs were given back
+FAIL  humpback x0.5: released(charge) said so once
+FAIL  humpback x0.5: a tap lands 120 ticks after the release
+FAIL  humpback x0.5: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  humpback x0.5: a tap's cooldown is the form's own (0.00 s)
+ok    humpback x0.5: a press on the cooldown opens nothing
+FAIL  humpback x1.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  humpback x1.0: held open, nothing has landed
+FAIL  humpback x1.0: holding costs speed x0.80 and turn x0.70
+ok    humpback x1.0: an uncharged bite is the plain one (reach 2.20, capacity 6)
+FAIL  humpback x1.0: full charge after 308 ticks (wanted 158)
+ok    humpback x1.0: a charged engulf bite is at least the plain one (reach 2.20, capacity 6)
+FAIL  humpback x1.0: still held open after 3 s more
+FAIL  humpback x1.0: the release lands in 120 ticks (strike 9)
+FAIL  humpback x1.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.40)
+ok    humpback x1.0: the hold costs were given back
+FAIL  humpback x1.0: released(charge) said so once
+FAIL  humpback x1.0: a tap lands 120 ticks after the release
+FAIL  humpback x1.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  humpback x1.0: a tap's cooldown is the form's own (0.00 s)
+ok    humpback x1.0: a press on the cooldown opens nothing
+FAIL  humpback x3.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  humpback x3.0: held open, nothing has landed
+FAIL  humpback x3.0: holding costs speed x0.80 and turn x0.70
+ok    humpback x3.0: an uncharged bite is the plain one (reach 6.60, capacity 31)
+FAIL  humpback x3.0: full charge after 308 ticks (wanted 158)
+ok    humpback x3.0: a charged engulf bite is at least the plain one (reach 6.60, capacity 31)
+FAIL  humpback x3.0: still held open after 3 s more
+FAIL  humpback x3.0: the release lands in 120 ticks (strike 9)
+FAIL  humpback x3.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.40)
+ok    humpback x3.0: the hold costs were given back
+FAIL  humpback x3.0: released(charge) said so once
+FAIL  humpback x3.0: a tap lands 120 ticks after the release
+FAIL  humpback x3.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  humpback x3.0: a tap's cooldown is the form's own (0.00 s)
+ok    humpback x3.0: a press on the cooldown opens nothing
+FAIL  orca x0.5: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  orca x0.5: held open, nothing has landed
+FAIL  orca x0.5: holding costs speed x0.80 and turn x0.70
+ok    orca x0.5: an uncharged bite is the plain one (reach 0.60, capacity 1)
+FAIL  orca x0.5: full charge after 308 ticks (wanted 158)
+ok    orca x0.5: a charged engulf bite is at least the plain one (reach 0.60, capacity 1)
+FAIL  orca x0.5: still held open after 3 s more
+FAIL  orca x0.5: the release lands in 120 ticks (strike 9)
+FAIL  orca x0.5: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.00)
+ok    orca x0.5: the hold costs were given back
+FAIL  orca x0.5: released(charge) said so once
+FAIL  orca x0.5: a tap lands 120 ticks after the release
+FAIL  orca x0.5: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  orca x0.5: a tap's cooldown is the form's own (0.00 s)
+ok    orca x0.5: a press on the cooldown opens nothing
+FAIL  orca x1.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  orca x1.0: held open, nothing has landed
+FAIL  orca x1.0: holding costs speed x0.80 and turn x0.70
+ok    orca x1.0: an uncharged bite is the plain one (reach 1.20, capacity 4)
+FAIL  orca x1.0: full charge after 308 ticks (wanted 158)
+ok    orca x1.0: a charged engulf bite is at least the plain one (reach 1.20, capacity 4)
+FAIL  orca x1.0: still held open after 3 s more
+FAIL  orca x1.0: the release lands in 120 ticks (strike 9)
+FAIL  orca x1.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.00)
+ok    orca x1.0: the hold costs were given back
+FAIL  orca x1.0: released(charge) said so once
+FAIL  orca x1.0: a tap lands 120 ticks after the release
+FAIL  orca x1.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  orca x1.0: a tap's cooldown is the form's own (0.00 s)
+ok    orca x1.0: a press on the cooldown opens nothing
+FAIL  orca x3.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  orca x3.0: held open, nothing has landed
+FAIL  orca x3.0: holding costs speed x0.80 and turn x0.70
+ok    orca x3.0: an uncharged bite is the plain one (reach 3.60, capacity 21)
+FAIL  orca x3.0: full charge after 308 ticks (wanted 158)
+ok    orca x3.0: a charged engulf bite is at least the plain one (reach 3.60, capacity 21)
+FAIL  orca x3.0: still held open after 3 s more
+FAIL  orca x3.0: the release lands in 120 ticks (strike 9)
+FAIL  orca x3.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.00)
+ok    orca x3.0: the hold costs were given back
+FAIL  orca x3.0: released(charge) said so once
+FAIL  orca x3.0: a tap lands 120 ticks after the release
+FAIL  orca x3.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  orca x3.0: a tap's cooldown is the form's own (0.00 s)
+ok    orca x3.0: a press on the cooldown opens nothing
+FAIL  beluga x0.5: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  beluga x0.5: held open, nothing has landed
+FAIL  beluga x0.5: holding costs speed x0.80 and turn x0.70
+ok    beluga x0.5: an uncharged bite is the plain one (reach 0.38, capacity 1)
+FAIL  beluga x0.5: full charge after 308 ticks (wanted 158)
+ok    beluga x0.5: a charged engulf bite is at least the plain one (reach 0.38, capacity 1)
+FAIL  beluga x0.5: still held open after 3 s more
+FAIL  beluga x0.5: the release lands in 120 ticks (strike 9)
+FAIL  beluga x0.5: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 1.80)
+ok    beluga x0.5: the hold costs were given back
+FAIL  beluga x0.5: released(charge) said so once
+FAIL  beluga x0.5: a tap lands 120 ticks after the release
+FAIL  beluga x0.5: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  beluga x0.5: a tap's cooldown is the form's own (0.00 s)
+ok    beluga x0.5: a press on the cooldown opens nothing
+FAIL  beluga x1.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  beluga x1.0: held open, nothing has landed
+FAIL  beluga x1.0: holding costs speed x0.80 and turn x0.70
+ok    beluga x1.0: an uncharged bite is the plain one (reach 0.75, capacity 3)
+FAIL  beluga x1.0: full charge after 308 ticks (wanted 158)
+ok    beluga x1.0: a charged engulf bite is at least the plain one (reach 0.75, capacity 3)
+FAIL  beluga x1.0: still held open after 3 s more
+FAIL  beluga x1.0: the release lands in 120 ticks (strike 9)
+FAIL  beluga x1.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 1.80)
+ok    beluga x1.0: the hold costs were given back
+FAIL  beluga x1.0: released(charge) said so once
+FAIL  beluga x1.0: a tap lands 120 ticks after the release
+FAIL  beluga x1.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  beluga x1.0: a tap's cooldown is the form's own (0.00 s)
+ok    beluga x1.0: a press on the cooldown opens nothing
+FAIL  beluga x3.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  beluga x3.0: held open, nothing has landed
+FAIL  beluga x3.0: holding costs speed x0.80 and turn x0.70
+ok    beluga x3.0: an uncharged bite is the plain one (reach 2.25, capacity 16)
+FAIL  beluga x3.0: full charge after 308 ticks (wanted 158)
+ok    beluga x3.0: a charged engulf bite is at least the plain one (reach 2.25, capacity 16)
+FAIL  beluga x3.0: still held open after 3 s more
+FAIL  beluga x3.0: the release lands in 120 ticks (strike 9)
+FAIL  beluga x3.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 1.80)
+ok    beluga x3.0: the hold costs were given back
+FAIL  beluga x3.0: released(charge) said so once
+FAIL  beluga x3.0: a tap lands 120 ticks after the release
+FAIL  beluga x3.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  beluga x3.0: a tap's cooldown is the form's own (0.00 s)
+ok    beluga x3.0: a press on the cooldown opens nothing
+FAIL  sperm x0.5: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  sperm x0.5: held open, nothing has landed
+FAIL  sperm x0.5: holding costs speed x0.80 and turn x0.70
+ok    sperm x0.5: an uncharged bite is the plain one (reach 1.25, capacity 2)
+FAIL  sperm x0.5: full charge after 308 ticks (wanted 158)
+ok    sperm x0.5: a charged engulf bite is at least the plain one (reach 1.25, capacity 2)
+FAIL  sperm x0.5: still held open after 3 s more
+FAIL  sperm x0.5: the release lands in 120 ticks (strike 9)
+FAIL  sperm x0.5: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.60)
+ok    sperm x0.5: the hold costs were given back
+FAIL  sperm x0.5: released(charge) said so once
+FAIL  sperm x0.5: a tap lands 120 ticks after the release
+FAIL  sperm x0.5: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  sperm x0.5: a tap's cooldown is the form's own (0.00 s)
+ok    sperm x0.5: a press on the cooldown opens nothing
+FAIL  sperm x1.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  sperm x1.0: held open, nothing has landed
+FAIL  sperm x1.0: holding costs speed x0.80 and turn x0.70
+ok    sperm x1.0: an uncharged bite is the plain one (reach 2.50, capacity 5)
+FAIL  sperm x1.0: full charge after 308 ticks (wanted 158)
+ok    sperm x1.0: a charged engulf bite is at least the plain one (reach 2.50, capacity 5)
+FAIL  sperm x1.0: still held open after 3 s more
+FAIL  sperm x1.0: the release lands in 120 ticks (strike 9)
+FAIL  sperm x1.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.60)
+ok    sperm x1.0: the hold costs were given back
+FAIL  sperm x1.0: released(charge) said so once
+FAIL  sperm x1.0: a tap lands 120 ticks after the release
+FAIL  sperm x1.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  sperm x1.0: a tap's cooldown is the form's own (0.00 s)
+ok    sperm x1.0: a press on the cooldown opens nothing
+FAIL  sperm x3.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  sperm x3.0: held open, nothing has landed
+FAIL  sperm x3.0: holding costs speed x0.80 and turn x0.70
+ok    sperm x3.0: an uncharged bite is the plain one (reach 7.50, capacity 26)
+FAIL  sperm x3.0: full charge after 308 ticks (wanted 158)
+ok    sperm x3.0: a charged engulf bite is at least the plain one (reach 7.50, capacity 26)
+FAIL  sperm x3.0: still held open after 3 s more
+FAIL  sperm x3.0: the release lands in 120 ticks (strike 9)
+FAIL  sperm x3.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.60)
+ok    sperm x3.0: the hold costs were given back
+FAIL  sperm x3.0: released(charge) said so once
+FAIL  sperm x3.0: a tap lands 120 ticks after the release
+FAIL  sperm x3.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  sperm x3.0: a tap's cooldown is the form's own (0.00 s)
+ok    sperm x3.0: a press on the cooldown opens nothing
+FAIL  blue x0.5: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  blue x0.5: held open, nothing has landed
+FAIL  blue x0.5: holding costs speed x0.80 and turn x0.70
+ok    blue x0.5: an uncharged bite is the plain one (reach 2.00, capacity 3)
+FAIL  blue x0.5: full charge after 308 ticks (wanted 158)
+ok    blue x0.5: a charged engulf bite is at least the plain one (reach 2.00, capacity 3)
+FAIL  blue x0.5: still held open after 3 s more
+FAIL  blue x0.5: the release lands in 120 ticks (strike 9)
+FAIL  blue x0.5: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 3.00)
+ok    blue x0.5: the hold costs were given back
+FAIL  blue x0.5: released(charge) said so once
+FAIL  blue x0.5: a tap lands 120 ticks after the release
+FAIL  blue x0.5: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  blue x0.5: a tap's cooldown is the form's own (0.00 s)
+ok    blue x0.5: a press on the cooldown opens nothing
+FAIL  blue x1.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  blue x1.0: held open, nothing has landed
+FAIL  blue x1.0: holding costs speed x0.80 and turn x0.70
+ok    blue x1.0: an uncharged bite is the plain one (reach 4.00, capacity 9)
+FAIL  blue x1.0: full charge after 308 ticks (wanted 158)
+ok    blue x1.0: a charged engulf bite is at least the plain one (reach 4.00, capacity 9)
+FAIL  blue x1.0: still held open after 3 s more
+FAIL  blue x1.0: the release lands in 120 ticks (strike 9)
+FAIL  blue x1.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 3.00)
+ok    blue x1.0: the hold costs were given back
+FAIL  blue x1.0: released(charge) said so once
+FAIL  blue x1.0: a tap lands 120 ticks after the release
+FAIL  blue x1.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  blue x1.0: a tap's cooldown is the form's own (0.00 s)
+ok    blue x1.0: a press on the cooldown opens nothing
+FAIL  blue x3.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  blue x3.0: held open, nothing has landed
+FAIL  blue x3.0: holding costs speed x0.80 and turn x0.70
+ok    blue x3.0: an uncharged bite is the plain one (reach 12.00, capacity 47)
+FAIL  blue x3.0: full charge after 308 ticks (wanted 158)
+ok    blue x3.0: a charged engulf bite is at least the plain one (reach 12.00, capacity 47)
+FAIL  blue x3.0: still held open after 3 s more
+FAIL  blue x3.0: the release lands in 120 ticks (strike 9)
+FAIL  blue x3.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 3.00)
+ok    blue x3.0: the hold costs were given back
+FAIL  blue x3.0: released(charge) said so once
+FAIL  blue x3.0: a tap lands 120 ticks after the release
+FAIL  blue x3.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  blue x3.0: a tap's cooldown is the form's own (0.00 s)
+ok    blue x3.0: a press on the cooldown opens nothing
+FAIL  king_of_herrings x0.5: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  king_of_herrings x0.5: held open, nothing has landed
+FAIL  king_of_herrings x0.5: holding costs speed x0.80 and turn x0.70
+ok    king_of_herrings x0.5: an uncharged bite is the plain one (reach 2.75, capacity 2)
+FAIL  king_of_herrings x0.5: full charge after 308 ticks (wanted 158)
+ok    king_of_herrings x0.5: a charged coil bite is at least the plain one (reach 2.75, capacity 2)
+FAIL  king_of_herrings x0.5: still held open after 3 s more
+FAIL  king_of_herrings x0.5: the release lands in 120 ticks (strike 9)
+FAIL  king_of_herrings x0.5: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.80)
+ok    king_of_herrings x0.5: the hold costs were given back
+FAIL  king_of_herrings x0.5: released(charge) said so once
+FAIL  king_of_herrings x0.5: a tap lands 120 ticks after the release
+FAIL  king_of_herrings x0.5: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  king_of_herrings x0.5: a tap's cooldown is the form's own (0.00 s)
+ok    king_of_herrings x0.5: a press on the cooldown opens nothing
+FAIL  king_of_herrings x1.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  king_of_herrings x1.0: held open, nothing has landed
+FAIL  king_of_herrings x1.0: holding costs speed x0.80 and turn x0.70
+ok    king_of_herrings x1.0: an uncharged bite is the plain one (reach 5.50, capacity 7)
+FAIL  king_of_herrings x1.0: full charge after 308 ticks (wanted 158)
+ok    king_of_herrings x1.0: a charged coil bite is at least the plain one (reach 5.50, capacity 7)
+FAIL  king_of_herrings x1.0: still held open after 3 s more
+FAIL  king_of_herrings x1.0: the release lands in 120 ticks (strike 9)
+FAIL  king_of_herrings x1.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.80)
+ok    king_of_herrings x1.0: the hold costs were given back
+FAIL  king_of_herrings x1.0: released(charge) said so once
+FAIL  king_of_herrings x1.0: a tap lands 120 ticks after the release
+FAIL  king_of_herrings x1.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  king_of_herrings x1.0: a tap's cooldown is the form's own (0.00 s)
+ok    king_of_herrings x1.0: a press on the cooldown opens nothing
+FAIL  king_of_herrings x3.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  king_of_herrings x3.0: held open, nothing has landed
+FAIL  king_of_herrings x3.0: holding costs speed x0.80 and turn x0.70
+ok    king_of_herrings x3.0: an uncharged bite is the plain one (reach 16.50, capacity 36)
+FAIL  king_of_herrings x3.0: full charge after 308 ticks (wanted 158)
+ok    king_of_herrings x3.0: a charged coil bite is at least the plain one (reach 16.50, capacity 36)
+FAIL  king_of_herrings x3.0: still held open after 3 s more
+FAIL  king_of_herrings x3.0: the release lands in 120 ticks (strike 9)
+FAIL  king_of_herrings x3.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.80)
+ok    king_of_herrings x3.0: the hold costs were given back
+FAIL  king_of_herrings x3.0: released(charge) said so once
+FAIL  king_of_herrings x3.0: a tap lands 120 ticks after the release
+FAIL  king_of_herrings x3.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  king_of_herrings x3.0: a tap's cooldown is the form's own (0.00 s)
+ok    king_of_herrings x3.0: a press on the cooldown opens nothing
+FAIL  gulper_mother x0.5: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  gulper_mother x0.5: held open, nothing has landed
+FAIL  gulper_mother x0.5: holding costs speed x0.80 and turn x0.70
+ok    gulper_mother x0.5: an uncharged bite is the plain one (reach 3.00, capacity 3)
+FAIL  gulper_mother x0.5: full charge after 308 ticks (wanted 158)
+ok    gulper_mother x0.5: a charged suction bite is at least the plain one (reach 3.00, capacity 3)
+FAIL  gulper_mother x0.5: still held open after 3 s more
+FAIL  gulper_mother x0.5: the release lands in 120 ticks (strike 9)
+FAIL  gulper_mother x0.5: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.50)
+ok    gulper_mother x0.5: the hold costs were given back
+FAIL  gulper_mother x0.5: released(charge) said so once
+FAIL  gulper_mother x0.5: a tap lands 120 ticks after the release
+FAIL  gulper_mother x0.5: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  gulper_mother x0.5: a tap's cooldown is the form's own (0.00 s)
+ok    gulper_mother x0.5: a press on the cooldown opens nothing
+FAIL  gulper_mother x1.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  gulper_mother x1.0: held open, nothing has landed
+FAIL  gulper_mother x1.0: holding costs speed x0.80 and turn x0.70
+ok    gulper_mother x1.0: an uncharged bite is the plain one (reach 6.00, capacity 8)
+FAIL  gulper_mother x1.0: full charge after 308 ticks (wanted 158)
+ok    gulper_mother x1.0: a charged suction bite is at least the plain one (reach 6.00, capacity 8)
+FAIL  gulper_mother x1.0: still held open after 3 s more
+FAIL  gulper_mother x1.0: the release lands in 120 ticks (strike 9)
+FAIL  gulper_mother x1.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.50)
+ok    gulper_mother x1.0: the hold costs were given back
+FAIL  gulper_mother x1.0: released(charge) said so once
+FAIL  gulper_mother x1.0: a tap lands 120 ticks after the release
+FAIL  gulper_mother x1.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  gulper_mother x1.0: a tap's cooldown is the form's own (0.00 s)
+ok    gulper_mother x1.0: a press on the cooldown opens nothing
+FAIL  gulper_mother x3.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  gulper_mother x3.0: held open, nothing has landed
+FAIL  gulper_mother x3.0: holding costs speed x0.80 and turn x0.70
+ok    gulper_mother x3.0: an uncharged bite is the plain one (reach 18.00, capacity 42)
+FAIL  gulper_mother x3.0: full charge after 308 ticks (wanted 158)
+ok    gulper_mother x3.0: a charged suction bite is at least the plain one (reach 18.00, capacity 42)
+FAIL  gulper_mother x3.0: still held open after 3 s more
+FAIL  gulper_mother x3.0: the release lands in 120 ticks (strike 9)
+FAIL  gulper_mother x3.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.50)
+ok    gulper_mother x3.0: the hold costs were given back
+FAIL  gulper_mother x3.0: released(charge) said so once
+FAIL  gulper_mother x3.0: a tap lands 120 ticks after the release
+FAIL  gulper_mother x3.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  gulper_mother x3.0: a tap's cooldown is the form's own (0.00 s)
+ok    gulper_mother x3.0: a press on the cooldown opens nothing
+FAIL  lamprey_queen x0.5: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  lamprey_queen x0.5: held open, nothing has landed
+FAIL  lamprey_queen x0.5: holding costs speed x0.80 and turn x0.70
+ok    lamprey_queen x0.5: an uncharged bite is the plain one (reach 1.60, capacity 1)
+FAIL  lamprey_queen x0.5: full charge after 308 ticks (wanted 158)
+ok    lamprey_queen x0.5: a charged drill bite is at least the plain one (reach 1.60, capacity 1)
+FAIL  lamprey_queen x0.5: still held open after 3 s more
+FAIL  lamprey_queen x0.5: the release lands in 120 ticks (strike 9)
+FAIL  lamprey_queen x0.5: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 3.00)
+ok    lamprey_queen x0.5: the hold costs were given back
+FAIL  lamprey_queen x0.5: released(charge) said so once
+FAIL  lamprey_queen x0.5: a tap lands 120 ticks after the release
+FAIL  lamprey_queen x0.5: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  lamprey_queen x0.5: a tap's cooldown is the form's own (0.00 s)
+ok    lamprey_queen x0.5: a press on the cooldown opens nothing
+FAIL  lamprey_queen x1.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  lamprey_queen x1.0: held open, nothing has landed
+FAIL  lamprey_queen x1.0: holding costs speed x0.80 and turn x0.70
+ok    lamprey_queen x1.0: an uncharged bite is the plain one (reach 3.20, capacity 1)
+FAIL  lamprey_queen x1.0: full charge after 308 ticks (wanted 158)
+ok    lamprey_queen x1.0: a charged drill bite is at least the plain one (reach 3.20, capacity 1)
+FAIL  lamprey_queen x1.0: still held open after 3 s more
+FAIL  lamprey_queen x1.0: the release lands in 120 ticks (strike 9)
+FAIL  lamprey_queen x1.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 3.00)
+ok    lamprey_queen x1.0: the hold costs were given back
+FAIL  lamprey_queen x1.0: released(charge) said so once
+FAIL  lamprey_queen x1.0: a tap lands 120 ticks after the release
+FAIL  lamprey_queen x1.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  lamprey_queen x1.0: a tap's cooldown is the form's own (0.00 s)
+ok    lamprey_queen x1.0: a press on the cooldown opens nothing
+FAIL  lamprey_queen x3.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  lamprey_queen x3.0: held open, nothing has landed
+FAIL  lamprey_queen x3.0: holding costs speed x0.80 and turn x0.70
+ok    lamprey_queen x3.0: an uncharged bite is the plain one (reach 9.60, capacity 5)
+FAIL  lamprey_queen x3.0: full charge after 308 ticks (wanted 158)
+ok    lamprey_queen x3.0: a charged drill bite is at least the plain one (reach 9.60, capacity 5)
+FAIL  lamprey_queen x3.0: still held open after 3 s more
+FAIL  lamprey_queen x3.0: the release lands in 120 ticks (strike 9)
+FAIL  lamprey_queen x3.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 3.00)
+ok    lamprey_queen x3.0: the hold costs were given back
+FAIL  lamprey_queen x3.0: released(charge) said so once
+FAIL  lamprey_queen x3.0: a tap lands 120 ticks after the release
+FAIL  lamprey_queen x3.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  lamprey_queen x3.0: a tap's cooldown is the form's own (0.00 s)
+ok    lamprey_queen x3.0: a press on the cooldown opens nothing
+FAIL  fallen_angel x0.5: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  fallen_angel x0.5: held open, nothing has landed
+FAIL  fallen_angel x0.5: holding costs speed x0.80 and turn x0.70
+ok    fallen_angel x0.5: an uncharged bite is the plain one (reach 3.25, capacity 1)
+FAIL  fallen_angel x0.5: full charge after 308 ticks (wanted 158)
+ok    fallen_angel x0.5: a charged lock bite is at least the plain one (reach 3.25, capacity 1)
+FAIL  fallen_angel x0.5: still held open after 3 s more
+FAIL  fallen_angel x0.5: the release lands in 120 ticks (strike 9)
+FAIL  fallen_angel x0.5: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.20)
+ok    fallen_angel x0.5: the hold costs were given back
+FAIL  fallen_angel x0.5: released(charge) said so once
+FAIL  fallen_angel x0.5: a tap lands 120 ticks after the release
+FAIL  fallen_angel x0.5: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  fallen_angel x0.5: a tap's cooldown is the form's own (0.00 s)
+ok    fallen_angel x0.5: a press on the cooldown opens nothing
+FAIL  fallen_angel x1.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  fallen_angel x1.0: held open, nothing has landed
+FAIL  fallen_angel x1.0: holding costs speed x0.80 and turn x0.70
+ok    fallen_angel x1.0: an uncharged bite is the plain one (reach 6.50, capacity 2)
+FAIL  fallen_angel x1.0: full charge after 308 ticks (wanted 158)
+ok    fallen_angel x1.0: a charged lock bite is at least the plain one (reach 6.50, capacity 2)
+FAIL  fallen_angel x1.0: still held open after 3 s more
+FAIL  fallen_angel x1.0: the release lands in 120 ticks (strike 9)
+FAIL  fallen_angel x1.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.20)
+ok    fallen_angel x1.0: the hold costs were given back
+FAIL  fallen_angel x1.0: released(charge) said so once
+FAIL  fallen_angel x1.0: a tap lands 120 ticks after the release
+FAIL  fallen_angel x1.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  fallen_angel x1.0: a tap's cooldown is the form's own (0.00 s)
+ok    fallen_angel x1.0: a press on the cooldown opens nothing
+FAIL  fallen_angel x3.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  fallen_angel x3.0: held open, nothing has landed
+FAIL  fallen_angel x3.0: holding costs speed x0.80 and turn x0.70
+ok    fallen_angel x3.0: an uncharged bite is the plain one (reach 19.50, capacity 10)
+FAIL  fallen_angel x3.0: full charge after 308 ticks (wanted 158)
+ok    fallen_angel x3.0: a charged lock bite is at least the plain one (reach 19.50, capacity 10)
+FAIL  fallen_angel x3.0: still held open after 3 s more
+FAIL  fallen_angel x3.0: the release lands in 120 ticks (strike 9)
+FAIL  fallen_angel x3.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.20)
+ok    fallen_angel x3.0: the hold costs were given back
+FAIL  fallen_angel x3.0: released(charge) said so once
+FAIL  fallen_angel x3.0: a tap lands 120 ticks after the release
+FAIL  fallen_angel x3.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  fallen_angel x3.0: a tap's cooldown is the form's own (0.00 s)
+ok    fallen_angel x3.0: a press on the cooldown opens nothing
+FAIL  ember_octopus x0.5: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  ember_octopus x0.5: held open, nothing has landed
+FAIL  ember_octopus x0.5: holding costs speed x0.80 and turn x0.70
+ok    ember_octopus x0.5: an uncharged bite is the plain one (reach 1.70, capacity 2)
+FAIL  ember_octopus x0.5: full charge after 308 ticks (wanted 158)
+ok    ember_octopus x0.5: a charged whip bite is at least the plain one (reach 1.70, capacity 2)
+FAIL  ember_octopus x0.5: still held open after 3 s more
+FAIL  ember_octopus x0.5: the release lands in 120 ticks (strike 9)
+FAIL  ember_octopus x0.5: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.40)
+ok    ember_octopus x0.5: the hold costs were given back
+FAIL  ember_octopus x0.5: released(charge) said so once
+FAIL  ember_octopus x0.5: a tap lands 120 ticks after the release
+FAIL  ember_octopus x0.5: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  ember_octopus x0.5: a tap's cooldown is the form's own (0.00 s)
+ok    ember_octopus x0.5: a press on the cooldown opens nothing
+FAIL  ember_octopus x1.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  ember_octopus x1.0: held open, nothing has landed
+FAIL  ember_octopus x1.0: holding costs speed x0.80 and turn x0.70
+ok    ember_octopus x1.0: an uncharged bite is the plain one (reach 3.40, capacity 5)
+FAIL  ember_octopus x1.0: full charge after 308 ticks (wanted 158)
+ok    ember_octopus x1.0: a charged whip bite is at least the plain one (reach 3.40, capacity 5)
+FAIL  ember_octopus x1.0: still held open after 3 s more
+FAIL  ember_octopus x1.0: the release lands in 120 ticks (strike 9)
+FAIL  ember_octopus x1.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.40)
+ok    ember_octopus x1.0: the hold costs were given back
+FAIL  ember_octopus x1.0: released(charge) said so once
+FAIL  ember_octopus x1.0: a tap lands 120 ticks after the release
+FAIL  ember_octopus x1.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  ember_octopus x1.0: a tap's cooldown is the form's own (0.00 s)
+ok    ember_octopus x1.0: a press on the cooldown opens nothing
+FAIL  ember_octopus x3.0: the press opens the jaws in 120 ticks (open_s 0.12 s)
+FAIL  ember_octopus x3.0: held open, nothing has landed
+FAIL  ember_octopus x3.0: holding costs speed x0.80 and turn x0.70
+ok    ember_octopus x3.0: an uncharged bite is the plain one (reach 10.20, capacity 26)
+FAIL  ember_octopus x3.0: full charge after 308 ticks (wanted 158)
+ok    ember_octopus x3.0: a charged whip bite is at least the plain one (reach 10.20, capacity 26)
+FAIL  ember_octopus x3.0: still held open after 3 s more
+FAIL  ember_octopus x3.0: the release lands in 120 ticks (strike 9)
+FAIL  ember_octopus x3.0: the cooldown grew with the hold (0.00 s after 0.0 s held; wanted 2.40)
+ok    ember_octopus x3.0: the hold costs were given back
+FAIL  ember_octopus x3.0: released(charge) said so once
+FAIL  ember_octopus x3.0: a tap lands 120 ticks after the release
+FAIL  ember_octopus x3.0: a tap strikes from at least tap_open_min open, uncharged (-1.00)
+FAIL  ember_octopus x3.0: a tap's cooldown is the form's own (0.00 s)
+ok    ember_octopus x3.0: a press on the cooldown opens nothing
+FAIL  tap mode: it chomps on the press (120 ticks), as the snap did
+ok    tap mode: it never held open
+ok    tap mode: no charge
+FAIL  tap mode: the release did nothing
+FAIL  tap mode: the plain cooldown (0.00 s)
+ok    feel (caught 3): HunterBiteFx is a child of the bite
+ok    feel (caught 3): press: pose 31760, cue 31759, sound 31759, rumble 31759 (spread 1 tick)
+ok    feel (caught 3): hold: pose 31774, cue 31773, sound 31773, rumble 31773 (spread 1 tick)
+ok    feel (caught 3): strike: pose 31979, cue 31978, sound 31978, rumble - (spread 1 tick)
+ok    feel (caught 3): charged: pose 31919, cue 31918, sound 31918, rumble 31918 (spread 1 tick)
+ok    feel (caught 3): contact: pose 31986, cue 31985, sound 31985, rumble 31985 (spread 1 tick)
+ok    feel (caught 3): landed(3) fired on the contact tick
+ok    feel (caught 3): a crunch on the contact tick
+ok    feel (caught 3): the Hunter is in hit-stop on a catch
+ok    feel (caught 3): hit-stop ended; the global time scale never moved
+ok    feel (caught 3): a second hit-stop locks
+ok    feel (caught 3): the hit-stop does not unlock a Hunter the match locked meanwhile
+ok    feel (caught 3): a bot-driven Hunter feels no rumble
+ok    feel (a miss): HunterBiteFx is a child of the bite
+ok    feel (a miss): press: pose 32061, cue 32060, sound 32060, rumble 32060 (spread 1 tick)
+ok    feel (a miss): hold: pose 32075, cue 32074, sound 32074, rumble 32074 (spread 1 tick)
+ok    feel (a miss): strike: pose 32280, cue 32279, sound 32279, rumble - (spread 1 tick)
+ok    feel (a miss): charged: pose 32220, cue 32219, sound 32219, rumble 32219 (spread 1 tick)
+ok    feel (a miss): contact: pose 32287, cue 32286, sound 32286, rumble 32286 (spread 1 tick)
+ok    feel (a miss): landed(0) fired on the contact tick
+ok    feel (a miss): no hit-stop on a miss
+ok    feel (a miss): a bot-driven Hunter feels no rumble
+ok    sounds: every Hunter sound id is a catalog row with a stand-in ([])
+ok    rumble: a local player's fish feels it, a puppet and a bot do not ([true, false, false])
+ok    prey: a caught player's pad takes a hard pulse
+ok    prey: prey_impact 0 switches it off
+ok    control: a plain fish jumps on the press
+ok    the Hunter's fish ignores jump and dodge
+ok    presses and releases never jump, double-jump or dodge ([0, 0, 0])
+ok    ...they only bite (2)
+ok    the fish gets its jump back when the bite goes
+ok    bot: a fish far off is not worth opening for
+ok    bot: a fish in open range gets a press
+ok    bot: not one behind it
+ok    bot: not with a stinker in the bite (Upset Stomach)
+ok    bot: (the probe opened the jaws)
+ok    bot: a fish in the frustum but no charge yet: keep holding
+ok    bot: charged with a fish in the frustum: let go
+ok    bot: ...unless a stinker is in it
+ok    bot: a fish getting away: let go at once
+ok    bot: nothing near any more: give up and let go
+ok    bot: in tap mode it presses when close, as before
+ok    net: _ws_bite_open opens the puppet's jaws (pose only)
+ok    net: the puppet's own clock charged it (0.20)
+ok    net: a reported charge of 1.0 is clamped to what the host saw (0.45)
+ok    net: a smaller report stands
+ok    net: a call-off passes through
+ok    net: _ws_bite_close shuts them at the clamped charge (0.45)
+ok    net: a negative charge calls the bite off with no strike
+ok    net: a puppet's own press opens nothing here
+ok    match: the local fish is the Hunter with a bite
+ok    match: the Hunter ignores jump and its style is the chomp
+      tap: ate 2
+      hold: ate 2
+ok    match: a tap ate 2 (capacity 4)
+ok    match: a held bite is judged with more capacity and reach ([10, 5.25] vs [4, 3.5]; it ate 2 vs 2, which depends on the school)
+ok    match: bite_closed carried each charge ([0.0, 1.0])
+ok    match: the schools' alarm x1.5 while the jaws are open (1.00, 1.50, 1.00)
+ok    match: a prey player near the open mouth feels a heartbeat (2 pulses), one far off does not (0)
+two_stage_bite_probe: 571 checks, 360 failed

@@ -15,7 +15,7 @@ extends RefCounted
 ## Every form, in the order the match card lists them.
 const KEYS: Array[String] = [
 	"drowned_shark", "humpback", "orca", "beluga", "sperm", "blue",
-	"king_of_herrings", "gulper_mother", "whale_fall", "lamprey_queen", "fallen_angel",
+	"king_of_herrings", "gulper_mother", "whale_fall", "lamprey_queen", "fallen_angel", "ember_octopus", "lantern_angler",
 ]
 
 const FORMS := {
@@ -30,6 +30,8 @@ const FORMS := {
 	"whale_fall": preload("res://scripts/what_stinks/forms/whale_fall.gd"),
 	"lamprey_queen": preload("res://scripts/what_stinks/forms/lamprey_queen.gd"),
 	"fallen_angel": preload("res://scripts/what_stinks/forms/fallen_angel.gd"),
+	"ember_octopus": preload("res://scripts/what_stinks/forms/ember_octopus.gd"),
+	"lantern_angler": preload("res://scripts/what_stinks/forms/lantern_angler.gd"),
 }
 
 ## What a sheet takes when its form file leaves a key out (the Drowned Shark's numbers).

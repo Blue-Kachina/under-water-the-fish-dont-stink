@@ -17,6 +17,8 @@ a longer, better-timed hold can take more fish. Every form gets its own version 
 | Gulper Mother | The pouch balloons open | Suction pulls fish toward the mouth | The pouch snaps shut on what's in it |
 | King of Herrings | The body starts to coil, head drawn back | The coil tightens | The whip-sweep, wider the longer it was coiled |
 | Lamprey Queen | The disc flares and the teeth spin up | The rasp speeds up | A corkscrew dash that drills through what it hits |
+| Ember Octopus | The eight arms start to coil, mantle glows | Charge builds, arms lock onto fish ahead (up to 8) | The arms unroll and lash onto their locks, nearest first |
+| Lantern Angler | The esca flares, eyes flash | Light draws bots and prey in (resistable drift, a dash breaks it) | The jaws snap on what was drawn in |
 | Whale Fall (disabled) | The hagfish rear back | More hagfish rear as you hold (1 to 6) | They lash out, one fish per hagfish, and a slime cloud the size of the charge |
 
 The rule above everything else: **every beat must be seen, felt and heard on the same tick.** The press
@@ -256,6 +258,30 @@ sheet names its sound ids and effect strengths.
 - Release: each reared hagfish lashes into the cone and takes one fish (the nearest left). The slime cloud's
   size follows the charge.
 
+### 4h. Ember Octopus: whip (style key `whip`, `attacks/whip_attack.gd`; added 2026-11-08 by the new-hunters pass)
+- Press: all eight arms start to coil (cocked spiral, tighter with charge); the mantle glows. Held: the charge builds
+  and the arms lock onto the nearest fish ahead (up to 8 locks; the HUD ring shows "N" and "of N arms").
+- Release: the arms unroll base to tip toward their locks with a travelling crack wave; the first (nearest) arm is
+  judged on the bite's contact tick (a real hit or miss, the STRIKE phase waits until it lands), later arms are
+  judged as they arrive through `match.judge_drill` (host only, same precedent as the Lamprey drill). Retract reels
+  the arms back onto the gait pose (`OctopusRig.gait_joints`) with no pop.
+- Net: puppets and guests run the same lash visuals from the synced bite beats; the host judges every arm. No lock
+  list is sent, so visual lock targets can differ slightly between machines.
+- Settings: 31 `whip_*` (group "Octopus lash"). Probe: `octopus_whip_probe` 74, `octopus_match_probe` 43.
+
+### 4i. Lantern Angler: lure (style key `lure`, `attacks/lure_attack.gd`, `lure_field.gd`; added 2026-11-08)
+- Press: the esca flares (spike), the eyes flash, the stalk kicks and a `LureField` source is registered at the
+  esca. Held: the field ramps; bots and prey players inside its cone are pulled toward the light as a
+  resistable drift (capped acceleration; thrusting away resists, a prey dash breaks it, then a short immunity). Human
+  prey get an amber "captivated" vignette; bots steer through `LureField.blend_target`. The jaw gapes with the hold
+  (`LureAttack.gape_mult`).
+- Release: the field ends, the esca drops dark, the jaws snap on what was drawn in (the plain bite judge), and
+  `lure_cooldown` relights it over the cooldown.
+- Net: no extra messages; puppets run `on_open/on_close` from the synced beats, each machine pushes only the prey
+  it owns. Esca, jaw and tail are derived locally.
+- Settings: 17 `lure_*` and 12 `angler_*` (group "Lantern Angler"). Probes: `lure_pull_probe` 66,
+  `angler_match_probe` 50.
+
 ## 5. Settings (flexible tuning: panel settings, wide ranges)
 In `WhatStinksSettings`, "Bite" group: `bite_mode` (hold, tap), `hold_speed_mult`,
 `hold_turn_mult`, `hold_alarm_mult`, `hold_cooldown_per_s`, `hold_cooldown_max`, `hold_capacity_mult`,
@@ -283,6 +309,8 @@ Per form, in the sheet (and a panel group per style): `charge_s`, `open_s`; engu
 | `gulper/suck` (loop), `gulper/snap` | Suction | the boss's `gulper` ids |
 | `king/coil` (loop), `king/whip` | Coil | `boss/leviathan_*` |
 | `lamprey/rasp` (loop), `lamprey/drill` | Drill | `boss/grab` |
+| `octopus/*` (10 ids) | Whip beats, jets, arm cracks | stand-ins in `sound_catalog.gd` FALLBACKS |
+| `angler/flare`, `angler/hum` (loop), `angler/snap` | Lure beats | stand-ins in `sound_catalog.gd` FALLBACKS |
 
 ## 7. Probes (headless) and tools
 - `tests/two_stage_bite_probe.tscn`: for each ready form at 0.5x, 1x and 3x, a press opens (jaw over 0.9
@@ -477,3 +505,6 @@ Per form, in the sheet (and a panel group per style): `charge_s`, `open_s`; engu
 **Build.** `builds/windows/FishPlayground.exe` exported 2026-11-08 00:32 (debug export), after the probes above.
 **Not run / not verified.** Whale Fall lash (out of scope). Windowed visuals for the Angel ring and line, the King coil, the Queen's drill, the Gulper lumps and the whale jaws (headless only). Real rumble and audio. A real two-machine run of the whale net path (whale_engulf_probe section D covers it in one process; what_stinks_net.sh uses the shark).
 **Play-test first (all numbers are first guesses; nothing tuned).** Hold balance (alarm x1.5 scares schools off: a held shark bite ate 1 fish where a tap ate 3 to 4 in the match probe); Gulper pull strength against a fleeing school; Angel lock feel (ring, "xN", `angel_close_speed` at larger sizes); King coil arc and `coil_thick`; Lamprey dash speed (55 m/s at size 1) and the body ram being held off during it; whale looks (thin ribbon jaw, pink sperm roof, throat swell) and Orca/Beluga/Sperm/Blue numbers; bot sim: Clean Sweep 0 of 80 bot Hunter wins, Beluga weakest, Upset Stomach easy for most forms (what_stinks_report.md, at 1x not the 0.5x default).
+
+### 2026-11-08_11:57 New-hunters pass: two more styles and the exaggeration layer
+Two styles were added after the six above: **whip** (Ember Octopus, section 4h) and **lure** (Lantern Angler, section 4i); `HunterAttack.STYLES` and `HunterBiteFx.SOUNDS` have rows for both, sound stand-ins are in `sound_catalog.gd`. Every existing style now also drives an `AttackExaggerate` kit from the HunterBite signals (opened, released, landed, aborted): bolder anticipation, overshoot and a short hit-stop, scaled by `hunter_exaggeration` (0 = the old look). The Lamprey dash is now `lamprey_lunge_impulse` 0.55 of the old speed. Probes: whip 74, octopus_match 43, lure_pull 66, angler_match 50, b1-b6 exaggeration probes, drill 38 (checks multiply by `DrillAttack.lunge_impulse`). Known: `two_stage_bite_probe` fails (306, the press never opens for the forms from the shark at x1.0 up) with or without the new forms; it was green at 00:32 (586/0), so something changed in its setup or the bite path in between and it needs a look. Details and open items: `planning_new_hunters.md` Progress log.

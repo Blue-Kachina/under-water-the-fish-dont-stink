@@ -1,0 +1,10 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+built:
+  PASS  the same seed builds the same school (the Fry-day Crew, 50 fish, 0.0000 m apart)
+following (100 ms lag, 30 ms jitter, 5% lost):
+  PASS  a fish is on average 0.34 m from its twin over a minute (limit 0.5)
+  PASS  and never more than 1.14 m (limit 1.5)
+  PASS  a battery takes the same fish on both
+  PASS  the leaders end 0.15 m apart
+school_sync_probe: all checks passed

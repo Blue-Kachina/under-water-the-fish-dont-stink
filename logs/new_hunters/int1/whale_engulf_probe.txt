@@ -1,0 +1,141 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    humpback: a Marco Polo whale has no jaw and an untouched skin
+ok    humpback: the jaw is shut to begin with
+ok    humpback: shut, the body's skin is whole
+ok    WhaleJawSkin0: shut, the jaw's skin copy is hidden
+ok    WhaleJawSkin1: shut, the jaw's skin copy is hidden
+ok    WhaleJawSkin2: shut, the jaw's skin copy is hidden
+ok    humpback: shut, the inside is hidden
+ok    humpback: wide open it drops to the gape (80 deg)
+ok    humpback: open, the inside shows and the jaw's inside swings with it
+ok    humpback: and stretches 1.25x
+ok    humpback: the skin's shader hinge follows (-1.40 rad)
+ok    humpback: open, the belly is cut out of the body
+ok    WhaleJawSkin0: open, the jaw's skin copy shows
+ok    WhaleJawSkin1: open, the jaw's skin copy shows
+ok    WhaleJawSkin2: open, the jaw's skin copy shows
+ok    humpback: a full mouth swells the throat (0.31 m)
+ok    humpback: the fling swings it past wide (99 deg)
+ok    humpback: shut again
+ok    humpback: the mouth is at the nose (z -3.19)
+ok    orca: a Marco Polo whale has no jaw and an untouched skin
+ok    orca: the jaw is shut to begin with
+ok    orca: shut, the body's skin is whole
+ok    WhaleJawSkin0: shut, the jaw's skin copy is hidden
+ok    WhaleJawSkin1: shut, the jaw's skin copy is hidden
+ok    WhaleJawSkin2: shut, the jaw's skin copy is hidden
+ok    orca: shut, the inside is hidden
+ok    orca: wide open it drops to the gape (80 deg)
+ok    orca: open, the inside shows and the jaw's inside swings with it
+ok    orca: and stretches 1.25x
+ok    orca: the skin's shader hinge follows (-1.40 rad)
+ok    orca: open, the belly is cut out of the body
+ok    WhaleJawSkin0: open, the jaw's skin copy shows
+ok    WhaleJawSkin1: open, the jaw's skin copy shows
+ok    WhaleJawSkin2: open, the jaw's skin copy shows
+ok    orca: a full mouth swells the throat (0.14 m)
+ok    orca: the fling swings it past wide (99 deg)
+ok    orca: shut again
+ok    orca: the mouth is at the nose (z -3.19)
+ok    beluga: a Marco Polo whale has no jaw and an untouched skin
+ok    beluga: the jaw is shut to begin with
+ok    beluga: shut, the body's skin is whole
+ok    WhaleJawSkin0: shut, the jaw's skin copy is hidden
+ok    WhaleJawSkin1: shut, the jaw's skin copy is hidden
+ok    WhaleJawSkin2: shut, the jaw's skin copy is hidden
+ok    beluga: shut, the inside is hidden
+ok    beluga: wide open it drops to the gape (80 deg)
+ok    beluga: open, the inside shows and the jaw's inside swings with it
+ok    beluga: and stretches 1.25x
+ok    beluga: the skin's shader hinge follows (-1.40 rad)
+ok    beluga: open, the belly is cut out of the body
+ok    WhaleJawSkin0: open, the jaw's skin copy shows
+ok    WhaleJawSkin1: open, the jaw's skin copy shows
+ok    WhaleJawSkin2: open, the jaw's skin copy shows
+ok    beluga: a full mouth swells the throat (0.14 m)
+ok    beluga: the fling swings it past wide (99 deg)
+ok    beluga: shut again
+ok    beluga: the mouth is at the nose (z -3.19)
+ok    sperm: a Marco Polo whale has no jaw and an untouched skin
+ok    sperm: the jaw is shut to begin with
+ok    sperm: shut, the inside is hidden
+ok    sperm: wide open it drops to the gape (80 deg)
+ok    sperm: open, the inside shows and the jaw's inside swings with it
+ok    sperm: and stretches 1.25x
+ok    sperm: the skin's shader hinge follows (-1.40 rad)
+ok    sperm: the fling swings it past wide (99 deg)
+ok    sperm: shut again
+ok    sperm: the mouth is at the nose (z -3.04)
+ok    blue: a Marco Polo whale has no jaw and an untouched skin
+ok    blue: the jaw is shut to begin with
+ok    blue: shut, the body's skin is whole
+ok    WhaleJawSkin0: shut, the jaw's skin copy is hidden
+ok    WhaleJawSkin1: shut, the jaw's skin copy is hidden
+ok    WhaleJawSkin2: shut, the jaw's skin copy is hidden
+ok    blue: shut, the inside is hidden
+ok    blue: wide open it drops to the gape (80 deg)
+ok    blue: open, the inside shows and the jaw's inside swings with it
+ok    blue: and stretches 1.25x
+ok    blue: the skin's shader hinge follows (-1.40 rad)
+ok    blue: open, the belly is cut out of the body
+ok    WhaleJawSkin0: open, the jaw's skin copy shows
+ok    WhaleJawSkin1: open, the jaw's skin copy shows
+ok    WhaleJawSkin2: open, the jaw's skin copy shows
+ok    blue: a full mouth swells the throat (0.31 m)
+ok    blue: the fling swings it past wide (99 deg)
+ok    blue: shut again
+ok    blue: the mouth is at the nose (z -3.19)
+ok    bot: the Humpback's style is the engulf
+ok    bot: a fish far off is not worth opening for
+ok    bot: a school in range gets a press
+ok    bot: not with a stinker about (Upset Stomach)
+ok    bot: (the probe opened the mouth)
+ok    bot: an empty mouth with a school near: keep it open
+ok    bot: a full mouth: shut it
+ok    bot: a fish just went in: keep it open for more
+ok    bot: nothing has gone in for a while: shut it
+ok    bot: the school is behind it and the mouth is empty: shut it
+ok    match: the local fish is the Hunter with a bite
+ok    match: the Hunter wears the Humpback: the engulf style, a WhaleJaw, and the bite knows the match
+      A: school fish
+ok    engulf: the Humpback's mouth holds up to 12 (capacity 6 x engulf_max_mult 2)
+ok    engulf: the press opens the jaw (80 deg)
+ok    engulf: fish that swim into the mouth are held (4)
+ok    engulf: the school holds the same fish (4)
+ok    engulf: they ride in the mouth (4 of 4 within the box)
+ok    engulf: the throat swells with them (0.75)
+ok    engulf: the HUD's ring counts what is held (9)
+ok    engulf: held fish are still alive until it shuts (30 of 30)
+ok    engulf: the release eats everything held in one bite (held 9, ate [9, 0])
+ok    engulf: those fish are gone from the school (21 left)
+ok    engulf: nothing is held after it shut
+ok    engulf: the pleats squeeze back down (0.00)
+      B: a full mouth
+ok    full: the mouth fills to its limit (3)
+ok    full: it stays open but takes no more (3 held)
+ok    full: the strain cue plays while it is full
+ok    full: the release ate exactly what it held ([3, 0])
+      C: prey players
+ok    prey: the match has prey to test with (4)
+ok    prey: a player that swims into the mouth is held and locked
+ok    prey: and carried with it (1.0 m from the mouth)
+ok    prey: eaten on the release (Clean Sweep)
+ok    stomach: a second player is held
+ok    stomach: it is spat out, not eaten
+ok    stomach: and free again
+      E: other sizes
+ok    size 0.5: fish are held and ride in the mouth (3 of cap 4, 3 near)
+ok    size 0.5: the release eats them (held 3, ate [3, 0])
+ok    size 0.5: nothing held after
+ok    size 2.0: fish are held and ride in the mouth (3 of cap 34, 3 near)
+ok    size 2.0: the release eats them (held 3, ate [18, 0])
+ok    size 2.0: nothing held after
+      D: a guest's Hunter (the host runs its engulf)
+ok    net: the Hunter is a puppet here, as a guest's is on the host
+ok    net: the host holds fish for the guest's open mouth (3)
+ok    net: the puppet's shutting does not let go (the guest's report is on its way)
+ok    net: judge_net_bite eats what the host held (held 3, ate [7, 0])
+ok    net: nothing held after the judgment
+ok    net: an unreported bite lets go of its fish after 1.5 s (held 2)
+whale_engulf_probe: 133 checks, 0 failed

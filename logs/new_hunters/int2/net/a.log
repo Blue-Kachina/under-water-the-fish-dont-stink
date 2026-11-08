@@ -1,0 +1,35 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+a: joining
+  [a] PASS  welcomed: a guest's match (no bots of its own)
+  [a] PASS  everyone's here (7 of 7), the bots puppets
+  [a] PASS  the schools are the host's: ids and fish alive ({ 0: 19, 1: 22, 2: 23, 3: 22, 4: 20 })
+  [a] PASS  the host's fish is a puppet here
+  [a] PASS  the host's round: a hunts here too
+  [a] PASS  counting down, the host's ocean seed
+  [a] PASS  the same schools (5)
+  [a] PASS  we hunt: held through the count, in the monster's body (21.0 m)
+  [a] PASS  LIVE here too
+  [a] PASS  the Hunter's let go
+  [a] PASS  we see b at the host's exposure (0.60)
+  [a] PASS  and no points of anyone's
+  [a] PASS  the Hunter was never told who joined
+  [a] PASS  the Hunter saw the school bolt too (no name with it, the same scatter)
+  [a] PASS  the host's Click of ours: on its cooldown here (3.0 s)
+  [a] PASS  sniffing: slower here (speed x0.50)
+  [a] PASS  sniff off, speed back (x1.00)
+    [a] bite setup: fish (23.28231, 0.232644, 64.51527) mouth (26.43372, -0.916877, 75.01997) prey (27.48433, -0.975721, 79.19381) facing (0.287348, 0.0, 0.957826)
+  [a] PASS  our jaws are held open and charging (0.39)
+  [a] PASS  our bite landed (the jaws shut at 2.4 m from b)
+  [a] FAIL  b is eaten here too
+  [a] PASS  the schools' fish agree with the host's ({ 0: 21, 1: 24, 2: 23, 3: 23, 4: 22 })
+  [a] PASS  ROUND_OVER with the host's totals and reason (clock)
+  [a] PASS  Upset Stomach here too, a hunting
+    [a] bite setup: fish (40.88947, 1.55755, -26.75184) mouth (44.04088, 0.40803, -16.24713) prey (45.54945, 0.40803, -11.21854) facing (0.287348, 0.0, 0.957826)
+  [a] PASS  our jaws are held open and charging (0.39)
+  [a] PASS  our bite landed (the jaws shut at 0.6 m from b)
+  [a] PASS  our bars: queasy 1.0 (the host's 1.0), satiation 8.6
+  [a] PASS  the school the host added is here (6 schools)
+  [a] PASS  the regrown school has its new fish (26)
+  [a] PASS  the host left: What Stinks? of our own, with bots
+what_stinks_net_peer [a]: 1 FAILED

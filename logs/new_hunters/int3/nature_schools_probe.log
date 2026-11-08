@@ -1,0 +1,29 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+schools:
+  PASS  three schools (3)
+  PASS  of fifty fish each (Nature's defaults)
+  PASS  the first waits 45.2 m off
+  PASS  ball cam on the lone fish, nearest ahead
+lone fish off:
+  PASS  the lone fish goes
+  PASS  ball cam moves to a school
+ball cam picks again:
+  PASS  ball cam stays put until pressed
+  PASS  pressing it looks at the school ahead now
+school count:
+  PASS  up to five
+  PASS  down to one
+left behind:
+  PASS  a school past the leash is replaced
+  PASS  still three
+  PASS  the new one turns up 46.1 m off
+  PASS  out of view ahead
+  PASS  the lone fish comes back when switched on
+panel:
+  PASS  NATURE section: school_count is a whole-number slider that allows more
+  PASS  a preset value past the end applies (40)
+tuning kept:
+  PASS  leaving puts the tuning from before back
+  PASS  coming back keeps the changes made in Nature
+nature_schools_probe: all checks passed

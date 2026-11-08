@@ -1,0 +1,6 @@
+# P1-octopus-polish log
+1. Rendered model_shots, gait sheets, whip shots (logs/new_hunters/p1/l1). Compared to private_content/giant_glowing_octopus.png.
+2. Defects: (a) charge/hold/lash frames blown out to white (skin charge drive + arm_glow + sucker glow + additive targeting cone stacked at the apex over the body), detail and copper lost; (b) siphon funnel base was an open cut tube end sitting under the head (hard slab silhouette in side view); (c) arms read as a tight spear in jet/cruise, shorter than the reference's long trailing curls (not changed, would need a model length/rig budget decision).
+3. Fixes: octopus_skin.gdshader charge/arm-glow/sucker emission gains reduced (vein drive charge 0.85->0.45, ag 1.4->0.9, white mix lower, sucker charge 0.9->0.55); whip_attack _glow_target cocked 0.55+0.9c -> 0.5+0.55c, sucker_glow gain 1.6 -> 1.0; octopus_whip_fx aura cone faded near the apex (smoothstep 0.03..0.4); siphon mesh gets a rounded flared base and sits 0.01 higher.
+4. Re-rendered (l1b, l1c): detail visible at full charge. Probes: model 53/53, gait 44, roll 38, whip 74, form 58, match 43, all green.
+5. Open: flat siphon silhouette side-on is still a little slab-like; arms could spread/curl more in cruise to match the reference; crawl foot plant not re-measured; no perf bench rerun.

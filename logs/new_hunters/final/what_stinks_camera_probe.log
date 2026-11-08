@@ -1,0 +1,65 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+countdown:
+  PASS  round 0 counting down, the local fish the Hunter
+  PASS  no wheel before the round is live
+  PASS  the follow cam (Settle style) is on from the start
+follow cam:
+  PASS  live: lock-on is on offer, the ball cam button holds a wheel
+  PASS  the view is the follow cam by default (no lock-on)
+  PASS  the follow cam turns when the Hunter does (view turned 87 of 90 degrees)
+  PASS  and ends up behind it again (14 degrees off its heading)
+  (old view, no follow cam settings: turned 0 degrees, 90 off its heading)
+tap:
+  PASS  the wheel lists a slice per live school (2)
+  PASS  (B is the nearer school, A the one ahead)
+  PASS  a tap turns lock-on on
+  PASS  and looks at the school ahead, not the nearer one behind
+  PASS  the view faces the school
+  PASS  a second tap turns it off
+hold:
+  PASS  holding opens the wheel, lock-on left as it was
+  PASS  each slice has a name and fish left
+  PASS  (the two slices point different ways)
+  PASS  the stick toward B picks it
+  PASS  letting go locks on B, lock-on on
+stick alone:
+  PASS  opening and closing without the stick stays on B
+wiped out:
+  PASS  B wiped out: the lock moves on to A
+  PASS  the wheel lists only the live school
+  PASS  no school left: nothing locked, the view stays a follow cam
+round end:
+  PASS  (wheel open again)
+  PASS  round over: lock-on off, no button hold, ball cam off
+  PASS  the wheel is gone
+  PASS  and the camera's wheel flag is clear
+  PASS  letting go changes nothing; the follow cam stays
+next round (the Hunter is a bot, the local fish is prey):
+  PASS  prey get lock-on and the wheel too
+  PASS  a prey's tap locks on a school
+  PASS  lock_on_prey off: prey have the follow cam only
+  PASS  and back on
+eaten:
+  PASS  eaten: no lock-on, no wheel, spectating
+  PASS  the spectate cycling still has the camera on a fish
+  PASS  cycling spectate works (same)
+framing:
+  PASS  drowned_shark at 0.5x: the body (3.5 m) and the school are in frame (body true, school true, camera 7.4 m back)
+  PASS  drowned_shark at 1.0x: the body (7.0 m) and the school are in frame (body true, school true, camera 14.8 m back)
+  PASS  drowned_shark at 3.0x: the body (21.0 m) and the school are in frame (body true, school true, camera 44.3 m back)
+  PASS  drowned_shark at 10.0x: the body (70.0 m) and the school are in frame (body true, school true, camera 147.6 m back)
+  PASS  king_of_herrings at 0.5x: the body (8.0 m) and the school are in frame (body true, school true, camera 14.7 m back)
+  PASS  king_of_herrings at 1.0x: the body (16.0 m) and the school are in frame (body true, school true, camera 29.4 m back)
+  PASS  king_of_herrings at 3.0x: the body (48.0 m) and the school are in frame (body true, school true, camera 88.1 m back)
+  PASS  king_of_herrings at 10.0x: the body (160.0 m) and the school are in frame (body true, school true, camera 293.7 m back)
+  PASS  gulper_mother at 0.5x: the body (4.5 m) and the school are in frame (body true, school true, camera 10.9 m back)
+  PASS  gulper_mother at 1.0x: the body (9.0 m) and the school are in frame (body true, school true, camera 21.7 m back)
+  PASS  gulper_mother at 3.0x: the body (27.0 m) and the school are in frame (body true, school true, camera 65.2 m back)
+  PASS  gulper_mother at 10.0x: the body (90.0 m) and the school are in frame (body true, school true, camera 217.3 m back)
+mode exit:
+  PASS  leaving the mode hands the camera back
+  PASS  body_follow and the extra distance reset
+  PASS  no wheel left in the scene (0)
+  PASS  the lock-on node is freed with the match
+what_stinks_camera_probe: all checks passed

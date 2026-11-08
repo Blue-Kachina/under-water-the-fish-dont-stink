@@ -1,0 +1,28 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+b: joining
+  [b] PASS  welcomed: a guest's match (no bots of its own)
+  [b] PASS  everyone's here (7 of 7), the bots puppets
+  [b] PASS  the schools are the host's: ids and fish alive ({ 0: 22, 1: 21, 2: 24, 3: 24, 4: 19 })
+  [b] PASS  the host's fish is a puppet here
+  [b] PASS  the host's round: a hunts here too
+  [b] PASS  counting down, the host's ocean seed
+  [b] PASS  the same schools (5)
+  [b] PASS  we're prey: free
+  [b] PASS  LIVE here too
+  [b] PASS  we know our own exposure (0.60), nobody else's
+  [b] PASS  our Join press: the host put us in school 0
+  [b] PASS  our place is the host's (18)
+  [b] PASS  in lockstep with it (0.03 m)
+  [b] PASS  our Spook went (0 left)
+  [b] FAIL  b is eaten here too
+  [b] PASS  the schools' fish agree with the host's ({ 0: 19, 1: 18, 2: 21, 3: 24, 4: 24 })
+  [b] FAIL  we're out: spectating, not in the school
+  [b] PASS  ROUND_OVER with the host's totals and reason (clock)
+  [b] PASS  Upset Stomach here too, a hunting
+  [b] PASS  we were spat out: dazed, no boost, still in
+  [b] PASS  and let go of the hold: flung (5.1 m/s now)
+  [b] PASS  the school the host added is here (6 schools)
+  [b] PASS  the regrown school has its new fish (25)
+  [b] PASS  the host left: What Stinks? of our own, with bots
+what_stinks_net_peer [b]: 2 FAILED

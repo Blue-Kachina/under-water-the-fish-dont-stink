@@ -67,6 +67,8 @@ proportion (`cam_frame`); the schools' alarm radius x s^`alarm_exp` (all schools
 | `whale_fall` | Whale Fall | MONSTER | **disabled** (`ready()` false) | Hagfish knot / lash: not built (out of scope, behind its flag) |
 | `lamprey_queen` | Lamprey Queen | MONSTER | **ready** | **Drill** (`drill`): the hold winds the body back, release is a corkscrew dash through a tube |
 | `fallen_angel` | Fallen Angel | MONSTER | **ready** | **Lock** (`lock`): the press needs a fish in reach, the hold locks it (pace match, auto-face, orbit), release lashes the line through it |
+| `ember_octopus` | Ember Octopus | MONSTER | **ready** (new 2026-11-08, first-guess sheet) | **Whip** (`whip`): the hold coils and locks up to 8 arms onto fish ahead, release lashes them, nearest first |
+| `lantern_angler` | Lantern Angler | MONSTER (generic box, thinner than the globe) | **ready** (new 2026-11-08, first-guess sheet) | **Lure** (`lure`): the hold lights the esca and draws bots and prey in (resistable, a dash breaks it), release snaps the jaws |
 
 Every number below is a first guess for play-testing. Each style is a file in `scripts/what_stinks/attacks/`
 (`HunterAttack.STYLES` maps the sheet's `attack` key), the shared hold, charge and cost machinery is
@@ -172,3 +174,43 @@ Registered file `forms/fallen_angel.gd` (the registry loads it by key; the brief
 | Not built | "A fish it has watched": the bite does not track or reward a watched target (a watch-time bonus would need the bite or the field to read a lock state, both shared files). The shapes carry the idea: a narrow cone you have to hold on a fish. The hit area is the shark's box (wider and taller than the glass body). Wings and ring were looked at in free-camera shots only; the Hunter murk look is not built. |
 
 **Bite, two-stage (Lock).** `attacks/lock_attack.gd`. The press only opens when a prey fish is inside `angel_lock_range` 2 reaches and `angel_lock_cone` 40 degrees (else a short denied beat). The hold locks the nearest fish: it matches the school's pace (`angel_close_speed` 14 to reach the stand-off `angel_standoff` 0.7 reaches), auto-faces it (`angel_face_rate`), and the stick orbits (`angel_orbit_speed`). A ring and line sit on the target with an "xN" preview of the count. The release lashes a line through the target (`angel_lash_speed` 40): fish taken = capacity x `angel_count_mult` 3 x the facing share (how squarely the Angel faces the mass of the target's school, with `angel_charge_weight` 0.3 of the share from the charge), at least the target; the camera's lock-on bite on the same school multiplies on top. It breaks if the target leaves `angel_break_range` 3.5 (cooldown `angel_break_cooldown`). The "Lock-on" bite shape row above is the tap path. Probe: `angel_lock_probe` (71). Needs a windowed look at the ring, line and label.
+
+## Ember Octopus (`ember_octopus`): ready
+
+`forms/ember_octopus.gd` (sheet, dress), `octopus_rig.gd` (gait), `octopus_model.gd` + `shaders/octopus_skin.gdshader` (body; `octopus_contract.md` is its API), `attacks/whip_attack.gd` (Tendril Lash) + `forms/octopus_whip_fx.gd`.
+
+- Sheet: class MONSTER, 6 m, speed 1.15, accel 0.45, turn 0.6, reach 3.4 m, radius 2.6 m, wind 0.85 s, every 2.4 s, capacity 5, camera (1.05, 1.2), attack `whip`.
+- Gait: jet pulse (arms bundle forward on the power stroke, flare on recovery; thrust and off-centre torque applied in the fish's physics tick), cruise scull, dash jet (x1.8, arms bundled), crawl within `octopus_crawl_range` body lengths of a floor (sucker feet plant and step), air-roll aware (stick x is roll when air roll is held). A frozen body (card preview, countdown) runs the jet clock on the frame.
+- Attack, Tendril Lash: press flares the arms into a crown and locks up to `whip_arms` prey (nearest first inside `whip_cone` degrees and `whip_range` reaches, one arm each); hold coils tighter with the charge (reach x`whip_charge_reach`, fish per arm x`whip_charge_capacity`); release whips the arms out on homing curves 30-60 ms apart and each arm is judged as it arrives; the octopus is pushed back `whip_recoil` m/s per arm that lands (a miss a share of it, capped by `whip_recoil_cap`). A lash with nothing locked still whips `whip_whiff_arms` front arms. Arms reel back onto the gait pose with no pop.
+- Online: no lock list is sent; puppets and guests run the same lock and timeline from the synced bite beats, the host judges every arm.
+- Attack exaggeration: the mantle squashes and pops, arms stretch up to `whip_stretch`, hit-stop and camera punch from `hunter_exaggeration`.
+- Probe: `octopus_match_probe` (registry, settings, docs, sounds, a player match with jets and a lash, a bot match, a puppet's bite).
+
+## Lantern Angler (`lantern_angler`): ready
+
+`forms/lantern_angler.gd` (sheet, dress), `lantern_rig.gd` (gait), `angler_model.gd` + `shaders/angler_skin.gdshader` (body; `angler_contract.md`), `attacks/lure_attack.gd` + `lure_field.gd` (the Lure).
+
+- Sheet: class MONSTER, 6 m, speed 1.1, accel 0.55, turn 0.5, reach 3.2 m, radius 2.2 m, wind 0.9 s, every 2.6 s, capacity 5, cam (1.0, 1.2), attack `lure`.
+- Gait: stiff body, slow pectoral scull, tail snap on bursts of acceleration, spring-chain lure stalk; settings `angler_*` (Lantern Angler group).
+- Attack, the Lure: press flares the esca and gapes the jaw and starts the attraction field; hold ramps a resistable drift on prey in the light cone (bots also steer toward it; a dash breaks it; HUD captivated vignette); release snaps shut. Settings `lure_*`.
+- Online: puppets run the same lure from synced bite beats; each machine moves the prey it owns.
+- Probe: `angler_match_probe` (registry, settings, docs, sounds, a player match with a held lure pulling prey, resist and dash, a bot match, a puppet's bite).
+
+## Attack exaggeration (`attack_exaggerate.gd`, the Exaggeration / Shark / Whales / King and Lamprey bodies / Preview setting groups)
+
+Every ready form's bite is drawn bold (Battletoads style): the press squashes a part (anticipation), the hold swells it past rest, the release snaps it, and a landing freezes the rig for a few frames and punches the camera. `AttackExaggerate` is the shared driver: per-channel scale curves (jaw, limb, throat, head, tail, eyes), smear, hit-stop and a camera-margin helper. Each form keeps its own preset (its rig's `EXAGGERATE` table, or a sheet key `exaggerate` Dictionary merged into the kit's params, e.g. `{"channels": {"jaw": {"hold_peak": 2.6}}}`). The sheet key `exaggeration` (float, default 1) is the form's own multiplier. All effective values are the preset x `hunter_exaggeration` x the form's `exaggeration`; 0 is exactly the old look.
+
+Shared settings: `hunter_exaggeration` 1 (0-4), `hunter_hit_stop_frames` 2.5 (0-12), `hunter_camera_punch` 0.5 (0-5), `hunter_exaggerate_squash` 1 (0-3), `hunter_exaggerate_smear` 0.05 (0-0.5), `hunter_exaggerate_max_scale` 3.5 (1-8). The follow camera pads its collision margin with the rig's `camera_margin(radius)` (not wired yet, see below).
+
+| Form | What departs from rest (at hunter_exaggeration 1) | Form settings |
+| --- | --- | --- |
+| Drowned Shark | jaw 2.2x hold / 0.7x snap, head 1.8x hold / 2.4x snap, teeth 1.9x / 2.5x, eyes 1.8x / 2.3x; snap_omega 32, snap_time 0.09 | `shark_jaw_gape`, `shark_head_thrust`, `shark_body_stretch`, `shark_teeth_gain`, `shark_eye_flare` |
+| Whales (humpback, orca, beluga, sperm, blue) | jaw gape up to 2.2x, soft-limited at `whale_gape_max_deg` 135; head/tail body pulse; throat balloon; baleen/teeth pop; shut-jaw rebound; 3-tick hit-stop | `whale_gape_max_deg`, `whale_rebound_deg`, `whale_body_pulse`, `whale_throat_balloon`, `whale_tooth_pop` |
+| King of Herrings | coil +166 deg curl with lift, gape 2.2x, eyes 1.7x, tail 1.5x stretch with smear and whip lag, 3-frame hit-stop, camera punch; the coil unwinds over strike + shake | `king_whip_stretch`, `king_coil_tighten`, `king_whip_lag`, `coil_press_floor` |
+| Lamprey Queen | disc 1 to 2.1x lip at hold, 2.6x at the release snap; body 0.72 on hold, 1.86 peak on release (cap 1.9); teeth 0 to 14 rad/s on hold, plus 14 rad/s through the dash | `lamprey_disc_flare`, `lamprey_teeth_spin`, `lamprey_telescope_max`, `lamprey_dash_stretch/flare/spin`, `lamprey_lunge_impulse` |
+| Gulper Mother | jaw pouch gape pinch -0.22, hold sail about 2.7 (x2.3 jaw), release clamp; body girth 1.14 puff, 0.7 deflate, 1.3 rebound; gulp bulge x2.4 ringing plus 0.6 x strength | shared only |
+| Fallen Angel | jaw/crown hold 1.9 / squash 0.6 / release 1.5 (the lash on contact up to 2.4x); limb/wings 1.5 / 0.7 / 1.85; throat/ring+glow 1.15 / 0.82 / 2.3; head/body lunge 1.08 / 0.86 / 1.28; tail unchanged; hit-stop 3 ticks, camera punch 0.7 | shared only |
+
+Other tuning from this pass: `body_stiffness` 0.4 (0 old floppy, 1 rigid bar; King and Lamprey bodies), `lamprey_lunge_impulse` 0.55 (the corkscrew dash's speed as a multiple of the old lunge). The card's Hunter preview (`hunter_preview.gd`) swims every form on a real fish, so each form's dress hook also runs on a frozen fish with `controls` null and must be safe there; `preview_throttle` 0.75, `preview_speed` 1, `preview_wander` 1.
+
+Known gaps: the kit is not hooked into `hunter_bite_fx.gd` (each rig drives its own kit from HunterBite signals); `what_stinks_cam.gd` does not yet use `camera_margin()` or the kit's `camera_punch` (so a landing may punch twice only if both are wired later); the double punch is tuned by `hunter_camera_punch`.

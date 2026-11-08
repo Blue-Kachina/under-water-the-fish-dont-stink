@@ -1,0 +1,48 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    match: the local fish is the Hunter with a bite
+ok    style: the Gulper's attack is the suction
+ok    style: the Gulper's rig wears the boss skin
+      A: the numbers
+ok    numbers: the suction reaches 15.0 m at full charge (bite 6.0), 6.0 m at none
+ok    numbers: and pulls harder with the charge (5.6 to 16.0 m/s)
+ok    numbers: the snap's sphere is smaller than the bite's radius (2.8 m)
+ok    numbers: held, the catch is a sphere round the mouth
+ok    net: a guest's release is judged round the mouth it reports
+ok    tap: the snap is the plain frustum
+      B: school fish
+ok    pull: nothing is pulling before the press
+ok    pull: the press opens the pouch and the school feels the suction
+ok    pull: a school out of reach does not
+ok    pull: the school is drawn to the mouth (30 fish within the snap's reach, from 3)
+ok    pull: fish crowd the mouth (30) and the belly fills (1.00)
+ok    pull: the charge is building (1.00)
+ok    pull: the HUD's ring counts the crowd (8)
+ok    pull: the shader's belly is fuller than at rest (1.00)
+ok    snap: the release ate what was at the mouth (8 of capacity 8, crowd was 30)
+ok    snap: they are gone from the school (22 left)
+ok    snap: the suction stops
+ok    snap: the belly shows a lump (2.5 s left)
+ok    snap: the shader's lump is on the belly (at 19.3 m, press 0.50)
+ok    snap: and slides down it (19.3 to 28.2)
+ok    snap: it passes and the belly empties (full 0.00)
+      C: a called-off bite
+ok    lapse: pulling while held
+ok    lapse: a called-off bite stops pulling
+      D: prey players
+ok    prey: the match has prey to test with (4)
+ok    prey: a player in the cone is shoved toward the mouth (3.29 m/s in)
+ok    prey: a player beside the mouth is not (0.12 m/s; the Gulper drifts and can bump it)
+ok    prey: the player's controls stay free (they can swim against it)
+ok    prey: a player at the mouth is eaten on the release
+ok    prey: the one behind is not
+      E: the bot
+ok    bot: a school far off is not worth opening for
+ok    bot: a school in the suction's range gets a press
+ok    bot: not with a stinker about
+ok    bot: (the probe opened the mouth)
+ok    bot: an empty mouth with a school near: keep sucking
+ok    bot: a crowded mouth: snap shut
+ok    bot: the crowd stopped growing: snap shut
+ok    bot: a stinker in the mouth holds the release back
+gulper_suction_probe: 40 checks, 0 failed

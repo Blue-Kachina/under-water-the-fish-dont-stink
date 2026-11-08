@@ -127,9 +127,9 @@ func _alone() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	_check(attack.active(), "the release starts the dash")
-	var speed_cap := fish.max_boost_speed * top_base * settings.drill_dash
+	var speed_cap := fish.max_boost_speed * top_base * settings.drill_dash * DrillAttack.lunge_impulse(settings)
 	_check(is_equal_approx(attack.speed, speed_cap), "its speed: %.1f m/s (%.1f x her top speed)" % [attack.speed, settings.drill_dash])
-	_check(is_equal_approx(fish.top_speed_scale, top_base * settings.drill_dash), "the integrator's cap is lifted for it (x%.2f)" % (fish.top_speed_scale / top_base))
+	_check(is_equal_approx(fish.top_speed_scale, top_base * maxf(settings.drill_dash * DrillAttack.lunge_impulse(settings), 1.0)), "the integrator's cap is lifted for it (x%.2f)" % (fish.top_speed_scale / top_base))
 	var peak := 0.0
 	var spin_peak := 0.0
 	var ticks := 0

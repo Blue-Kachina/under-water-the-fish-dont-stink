@@ -1,0 +1,32 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+  PASS  the round is live
+capacity 4, reach 3.5 m, mult 2.00
+settings:
+  PASS  the locked bite is on by default
+a square, close bite:
+  PASS  locked on the school
+  PASS  it took 6 fish
+  PASS  all of them from the locked school (34 left of 40)
+  PASS  none from another school
+  PASS  within what the line-up earns (8)
+      alive total now 154
+a poor line-up (facing away):
+  PASS  it still took 5 (at least one)
+  PASS  facing the school earns more than facing away (40 > 10)
+lock_bite off, or too far: the plain bite:
+  PASS  a plain bite takes at most capacity (1 of 4)
+  PASS  the locked school was not eaten from
+  PASS  locked on a school out of reach: it falls back to the cone bite
+ramming:
+  PASS  below ram speed it takes nothing
+  PASS  at ram speed its body takes fish (1)
+  PASS  they left the school (39 of 40)
+  PASS  ram off: nothing
+callouts:
+  PASS  a bite that took fish calls it out (2 fish)
+  PASS  with its count and source (DOUBLE DIP x2)
+  PASS  several at once is a multi (DOUBLE DIP)
+      ram dbg: total 4 from 1 seen 2 alive_s1 37 speed 20.9 need 14.0
+  PASS  a ram calls itself out too
+what_stinks_lock_bite_probe: 20 checks, 0 failed

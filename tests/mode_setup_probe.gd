@@ -169,10 +169,8 @@ func _check_forms() -> void:
 	for key: String in HunterForms.ready_keys():
 		showcase.show_form(key)
 		await _frames(3)
-		var boss: bool = key != "drowned_shark" and HunterForms.sheet(key)["class"] == FishCharacter.FishClass.MONSTER
-		var built: bool = (showcase._fish != null) if boss else (showcase._model != null)
-		check(built, "%s: a preview is built%s" % [key, " (dressed fish)" if boss else ""])
-		looks[key] = showcase._fish.get_instance_id() if boss else showcase._model.get_instance_id()
+		check(showcase._fish != null and showcase._preview != null, "%s: a preview is built (the form's own fish, swimming)" % key)  # every form is a dressed fish now (HunterPreview)
+		looks[key] = showcase._fish.get_instance_id()
 	check(looks.values().size() == looks.keys().size(), "one model each")
 	showcase.queue_free()
 	await _frames(2)

@@ -1,0 +1,111 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+sheet:
+FAIL  the Whale Fall reports ready
+FAIL  and the card would list it
+ok    its sheet: name and class
+ok    the cone is deeper and wider than the shark's chomp
+ok    it opens slower and takes more
+ok    a half angle past 26 degrees at the far end (radius over reach 0.80)
+size x0.5:
+ok    x0.5: the Whale Fall's rig is on the model
+ok    x0.5: the bite's jaw is the Whale Fall's
+ok    x0.5: dressing twice leaves one rig (1)
+ok    x0.5: the shark's own parts are hidden
+ok    x0.5: body scale 4.98, hitbox 6.00 m
+      model extent (1.195872, 1.653968, 5.974118) m for a hitbox of 6.00 m long
+ok    x0.5: model length 5.97 m is about the hitbox's
+ok    x0.5: its girth sits near the box (1.20 x 1.65 m for 2.79 x 1.99)
+ok    x0.5: 6 hagfish
+ok    x0.5: idle at rest
+ok    x0.5: the swim reads speed (1.00 of full at 14.7 m/s)
+      hagfish stream 0.25 of their length back at speed (-0.02 at rest)
+ok    x0.5: the hagfish stream back with speed
+      the carcass leaned 0.23 rad in the turn
+ok    x0.5: the carcass leans into a turn (0.23 rad)
+ok    x0.5: the bite's mouth is at the front of the body (0.15 m off the nose)
+      bite: 1 landed, opened to 0.99, hagfish glow 0.49, 5 in the cone, knot 1.00, 1 slime clouds
+ok    x0.5: one bite lands from one press
+ok    x0.5: the hagfish rear back and glow on the wind-up (glow 0.49)
+ok    x0.5: the hagfish lash into the cone (5 heads in it)
+ok    x0.5: they tie a knot (1.00)
+ok    x0.5: one cloud of slime is let go (1)
+ok    x0.5: the cloud hangs in the cone (radius 1.44 m)
+ok    x0.5: reach 2.25 m, radius 1.80 m
+ok    x0.5: the far end takes fish most of the radius off the nose
+ok    x0.5: and the near end is narrow
+ok    x0.5: nothing behind the mouth or past the reach
+      camera: 15.83 m away (2.64 body lengths), zoom 4.44, the body's box spans 8% of the screen width
+ok    x0.5: the body fills a fair share of the screen (8%)
+size x1.0:
+ok    x1.0: the Whale Fall's rig is on the model
+ok    x1.0: the bite's jaw is the Whale Fall's
+ok    x1.0: dressing twice leaves one rig (1)
+ok    x1.0: the shark's own parts are hidden
+ok    x1.0: body scale 9.96, hitbox 12.00 m
+      model extent (2.235499, 3.300694, 11.94824) m for a hitbox of 12.00 m long
+ok    x1.0: model length 11.95 m is about the hitbox's
+ok    x1.0: its girth sits near the box (2.24 x 3.30 m for 5.58 x 3.98)
+ok    x1.0: 6 hagfish
+ok    x1.0: idle at rest
+ok    x1.0: the swim reads speed (1.00 of full at 20.8 m/s)
+      hagfish stream 0.30 of their length back at speed (-0.02 at rest)
+ok    x1.0: the hagfish stream back with speed
+      the carcass leaned 0.16 rad in the turn
+ok    x1.0: the carcass leans into a turn (0.16 rad)
+ok    x1.0: the bite's mouth is at the front of the body (0.31 m off the nose)
+      bite: 1 landed, opened to 0.99, hagfish glow 0.71, 5 in the cone, knot 1.00, 1 slime clouds
+ok    x1.0: one bite lands from one press
+ok    x1.0: the hagfish rear back and glow on the wind-up (glow 0.71)
+ok    x1.0: the hagfish lash into the cone (5 heads in it)
+ok    x1.0: they tie a knot (1.00)
+ok    x1.0: one cloud of slime is let go (1)
+ok    x1.0: the cloud hangs in the cone (radius 2.88 m)
+ok    x1.0: reach 4.50 m, radius 3.60 m
+ok    x1.0: the far end takes fish most of the radius off the nose
+ok    x1.0: and the near end is narrow
+ok    x1.0: nothing behind the mouth or past the reach
+      camera: 31.52 m away (2.63 body lengths), zoom 8.89, the body's box spans 8% of the screen width
+ok    x1.0: the body fills a fair share of the screen (8%)
+size x3.0:
+ok    x3.0: the Whale Fall's rig is on the model
+ok    x3.0: the bite's jaw is the Whale Fall's
+ok    x3.0: dressing twice leaves one rig (1)
+ok    x3.0: the shark's own parts are hidden
+ok    x3.0: body scale 29.88, hitbox 36.00 m
+      model extent (6.706498, 9.902082, 35.84471) m for a hitbox of 36.00 m long
+ok    x3.0: model length 35.84 m is about the hitbox's
+ok    x3.0: its girth sits near the box (6.71 x 9.90 m for 16.73 x 11.95)
+ok    x3.0: 6 hagfish
+ok    x3.0: idle at rest
+ok    x3.0: the swim reads speed (1.00 of full at 36.0 m/s)
+      hagfish stream 0.35 of their length back at speed (-0.02 at rest)
+ok    x3.0: the hagfish stream back with speed
+      the carcass leaned 0.09 rad in the turn
+ok    x3.0: the carcass leans into a turn (0.09 rad)
+ok    x3.0: the bite's mouth is at the front of the body (0.93 m off the nose)
+      bite: 1 landed, opened to 0.99, hagfish glow 0.69, 5 in the cone, knot 1.00, 1 slime clouds
+ok    x3.0: one bite lands from one press
+ok    x3.0: the hagfish rear back and glow on the wind-up (glow 0.69)
+ok    x3.0: the hagfish lash into the cone (5 heads in it)
+ok    x3.0: they tie a knot (1.00)
+ok    x3.0: one cloud of slime is let go (1)
+ok    x3.0: the cloud hangs in the cone (radius 8.64 m)
+ok    x3.0: reach 13.50 m, radius 10.80 m
+ok    x3.0: the far end takes fish most of the radius off the nose
+ok    x3.0: and the near end is narrow
+ok    x3.0: nothing behind the mouth or past the reach
+      camera: 94.25 m away (2.62 body lengths), zoom 26.67, the body's box spans 8% of the screen width
+ok    x3.0: the body fills a fair share of the screen (8%)
+in a match:
+FAIL  round 0: the match card offers the Whale Fall (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    round 0: a match with the local fish as Hunter
+ok    round 0: the Hunter wears the Whale Fall's rig
+FAIL  round 0: the bite is the Whale Fall's, with its mouth (reach 3.5 m)
+ok    round 0: and bites from the front, not the middle
+FAIL  round 1: the match card offers the Whale Fall (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    round 1: a match with the local fish as Hunter
+FAIL  round 1: the Hunter wears the Whale Fall's rig
+FAIL  round 1: the bite is the Whale Fall's, with its mouth (reach 3.5 m)
+ok    round 1: and bites from the front, not the middle
+whalefall_probe: 88 checks, 7 failed

@@ -1,0 +1,139 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+every mode has a screen:
+  PASS  Unnatural: a fish item and 1 option row(s) (1)
+  PASS  Marco Polo: a fish item and 3 option row(s) (3)
+  PASS  Fish Sticks: a fish item and 1 option row(s) (1)
+  PASS  Hunt: a fish item and 0 option row(s) (0)
+  PASS  Nature: a fish item and 0 option row(s) (0)
+  PASS  Obstacle Course: a fish item and 0 option row(s) (0)
+  PASS  Test Tank: a fish item and 0 option row(s) (0)
+  PASS  What Stinks?: a fish item and 2 option row(s) (2)
+  PASS  the fish pool is every pickable class
+navigation:
+  PASS  RB: the next class
+  PASS  left: back a class
+  PASS  down then right: Run length steps (and applies at once)
+  PASS  left: and back
+  PASS  B cancels
+  PASS  and the screen goes
+  PASS  A confirms
+the stick:
+  PASS  a held stick down steps one item, not to the bottom (1)
+  PASS  back to the middle and pushed again: the next (2)
+  PASS  a held stick right steps a value once
+hunter form previews:
+  PASS  drowned_shark: a preview is built (the form's own fish, swimming)
+  PASS  humpback: a preview is built (the form's own fish, swimming)
+  PASS  orca: a preview is built (the form's own fish, swimming)
+  PASS  beluga: a preview is built (the form's own fish, swimming)
+  PASS  sperm: a preview is built (the form's own fish, swimming)
+  PASS  blue: a preview is built (the form's own fish, swimming)
+  PASS  king_of_herrings: a preview is built (the form's own fish, swimming)
+  PASS  gulper_mother: a preview is built (the form's own fish, swimming)
+  PASS  lamprey_queen: a preview is built (the form's own fish, swimming)
+  PASS  fallen_angel: a preview is built (the form's own fish, swimming)
+  PASS  ember_octopus: a preview is built (the form's own fish, swimming)
+  PASS  one model each
+roles:
+  PASS  each role keeps its own character
+  PASS  Marco Polo as Seeker: no fish to pick, the whale card does it
+  PASS  Start as Hider: the last hider
+  PASS  applying remembers the hider only
+  PASS  a whale seeker wears the hider's fish under its whale
+  PASS  with whales off a seeker picks a fish again
+  PASS  What Stinks? as Hunter offers the Hunter forms
+  PASS  What Stinks? has Variant and Start as (the Hunter size is locked, a panel option)
+  PASS  applying sets the Hunter form
+  PASS  as Prey: fish again
+pause menu:
+  PASS  Change Character is grayed out in Unnatural
+  PASS  and available in Nature
+  PASS  it opens the character screen (no options)
+  PASS  Apply plays as the pick and remembers it
+  PASS  and resumes
+live swaps (no restart):
+  PASS  Nature: worn at once, the same match
+  PASS  Nature: no respawn (0.0 m from where it was)
+  PASS  Hunt: worn at once, the same match
+  PASS  Hunt: no respawn (0.0 m from where it was)
+  PASS  1v1: worn at once, the same match
+  PASS  1v1: no respawn (0.1 m from where it was)
+whale seeker pause menu:
+  PASS  Change Character is grayed out for a whale seeker (its card picks)
+  PASS  and available to a hider
+picks survive entering the mode:
+  PASS  Start as Hunter and the Humpback survive Nature's tuning restore
+mid-match character changes:
+  PASS  What Stinks? waits on its card
+  PASS  Play starts the match
+  PASS  playing it as the Hunter (start_as 0, hunters [Fish:<RigidBody3D#222700767371>], local Fish:<RigidBody3D#222700767371>, fish Fish:<RigidBody3D#222700767371>, phase 0)
+  PASS  wearing the King of Herrings
+  PASS  the screen opens on the form worn
+  PASS  a new form is worn at once, the King's body gone
+  PASS  a Hunter's pick of a fish waits under its body
+  PASS  and is worn once it's prey
+  PASS  as prey, mid-round: worn at once, the match goes on
+joining:
+  PASS  the joiner's fish waits on their screen
+  PASS  their screen answers their pad only
+  PASS  another pad does nothing
+  PASS  their RB changes their class
+  PASS  Dive in: they wear it and join the run
+  PASS  Back leaves again
+mode_setup_probe: all checks passed
+ERROR: 1 RID allocations of type 'N16RendererViewport8ViewportE' were leaked at exit.
+ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.
+ERROR: 6 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.
+ERROR: 3 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.
+ERROR: 17 RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.
+ERROR: 1 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.
+ERROR: 19 RID allocations of type 'N17RendererSceneCull8InstanceE' were leaked at exit.
+ERROR: 1 RID allocations of type 'N17RendererSceneCull8ScenarioE' were leaked at exit.
+ERROR: 1 RID allocations of type 'N17RendererSceneCull6CameraE' were leaked at exit.
+WARNING: 1 RID of type "Canvas" was leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2733)
+WARNING: 1 RID of type "CanvasItem" was leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2733)
+ERROR: Pages in use exist at exit in PagedAllocator: N20RasterizerSceneDummy21GeometryInstanceDummyE
+   at: ~PagedAllocator (./core/templates/paged_allocator.h:170)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.
+   at: ~Dependency (servers/rendering/storage/utilities.cpp:56)
+WARNING: 78 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 8 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+ERROR: Pages in use exist at exit in PagedAllocator: N12VariantPools12BucketMediumE
+   at: ~PagedAllocator (./core/templates/paged_allocator.h:170)

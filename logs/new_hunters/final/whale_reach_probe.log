@@ -1,0 +1,59 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+hider body radius 0.16 m, whale body radius 1.20 m, cell 0.75 m
+temple: temple_arena.gd, 120 x 40 x 94 voxels in 18.4 s
+  hider-reachable 185070 m3, within the whale's body reach 185066 m3 (100%)
+  pocket 0.4 m3 around (-45, 0, -35), spanning (-45, 0, -35) to (-45, 0, -35) (NOT A PORTHOLE OR HIDEAWAY)
+  pocket 0.4 m3 around (-45, 30, -35), spanning (-45, 30, -35) to (-45, 30, -35) (NOT A PORTHOLE OR HIDEAWAY)
+  pocket 0.4 m3 around (3, 0, -14), spanning (3, 0, -14) to (3, 0, -14) (NOT A PORTHOLE OR HIDEAWAY)
+  pocket 0.4 m3 around (45, 0, -35), spanning (45, 0, -35) to (45, 0, -35) (NOT A PORTHOLE OR HIDEAWAY)
+  pocket 0.4 m3 around (45, 30, -35), spanning (45, 30, -35) to (45, 30, -35) (NOT A PORTHOLE OR HIDEAWAY)
+  hider-only pockets (4 m3 and up) that are not portholes or hideaways: 0
+  deep cover (a hider the whale's body only just reaches, 8 m3 and up, not a porthole): 5 groups
+    208 m3 around (1, 21, -21), spanning (-45, 0, -35) to (45, 30, 34)
+    14 m3 around (-45, 0, 24), spanning (-45, 0, 13) to (-44, 1, 34)
+    12 m3 around (45, 0, 25), spanning (44, 0, 15) to (45, 1, 34)
+    11 m3 around (45, 0, 0), spanning (44, 0, -8) to (45, 1, 9)
+    8 m3 around (-45, 0, -8), spanning (-45, 0, -15) to (-45, 0, -1)
+  dead ends (more than one body length from room to turn round in, 6.7 m): 4 groups of 8 m3 and up
+    dead end 25 m3 around (-34, 3, 33)
+    dead end 20 m3 around (-1, 3, -5)
+    dead end 13 m3 around (4, 3, 2)
+    dead end 10 m3 around (-1, 3, 5)
+  tight passages (a 2.4 m whale fits, a 3.4 m one does not): 257 groups, 49 over 4 m3
+    1786 m3 around (-0, 15, 34)
+    494 m3 around (0, 4, -0)
+    176 m3 around (-0, 4, -30)
+    106 m3 around (-7, 7, -21)
+    94 m3 around (10, 7, -24)
+    64 m3 around (-9, 10, -26)
+    46 m3 around (-9, 13, -23)
+    41 m3 around (14, 3, -17)
+  map: C:/Users/Admin/AppData/Roaming/Godot/app_userdata/Under Water The Fish Don't Stink/whale_reach/reach_temple.png
+tank: fish_tank_arena.gd, 107 x 56 x 54 voxels in 12.7 s
+  hider-reachable 125285 m3, within the whale's body reach 125269 m3 (100%)
+  pocket 5.1 m3 around (-8, 1, 7), spanning (-10, 0, 6) to (-7, 1, 8) (hideaway Under the bridge (west))
+  pocket 7.2 m3 around (2, 1, 5), spanning (2, 0, 4) to (3, 1, 7) (hideaway Under the bridge (east))
+  pocket 2.5 m3 around (14, 2, -8), spanning (14, 0, -8) to (14, 4, -8) (NOT A PORTHOLE OR HIDEAWAY)
+  pocket 1.3 m3 around (34, 0, -16), spanning (34, 0, -17) to (35, 0, -16) (NOT A PORTHOLE OR HIDEAWAY)
+  hider-only pockets (4 m3 and up) that are not portholes or hideaways: 0
+  deep cover (a hider the whale's body only just reaches, 8 m3 and up, not a porthole): 5 groups
+    25 m3 around (-40, 0, 1), spanning (-40, 0, -19) to (-39, 1, 19)
+    24 m3 around (-40, 42, 0), spanning (-40, 41, -19) to (-39, 42, 19)
+    11 m3 around (2, 1, 6), spanning (1, 0, 3) to (5, 2, 8)
+    8 m3 around (-8, 1, 7), spanning (-10, 0, 4) to (-7, 1, 9)
+    8 m3 around (34, 0, -17), spanning (32, 0, -19) to (35, 1, -14)
+  dead ends (more than one body length from room to turn round in, 6.7 m): 2 groups of 8 m3 and up
+    dead end 234 m3 around (37, 21, -18)
+    dead end 8 m3 around (-3, 2, 6)
+  tight passages (a 2.4 m whale fits, a 3.4 m one does not): 285 groups, 92 over 4 m3
+    3338 m3 around (12, 21, 13)
+    105 m3 around (-24, 11, -11)
+    102 m3 around (-24, 11, 1)
+    94 m3 around (-31, 9, -4)
+    71 m3 around (-16, 10, -4)
+    69 m3 around (34, 20, -14)
+    69 m3 around (32, 20, -16)
+    55 m3 around (-12, 8, -10)
+  map: C:/Users/Admin/AppData/Roaming/Godot/app_userdata/Under Water The Fish Don't Stink/whale_reach/reach_tank.png
+whale_reach_probe: no hider-only pockets

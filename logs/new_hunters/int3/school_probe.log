@@ -1,0 +1,36 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+together:
+  PASS  8 fish
+  PASS  every fish within the school (farthest 2.86 m of 2.10)
+  PASS  none on top of another (closest 1.06 m)
+  PASS  swimming in unison (mean heading dot 0.989)
+  PASS  at the school's cruise (5.5 m/s of 5.5)
+  PASS  roaming near home (22.9 m)
+  PASS  no fish steeper than the school climbs, give or take (10 degrees)
+turning:
+  PASS  the whole school turned round
+  PASS  the turn ripples back (front at tick 24, back at 68)
+  PASS  back in unison after (0.984)
+drawn:
+  PASS  one baked look per tail pose (3)
+  PASS  far from the camera every fish is in the looks (8), no full models
+  PASS  drawn at fish_scale (0.50)
+  PASS  no shadows by default
+  PASS  near the camera the nearest get full models (1)
+  PASS  and leave the looks (7 + 1)
+  PASS  and give them back when it's gone
+live changes:
+  PASS  more fish join (14)
+  PASS  and leave (5)
+  PASS  a bigger spread loosens it (2.35 m -> 4.98 m)
+  PASS  fish size follows fish_scale (1.50)
+  PASS  shadows when asked for
+  PASS  school speed 0 holds it in place, turning on the spot (0.00 m in 5 s, fish at 0.59 m/s)
+  PASS  still schools at a 10 Hz step (0.996)
+centre:
+  PASS  centre follows the middle of the fish
+  PASS  hidden once none are left
+budget:
+  PASS  10 schools of 50: 0.88 ms a step at 30 Hz (26.5 ms a second); drawing 0.40 ms a frame
+school_probe: all checks passed

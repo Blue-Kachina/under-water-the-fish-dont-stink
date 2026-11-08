@@ -1,0 +1,1258 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+registry:
+ok    eleven forms, five whales and six bosses, in card order
+ok    drowned_shark: registered, with its own file
+ok    drowned_shark: the sheet has every key (name 'Drowned Shark')
+ok    drowned_shark: its class has the species
+ok    drowned_shark: sane lengths
+ok    humpback: registered, with its own file
+ok    humpback: the sheet has every key (name 'Humpback')
+ok    humpback: its class has the species
+ok    humpback: sane lengths
+ok    orca: registered, with its own file
+ok    orca: the sheet has every key (name 'Orca')
+ok    orca: its class has the species
+ok    orca: sane lengths
+ok    beluga: registered, with its own file
+ok    beluga: the sheet has every key (name 'Beluga')
+ok    beluga: its class has the species
+ok    beluga: sane lengths
+ok    sperm: registered, with its own file
+ok    sperm: the sheet has every key (name 'Sperm Whale')
+ok    sperm: its class has the species
+ok    sperm: sane lengths
+ok    blue: registered, with its own file
+ok    blue: the sheet has every key (name 'Blue Whale')
+ok    blue: its class has the species
+ok    blue: sane lengths
+ok    king_of_herrings: registered, with its own file
+ok    king_of_herrings: the sheet has every key (name 'King of Herrings')
+ok    king_of_herrings: its class has the species
+ok    king_of_herrings: sane lengths
+ok    gulper_mother: registered, with its own file
+ok    gulper_mother: the sheet has every key (name 'Gulper Mother')
+ok    gulper_mother: its class has the species
+ok    gulper_mother: sane lengths
+ok    whale_fall: registered, with its own file
+ok    whale_fall: the sheet has every key (name 'Whale Fall')
+ok    whale_fall: its class has the species
+ok    whale_fall: sane lengths
+ok    lamprey_queen: registered, with its own file
+ok    lamprey_queen: the sheet has every key (name 'Lamprey Queen')
+ok    lamprey_queen: its class has the species
+ok    lamprey_queen: sane lengths
+ok    fallen_angel: registered, with its own file
+ok    fallen_angel: the sheet has every key (name 'Fallen Angel')
+ok    fallen_angel: its class has the species
+ok    fallen_angel: sane lengths
+ok    ember_octopus: registered, with its own file
+ok    ember_octopus: the sheet has every key (name 'Ember Octopus')
+ok    ember_octopus: its class has the species
+ok    ember_octopus: sane lengths
+ok    lantern_angler: registered, with its own file
+ok    lantern_angler: the sheet has every key (name 'Lantern Angler')
+ok    lantern_angler: its class has the species
+ok    lantern_angler: sane lengths
+ok    the shark and the humpback are ready (["drowned_shark", "humpback", "orca", "beluga", "sperm", "blue", "king_of_herrings", "gulper_mother", "lamprey_queen", "fallen_angel", "ember_octopus", "lantern_angler"])
+ok    drowned_shark: ready both ways
+ok    humpback: ready both ways
+ok    orca: ready both ways
+ok    beluga: ready both ways
+ok    sperm: ready both ways
+ok    blue: ready both ways
+ok    king_of_herrings: ready both ways
+ok    gulper_mother: ready both ways
+ok    lamprey_queen: ready both ways
+ok    fallen_angel: ready both ways
+ok    ember_octopus: ready both ways
+ok    lantern_angler: ready both ways
+ok    an unknown form is not ready and plays as the shark
+ok    an unknown form's sheet is the shark's
+ok    settings form drowned_shark plays as drowned_shark
+ok    settings form humpback plays as humpback
+ok    settings form orca plays as orca
+ok    settings form beluga plays as beluga
+ok    settings form sperm plays as sperm
+ok    settings form blue plays as blue
+ok    settings form king_of_herrings plays as king_of_herrings
+ok    settings form gulper_mother plays as gulper_mother
+ok    settings form whale_fall plays as drowned_shark
+ok    settings form lamprey_queen plays as lamprey_queen
+ok    settings form fallen_angel plays as fallen_angel
+ok    settings form ember_octopus plays as ember_octopus
+ok    settings form lantern_angler plays as lantern_angler
+ok    HunterForm.sheet reads the registry
+ok    drowned_shark x0.5: body_scale 2.90
+ok    drowned_shark x0.5: hitbox length 3.50 m (form 7.0 x 0.5)
+ok    drowned_shark x0.5: collision box (1.626556, 1.161826, 3.5)
+      model extent (2.392107, 1.494617, 3.686939) m for a hitbox (1.626556, 1.161826, 3.5)
+ok    drowned_shark x0.5: model length 3.69 m is about the hitbox's 3.50
+      peak spin 4.34 rad/s
+      swim: peak speed 21.2 m/s, turn rate 3.66 rad/s (top_speed_scale 0.92, turn_scale 0.78)
+ok    drowned_shark x0.5: swims (peak 21.2 m/s)
+ok    drowned_shark x0.5: turns (3.66 rad/s)
+      camera: 7.53 m away (2.15 body lengths), zoom 2.59, body spans 11% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    drowned_shark x0.5: one bite lands from one press
+ok    drowned_shark x0.5: the jaw gapes (0.99)
+ok    drowned_shark x0.5: reach 1.75 m
+ok    drowned_shark x0.5: radius 0.80 m
+ok    drowned_shark x0.5: capacity 1 (wanted 1)
+ok    drowned_shark x0.5: a point half the reach ahead is in the bite
+ok    drowned_shark x0.5: a point at the far end, half the radius off, is in
+ok    drowned_shark x0.5: a point behind the mouth is out
+ok    drowned_shark x0.5: a point past the reach is out
+ok    drowned_shark x0.5: a point far off the nose is out
+ok    drowned_shark x0.5: cooldown (1.4 s) holds the next bite
+ok    drowned_shark x1.0: body_scale 5.81
+ok    drowned_shark x1.0: hitbox length 7.00 m (form 7.0 x 1.0)
+ok    drowned_shark x1.0: collision box (3.253112, 2.323651, 7.0)
+      model extent (4.784213, 2.989235, 7.365623) m for a hitbox (3.253112, 2.323651, 7.0)
+ok    drowned_shark x1.0: model length 7.37 m is about the hitbox's 7.00
+      peak spin 3.07 rad/s
+      swim: peak speed 30.0 m/s, turn rate 2.59 rad/s (top_speed_scale 1.30, turn_scale 0.55)
+ok    drowned_shark x1.0: swims (peak 30.0 m/s)
+ok    drowned_shark x1.0: turns (2.59 rad/s)
+      camera: 14.89 m away (2.13 body lengths), zoom 5.19, body spans 11% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    drowned_shark x1.0: one bite lands from one press
+ok    drowned_shark x1.0: the jaw gapes (0.99)
+ok    drowned_shark x1.0: reach 3.50 m
+ok    drowned_shark x1.0: radius 1.60 m
+ok    drowned_shark x1.0: capacity 4 (wanted 4)
+ok    drowned_shark x1.0: a point half the reach ahead is in the bite
+ok    drowned_shark x1.0: a point at the far end, half the radius off, is in
+ok    drowned_shark x1.0: a point behind the mouth is out
+ok    drowned_shark x1.0: a point past the reach is out
+ok    drowned_shark x1.0: a point far off the nose is out
+ok    drowned_shark x1.0: cooldown (1.4 s) holds the next bite
+ok    drowned_shark x3.0: body_scale 17.43
+ok    drowned_shark x3.0: hitbox length 21.00 m (form 7.0 x 3.0)
+ok    drowned_shark x3.0: collision box (9.759336, 6.970954, 21.0)
+      model extent (14.35264, 8.967707, 22.1141) m for a hitbox (9.759336, 6.970954, 21.0)
+ok    drowned_shark x3.0: model length 22.11 m is about the hitbox's 21.00
+      peak spin 1.77 rad/s
+      swim: peak speed 52.0 m/s, turn rate 1.50 rad/s (top_speed_scale 2.25, turn_scale 0.32)
+ok    drowned_shark x3.0: swims (peak 52.0 m/s)
+ok    drowned_shark x3.0: turns (1.50 rad/s)
+      camera: 44.42 m away (2.12 body lengths), zoom 15.56, body spans 11% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    drowned_shark x3.0: one bite lands from one press
+ok    drowned_shark x3.0: the jaw gapes (0.99)
+ok    drowned_shark x3.0: reach 10.50 m
+ok    drowned_shark x3.0: radius 4.80 m
+ok    drowned_shark x3.0: capacity 21 (wanted 21)
+ok    drowned_shark x3.0: a point half the reach ahead is in the bite
+ok    drowned_shark x3.0: a point at the far end, half the radius off, is in
+ok    drowned_shark x3.0: a point behind the mouth is out
+ok    drowned_shark x3.0: a point past the reach is out
+ok    drowned_shark x3.0: a point far off the nose is out
+ok    drowned_shark x3.0: cooldown (1.4 s) holds the next bite
+drowned_shark: peak speed 21.2 / 30.0 / 52.0 m/s, turn 3.66 / 2.59 / 1.50 rad/s at x0.5 / x1 / x3
+drowned_shark: camera 2.15 / 2.13 / 2.12 body lengths away, screen share 11% / 11% / 11%
+ok    drowned_shark: bigger boosts to a higher speed (52.0 > 30.0 > 21.2)
+ok    drowned_shark: bigger turns slower (1.50 < 3.66)
+ok    drowned_shark: camera framing holds across sizes (ratio 0.98)
+ok    humpback x0.5: body_scale 0.50
+ok    humpback x0.5: hitbox length 3.35 m (form 6.7 x 0.5)
+ok    humpback x0.5: collision box (1.2, 0.95, 3.35)
+      model extent (1.909506, 0.978305, 3.335161) m for a hitbox (1.2, 0.95, 3.35)
+ok    humpback x0.5: model length 3.34 m is about the hitbox's 3.35
+      lod range end now 8.4
+      peak spin 3.94 rad/s
+      swim: peak speed 18.8 m/s, turn rate 3.33 rad/s (top_speed_scale 0.81, turn_scale 0.71)
+ok    humpback x0.5: swims (peak 18.8 m/s)
+ok    humpback x0.5: turns (3.33 rad/s)
+      camera: 8.55 m away (2.55 body lengths), zoom 2.48, body spans 7% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    humpback x0.5: one bite lands from one press
+ok    humpback x0.5: the jaw gapes (0.99)
+ok    humpback x0.5: reach 1.10 m
+ok    humpback x0.5: radius 1.30 m
+ok    humpback x0.5: capacity 2 (wanted 2)
+ok    humpback x0.5: a point half the reach ahead is in the bite
+ok    humpback x0.5: a point at the far end, half the radius off, is in
+ok    humpback x0.5: a point behind the mouth is out
+ok    humpback x0.5: a point past the reach is out
+ok    humpback x0.5: a point far off the nose is out
+ok    humpback x0.5: cooldown (1.8 s) holds the next bite
+ok    humpback x1.0: body_scale 1.00
+ok    humpback x1.0: hitbox length 6.70 m (form 6.7 x 1.0)
+ok    humpback x1.0: collision box (2.4, 1.9, 6.7)
+      model extent (3.819012, 1.95065, 6.670261) m for a hitbox (2.4, 1.9, 6.7)
+ok    humpback x1.0: model length 6.67 m is about the hitbox's 6.70
+      lod range end now 16.8
+      peak spin 2.79 rad/s
+      swim: peak speed 26.6 m/s, turn rate 2.36 rad/s (top_speed_scale 1.15, turn_scale 0.50)
+ok    humpback x1.0: swims (peak 26.6 m/s)
+ok    humpback x1.0: turns (2.36 rad/s)
+      camera: 16.94 m away (2.53 body lengths), zoom 4.96, body spans 7% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    humpback x1.0: one bite lands from one press
+ok    humpback x1.0: the jaw gapes (0.99)
+ok    humpback x1.0: reach 2.20 m
+ok    humpback x1.0: radius 2.60 m
+ok    humpback x1.0: capacity 6 (wanted 6)
+ok    humpback x1.0: a point half the reach ahead is in the bite
+ok    humpback x1.0: a point at the far end, half the radius off, is in
+ok    humpback x1.0: a point behind the mouth is out
+ok    humpback x1.0: a point past the reach is out
+ok    humpback x1.0: a point far off the nose is out
+ok    humpback x1.0: cooldown (1.8 s) holds the next bite
+ok    humpback x3.0: body_scale 3.00
+ok    humpback x3.0: hitbox length 20.10 m (form 6.7 x 3.0)
+ok    humpback x3.0: collision box (7.2, 5.7, 20.1)
+      model extent (11.45704, 5.823935, 20.01338) m for a hitbox (7.2, 5.7, 20.1)
+ok    humpback x3.0: model length 20.01 m is about the hitbox's 20.10
+      lod range end now 50.3
+      peak spin 1.61 rad/s
+      swim: peak speed 46.0 m/s, turn rate 1.36 rad/s (top_speed_scale 1.99, turn_scale 0.29)
+ok    humpback x3.0: swims (peak 46.0 m/s)
+ok    humpback x3.0: turns (1.36 rad/s)
+      camera: 50.57 m away (2.52 body lengths), zoom 14.89, body spans 7% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    humpback x3.0: one bite lands from one press
+ok    humpback x3.0: the jaw gapes (0.99)
+ok    humpback x3.0: reach 6.60 m
+ok    humpback x3.0: radius 7.80 m
+ok    humpback x3.0: capacity 31 (wanted 31)
+ok    humpback x3.0: a point half the reach ahead is in the bite
+ok    humpback x3.0: a point at the far end, half the radius off, is in
+ok    humpback x3.0: a point behind the mouth is out
+ok    humpback x3.0: a point past the reach is out
+ok    humpback x3.0: a point far off the nose is out
+ok    humpback x3.0: cooldown (1.8 s) holds the next bite
+humpback: peak speed 18.8 / 26.6 / 46.0 m/s, turn 3.33 / 2.36 / 1.36 rad/s at x0.5 / x1 / x3
+humpback: camera 2.55 / 2.53 / 2.52 body lengths away, screen share 7% / 7% / 7%
+ok    humpback: bigger boosts to a higher speed (46.0 > 26.6 > 18.8)
+ok    humpback: bigger turns slower (1.36 < 3.33)
+ok    humpback: camera framing holds across sizes (ratio 0.99)
+ok    orca x0.5: body_scale 0.27
+ok    orca x0.5: hitbox length 1.80 m (form 3.6 x 0.5)
+ok    orca x0.5: collision box (0.644776, 0.510448, 1.8)
+      model extent (0.496186, 0.764726, 1.759696) m for a hitbox (0.644776, 0.510448, 1.8)
+ok    orca x0.5: model length 1.76 m is about the hitbox's 1.80
+      lod range end now 4.5
+      peak spin 4.34 rad/s
+      swim: peak speed 21.2 m/s, turn rate 3.66 rad/s (top_speed_scale 0.92, turn_scale 0.78)
+ok    orca x0.5: swims (peak 21.2 m/s)
+ok    orca x0.5: turns (3.66 rad/s)
+      camera: 3.94 m away (2.19 body lengths), zoom 1.33, body spans 8% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    orca x0.5: one bite lands from one press
+ok    orca x0.5: the jaw gapes (0.99)
+ok    orca x0.5: reach 0.60 m
+ok    orca x0.5: radius 0.50 m
+ok    orca x0.5: capacity 1 (wanted 1)
+ok    orca x0.5: a point half the reach ahead is in the bite
+ok    orca x0.5: a point at the far end, half the radius off, is in
+ok    orca x0.5: a point behind the mouth is out
+ok    orca x0.5: a point past the reach is out
+ok    orca x0.5: a point far off the nose is out
+ok    orca x0.5: cooldown (1.4 s) holds the next bite
+ok    orca x1.0: body_scale 0.54
+ok    orca x1.0: hitbox length 3.60 m (form 3.6 x 1.0)
+ok    orca x1.0: collision box (1.289552, 1.020896, 3.6)
+      model extent (0.992372, 1.528244, 3.519581) m for a hitbox (1.289552, 1.020896, 3.6)
+ok    orca x1.0: model length 3.52 m is about the hitbox's 3.60
+      lod range end now 9.0
+      peak spin 3.07 rad/s
+      swim: peak speed 30.0 m/s, turn rate 2.59 rad/s (top_speed_scale 1.30, turn_scale 0.55)
+ok    orca x1.0: swims (peak 30.0 m/s)
+ok    orca x1.0: turns (2.59 rad/s)
+      camera: 7.73 m away (2.15 body lengths), zoom 2.67, body spans 8% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    orca x1.0: one bite lands from one press
+ok    orca x1.0: the jaw gapes (0.99)
+ok    orca x1.0: reach 1.20 m
+ok    orca x1.0: radius 1.00 m
+ok    orca x1.0: capacity 4 (wanted 4)
+ok    orca x1.0: a point half the reach ahead is in the bite
+ok    orca x1.0: a point at the far end, half the radius off, is in
+ok    orca x1.0: a point behind the mouth is out
+ok    orca x1.0: a point past the reach is out
+ok    orca x1.0: a point far off the nose is out
+ok    orca x1.0: cooldown (1.4 s) holds the next bite
+ok    orca x3.0: body_scale 1.61
+ok    orca x3.0: hitbox length 10.80 m (form 3.6 x 3.0)
+ok    orca x3.0: collision box (3.868657, 3.062687, 10.8)
+      model extent (2.977115, 4.588073, 10.55825) m for a hitbox (3.868657, 3.062687, 10.8)
+ok    orca x3.0: model length 10.56 m is about the hitbox's 10.80
+      lod range end now 27.0
+      peak spin 1.77 rad/s
+      swim: peak speed 52.0 m/s, turn rate 1.50 rad/s (top_speed_scale 2.25, turn_scale 0.32)
+ok    orca x3.0: swims (peak 52.0 m/s)
+ok    orca x3.0: turns (1.50 rad/s)
+      camera: 22.92 m away (2.12 body lengths), zoom 8.00, body spans 8% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    orca x3.0: one bite lands from one press
+ok    orca x3.0: the jaw gapes (0.99)
+ok    orca x3.0: reach 3.60 m
+ok    orca x3.0: radius 3.00 m
+ok    orca x3.0: capacity 21 (wanted 21)
+ok    orca x3.0: a point half the reach ahead is in the bite
+ok    orca x3.0: a point at the far end, half the radius off, is in
+ok    orca x3.0: a point behind the mouth is out
+ok    orca x3.0: a point past the reach is out
+ok    orca x3.0: a point far off the nose is out
+ok    orca x3.0: cooldown (1.4 s) holds the next bite
+orca: peak speed 21.2 / 30.0 / 52.0 m/s, turn 3.66 / 2.59 / 1.50 rad/s at x0.5 / x1 / x3
+orca: camera 2.19 / 2.15 / 2.12 body lengths away, screen share 8% / 8% / 8%
+ok    orca: bigger boosts to a higher speed (52.0 > 30.0 > 21.2)
+ok    orca: bigger turns slower (1.50 < 3.66)
+ok    orca: camera framing holds across sizes (ratio 0.97)
+ok    beluga x0.5: body_scale 0.16
+ok    beluga x0.5: hitbox length 1.10 m (form 2.2 x 0.5)
+ok    beluga x0.5: collision box (0.39403, 0.31194, 1.1)
+      model extent (0.305153, 0.259924, 1.074669) m for a hitbox (0.39403, 0.31194, 1.1)
+ok    beluga x0.5: model length 1.07 m is about the hitbox's 1.10
+      lod range end now 2.8
+      peak spin 4.34 rad/s
+      swim: peak speed 19.6 m/s, turn rate 3.66 rad/s (top_speed_scale 0.85, turn_scale 0.78)
+ok    beluga x0.5: swims (peak 19.6 m/s)
+ok    beluga x0.5: turns (3.66 rad/s)
+      camera: 3.01 m away (2.74 body lengths), zoom 1.00, body spans 6% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    beluga x0.5: one bite lands from one press
+ok    beluga x0.5: the jaw gapes (0.99)
+ok    beluga x0.5: reach 0.38 m
+ok    beluga x0.5: radius 0.30 m
+ok    beluga x0.5: capacity 1 (wanted 1)
+ok    beluga x0.5: a point half the reach ahead is in the bite
+ok    beluga x0.5: a point at the far end, half the radius off, is in
+ok    beluga x0.5: a point behind the mouth is out
+ok    beluga x0.5: a point past the reach is out
+ok    beluga x0.5: a point far off the nose is out
+ok    beluga x0.5: cooldown (1.2 s) holds the next bite
+ok    beluga x1.0: body_scale 0.33
+ok    beluga x1.0: hitbox length 2.20 m (form 2.2 x 1.0)
+ok    beluga x1.0: collision box (0.78806, 0.623881, 2.2)
+      model extent (0.610306, 0.519848, 2.148834) m for a hitbox (0.78806, 0.623881, 2.2)
+ok    beluga x1.0: model length 2.15 m is about the hitbox's 2.20
+      lod range end now 5.5
+      peak spin 3.07 rad/s
+      swim: peak speed 27.7 m/s, turn rate 2.59 rad/s (top_speed_scale 1.20, turn_scale 0.55)
+ok    beluga x1.0: swims (peak 27.7 m/s)
+ok    beluga x1.0: turns (2.59 rad/s)
+      camera: 4.80 m away (2.18 body lengths), zoom 1.63, body spans 8% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    beluga x1.0: one bite lands from one press
+ok    beluga x1.0: the jaw gapes (0.99)
+ok    beluga x1.0: reach 0.75 m
+ok    beluga x1.0: radius 0.60 m
+ok    beluga x1.0: capacity 3 (wanted 3)
+ok    beluga x1.0: a point half the reach ahead is in the bite
+ok    beluga x1.0: a point at the far end, half the radius off, is in
+ok    beluga x1.0: a point behind the mouth is out
+ok    beluga x1.0: a point past the reach is out
+ok    beluga x1.0: a point far off the nose is out
+ok    beluga x1.0: cooldown (1.2 s) holds the next bite
+ok    beluga x3.0: body_scale 0.99
+ok    beluga x3.0: hitbox length 6.60 m (form 2.2 x 3.0)
+ok    beluga x3.0: collision box (2.364179, 1.871642, 6.6)
+      model extent (1.830917, 1.559544, 6.445568) m for a hitbox (2.364179, 1.871642, 6.6)
+ok    beluga x3.0: model length 6.45 m is about the hitbox's 6.60
+      lod range end now 16.5
+      peak spin 1.77 rad/s
+      swim: peak speed 48.0 m/s, turn rate 1.50 rad/s (top_speed_scale 2.08, turn_scale 0.32)
+ok    beluga x3.0: swims (peak 48.0 m/s)
+ok    beluga x3.0: turns (1.50 rad/s)
+      camera: 14.05 m away (2.13 body lengths), zoom 4.89, body spans 8% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    beluga x3.0: one bite lands from one press
+ok    beluga x3.0: the jaw gapes (0.99)
+ok    beluga x3.0: reach 2.25 m
+ok    beluga x3.0: radius 1.80 m
+ok    beluga x3.0: capacity 16 (wanted 16)
+ok    beluga x3.0: a point half the reach ahead is in the bite
+ok    beluga x3.0: a point at the far end, half the radius off, is in
+ok    beluga x3.0: a point behind the mouth is out
+ok    beluga x3.0: a point past the reach is out
+ok    beluga x3.0: a point far off the nose is out
+ok    beluga x3.0: cooldown (1.2 s) holds the next bite
+beluga: peak speed 19.6 / 27.7 / 48.0 m/s, turn 3.66 / 2.59 / 1.50 rad/s at x0.5 / x1 / x3
+beluga: camera 2.74 / 2.18 / 2.13 body lengths away, screen share 6% / 8% / 8%
+ok    beluga: bigger boosts to a higher speed (48.0 > 27.7 > 19.6)
+ok    beluga: bigger turns slower (1.50 < 3.66)
+ok    beluga: camera framing holds across sizes (ratio 0.78)
+ok    sperm x0.5: body_scale 0.57
+ok    sperm x0.5: hitbox length 3.85 m (form 7.7 x 0.5)
+ok    sperm x0.5: collision box (1.379104, 1.091791, 3.85)
+      model extent (1.07415, 0.768443, 3.797656) m for a hitbox (1.379104, 1.091791, 3.85)
+ok    sperm x0.5: model length 3.80 m is about the hitbox's 3.85
+      lod range end now 9.6
+      peak spin 3.94 rad/s
+      swim: peak speed 18.0 m/s, turn rate 3.33 rad/s (top_speed_scale 0.78, turn_scale 0.71)
+ok    sperm x0.5: swims (peak 18.0 m/s)
+ok    sperm x0.5: turns (3.33 rad/s)
+      camera: 9.03 m away (2.35 body lengths), zoom 2.85, body spans 7% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    sperm x0.5: one bite lands from one press
+ok    sperm x0.5: the jaw gapes (0.99)
+ok    sperm x0.5: reach 1.25 m
+ok    sperm x0.5: radius 0.85 m
+ok    sperm x0.5: capacity 2 (wanted 2)
+ok    sperm x0.5: a point half the reach ahead is in the bite
+ok    sperm x0.5: a point at the far end, half the radius off, is in
+ok    sperm x0.5: a point behind the mouth is out
+ok    sperm x0.5: a point past the reach is out
+ok    sperm x0.5: a point far off the nose is out
+ok    sperm x0.5: cooldown (2.0 s) holds the next bite
+ok    sperm x1.0: body_scale 1.15
+ok    sperm x1.0: hitbox length 7.70 m (form 7.7 x 1.0)
+ok    sperm x1.0: collision box (2.758209, 2.183582, 7.7)
+      model extent (2.1483, 1.532041, 7.59425) m for a hitbox (2.758209, 2.183582, 7.7)
+ok    sperm x1.0: model length 7.59 m is about the hitbox's 7.70
+      lod range end now 19.3
+      peak spin 2.79 rad/s
+      swim: peak speed 25.4 m/s, turn rate 2.36 rad/s (top_speed_scale 1.10, turn_scale 0.50)
+ok    sperm x1.0: swims (peak 25.4 m/s)
+ok    sperm x1.0: turns (2.36 rad/s)
+      camera: 17.92 m away (2.33 body lengths), zoom 5.70, body spans 7% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    sperm x1.0: one bite lands from one press
+ok    sperm x1.0: the jaw gapes (0.99)
+ok    sperm x1.0: reach 2.50 m
+ok    sperm x1.0: radius 1.70 m
+ok    sperm x1.0: capacity 5 (wanted 5)
+ok    sperm x1.0: a point half the reach ahead is in the bite
+ok    sperm x1.0: a point at the far end, half the radius off, is in
+ok    sperm x1.0: a point behind the mouth is out
+ok    sperm x1.0: a point past the reach is out
+ok    sperm x1.0: a point far off the nose is out
+ok    sperm x1.0: cooldown (2.0 s) holds the next bite
+ok    sperm x3.0: body_scale 3.45
+ok    sperm x3.0: hitbox length 23.10 m (form 7.7 x 3.0)
+ok    sperm x3.0: collision box (8.274627, 6.550746, 23.1)
+      model extent (6.4449, 4.586544, 22.78991) m for a hitbox (8.274627, 6.550746, 23.1)
+ok    sperm x3.0: model length 22.79 m is about the hitbox's 23.10
+      lod range end now 57.8
+      peak spin 1.61 rad/s
+      swim: peak speed 44.0 m/s, turn rate 1.36 rad/s (top_speed_scale 1.91, turn_scale 0.29)
+ok    sperm x3.0: swims (peak 44.0 m/s)
+ok    sperm x3.0: turns (1.36 rad/s)
+      camera: 53.45 m away (2.31 body lengths), zoom 17.11, body spans 7% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    sperm x3.0: one bite lands from one press
+ok    sperm x3.0: the jaw gapes (0.99)
+ok    sperm x3.0: reach 7.50 m
+ok    sperm x3.0: radius 5.10 m
+ok    sperm x3.0: capacity 26 (wanted 26)
+ok    sperm x3.0: a point half the reach ahead is in the bite
+ok    sperm x3.0: a point at the far end, half the radius off, is in
+ok    sperm x3.0: a point behind the mouth is out
+ok    sperm x3.0: a point past the reach is out
+ok    sperm x3.0: a point far off the nose is out
+ok    sperm x3.0: cooldown (2.0 s) holds the next bite
+sperm: peak speed 18.0 / 25.4 / 44.0 m/s, turn 3.33 / 2.36 / 1.36 rad/s at x0.5 / x1 / x3
+sperm: camera 2.35 / 2.33 / 2.31 body lengths away, screen share 7% / 7% / 7%
+ok    sperm: bigger boosts to a higher speed (44.0 > 25.4 > 18.0)
+ok    sperm: bigger turns slower (1.36 < 3.33)
+ok    sperm: camera framing holds across sizes (ratio 0.99)
+ok    blue x0.5: body_scale 0.90
+ok    blue x0.5: hitbox length 6.00 m (form 12.0 x 0.5)
+ok    blue x0.5: collision box (2.149254, 1.701493, 6.0)
+      model extent (1.665992, 0.939158, 5.919277) m for a hitbox (2.149254, 1.701493, 6.0)
+ok    blue x0.5: model length 5.92 m is about the hitbox's 6.00
+      lod range end now 15.0
+      peak spin 3.15 rad/s
+      swim: peak speed 17.2 m/s, turn rate 2.66 rad/s (top_speed_scale 0.74, turn_scale 0.57)
+ok    blue x0.5: swims (peak 17.2 m/s)
+ok    blue x0.5: turns (2.66 rad/s)
+      camera: 16.45 m away (2.74 body lengths), zoom 4.44, body spans 6% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    blue x0.5: one bite lands from one press
+ok    blue x0.5: the jaw gapes (0.99)
+ok    blue x0.5: reach 2.00 m
+ok    blue x0.5: radius 2.20 m
+ok    blue x0.5: capacity 3 (wanted 3)
+ok    blue x0.5: a point half the reach ahead is in the bite
+ok    blue x0.5: a point at the far end, half the radius off, is in
+ok    blue x0.5: a point behind the mouth is out
+ok    blue x0.5: a point past the reach is out
+ok    blue x0.5: a point far off the nose is out
+ok    blue x0.5: cooldown (2.4 s) holds the next bite
+ok    blue x1.0: body_scale 1.79
+ok    blue x1.0: hitbox length 12.00 m (form 12.0 x 1.0)
+ok    blue x1.0: collision box (4.298507, 3.402985, 12.0)
+      model extent (3.331985, 1.877775, 11.83824) m for a hitbox (4.298507, 3.402985, 12.0)
+ok    blue x1.0: model length 11.84 m is about the hitbox's 12.00
+      lod range end now 30.0
+      peak spin 2.23 rad/s
+      swim: peak speed 24.3 m/s, turn rate 1.88 rad/s (top_speed_scale 1.05, turn_scale 0.40)
+ok    blue x1.0: swims (peak 24.3 m/s)
+ok    blue x1.0: turns (1.88 rad/s)
+      camera: 32.77 m away (2.73 body lengths), zoom 8.89, body spans 6% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    blue x1.0: one bite lands from one press
+ok    blue x1.0: the jaw gapes (0.99)
+ok    blue x1.0: reach 4.00 m
+ok    blue x1.0: radius 4.40 m
+ok    blue x1.0: capacity 9 (wanted 9)
+ok    blue x1.0: a point half the reach ahead is in the bite
+ok    blue x1.0: a point at the far end, half the radius off, is in
+ok    blue x1.0: a point behind the mouth is out
+ok    blue x1.0: a point past the reach is out
+ok    blue x1.0: a point far off the nose is out
+ok    blue x1.0: cooldown (2.4 s) holds the next bite
+ok    blue x3.0: body_scale 5.37
+ok    blue x3.0: hitbox length 36.00 m (form 12.0 x 3.0)
+ok    blue x3.0: collision box (12.89552, 10.20896, 36.0)
+      model extent (9.995955, 5.642861, 35.51587) m for a hitbox (12.89552, 10.20896, 36.0)
+ok    blue x3.0: model length 35.52 m is about the hitbox's 36.00
+      lod range end now 90.0
+      peak spin 1.29 rad/s
+      swim: peak speed 42.0 m/s, turn rate 1.09 rad/s (top_speed_scale 1.82, turn_scale 0.23)
+ok    blue x3.0: swims (peak 42.0 m/s)
+ok    blue x3.0: turns (1.09 rad/s)
+      camera: 98.06 m away (2.72 body lengths), zoom 26.67, body spans 6% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    blue x3.0: one bite lands from one press
+ok    blue x3.0: the jaw gapes (0.99)
+ok    blue x3.0: reach 12.00 m
+ok    blue x3.0: radius 13.20 m
+ok    blue x3.0: capacity 47 (wanted 47)
+ok    blue x3.0: a point half the reach ahead is in the bite
+ok    blue x3.0: a point at the far end, half the radius off, is in
+ok    blue x3.0: a point behind the mouth is out
+ok    blue x3.0: a point past the reach is out
+ok    blue x3.0: a point far off the nose is out
+ok    blue x3.0: cooldown (2.4 s) holds the next bite
+blue: peak speed 17.2 / 24.3 / 42.0 m/s, turn 2.66 / 1.88 / 1.09 rad/s at x0.5 / x1 / x3
+blue: camera 2.74 / 2.73 / 2.72 body lengths away, screen share 6% / 6% / 6%
+ok    blue: bigger boosts to a higher speed (42.0 > 24.3 > 17.2)
+ok    blue: bigger turns slower (1.09 < 2.66)
+ok    blue: camera framing holds across sizes (ratio 0.99)
+ok    king_of_herrings x0.5: body_scale 6.64
+ok    king_of_herrings x0.5: hitbox length 8.00 m (form 16.0 x 0.5)
+ok    king_of_herrings x0.5: collision box (3.717843, 2.655602, 8.0)
+      model extent (5.467672, 3.416268, 8.421734) m for a hitbox (3.717843, 2.655602, 8.0)
+ok    king_of_herrings x0.5: model length 8.42 m is about the hitbox's 8.00
+      peak spin 3.55 rad/s
+      swim: peak speed 19.6 m/s, turn rate 3.00 rad/s (top_speed_scale 0.85, turn_scale 0.64)
+ok    king_of_herrings x0.5: swims (peak 19.6 m/s)
+ok    king_of_herrings x0.5: turns (3.00 rad/s)
+      camera: 14.91 m away (1.86 body lengths), zoom 5.93, body spans 14% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    king_of_herrings x0.5: one bite lands from one press
+ok    king_of_herrings x0.5: the jaw gapes (0.99)
+ok    king_of_herrings x0.5: reach 2.75 m
+ok    king_of_herrings x0.5: radius 2.25 m
+ok    king_of_herrings x0.5: capacity 2 (wanted 2)
+ok    king_of_herrings x0.5: a point half the reach ahead is in the bite
+ok    king_of_herrings x0.5: a point at the far end, half the radius off, is in
+ok    king_of_herrings x0.5: a point behind the mouth is out
+ok    king_of_herrings x0.5: a point past the reach is out
+ok    king_of_herrings x0.5: a point far off the nose is out
+ok    king_of_herrings x0.5: cooldown (2.2 s) holds the next bite
+ok    king_of_herrings x1.0: body_scale 13.28
+ok    king_of_herrings x1.0: hitbox length 16.00 m (form 16.0 x 1.0)
+ok    king_of_herrings x1.0: collision box (7.435685, 5.311203, 16.0)
+      model extent (10.93534, 6.832539, 16.83945) m for a hitbox (7.435685, 5.311203, 16.0)
+ok    king_of_herrings x1.0: model length 16.84 m is about the hitbox's 16.00
+      peak spin 2.51 rad/s
+      swim: peak speed 27.7 m/s, turn rate 2.12 rad/s (top_speed_scale 1.20, turn_scale 0.45)
+ok    king_of_herrings x1.0: swims (peak 27.7 m/s)
+ok    king_of_herrings x1.0: turns (2.12 rad/s)
+      camera: 29.60 m away (1.85 body lengths), zoom 11.85, body spans 14% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    king_of_herrings x1.0: one bite lands from one press
+ok    king_of_herrings x1.0: the jaw gapes (0.99)
+ok    king_of_herrings x1.0: reach 5.50 m
+ok    king_of_herrings x1.0: radius 4.50 m
+ok    king_of_herrings x1.0: capacity 7 (wanted 7)
+ok    king_of_herrings x1.0: a point half the reach ahead is in the bite
+ok    king_of_herrings x1.0: a point at the far end, half the radius off, is in
+ok    king_of_herrings x1.0: a point behind the mouth is out
+ok    king_of_herrings x1.0: a point past the reach is out
+ok    king_of_herrings x1.0: a point far off the nose is out
+ok    king_of_herrings x1.0: cooldown (2.2 s) holds the next bite
+ok    king_of_herrings x3.0: body_scale 39.83
+ok    king_of_herrings x3.0: hitbox length 48.00 m (form 16.0 x 3.0)
+ok    king_of_herrings x3.0: collision box (22.30705, 15.93361, 48.0)
+      model extent (32.80603, 20.49761, 50.56799) m for a hitbox (22.30705, 15.93361, 48.0)
+ok    king_of_herrings x3.0: model length 50.57 m is about the hitbox's 48.00
+      peak spin 1.45 rad/s
+      swim: peak speed 48.0 m/s, turn rate 1.22 rad/s (top_speed_scale 2.08, turn_scale 0.26)
+ok    king_of_herrings x3.0: swims (peak 48.0 m/s)
+ok    king_of_herrings x3.0: turns (1.22 rad/s)
+      camera: 88.31 m away (1.84 body lengths), zoom 35.56, body spans 14% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    king_of_herrings x3.0: one bite lands from one press
+ok    king_of_herrings x3.0: the jaw gapes (0.99)
+ok    king_of_herrings x3.0: reach 16.50 m
+ok    king_of_herrings x3.0: radius 13.50 m
+ok    king_of_herrings x3.0: capacity 36 (wanted 36)
+ok    king_of_herrings x3.0: a point half the reach ahead is in the bite
+ok    king_of_herrings x3.0: a point at the far end, half the radius off, is in
+ok    king_of_herrings x3.0: a point behind the mouth is out
+ok    king_of_herrings x3.0: a point past the reach is out
+ok    king_of_herrings x3.0: a point far off the nose is out
+ok    king_of_herrings x3.0: cooldown (2.2 s) holds the next bite
+king_of_herrings: peak speed 19.6 / 27.7 / 48.0 m/s, turn 3.00 / 2.12 / 1.22 rad/s at x0.5 / x1 / x3
+king_of_herrings: camera 1.86 / 1.85 / 1.84 body lengths away, screen share 14% / 14% / 14%
+ok    king_of_herrings: bigger boosts to a higher speed (48.0 > 27.7 > 19.6)
+ok    king_of_herrings: bigger turns slower (1.22 < 3.00)
+ok    king_of_herrings: camera framing holds across sizes (ratio 0.99)
+ok    gulper_mother x0.5: body_scale 3.73
+ok    gulper_mother x0.5: hitbox length 4.50 m (form 9.0 x 0.5)
+ok    gulper_mother x0.5: collision box (2.091286, 1.493776, 4.5)
+      model extent (3.075566, 1.921652, 4.740012) m for a hitbox (2.091286, 1.493776, 4.5)
+ok    gulper_mother x0.5: model length 4.74 m is about the hitbox's 4.50
+      peak spin 3.94 rad/s
+      swim: peak speed 18.8 m/s, turn rate 3.33 rad/s (top_speed_scale 0.81, turn_scale 0.71)
+ok    gulper_mother x0.5: swims (peak 18.8 m/s)
+ok    gulper_mother x0.5: turns (3.33 rad/s)
+      camera: 11.01 m away (2.45 body lengths), zoom 3.33, body spans 9% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    gulper_mother x0.5: one bite lands from one press
+ok    gulper_mother x0.5: the jaw gapes (0.99)
+ok    gulper_mother x0.5: reach 3.00 m
+ok    gulper_mother x0.5: radius 2.00 m
+ok    gulper_mother x0.5: capacity 3 (wanted 3)
+ok    gulper_mother x0.5: a point half the reach ahead is in the bite
+ok    gulper_mother x0.5: a point at the far end, half the radius off, is in
+ok    gulper_mother x0.5: a point behind the mouth is out
+ok    gulper_mother x0.5: a point past the reach is out
+ok    gulper_mother x0.5: a point far off the nose is out
+ok    gulper_mother x0.5: cooldown (1.9 s) holds the next bite
+ok    gulper_mother x1.0: body_scale 7.47
+ok    gulper_mother x1.0: hitbox length 9.00 m (form 9.0 x 1.0)
+ok    gulper_mother x1.0: collision box (4.182573, 2.987552, 9.0)
+      model extent (6.151132, 3.843303, 9.470142) m for a hitbox (4.182573, 2.987552, 9.0)
+ok    gulper_mother x1.0: model length 9.47 m is about the hitbox's 9.00
+      peak spin 2.79 rad/s
+      swim: peak speed 26.6 m/s, turn rate 2.36 rad/s (top_speed_scale 1.15, turn_scale 0.50)
+ok    gulper_mother x1.0: swims (peak 26.6 m/s)
+ok    gulper_mother x1.0: turns (2.36 rad/s)
+      camera: 21.85 m away (2.43 body lengths), zoom 6.67, body spans 9% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    gulper_mother x1.0: one bite lands from one press
+ok    gulper_mother x1.0: the jaw gapes (0.99)
+ok    gulper_mother x1.0: reach 6.00 m
+ok    gulper_mother x1.0: radius 4.00 m
+ok    gulper_mother x1.0: capacity 8 (wanted 8)
+ok    gulper_mother x1.0: a point half the reach ahead is in the bite
+ok    gulper_mother x1.0: a point at the far end, half the radius off, is in
+ok    gulper_mother x1.0: a point behind the mouth is out
+ok    gulper_mother x1.0: a point past the reach is out
+ok    gulper_mother x1.0: a point far off the nose is out
+ok    gulper_mother x1.0: cooldown (1.9 s) holds the next bite
+ok    gulper_mother x3.0: body_scale 22.41
+ok    gulper_mother x3.0: hitbox length 27.00 m (form 9.0 x 3.0)
+ok    gulper_mother x3.0: collision box (12.54772, 8.962656, 27.0)
+      model extent (18.4534, 11.52991, 28.4267) m for a hitbox (12.54772, 8.962656, 27.0)
+ok    gulper_mother x3.0: model length 28.43 m is about the hitbox's 27.00
+      peak spin 1.61 rad/s
+      swim: peak speed 46.0 m/s, turn rate 1.36 rad/s (top_speed_scale 1.99, turn_scale 0.29)
+ok    gulper_mother x3.0: swims (peak 46.0 m/s)
+ok    gulper_mother x3.0: turns (1.36 rad/s)
+      camera: 65.30 m away (2.42 body lengths), zoom 20.00, body spans 9% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    gulper_mother x3.0: one bite lands from one press
+ok    gulper_mother x3.0: the jaw gapes (0.99)
+ok    gulper_mother x3.0: reach 18.00 m
+ok    gulper_mother x3.0: radius 12.00 m
+ok    gulper_mother x3.0: capacity 42 (wanted 42)
+ok    gulper_mother x3.0: a point half the reach ahead is in the bite
+ok    gulper_mother x3.0: a point at the far end, half the radius off, is in
+ok    gulper_mother x3.0: a point behind the mouth is out
+ok    gulper_mother x3.0: a point past the reach is out
+ok    gulper_mother x3.0: a point far off the nose is out
+ok    gulper_mother x3.0: cooldown (1.9 s) holds the next bite
+gulper_mother: peak speed 18.8 / 26.6 / 46.0 m/s, turn 3.33 / 2.36 / 1.36 rad/s at x0.5 / x1 / x3
+gulper_mother: camera 2.45 / 2.43 / 2.42 body lengths away, screen share 9% / 9% / 9%
+ok    gulper_mother: bigger boosts to a higher speed (46.0 > 26.6 > 18.8)
+ok    gulper_mother: bigger turns slower (1.36 < 3.33)
+ok    gulper_mother: camera framing holds across sizes (ratio 0.99)
+ok    lamprey_queen x0.5: body_scale 5.81
+ok    lamprey_queen x0.5: hitbox length 7.00 m (form 14.0 x 0.5)
+ok    lamprey_queen x0.5: collision box (3.253112, 2.323651, 7.0)
+      model extent (4.784213, 2.989235, 7.37423) m for a hitbox (3.253112, 2.323651, 7.0)
+ok    lamprey_queen x0.5: model length 7.37 m is about the hitbox's 7.00
+      peak spin 3.55 rad/s
+      swim: peak speed 19.6 m/s, turn rate 3.00 rad/s (top_speed_scale 0.85, turn_scale 0.64)
+ok    lamprey_queen x0.5: swims (peak 19.6 m/s)
+ok    lamprey_queen x0.5: turns (3.00 rad/s)
+      camera: 14.19 m away (2.03 body lengths), zoom 5.19, body spans 12% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    lamprey_queen x0.5: one bite lands from one press
+ok    lamprey_queen x0.5: the jaw gapes (0.99)
+ok    lamprey_queen x0.5: reach 1.60 m
+ok    lamprey_queen x0.5: radius 0.50 m
+ok    lamprey_queen x0.5: capacity 1 (wanted 1)
+ok    lamprey_queen x0.5: a point half the reach ahead is in the bite
+ok    lamprey_queen x0.5: a point at the far end, half the radius off, is in
+ok    lamprey_queen x0.5: a point behind the mouth is out
+ok    lamprey_queen x0.5: a point past the reach is out
+ok    lamprey_queen x0.5: a point far off the nose is out
+ok    lamprey_queen x0.5: cooldown (2.4 s) holds the next bite
+ok    lamprey_queen x1.0: body_scale 11.62
+ok    lamprey_queen x1.0: hitbox length 14.00 m (form 14.0 x 1.0)
+ok    lamprey_queen x1.0: collision box (6.506224, 4.647303, 14.0)
+      model extent (9.568426, 5.978471, 14.73875) m for a hitbox (6.506224, 4.647303, 14.0)
+ok    lamprey_queen x1.0: model length 14.74 m is about the hitbox's 14.00
+      peak spin 2.51 rad/s
+      swim: peak speed 27.7 m/s, turn rate 2.12 rad/s (top_speed_scale 1.20, turn_scale 0.45)
+ok    lamprey_queen x1.0: swims (peak 27.7 m/s)
+ok    lamprey_queen x1.0: turns (2.12 rad/s)
+      camera: 28.17 m away (2.01 body lengths), zoom 10.37, body spans 12% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    lamprey_queen x1.0: one bite lands from one press
+ok    lamprey_queen x1.0: the jaw gapes (0.99)
+ok    lamprey_queen x1.0: reach 3.20 m
+ok    lamprey_queen x1.0: radius 1.00 m
+ok    lamprey_queen x1.0: capacity 1 (wanted 1)
+ok    lamprey_queen x1.0: a point half the reach ahead is in the bite
+ok    lamprey_queen x1.0: a point at the far end, half the radius off, is in
+ok    lamprey_queen x1.0: a point behind the mouth is out
+ok    lamprey_queen x1.0: a point past the reach is out
+ok    lamprey_queen x1.0: a point far off the nose is out
+ok    lamprey_queen x1.0: cooldown (2.4 s) holds the next bite
+ok    lamprey_queen x3.0: body_scale 34.85
+ok    lamprey_queen x3.0: hitbox length 42.00 m (form 14.0 x 3.0)
+ok    lamprey_queen x3.0: collision box (19.51867, 13.94191, 42.0)
+      model extent (28.70528, 17.93541, 44.19695) m for a hitbox (19.51867, 13.94191, 42.0)
+ok    lamprey_queen x3.0: model length 44.20 m is about the hitbox's 42.00
+      peak spin 1.45 rad/s
+      swim: peak speed 48.0 m/s, turn rate 1.22 rad/s (top_speed_scale 2.08, turn_scale 0.26)
+ok    lamprey_queen x3.0: swims (peak 48.0 m/s)
+ok    lamprey_queen x3.0: turns (1.22 rad/s)
+      camera: 84.08 m away (2.00 body lengths), zoom 31.11, body spans 12% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    lamprey_queen x3.0: one bite lands from one press
+ok    lamprey_queen x3.0: the jaw gapes (0.99)
+ok    lamprey_queen x3.0: reach 9.60 m
+ok    lamprey_queen x3.0: radius 3.00 m
+ok    lamprey_queen x3.0: capacity 5 (wanted 5)
+ok    lamprey_queen x3.0: a point half the reach ahead is in the bite
+ok    lamprey_queen x3.0: a point at the far end, half the radius off, is in
+ok    lamprey_queen x3.0: a point behind the mouth is out
+ok    lamprey_queen x3.0: a point past the reach is out
+ok    lamprey_queen x3.0: a point far off the nose is out
+ok    lamprey_queen x3.0: cooldown (2.4 s) holds the next bite
+lamprey_queen: peak speed 19.6 / 27.7 / 48.0 m/s, turn 3.00 / 2.12 / 1.22 rad/s at x0.5 / x1 / x3
+lamprey_queen: camera 2.03 / 2.01 / 2.00 body lengths away, screen share 12% / 12% / 12%
+ok    lamprey_queen: bigger boosts to a higher speed (48.0 > 27.7 > 19.6)
+ok    lamprey_queen: bigger turns slower (1.22 < 3.00)
+ok    lamprey_queen: camera framing holds across sizes (ratio 0.99)
+ok    fallen_angel x0.5: body_scale 4.15
+ok    fallen_angel x0.5: hitbox length 5.00 m (form 10.0 x 0.5)
+ok    fallen_angel x0.5: collision box (2.323652, 1.659751, 5.0)
+      model extent (3.417295, 2.135168, 5.267127) m for a hitbox (2.323652, 1.659751, 5.0)
+ok    fallen_angel x0.5: model length 5.27 m is about the hitbox's 5.00
+      peak spin 5.52 rad/s
+      swim: peak speed 19.6 m/s, turn rate 4.66 rad/s (top_speed_scale 0.85, turn_scale 0.99)
+ok    fallen_angel x0.5: swims (peak 19.6 m/s)
+ok    fallen_angel x0.5: turns (4.66 rad/s)
+      camera: 11.80 m away (2.36 body lengths), zoom 3.70, body spans 10% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    fallen_angel x0.5: one bite lands from one press
+ok    fallen_angel x0.5: the jaw gapes (0.99)
+ok    fallen_angel x0.5: reach 3.25 m
+ok    fallen_angel x0.5: radius 0.65 m
+ok    fallen_angel x0.5: capacity 1 (wanted 1)
+ok    fallen_angel x0.5: a point half the reach ahead is in the bite
+ok    fallen_angel x0.5: a point at the far end, half the radius off, is in
+ok    fallen_angel x0.5: a point behind the mouth is out
+ok    fallen_angel x0.5: a point past the reach is out
+ok    fallen_angel x0.5: a point far off the nose is out
+ok    fallen_angel x0.5: cooldown (1.6 s) holds the next bite
+ok    fallen_angel x1.0: body_scale 8.30
+ok    fallen_angel x1.0: hitbox length 10.00 m (form 10.0 x 1.0)
+ok    fallen_angel x1.0: collision box (4.647303, 3.319502, 10.0)
+      model extent (6.834591, 4.270336, 10.53395) m for a hitbox (4.647303, 3.319502, 10.0)
+ok    fallen_angel x1.0: model length 10.53 m is about the hitbox's 10.00
+      peak spin 3.90 rad/s
+      swim: peak speed 27.7 m/s, turn rate 3.30 rad/s (top_speed_scale 1.20, turn_scale 0.70)
+ok    fallen_angel x1.0: swims (peak 27.7 m/s)
+ok    fallen_angel x1.0: turns (3.30 rad/s)
+      camera: 23.45 m away (2.35 body lengths), zoom 7.41, body spans 10% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    fallen_angel x1.0: one bite lands from one press
+ok    fallen_angel x1.0: the jaw gapes (0.99)
+ok    fallen_angel x1.0: reach 6.50 m
+ok    fallen_angel x1.0: radius 1.30 m
+ok    fallen_angel x1.0: capacity 2 (wanted 2)
+ok    fallen_angel x1.0: a point half the reach ahead is in the bite
+ok    fallen_angel x1.0: a point at the far end, half the radius off, is in
+ok    fallen_angel x1.0: a point behind the mouth is out
+ok    fallen_angel x1.0: a point past the reach is out
+ok    fallen_angel x1.0: a point far off the nose is out
+ok    fallen_angel x1.0: cooldown (1.6 s) holds the next bite
+ok    fallen_angel x3.0: body_scale 24.90
+ok    fallen_angel x3.0: hitbox length 30.00 m (form 10.0 x 3.0)
+ok    fallen_angel x3.0: collision box (13.94191, 9.958507, 30.0)
+      model extent (20.50377, 12.81101, 31.56726) m for a hitbox (13.94191, 9.958507, 30.0)
+ok    fallen_angel x3.0: model length 31.57 m is about the hitbox's 30.00
+      peak spin 2.25 rad/s
+      swim: peak speed 48.0 m/s, turn rate 1.90 rad/s (top_speed_scale 2.08, turn_scale 0.40)
+ok    fallen_angel x3.0: swims (peak 48.0 m/s)
+ok    fallen_angel x3.0: turns (1.90 rad/s)
+      camera: 70.02 m away (2.33 body lengths), zoom 22.22, body spans 10% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    fallen_angel x3.0: one bite lands from one press
+ok    fallen_angel x3.0: the jaw gapes (0.99)
+ok    fallen_angel x3.0: reach 19.50 m
+ok    fallen_angel x3.0: radius 3.90 m
+ok    fallen_angel x3.0: capacity 10 (wanted 10)
+ok    fallen_angel x3.0: a point half the reach ahead is in the bite
+ok    fallen_angel x3.0: a point at the far end, half the radius off, is in
+ok    fallen_angel x3.0: a point behind the mouth is out
+ok    fallen_angel x3.0: a point past the reach is out
+ok    fallen_angel x3.0: a point far off the nose is out
+ok    fallen_angel x3.0: cooldown (1.6 s) holds the next bite
+fallen_angel: peak speed 19.6 / 27.7 / 48.0 m/s, turn 4.66 / 3.30 / 1.90 rad/s at x0.5 / x1 / x3
+fallen_angel: camera 2.36 / 2.35 / 2.33 body lengths away, screen share 10% / 10% / 10%
+ok    fallen_angel: bigger boosts to a higher speed (48.0 > 27.7 > 19.6)
+ok    fallen_angel: bigger turns slower (1.90 < 4.66)
+ok    fallen_angel: camera framing holds across sizes (ratio 0.99)
+ok    ember_octopus x0.5: body_scale 2.49
+ok    ember_octopus x0.5: hitbox length 3.00 m (form 6.0 x 0.5)
+ok    ember_octopus x0.5: collision box (1.394191, 0.995851, 3.0)
+      model extent (2.050377, 1.2811, 3.15868) m for a hitbox (1.394191, 0.995851, 3.0)
+ok    ember_octopus x0.5: model length 3.16 m is about the hitbox's 3.00
+      peak spin 4.73 rad/s
+      swim: peak speed 18.8 m/s, turn rate 4.00 rad/s (top_speed_scale 0.81, turn_scale 0.85)
+ok    ember_octopus x0.5: swims (peak 18.8 m/s)
+ok    ember_octopus x0.5: turns (4.00 rad/s)
+      camera: 6.91 m away (2.30 body lengths), zoom 2.22, body spans 10% of the screen width
+      bite: 1 landed (tick 17), jaw opened to 1.00, took 0.71 s, phase 0
+ok    ember_octopus x0.5: one bite lands from one press
+ok    ember_octopus x0.5: the jaw gapes (1.00)
+ok    ember_octopus x0.5: reach 1.70 m
+ok    ember_octopus x0.5: radius 1.30 m
+ok    ember_octopus x0.5: capacity 2 (wanted 2)
+ok    ember_octopus x0.5: a point half the reach ahead is in the bite
+ok    ember_octopus x0.5: a point at the far end, half the radius off, is in
+ok    ember_octopus x0.5: a point behind the mouth is out
+ok    ember_octopus x0.5: a point past the reach is out
+ok    ember_octopus x0.5: a point far off the nose is out
+ok    ember_octopus x0.5: cooldown (1.8 s) holds the next bite
+ok    ember_octopus x1.0: body_scale 4.98
+ok    ember_octopus x1.0: hitbox length 6.00 m (form 6.0 x 1.0)
+ok    ember_octopus x1.0: collision box (2.788382, 1.991701, 6.0)
+      model extent (4.100754, 2.562201, 6.320982) m for a hitbox (2.788382, 1.991701, 6.0)
+ok    ember_octopus x1.0: model length 6.32 m is about the hitbox's 6.00
+      peak spin 3.35 rad/s
+      swim: peak speed 26.6 m/s, turn rate 2.83 rad/s (top_speed_scale 1.15, turn_scale 0.60)
+ok    ember_octopus x1.0: swims (peak 26.6 m/s)
+ok    ember_octopus x1.0: turns (2.83 rad/s)
+      camera: 13.66 m away (2.28 body lengths), zoom 4.44, body spans 10% of the screen width
+      bite: 1 landed (tick 17), jaw opened to 1.00, took 0.71 s, phase 0
+ok    ember_octopus x1.0: one bite lands from one press
+ok    ember_octopus x1.0: the jaw gapes (1.00)
+ok    ember_octopus x1.0: reach 3.40 m
+ok    ember_octopus x1.0: radius 2.60 m
+ok    ember_octopus x1.0: capacity 5 (wanted 5)
+ok    ember_octopus x1.0: a point half the reach ahead is in the bite
+ok    ember_octopus x1.0: a point at the far end, half the radius off, is in
+ok    ember_octopus x1.0: a point behind the mouth is out
+ok    ember_octopus x1.0: a point past the reach is out
+ok    ember_octopus x1.0: a point far off the nose is out
+ok    ember_octopus x1.0: cooldown (1.8 s) holds the next bite
+ok    ember_octopus x3.0: body_scale 14.94
+ok    ember_octopus x3.0: hitbox length 18.00 m (form 6.0 x 3.0)
+ok    ember_octopus x3.0: collision box (8.365146, 5.975104, 18.0)
+      model extent (12.30226, 7.686605, 18.93998) m for a hitbox (8.365146, 5.975104, 18.0)
+ok    ember_octopus x3.0: model length 18.94 m is about the hitbox's 18.00
+      peak spin 1.93 rad/s
+      swim: peak speed 46.0 m/s, turn rate 1.63 rad/s (top_speed_scale 1.99, turn_scale 0.35)
+ok    ember_octopus x3.0: swims (peak 46.0 m/s)
+ok    ember_octopus x3.0: turns (1.63 rad/s)
+      camera: 40.61 m away (2.26 body lengths), zoom 13.33, body spans 10% of the screen width
+      bite: 1 landed (tick 17), jaw opened to 1.00, took 0.71 s, phase 0
+ok    ember_octopus x3.0: one bite lands from one press
+ok    ember_octopus x3.0: the jaw gapes (1.00)
+ok    ember_octopus x3.0: reach 10.20 m
+ok    ember_octopus x3.0: radius 7.80 m
+ok    ember_octopus x3.0: capacity 26 (wanted 26)
+ok    ember_octopus x3.0: a point half the reach ahead is in the bite
+ok    ember_octopus x3.0: a point at the far end, half the radius off, is in
+ok    ember_octopus x3.0: a point behind the mouth is out
+ok    ember_octopus x3.0: a point past the reach is out
+ok    ember_octopus x3.0: a point far off the nose is out
+ok    ember_octopus x3.0: cooldown (1.8 s) holds the next bite
+ember_octopus: peak speed 18.8 / 26.6 / 46.0 m/s, turn 4.00 / 2.83 / 1.63 rad/s at x0.5 / x1 / x3
+ember_octopus: camera 2.30 / 2.28 / 2.26 body lengths away, screen share 10% / 10% / 10%
+ok    ember_octopus: bigger boosts to a higher speed (46.0 > 26.6 > 18.8)
+ok    ember_octopus: bigger turns slower (1.63 < 4.00)
+ok    ember_octopus: camera framing holds across sizes (ratio 0.98)
+ok    lantern_angler x0.5: body_scale 2.49
+ok    lantern_angler x0.5: hitbox length 3.00 m (form 6.0 x 0.5)
+ok    lantern_angler x0.5: collision box (1.394191, 0.995851, 3.0)
+      model extent (2.050377, 1.2811, 3.160384) m for a hitbox (1.394191, 0.995851, 3.0)
+ok    lantern_angler x0.5: model length 3.16 m is about the hitbox's 3.00
+      peak spin 3.94 rad/s
+      swim: peak speed 18.0 m/s, turn rate 3.33 rad/s (top_speed_scale 0.78, turn_scale 0.71)
+ok    lantern_angler x0.5: swims (peak 18.0 m/s)
+ok    lantern_angler x0.5: turns (3.33 rad/s)
+      camera: 6.64 m away (2.21 body lengths), zoom 2.22, body spans 11% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    lantern_angler x0.5: one bite lands from one press
+ok    lantern_angler x0.5: the jaw gapes (0.99)
+ok    lantern_angler x0.5: reach 1.60 m
+ok    lantern_angler x0.5: radius 1.10 m
+ok    lantern_angler x0.5: capacity 2 (wanted 2)
+ok    lantern_angler x0.5: a point half the reach ahead is in the bite
+ok    lantern_angler x0.5: a point at the far end, half the radius off, is in
+ok    lantern_angler x0.5: a point behind the mouth is out
+ok    lantern_angler x0.5: a point past the reach is out
+ok    lantern_angler x0.5: a point far off the nose is out
+ok    lantern_angler x0.5: cooldown (2.0 s) holds the next bite
+ok    lantern_angler x1.0: body_scale 4.98
+ok    lantern_angler x1.0: hitbox length 6.00 m (form 6.0 x 1.0)
+ok    lantern_angler x1.0: collision box (2.788382, 1.991701, 6.0)
+      model extent (4.100754, 2.562201, 6.319605) m for a hitbox (2.788382, 1.991701, 6.0)
+ok    lantern_angler x1.0: model length 6.32 m is about the hitbox's 6.00
+      peak spin 2.79 rad/s
+      swim: peak speed 25.4 m/s, turn rate 2.36 rad/s (top_speed_scale 1.10, turn_scale 0.50)
+ok    lantern_angler x1.0: swims (peak 25.4 m/s)
+ok    lantern_angler x1.0: turns (2.36 rad/s)
+      camera: 13.08 m away (2.18 body lengths), zoom 4.44, body spans 11% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    lantern_angler x1.0: one bite lands from one press
+ok    lantern_angler x1.0: the jaw gapes (0.99)
+ok    lantern_angler x1.0: reach 3.20 m
+ok    lantern_angler x1.0: radius 2.20 m
+ok    lantern_angler x1.0: capacity 5 (wanted 5)
+ok    lantern_angler x1.0: a point half the reach ahead is in the bite
+ok    lantern_angler x1.0: a point at the far end, half the radius off, is in
+ok    lantern_angler x1.0: a point behind the mouth is out
+ok    lantern_angler x1.0: a point past the reach is out
+ok    lantern_angler x1.0: a point far off the nose is out
+ok    lantern_angler x1.0: cooldown (2.0 s) holds the next bite
+ok    lantern_angler x3.0: body_scale 14.94
+ok    lantern_angler x3.0: hitbox length 18.00 m (form 6.0 x 3.0)
+ok    lantern_angler x3.0: collision box (8.365146, 5.975104, 18.0)
+      model extent (12.30226, 7.686605, 18.93989) m for a hitbox (8.365146, 5.975104, 18.0)
+ok    lantern_angler x3.0: model length 18.94 m is about the hitbox's 18.00
+      peak spin 1.61 rad/s
+      swim: peak speed 44.0 m/s, turn rate 1.36 rad/s (top_speed_scale 1.91, turn_scale 0.29)
+ok    lantern_angler x3.0: swims (peak 44.0 m/s)
+ok    lantern_angler x3.0: turns (1.36 rad/s)
+      camera: 38.95 m away (2.16 body lengths), zoom 13.33, body spans 11% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    lantern_angler x3.0: one bite lands from one press
+ok    lantern_angler x3.0: the jaw gapes (0.99)
+ok    lantern_angler x3.0: reach 9.60 m
+ok    lantern_angler x3.0: radius 6.60 m
+ok    lantern_angler x3.0: capacity 26 (wanted 26)
+ok    lantern_angler x3.0: a point half the reach ahead is in the bite
+ok    lantern_angler x3.0: a point at the far end, half the radius off, is in
+ok    lantern_angler x3.0: a point behind the mouth is out
+ok    lantern_angler x3.0: a point past the reach is out
+ok    lantern_angler x3.0: a point far off the nose is out
+ok    lantern_angler x3.0: cooldown (2.0 s) holds the next bite
+lantern_angler: peak speed 18.0 / 25.4 / 44.0 m/s, turn 3.33 / 2.36 / 1.36 rad/s at x0.5 / x1 / x3
+lantern_angler: camera 2.21 / 2.18 / 2.16 body lengths away, screen share 11% / 11% / 11%
+ok    lantern_angler: bigger boosts to a higher speed (44.0 > 25.4 > 18.0)
+ok    lantern_angler: bigger turns slower (1.36 < 3.33)
+ok    lantern_angler: camera framing holds across sizes (ratio 0.98)
+in a match:
+ok    drowned_shark x0.5: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    drowned_shark x0.5: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    drowned_shark x0.5: and has this one picked
+ok    drowned_shark x0.5: a match with the local fish as Hunter
+ok    drowned_shark x0.5: wears the form's class and species
+ok    drowned_shark x0.5: body scale 2.90 follows the size
+ok    drowned_shark x0.5: hitbox 3.50 m
+ok    drowned_shark x0.5: the bite is the form's (reach 1.75 m)
+ok    drowned_shark x0.5: capacity 1
+ok    drowned_shark x0.5: the schools' alarm scale 0.50
+ok    drowned_shark x0.5: a school's alarm range 7.5 m
+ok    drowned_shark x0.5: the camera's body_follow 1.53
+ok    drowned_shark x3.0: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    drowned_shark x3.0: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    drowned_shark x3.0: and has this one picked
+ok    drowned_shark x3.0: a match with the local fish as Hunter
+ok    drowned_shark x3.0: wears the form's class and species
+ok    drowned_shark x3.0: body scale 17.43 follows the size
+ok    drowned_shark x3.0: hitbox 21.00 m
+ok    drowned_shark x3.0: the bite is the form's (reach 10.50 m)
+ok    drowned_shark x3.0: capacity 21
+ok    drowned_shark x3.0: the schools' alarm scale 3.00
+ok    drowned_shark x3.0: a school's alarm range 45.0 m
+ok    drowned_shark x3.0: the camera's body_follow 2.13
+ok    humpback x0.5: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    humpback x0.5: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    humpback x0.5: and has this one picked
+ok    humpback x0.5: a match with the local fish as Hunter
+ok    humpback x0.5: wears the form's class and species
+ok    humpback x0.5: body scale 0.50 follows the size
+ok    humpback x0.5: hitbox 3.35 m
+ok    humpback x0.5: the bite is the form's (reach 1.10 m)
+ok    humpback x0.5: capacity 2
+ok    humpback x0.5: the schools' alarm scale 0.50
+ok    humpback x0.5: a school's alarm range 7.5 m
+ok    humpback x0.5: the camera's body_follow 1.52
+ok    humpback x3.0: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    humpback x3.0: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    humpback x3.0: and has this one picked
+ok    humpback x3.0: a match with the local fish as Hunter
+ok    humpback x3.0: wears the form's class and species
+ok    humpback x3.0: body scale 3.00 follows the size
+ok    humpback x3.0: hitbox 20.10 m
+ok    humpback x3.0: the bite is the form's (reach 6.60 m)
+ok    humpback x3.0: capacity 31
+ok    humpback x3.0: the schools' alarm scale 3.00
+ok    humpback x3.0: a school's alarm range 45.0 m
+ok    humpback x3.0: the camera's body_follow 2.11
+ok    orca x0.5: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    orca x0.5: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    orca x0.5: and has this one picked
+ok    orca x0.5: a match with the local fish as Hunter
+ok    orca x0.5: wears the form's class and species
+ok    orca x0.5: body scale 0.27 follows the size
+ok    orca x0.5: hitbox 1.80 m
+ok    orca x0.5: the bite is the form's (reach 0.60 m)
+ok    orca x0.5: capacity 1
+ok    orca x0.5: the schools' alarm scale 0.50
+ok    orca x0.5: a school's alarm range 7.5 m
+ok    orca x0.5: the camera's body_follow 1.38
+ok    orca x3.0: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    orca x3.0: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    orca x3.0: and has this one picked
+ok    orca x3.0: a match with the local fish as Hunter
+ok    orca x3.0: wears the form's class and species
+ok    orca x3.0: body scale 1.61 follows the size
+ok    orca x3.0: hitbox 10.80 m
+ok    orca x3.0: the bite is the form's (reach 3.60 m)
+ok    orca x3.0: capacity 21
+ok    orca x3.0: the schools' alarm scale 3.00
+ok    orca x3.0: a school's alarm range 45.0 m
+ok    orca x3.0: the camera's body_follow 1.86
+ok    beluga x0.5: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    beluga x0.5: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    beluga x0.5: and has this one picked
+ok    beluga x0.5: a match with the local fish as Hunter
+ok    beluga x0.5: wears the form's class and species
+ok    beluga x0.5: body scale 0.16 follows the size
+ok    beluga x0.5: hitbox 1.10 m
+ok    beluga x0.5: the bite is the form's (reach 0.38 m)
+ok    beluga x0.5: capacity 1
+ok    beluga x0.5: the schools' alarm scale 0.50
+ok    beluga x0.5: a school's alarm range 7.5 m
+ok    beluga x0.5: the camera's body_follow 1.00
+ok    beluga x3.0: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    beluga x3.0: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    beluga x3.0: and has this one picked
+ok    beluga x3.0: a match with the local fish as Hunter
+ok    beluga x3.0: wears the form's class and species
+ok    beluga x3.0: body scale 0.99 follows the size
+ok    beluga x3.0: hitbox 6.60 m
+ok    beluga x3.0: the bite is the form's (reach 2.25 m)
+ok    beluga x3.0: capacity 16
+ok    beluga x3.0: the schools' alarm scale 3.00
+ok    beluga x3.0: a school's alarm range 45.0 m
+ok    beluga x3.0: the camera's body_follow 1.70
+ok    sperm x0.5: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    sperm x0.5: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    sperm x0.5: and has this one picked
+ok    sperm x0.5: a match with the local fish as Hunter
+ok    sperm x0.5: wears the form's class and species
+ok    sperm x0.5: body scale 0.57 follows the size
+ok    sperm x0.5: hitbox 3.85 m
+ok    sperm x0.5: the bite is the form's (reach 1.25 m)
+ok    sperm x0.5: capacity 2
+ok    sperm x0.5: the schools' alarm scale 0.50
+ok    sperm x0.5: a school's alarm range 7.5 m
+ok    sperm x0.5: the camera's body_follow 1.55
+ok    sperm x3.0: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    sperm x3.0: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    sperm x3.0: and has this one picked
+ok    sperm x3.0: a match with the local fish as Hunter
+ok    sperm x3.0: wears the form's class and species
+ok    sperm x3.0: body scale 3.45 follows the size
+ok    sperm x3.0: hitbox 23.10 m
+ok    sperm x3.0: the bite is the form's (reach 7.50 m)
+ok    sperm x3.0: capacity 26
+ok    sperm x3.0: the schools' alarm scale 3.00
+ok    sperm x3.0: a school's alarm range 45.0 m
+ok    sperm x3.0: the camera's body_follow 2.17
+ok    blue x0.5: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    blue x0.5: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    blue x0.5: and has this one picked
+ok    blue x0.5: a match with the local fish as Hunter
+ok    blue x0.5: wears the form's class and species
+ok    blue x0.5: body scale 0.90 follows the size
+ok    blue x0.5: hitbox 6.00 m
+ok    blue x0.5: the bite is the form's (reach 2.00 m)
+ok    blue x0.5: capacity 3
+ok    blue x0.5: the schools' alarm scale 0.50
+ok    blue x0.5: a school's alarm range 7.5 m
+ok    blue x0.5: the camera's body_follow 1.67
+ok    blue x3.0: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    blue x3.0: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    blue x3.0: and has this one picked
+ok    blue x3.0: a match with the local fish as Hunter
+ok    blue x3.0: wears the form's class and species
+ok    blue x3.0: body scale 5.37 follows the size
+ok    blue x3.0: hitbox 36.00 m
+ok    blue x3.0: the bite is the form's (reach 12.00 m)
+ok    blue x3.0: capacity 47
+ok    blue x3.0: the schools' alarm scale 3.00
+ok    blue x3.0: a school's alarm range 45.0 m
+ok    blue x3.0: the camera's body_follow 2.39
+ok    king_of_herrings x0.5: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    king_of_herrings x0.5: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    king_of_herrings x0.5: and has this one picked
+ok    king_of_herrings x0.5: a match with the local fish as Hunter
+ok    king_of_herrings x0.5: wears the form's class and species
+ok    king_of_herrings x0.5: body scale 6.64 follows the size
+ok    king_of_herrings x0.5: hitbox 8.00 m
+ok    king_of_herrings x0.5: the bite is the form's (reach 2.75 m)
+ok    king_of_herrings x0.5: capacity 2
+ok    king_of_herrings x0.5: the schools' alarm scale 0.50
+ok    king_of_herrings x0.5: a school's alarm range 7.5 m
+ok    king_of_herrings x0.5: the camera's body_follow 1.76
+ok    king_of_herrings x3.0: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    king_of_herrings x3.0: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    king_of_herrings x3.0: and has this one picked
+ok    king_of_herrings x3.0: a match with the local fish as Hunter
+ok    king_of_herrings x3.0: wears the form's class and species
+ok    king_of_herrings x3.0: body scale 39.83 follows the size
+ok    king_of_herrings x3.0: hitbox 48.00 m
+ok    king_of_herrings x3.0: the bite is the form's (reach 16.50 m)
+ok    king_of_herrings x3.0: capacity 36
+ok    king_of_herrings x3.0: the schools' alarm scale 3.00
+ok    king_of_herrings x3.0: a school's alarm range 45.0 m
+ok    king_of_herrings x3.0: the camera's body_follow 2.55
+ok    gulper_mother x0.5: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    gulper_mother x0.5: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    gulper_mother x0.5: and has this one picked
+ok    gulper_mother x0.5: a match with the local fish as Hunter
+ok    gulper_mother x0.5: wears the form's class and species
+ok    gulper_mother x0.5: body scale 3.73 follows the size
+ok    gulper_mother x0.5: hitbox 4.50 m
+ok    gulper_mother x0.5: the bite is the form's (reach 3.00 m)
+ok    gulper_mother x0.5: capacity 3
+ok    gulper_mother x0.5: the schools' alarm scale 0.50
+ok    gulper_mother x0.5: a school's alarm range 7.5 m
+ok    gulper_mother x0.5: the camera's body_follow 1.59
+ok    gulper_mother x3.0: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    gulper_mother x3.0: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    gulper_mother x3.0: and has this one picked
+ok    gulper_mother x3.0: a match with the local fish as Hunter
+ok    gulper_mother x3.0: wears the form's class and species
+ok    gulper_mother x3.0: body scale 22.41 follows the size
+ok    gulper_mother x3.0: hitbox 27.00 m
+ok    gulper_mother x3.0: the bite is the form's (reach 18.00 m)
+ok    gulper_mother x3.0: capacity 42
+ok    gulper_mother x3.0: the schools' alarm scale 3.00
+ok    gulper_mother x3.0: a school's alarm range 45.0 m
+ok    gulper_mother x3.0: the camera's body_follow 2.25
+ok    lamprey_queen x0.5: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    lamprey_queen x0.5: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    lamprey_queen x0.5: and has this one picked
+ok    lamprey_queen x0.5: a match with the local fish as Hunter
+ok    lamprey_queen x0.5: wears the form's class and species
+ok    lamprey_queen x0.5: body scale 5.81 follows the size
+ok    lamprey_queen x0.5: hitbox 7.00 m
+ok    lamprey_queen x0.5: the bite is the form's (reach 1.60 m)
+ok    lamprey_queen x0.5: capacity 1
+ok    lamprey_queen x0.5: the schools' alarm scale 0.50
+ok    lamprey_queen x0.5: a school's alarm range 7.5 m
+ok    lamprey_queen x0.5: the camera's body_follow 1.72
+ok    lamprey_queen x3.0: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    lamprey_queen x3.0: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    lamprey_queen x3.0: and has this one picked
+ok    lamprey_queen x3.0: a match with the local fish as Hunter
+ok    lamprey_queen x3.0: wears the form's class and species
+ok    lamprey_queen x3.0: body scale 34.85 follows the size
+ok    lamprey_queen x3.0: hitbox 42.00 m
+ok    lamprey_queen x3.0: the bite is the form's (reach 9.60 m)
+ok    lamprey_queen x3.0: capacity 5
+ok    lamprey_queen x3.0: the schools' alarm scale 3.00
+ok    lamprey_queen x3.0: a school's alarm range 45.0 m
+ok    lamprey_queen x3.0: the camera's body_follow 2.47
+ok    fallen_angel x0.5: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    fallen_angel x0.5: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    fallen_angel x0.5: and has this one picked
+ok    fallen_angel x0.5: a match with the local fish as Hunter
+ok    fallen_angel x0.5: wears the form's class and species
+ok    fallen_angel x0.5: body scale 4.15 follows the size
+ok    fallen_angel x0.5: hitbox 5.00 m
+ok    fallen_angel x0.5: the bite is the form's (reach 3.25 m)
+ok    fallen_angel x0.5: capacity 1
+ok    fallen_angel x0.5: the schools' alarm scale 0.50
+ok    fallen_angel x0.5: a school's alarm range 7.5 m
+ok    fallen_angel x0.5: the camera's body_follow 1.62
+ok    fallen_angel x3.0: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    fallen_angel x3.0: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    fallen_angel x3.0: and has this one picked
+ok    fallen_angel x3.0: a match with the local fish as Hunter
+ok    fallen_angel x3.0: wears the form's class and species
+ok    fallen_angel x3.0: body scale 24.90 follows the size
+ok    fallen_angel x3.0: hitbox 30.00 m
+ok    fallen_angel x3.0: the bite is the form's (reach 19.50 m)
+ok    fallen_angel x3.0: capacity 10
+ok    fallen_angel x3.0: the schools' alarm scale 3.00
+ok    fallen_angel x3.0: a school's alarm range 45.0 m
+ok    fallen_angel x3.0: the camera's body_follow 2.30
+ok    ember_octopus x0.5: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    ember_octopus x0.5: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    ember_octopus x0.5: and has this one picked
+ok    ember_octopus x0.5: a match with the local fish as Hunter
+ok    ember_octopus x0.5: wears the form's class and species
+ok    ember_octopus x0.5: body scale 2.49 follows the size
+ok    ember_octopus x0.5: hitbox 3.00 m
+ok    ember_octopus x0.5: the bite is the form's (reach 1.70 m)
+ok    ember_octopus x0.5: capacity 2
+ok    ember_octopus x0.5: the schools' alarm scale 0.50
+ok    ember_octopus x0.5: a school's alarm range 7.5 m
+ok    ember_octopus x0.5: the camera's body_follow 1.49
+ERROR: Condition "!is_inside_tree()" is true. Returning: Transform3D()
+   at: get_global_transform (scene/3d/node_3d.cpp:649)
+   GDScript backtrace (most recent call first):
+       [0] mouth_point (res://scripts/what_stinks/hunter_bite.gd:186)
+       [1] _origin_of (res://scripts/what_stinks/attacks/whip_attack.gd:681)
+       [2] on_tick (res://scripts/what_stinks/attacks/whip_attack.gd:364)
+       [3] _physics_process (res://scripts/what_stinks/hunter_bite.gd:350)
+ok    ember_octopus x3.0: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    ember_octopus x3.0: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    ember_octopus x3.0: and has this one picked
+ok    ember_octopus x3.0: a match with the local fish as Hunter
+ok    ember_octopus x3.0: wears the form's class and species
+ok    ember_octopus x3.0: body scale 14.94 follows the size
+ok    ember_octopus x3.0: hitbox 18.00 m
+ok    ember_octopus x3.0: the bite is the form's (reach 10.20 m)
+ok    ember_octopus x3.0: capacity 26
+ok    ember_octopus x3.0: the schools' alarm scale 3.00
+ok    ember_octopus x3.0: a school's alarm range 45.0 m
+ok    ember_octopus x3.0: the camera's body_follow 2.06
+ERROR: Condition "!is_inside_tree()" is true. Returning: Transform3D()
+   at: get_global_transform (scene/3d/node_3d.cpp:649)
+   GDScript backtrace (most recent call first):
+       [0] mouth_point (res://scripts/what_stinks/hunter_bite.gd:186)
+       [1] _origin_of (res://scripts/what_stinks/attacks/whip_attack.gd:681)
+       [2] on_tick (res://scripts/what_stinks/attacks/whip_attack.gd:364)
+       [3] _physics_process (res://scripts/what_stinks/hunter_bite.gd:350)
+ok    lantern_angler x0.5: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    lantern_angler x0.5: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    lantern_angler x0.5: and has this one picked
+ok    lantern_angler x0.5: a match with the local fish as Hunter
+ok    lantern_angler x0.5: wears the form's class and species
+ok    lantern_angler x0.5: body scale 2.49 follows the size
+ok    lantern_angler x0.5: hitbox 3.00 m
+ok    lantern_angler x0.5: the bite is the form's (reach 1.60 m)
+ok    lantern_angler x0.5: capacity 2
+ok    lantern_angler x0.5: the schools' alarm scale 0.50
+ok    lantern_angler x0.5: a school's alarm range 7.5 m
+ok    lantern_angler x0.5: the camera's body_follow 1.49
+ok    lantern_angler x3.0: the card has Hunter and no Size (locked at 0.5x, a panel option) (["Variant", "Start as", "Hunter"])
+ok    lantern_angler x3.0: the card lists the ready forms only (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    lantern_angler x3.0: and has this one picked
+ok    lantern_angler x3.0: a match with the local fish as Hunter
+ok    lantern_angler x3.0: wears the form's class and species
+ok    lantern_angler x3.0: body scale 14.94 follows the size
+ok    lantern_angler x3.0: hitbox 18.00 m
+ok    lantern_angler x3.0: the bite is the form's (reach 9.60 m)
+ok    lantern_angler x3.0: capacity 26
+ok    lantern_angler x3.0: the schools' alarm scale 3.00
+ok    lantern_angler x3.0: a school's alarm range 45.0 m
+ok    lantern_angler x3.0: the camera's body_follow 2.06
+ok    a form's camera factor pushes the camera back (extra 1.35 m)
+ok    and factor 1 puts it back
+hunter_forms_probe: 1020 checks, 0 failed

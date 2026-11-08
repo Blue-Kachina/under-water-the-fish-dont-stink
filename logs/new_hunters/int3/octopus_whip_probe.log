@@ -1,0 +1,89 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+      A: the core
+ok    8-target case: 8 locks from 10 ahead (8)
+ok    8-target case: one arm each (8 distinct arms)
+ok    8-target case: the nearest eight are the ones locked
+ok    targets behind, out of range and outside the cone are not locked
+ok    no arm is sent to the far side of its target (they do not cross)
+ok    hold: all eight stay locked (8), beat HOLD
+ok    hold: every arm shows a cocked shape
+ok    release: 8 arms lashed at full charge (8)
+ok    release: arms go 30 to 60 ms apart
+ok    release: nearest target first
+ok    8 hits, all credited (8)
+ok    every arm's tip lands on its target (worst miss 0.19 m)
+ok    an arm stretches no more than whip_stretch (1.16x)
+ok    after the lash everything is back to rest (busy false, beat 0)
+ok    recoil: one impulse per arm (8)
+ok    recoil: the sum pushes the octopus away from the targets (1.00)
+ok    recoil: capped for one lash (7.00 m/s of 7.0)
+ok    smooth: no joint pops through the lash (0 pops, fastest 0.42 m per tick)
+      info: lash ran 0.00 s, arrivals at [0.125, 0.176, 0.218, 0.26, 0.285, 0.326, 0.376, 0.426]
+ok    recoil: one hit at no charge pushes whip_recoil x 0.65..1 (1.43)
+ok    recoil: straight back from the target
+ok    tap: lashes only half the locks at no charge (2 of 4)
+ok    recoil scales with the hits: 4 arms push 8.75 vs 1 arm 1.43
+ok    a target that got away is a miss, not a hit
+ok    miss: smaller recoil than a full-charge hit (0.77 vs 2.20)
+ok    charge buys reach: a target 1.2 x the range is locked only once charged (0 then 1)
+      A2: edge cases
+ok    hold: five locked (5)
+ok    hold: a target that goes behind or far is dropped (3 left, 2 dropped)
+ok    hold: a target in the slack band is kept (3)
+ok    release: a target outside the cone is dropped (fired 2, cone 75 deg)
+ok    a second release is ignored
+ok    release with no press does nothing
+ok    abort: the arms settle back, nothing is hit
+ok    a press during a lash starts a new hold (4 locks)
+ok    ... with every arm still posed
+ok    ... and it settles after a cancel
+ok    whiff: with nothing locked 4 front arms lash into the water
+ok    whiff: four misses, small recoil (3.06)
+ok    whiff: back to rest
+ok    an instant tap lashes half of six locks (3)
+ok    whip_arms = 3 caps the locks (3)
+ok    whip_arms = 0 locks nothing
+ok    the first landing triggers the kit's hit-stop on the lash clock
+      B: joints -> bends
+ok    solver: the rest joints give (almost) no bends and no stretch (0.000 rad, 0.000)
+ok    attach_model: arm lengths come from the model
+ok    solver: cocked coils (loose and tight) are reproduced by the skeleton (worst 0.0% of the arm)
+ok    solver: lashed shapes (stretched, bowed) are reproduced (worst 0.1% of the arm)
+ok    stretch: the tip reaches a goal 1.5 arm-lengths away (0.01 m off, arm 3.77 m)
+ok    stretch: clearing the stretch and the pose gives the rest arm back
+ok    solver: the suckers face the inside of a tight coil (9 of 9 joints)
+      B2: the attack posing a real OctopusModel
+ok    model: eight locked (8)
+ok    model: the arms' tips are where the cocked shapes put them (0.1%)
+ok    model: locked arms glow (1.45, 1.45)
+ok    model: through the whole lash the skeleton follows the shapes (worst tip 3.5% of the arm)
+ok    model: arms really reach out past their length (1.25x)
+ok    model: no arm tip jumps more than 1.2 m in a tick (0)
+ok    model: the lash is over and the arms are released
+ok    model: the arms end at the rig's rest pose with the stretch gone (0.00%)
+ok    model: the mantle is released
+      C: a real bite
+ok    style: key is whip
+ok    style table (registration needed if false: true)
+ok    press: three locked (3), beat 1
+ok    press: lunge is off (the recoil is the push)
+ok    press: the FX node was made
+ok    hold: the charge reaches the lash (0.50)
+ok    release: exactly one landing (1) and one chomp (1)
+ok    release: the strike waited for the first arm (117 ms; its flight 115 ms)
+ok    release: the nearest arm hit (1)
+ok    recoil: the fish was pushed back (2.54 m/s, (-0.082454, 0.059961, 2.540309))
+ok    sounds: lash, crack and hit beats played (["lash", "whoosh", "whoosh", "crack", "hit", "crack", "hit"])
+ok    fx: a crack per lashed arm (2 cracks, 2 arms)
+ok    stall limit: the bite lands at whip_stall_max (58 ms) even if the arm is slow
+ok    abort: no landing, the arms settled
+ok    tap mode: one press lashes and lands (1 landed, 1 hit)
+ok    puppet: the recoil is not applied (the owner's machine does it)
+octopus_whip_probe: 74 checks, 0 failed
+WARNING: 27 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 4 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+ERROR: Pages in use exist at exit in PagedAllocator: N12VariantPools12BucketMediumE
+   at: ~PagedAllocator (./core/templates/paged_allocator.h:170)

@@ -19,11 +19,13 @@ static func sheet() -> Dictionary:
 		# Tail Slap: reach 2.2 m but 2.6 m half width at the far end (a ~100 degree cone), 6 fish, slow wind-up.
 		"bite_reach_m": 2.2, "bite_radius_m": 2.6, "bite_wind": 0.95, "bite_every": 2.4,
 		"capacity": 6.0, "attack": "engulf",
+		# Attack exaggeration (AttackExaggerate over WhaleJaw's whale preset, B1): pleats balloon big, baleen lengthens
+		"exaggerate": {"channels": {"throat": {"hold_peak": 2.6}, "teeth": {"hold_peak": 1.6, "release_peak": 2.0}}},
 		# Long body with a long fluke: the camera sits further back and a little higher than the shark's.
 		"cam": Vector2(1.2, 1.1),
 	}
 
 
 ## The hinged jaw (WhaleJaw: meta hunter_jaw), the same one every round. Called every round, so keep it safe to repeat.
-static func dress(fish: FishController, _sheet: Dictionary) -> void:
-	WhaleJaw.wear(fish)
+static func dress(fish: FishController, sheet: Dictionary) -> void:
+	WhaleJaw.wear(fish, sheet)

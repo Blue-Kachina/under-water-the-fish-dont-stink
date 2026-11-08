@@ -1,0 +1,98 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    humpback: rests shut with an exaggeration kit
+ok    humpback: the held gape (126 deg) is well past the old 80
+ok    humpback: and never past the limit (126 of 135)
+ok    humpback: the press squashes the body first (min 0.942)
+ok    humpback: the charge swells the body (max 1.166, now 1.166)
+ok    humpback: but the camera margin stays small (peak 1.17)
+ok    humpback: the baleen / teeth grow (x1.50)
+ok    humpback: the empty throat balloons while held (swell 0.185 m)
+ok    humpback: bite is fully open
+ok    humpback: the release lands
+ok    humpback: hit-stop holds 3 ticks
+ok    humpback: the pose does not move during hit-stop
+ok    humpback: the jaw rebounds open off the landing (12.6 deg)
+ok    humpback: no popping: largest per-tick jaw step 23.9 deg
+ok    humpback: everything settles back (angle 0.000, scale (1.0, 1.0, 1.000002), phase 0)
+ok    humpback: baleen / teeth / tongue are back to rest size
+ok    humpback: an aborted bite settles with no rebound
+ok    orca: rests shut with an exaggeration kit
+ok    orca: the held gape (127 deg) is well past the old 80
+ok    orca: and never past the limit (127 of 135)
+ok    orca: the press squashes the body first (min 0.942)
+ok    orca: the charge swells the body (max 1.166, now 1.166)
+ok    orca: but the camera margin stays small (peak 1.17)
+ok    orca: the baleen / teeth grow (x1.59)
+ok    orca: the empty throat balloons while held (swell 0.031 m)
+ok    orca: bite is fully open
+ok    orca: the release lands
+ok    orca: hit-stop holds 3 ticks
+ok    orca: the pose does not move during hit-stop
+ok    orca: the jaw rebounds open off the landing (12.6 deg)
+ok    orca: no popping: largest per-tick jaw step 24.5 deg
+ok    orca: everything settles back (angle 0.000, scale (1.000001, 1.000001, 1.0), phase 0)
+ok    orca: baleen / teeth / tongue are back to rest size
+ok    orca: an aborted bite settles with no rebound
+ok    beluga: rests shut with an exaggeration kit
+ok    beluga: the held gape (126 deg) is well past the old 80
+ok    beluga: and never past the limit (126 of 135)
+ok    beluga: the press squashes the body first (min 0.942)
+ok    beluga: the charge swells the body (max 1.200, now 1.200)
+ok    beluga: but the camera margin stays small (peak 1.20)
+ok    beluga: the baleen / teeth grow (x1.42)
+ok    beluga: the empty throat balloons while held (swell 0.052 m)
+ok    beluga: bite is fully open
+ok    beluga: the release lands
+ok    beluga: hit-stop holds 3 ticks
+ok    beluga: the pose does not move during hit-stop
+ok    beluga: the jaw rebounds open off the landing (12.6 deg)
+ok    beluga: no popping: largest per-tick jaw step 23.9 deg
+ok    beluga: everything settles back (angle 0.000, scale (1.000001, 1.000001, 0.999998), phase 0)
+ok    beluga: baleen / teeth / tongue are back to rest size
+ok    beluga: an aborted bite settles with no rebound
+ok    sperm: rests shut with an exaggeration kit
+ok    sperm: the held gape (128 deg) is well past the old 80
+ok    sperm: and never past the limit (128 of 135)
+ok    sperm: the press squashes the body first (min 0.942)
+ok    sperm: the charge swells the body (max 1.133, now 1.133)
+ok    sperm: but the camera margin stays small (peak 1.13)
+ok    sperm: the baleen / teeth grow (x1.59)
+ok    sperm: bite is fully open
+ok    sperm: the release lands
+ok    sperm: hit-stop holds 3 ticks
+ok    sperm: the pose does not move during hit-stop
+ok    sperm: the jaw rebounds open off the landing (12.6 deg)
+ok    sperm: no popping: largest per-tick jaw step 25.1 deg
+ok    sperm: everything settles back (angle 0.000, scale (1.000001, 1.000001, 0.999998), phase 0)
+ok    sperm: baleen / teeth / tongue are back to rest size
+ok    sperm: an aborted bite settles with no rebound
+ok    blue: rests shut with an exaggeration kit
+ok    blue: the held gape (125 deg) is well past the old 80
+ok    blue: and never past the limit (125 of 135)
+ok    blue: the press squashes the body first (min 0.942)
+ok    blue: the charge swells the body (max 1.100, now 1.100)
+ok    blue: but the camera margin stays small (peak 1.10)
+ok    blue: the baleen / teeth grow (x1.42)
+ok    blue: the empty throat balloons while held (swell 0.208 m)
+ok    blue: bite is fully open
+ok    blue: the release lands
+ok    blue: hit-stop holds 3 ticks
+ok    blue: the pose does not move during hit-stop
+ok    blue: the jaw rebounds open off the landing (12.6 deg)
+ok    blue: no popping: largest per-tick jaw step 23.8 deg
+ok    blue: everything settles back (angle 0.000, scale (1.0, 1.0, 0.999999), phase 0)
+ok    blue: baleen / teeth / tongue are back to rest size
+ok    blue: an aborted bite settles with no rebound
+ok    off (form multiplier 0): the body is never scaled (0.00000)
+ok    off: the held gape is the old whale_gape_deg (87.1)
+ok    off: no hit-stop
+ok    match: the Humpback's jaw carries the kit
+ok    match: the press runs the anticipation then the hold ([0, 1, 2])
+ok    match: the held gape is exaggerated (129 deg)
+ok    match: the charge feeds the kit (1.00)
+ok    match: the release fires the snap once (1)
+ok    match: the landing's contact starts one hit-stop (1)
+ok    match: it settles after the bite (phase 0, angle 0.000)
+ok    match: a bite called off (battered) lets the kit settle (phase 0)
+b1_whales_probe: 95 checks, 0 failed

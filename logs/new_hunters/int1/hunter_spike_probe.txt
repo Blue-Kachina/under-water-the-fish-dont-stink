@@ -1,0 +1,112 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    drowned_shark x0.5: body_scale 2.90
+ok    drowned_shark x0.5: hitbox length 3.50 m (form 7.0 x 0.5)
+ok    drowned_shark x0.5: collision box (1.626556, 1.161826, 3.5)
+      model extent (2.392107, 1.494617, 3.686599) m for a hitbox (1.626556, 1.161826, 3.5)
+ok    drowned_shark x0.5: model length 3.69 m is about the hitbox's 3.50
+      peak spin 4.34 rad/s
+      swim: peak speed 21.2 m/s, turn rate 3.66 rad/s (top_speed_scale 0.92, turn_scale 0.78)
+ok    drowned_shark x0.5: swims (peak 21.2 m/s)
+ok    drowned_shark x0.5: turns (3.66 rad/s)
+      camera: 7.53 m away (2.15 body lengths), zoom 2.59, body spans 11% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    drowned_shark x0.5: one bite lands from one press
+ok    drowned_shark x0.5: the jaw gapes (0.99)
+ok    drowned_shark x0.5: reach 1.75 m
+ok    drowned_shark x0.5: radius 0.80 m
+ok    drowned_shark x0.5: capacity 1 (wanted 1)
+ok    drowned_shark x0.5: a point half the reach ahead is in the bite
+ok    drowned_shark x0.5: a point at the far end, half the radius off, is in
+ok    drowned_shark x0.5: a point behind the mouth is out
+ok    drowned_shark x0.5: a point past the reach is out
+ok    drowned_shark x0.5: a point far off the nose is out
+ok    drowned_shark x0.5: cooldown (1.4 s) holds the next bite
+ok    drowned_shark x1.0: body_scale 5.81
+ok    drowned_shark x1.0: hitbox length 7.00 m (form 7.0 x 1.0)
+ok    drowned_shark x1.0: collision box (3.253112, 2.323651, 7.0)
+      model extent (4.784213, 2.989235, 7.368333) m for a hitbox (3.253112, 2.323651, 7.0)
+ok    drowned_shark x1.0: model length 7.37 m is about the hitbox's 7.00
+      peak spin 3.07 rad/s
+      swim: peak speed 30.0 m/s, turn rate 2.59 rad/s (top_speed_scale 1.30, turn_scale 0.55)
+ok    drowned_shark x1.0: swims (peak 30.0 m/s)
+ok    drowned_shark x1.0: turns (2.59 rad/s)
+      camera: 14.91 m away (2.13 body lengths), zoom 5.19, body spans 11% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    drowned_shark x1.0: one bite lands from one press
+ok    drowned_shark x1.0: the jaw gapes (0.99)
+ok    drowned_shark x1.0: reach 3.50 m
+ok    drowned_shark x1.0: radius 1.60 m
+ok    drowned_shark x1.0: capacity 4 (wanted 4)
+ok    drowned_shark x1.0: a point half the reach ahead is in the bite
+ok    drowned_shark x1.0: a point at the far end, half the radius off, is in
+ok    drowned_shark x1.0: a point behind the mouth is out
+ok    drowned_shark x1.0: a point past the reach is out
+ok    drowned_shark x1.0: a point far off the nose is out
+ok    drowned_shark x1.0: cooldown (1.4 s) holds the next bite
+ok    drowned_shark x3.0: body_scale 17.43
+ok    drowned_shark x3.0: hitbox length 21.00 m (form 7.0 x 3.0)
+ok    drowned_shark x3.0: collision box (9.759336, 6.970954, 21.0)
+      model extent (14.35264, 8.967707, 22.10004) m for a hitbox (9.759336, 6.970954, 21.0)
+ok    drowned_shark x3.0: model length 22.10 m is about the hitbox's 21.00
+      peak spin 1.77 rad/s
+      swim: peak speed 52.0 m/s, turn rate 1.50 rad/s (top_speed_scale 2.25, turn_scale 0.32)
+ok    drowned_shark x3.0: swims (peak 52.0 m/s)
+ok    drowned_shark x3.0: turns (1.50 rad/s)
+      camera: 44.42 m away (2.12 body lengths), zoom 15.56, body spans 11% of the screen width
+      bite: 1 landed (tick 8), jaw opened to 0.99, took 0.64 s, phase 0
+ok    drowned_shark x3.0: one bite lands from one press
+ok    drowned_shark x3.0: the jaw gapes (0.99)
+ok    drowned_shark x3.0: reach 10.50 m
+ok    drowned_shark x3.0: radius 4.80 m
+ok    drowned_shark x3.0: capacity 21 (wanted 21)
+ok    drowned_shark x3.0: a point half the reach ahead is in the bite
+ok    drowned_shark x3.0: a point at the far end, half the radius off, is in
+ok    drowned_shark x3.0: a point behind the mouth is out
+ok    drowned_shark x3.0: a point past the reach is out
+ok    drowned_shark x3.0: a point far off the nose is out
+ok    drowned_shark x3.0: cooldown (1.4 s) holds the next bite
+drowned_shark: peak speed 21.2 / 30.0 / 52.0 m/s, turn 3.66 / 2.59 / 1.50 rad/s at x0.5 / x1 / x3
+drowned_shark: camera 2.15 / 2.13 / 2.12 body lengths away, screen share 11% / 11% / 11%
+ok    drowned_shark: bigger boosts to a higher speed (52.0 > 30.0 > 21.2)
+ok    drowned_shark: bigger turns slower (1.50 < 3.66)
+ok    drowned_shark: camera framing holds across sizes (ratio 0.98)
+ok    humpback x0.5: body_scale 0.50
+ok    humpback x0.5: hitbox length 3.35 m (form 6.7 x 0.5)
+ok    humpback x0.5: collision box (1.2, 0.95, 3.35)
+      model extent (1.909506, 0.977266, 3.335185) m for a hitbox (1.2, 0.95, 3.35)
+ok    humpback x0.5: model length 3.34 m is about the hitbox's 3.35
+      lod range end now 8.4
+      peak spin 3.94 rad/s
+      swim: peak speed 18.8 m/s, turn rate 3.33 rad/s (top_speed_scale 0.81, turn_scale 0.71)
+ok    humpback x0.5: swims (peak 18.8 m/s)
+ok    humpback x0.5: turns (3.33 rad/s)
+      camera: 8.55 m away (2.55 body lengths), zoom 2.48, body spans 7% of the screen width
+ok    humpback x1.0: body_scale 1.00
+ok    humpback x1.0: hitbox length 6.70 m (form 6.7 x 1.0)
+ok    humpback x1.0: collision box (2.4, 1.9, 6.7)
+      model extent (3.819012, 1.941625, 6.669039) m for a hitbox (2.4, 1.9, 6.7)
+ok    humpback x1.0: model length 6.67 m is about the hitbox's 6.70
+      lod range end now 16.8
+      peak spin 2.79 rad/s
+      swim: peak speed 26.6 m/s, turn rate 2.36 rad/s (top_speed_scale 1.15, turn_scale 0.50)
+ok    humpback x1.0: swims (peak 26.6 m/s)
+ok    humpback x1.0: turns (2.36 rad/s)
+      camera: 16.95 m away (2.53 body lengths), zoom 4.96, body spans 7% of the screen width
+ok    humpback x3.0: body_scale 3.00
+ok    humpback x3.0: hitbox length 20.10 m (form 6.7 x 3.0)
+ok    humpback x3.0: collision box (7.2, 5.7, 20.1)
+      model extent (11.45704, 5.824876, 20.00712) m for a hitbox (7.2, 5.7, 20.1)
+ok    humpback x3.0: model length 20.01 m is about the hitbox's 20.10
+      lod range end now 50.3
+      peak spin 1.61 rad/s
+      swim: peak speed 46.0 m/s, turn rate 1.36 rad/s (top_speed_scale 1.99, turn_scale 0.29)
+ok    humpback x3.0: swims (peak 46.0 m/s)
+ok    humpback x3.0: turns (1.36 rad/s)
+      camera: 50.56 m away (2.52 body lengths), zoom 14.89, body spans 7% of the screen width
+humpback: peak speed 18.8 / 26.6 / 46.0 m/s, turn 3.33 / 2.36 / 1.36 rad/s at x0.5 / x1 / x3
+humpback: camera 2.55 / 2.53 / 2.52 body lengths away, screen share 7% / 7% / 7%
+ok    humpback: bigger boosts to a higher speed (46.0 > 26.6 > 18.8)
+ok    humpback: bigger turns slower (1.36 < 3.33)
+ok    humpback: camera framing holds across sizes (ratio 0.99)
+hunter_spike_probe: 75 checks, 0 failed

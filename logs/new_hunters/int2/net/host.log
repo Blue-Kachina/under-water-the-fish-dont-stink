@@ -1,0 +1,52 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+  [host] PASS  our match, four bots to fill it
+host: hosting on 24733
+  [host] PASS  hosting: the session has our match
+  [host] PASS  both guests' fish are puppets in our match
+host: a round, guest a hunting
+  [host] PASS  guest a takes a turn hunting
+  [host] PASS  a hunts here too (a Hunter's body and bite on its puppet)
+host: privacy
+  [host] PASS  b's view: only its own exposure ([{ 116922323200: 0.6 }, 0.0, 0.0, 0.0])
+  [host] PASS  a's view (the Hunter): exposures of live prey only ([{ 116922323200: 0.6 }])
+host: b joins a school
+  [host] PASS  b joined school 0 here
+  [host] PASS  b is in lockstep with its place here (0.02 m)
+host: b spooks
+  [host] PASS  b's Spook was judged here (0 left)
+  [host] PASS  b is still in its school after the Spook
+host: a Click and Sniff
+  [host] PASS  a's Sniff button reached us: the cone narrows
+  [host] PASS  and its release too
+host: a bites b's school
+  [host] PASS  b is still joined before the bite
+SCRIPT ERROR: Trying to get a return value of a method that returns "void"
+   at: <anonymous lambda> (res://tests/what_stinks_net_peer.gd:210)
+   GDScript backtrace (most recent call first):
+       [0] <anonymous lambda> (res://tests/what_stinks_net_peer.gd:210)
+       [1] <anonymous lambda> (res://scripts/what_stinks/what_stinks_match.gd:498)
+       [2] net_close (res://scripts/what_stinks/hunter_bite.gd:303)
+       [3] _ws_bite_stop (res://scripts/net/what_stinks_net.gd:605)
+    host: bite by Remote134868062100 took {  } and 0 players
+  [host] FAIL  a's bite ate b here (its place was in it)
+  [host] FAIL  and school fish with it (113 -> 113)
+  [host] PASS  a's held bite opened and closed on its puppet here (1 open, 1 close)
+  [host] PASS  with the charge it held, clamped ([0.39583333333333])
+  [host] FAIL  b is out of its school
+host: ROUND_OVER
+  [host] PASS  the round's over (the clock)
+host: Upset Stomach
+SCRIPT ERROR: Trying to get a return value of a method that returns "void"
+   at: <anonymous lambda> (res://tests/what_stinks_net_peer.gd:210)
+   GDScript backtrace (most recent call first):
+       [0] <anonymous lambda> (res://tests/what_stinks_net_peer.gd:210)
+       [1] <anonymous lambda> (res://scripts/what_stinks/what_stinks_match.gd:498)
+       [2] net_close (res://scripts/what_stinks/hunter_bite.gd:303)
+       [3] _ws_bite_stop (res://scripts/net/what_stinks_net.gd:605)
+    host: bite by Remote134868062100 took {  } and 1 players
+  [host] PASS  a's bite spat b out here: not eaten
+  [host] PASS  b is dazed, a is queasy (1.0)
+host: schools come and grow
+host: leaving
+what_stinks_net_peer [host]: 3 FAILED

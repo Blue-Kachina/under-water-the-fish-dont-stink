@@ -1,0 +1,8 @@
+# B2-shark log
+1. Read plan, AttackExaggerate kit, HunterBite/HunterJaw/HunterBiteFx. The shark has no rig: HunterBite poses HunterJaw (shared, not mine) and sets model rotation each physics tick.
+2. Decision: new file scripts/what_stinks/forms/shark_rig.gd (Node child of the visual, process_priority 100 so it runs after HunterBite). dress() in drowned_shark.gd builds/reuses it. Rig drives AttackExaggerate from HunterBite signals (opened/released/landed/aborted) + polls charge each tick.
+3. Decision: per-tooth meshes (split HunterJaw's tooth ArrayMeshes, 12 verts per tooth) scaled about each tooth root, so scaled teeth stay rooted in the gum (no detaching at the corners). Originals hidden.
+4. Decision: jaw wider = extra overshoot on HunterJaw (set_overshoot(bite.over + extra) and re-pose) gated by bite.open; head thrust = model position z + mild z stretch about the tail; eye flare = Eye* scale + shader glow + iris colour.
+5. Finding: Node.process_priority only orders _process; _physics_process needs process_physics_priority (lamprey_exaggerate.gd uses process_priority = 100 for a physics hook: likely runs BEFORE the rig, check).
+6. Probe tests/b2_shark_probe.tscn: 29 checks green (gape 1.26 -> ~2 rad, thrust 0.2 L, teeth 0.63..2.25x, eye glow 0.7 -> 2.5, hit-stop 2-3 ticks, exact rest after settle, master 0 = plain, master 2 bigger).
+7. Strips: tests/b2_shark_shots.tscn -> logs/new_hunters/b2_shots/{side,front34,above}.png (rest/press/hold/release x4/settle). Reviewed side+front34: teeth, gape, eye flare readable; strike phase of the base bite is long so the jaw stays open ~16 ticks after release.

@@ -1,0 +1,109 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+sheet:
+ok    name and class
+ok    length, reach, wind-up set
+ok    camera sits above for the stalk
+ok    reports ready
+size x0.5:
+ok    x0.5: the angler's rig is on the model
+ok    x0.5: the bite's jaw is the angler's
+ok    x0.5: dressing twice leaves one rig (1)
+ok    x0.5: the shark's own parts are hidden
+ok    x0.5: hitbox 3.00 m (body scale 2.49)
+ok    x0.5: model length 3.00 m = hitbox 3.00 m
+ok    x0.5: head at the front of the box
+ok    x0.5: nearly straight at rest (a sinking head bends it a little) (tail off axis by (0.0, 0.0, 0.0) of length)
+ok    x0.5: the mouth is near the front (0.55 m off the nose)
+ok    x0.5: pose(open) turns the jaw (0.00 -> 1.00)
+      still: tail span 0.239 rad, flap span 0.600 rad, bursts 0
+ok    x0.5: a still angler sways its tail a little (0.239 rad)
+ok    x0.5: and sculls its pectorals (0.600 rad)
+ok    x0.5: no burst while still
+ok    x0.5: still channels move smoothly (tail step 0.0053, fin step 0.0164)
+      lunge: peak thrust 7.7 m/s2, bursts 1, peak snap 0.326 rad (cap 0.698), tail step max 0.0276
+ok    x0.5: a lunge fires a tail burst (1)
+ok    x0.5: the snap is a real flick, bounded (0.326 of 0.698)
+ok    x0.5: the snap is continuous, no pop (largest frame step 0.0276)
+ok    x0.5: fins blend smoothly in the burst (flap rate 2.38 rad/s, sweep 0.007 flutter 0.021)
+      cruising: speed share 1.00, flap span 0.282, sweep mean 0.380
+ok    x0.5: the scull is smaller at speed (0.282 < 0.600)
+ok    x0.5: fins sweep back at speed
+      turning: mean flap left -0.025 right 0.257
+ok    x0.5: a turn favours one fin (-0.025 vs 0.257)
+ok    x0.5: and the tail stays smooth in the turn (step 0.0075)
+ok    x0.5: no NaN in the spine, tail or esca
+      bite: landed 1, jaw peak 0.99, bursts 1 -> 2
+ok    x0.5: one press lands a bite
+ok    x0.5: the bite opens the angler's jaw (0.99)
+ok    x0.5: the bite's release snaps the tail
+size x1.0:
+ok    x1.0: the angler's rig is on the model
+ok    x1.0: the bite's jaw is the angler's
+ok    x1.0: dressing twice leaves one rig (1)
+ok    x1.0: the shark's own parts are hidden
+ok    x1.0: hitbox 6.00 m (body scale 4.98)
+ok    x1.0: model length 6.00 m = hitbox 6.00 m
+ok    x1.0: head at the front of the box
+ok    x1.0: nearly straight at rest (a sinking head bends it a little) (tail off axis by (0.0, 0.012739, 0.0) of length)
+ok    x1.0: the mouth is near the front (1.10 m off the nose)
+ok    x1.0: pose(open) turns the jaw (0.00 -> 1.00)
+      still: tail span 0.224 rad, flap span 0.683 rad, bursts 0
+ok    x1.0: a still angler sways its tail a little (0.224 rad)
+ok    x1.0: and sculls its pectorals (0.683 rad)
+ok    x1.0: no burst while still
+ok    x1.0: still channels move smoothly (tail step 0.0049, fin step 0.0169)
+      lunge: peak thrust 10.9 m/s2, bursts 1, peak snap 0.326 rad (cap 0.698), tail step max 0.0334
+ok    x1.0: a lunge fires a tail burst (1)
+ok    x1.0: the snap is a real flick, bounded (0.326 of 0.698)
+ok    x1.0: the snap is continuous, no pop (largest frame step 0.0334)
+ok    x1.0: fins blend smoothly in the burst (flap rate 2.45 rad/s, sweep 0.007 flutter 0.029)
+      cruising: speed share 1.00, flap span 0.282, sweep mean 0.380
+ok    x1.0: the scull is smaller at speed (0.282 < 0.683)
+ok    x1.0: fins sweep back at speed
+      turning: mean flap left -0.022 right 0.246
+ok    x1.0: a turn favours one fin (-0.022 vs 0.246)
+ok    x1.0: and the tail stays smooth in the turn (step 0.0075)
+ok    x1.0: no NaN in the spine, tail or esca
+      bite: landed 1, jaw peak 0.99, bursts 1 -> 2
+ok    x1.0: one press lands a bite
+ok    x1.0: the bite opens the angler's jaw (0.99)
+ok    x1.0: the bite's release snaps the tail
+size x3.0:
+ok    x3.0: the angler's rig is on the model
+ok    x3.0: the bite's jaw is the angler's
+ok    x3.0: dressing twice leaves one rig (1)
+ok    x3.0: the shark's own parts are hidden
+ok    x3.0: hitbox 18.00 m (body scale 14.94)
+ok    x3.0: model length 18.00 m = hitbox 18.00 m
+ok    x3.0: head at the front of the box
+ok    x3.0: nearly straight at rest (a sinking head bends it a little) (tail off axis by (0.0, -0.023433, 0.0) of length)
+ok    x3.0: the mouth is near the front (3.29 m off the nose)
+ok    x3.0: pose(open) turns the jaw (0.00 -> 1.00)
+      still: tail span 0.121 rad, flap span 0.783 rad, bursts 0
+ok    x3.0: a still angler sways its tail a little (0.121 rad)
+ok    x3.0: and sculls its pectorals (0.783 rad)
+ok    x3.0: no burst while still
+ok    x3.0: still channels move smoothly (tail step 0.0035, fin step 0.0165)
+      lunge: peak thrust 19.0 m/s2, bursts 1, peak snap 0.326 rad (cap 0.698), tail step max 0.0372
+ok    x3.0: a lunge fires a tail burst (1)
+ok    x3.0: the snap is a real flick, bounded (0.326 of 0.698)
+ok    x3.0: the snap is continuous, no pop (largest frame step 0.0372)
+ok    x3.0: fins blend smoothly in the burst (flap rate 2.73 rad/s, sweep 0.012 flutter 0.042)
+      cruising: speed share 1.00, flap span 0.286, sweep mean 0.379
+ok    x3.0: the scull is smaller at speed (0.286 < 0.783)
+ok    x3.0: fins sweep back at speed
+      turning: mean flap left -0.009 right 0.210
+ok    x3.0: a turn favours one fin (-0.009 vs 0.210)
+ok    x3.0: and the tail stays smooth in the turn (step 0.0075)
+ok    x3.0: no NaN in the spine, tail or esca
+      bite: landed 1, jaw peak 0.99, bursts 1 -> 2
+ok    x3.0: one press lands a bite
+ok    x3.0: the bite opens the angler's jaw (0.99)
+ok    x3.0: the bite's release snaps the tail
+spring:
+      peak 0.494 rad, 9 zero crossings, settled at 0.85 s
+ok    the tail rings through the middle at least twice (9)
+ok    and a full lunge stays inside the cap (0.494)
+ok    and settles in under 2.5 s (0.85)
+angler_form_probe: 85 checks, 0 failed

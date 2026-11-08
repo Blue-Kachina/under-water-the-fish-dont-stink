@@ -10,6 +10,22 @@ const JAW := preload("res://scripts/what_stinks/forms/gulper_jaw.gd")
 const N := SpineRig.SPINE_N
 ## The belly's fullness at rest (the boss skin's own default).
 const REST_FULLNESS := 0.3
+## This hunter's exaggeration (Battletoads style; the numbers are at hunter_exaggeration 1, the panel's master scales
+## how far they depart from 1). jaw is the pouch's balloon (it pinches on the press, swells to a sail on the hold,
+## clamps shut on the release); body is the girth (a quick puff on the press, then it deflates as the pouch fills, and
+## rebounds fat on the gulp); throat scales the gulp bulge travelling down the belly.
+const EXAGGERATE := {
+	"snap_omega": 30.0, "snap_zeta": 0.7,
+	"channels": {
+		"jaw": {"hold_peak": 2.3, "squash": 0.55, "release_peak": 0.5, "omega": 20.0, "zeta": 0.34, "volume": 0.0},
+		"body": {"hold_peak": 0.7, "squash": 1.14, "release_peak": 1.3, "omega": 14.0, "zeta": 0.36, "volume": 0.0},
+		"throat": {"hold_peak": 1.0, "squash": 1.0, "release_peak": 2.4, "omega": 9.0, "zeta": 0.3, "volume": 0.0},
+	},
+}
+## How much one unit of the jaw channel's departure from 1 gapes the pouch (the shader's gape: 1.25 is the old full open).
+const GAPE_PER_JAW := 1.1
+## The lowest the pouch pinches to (the shader's gape; below 0 it creases).
+const GAPE_PINCH := -0.22
 
 ## How hard each segment follows the one ahead of it (1/s): higher is a stiffer body.
 @export_range(2.0, 200.0, 1.0, "or_greater") var follow_rate := 50.0
@@ -47,6 +63,18 @@ var _suck_left := 0.0
 var _gape_hold := 0.0
 var _bite: HunterBite
 var _fresh := true
+## The exaggeration kit (attack_exaggerate.gd): the pouch balloons (jaw), the body deflates and rebounds (body), the gulp
+## bulge swells (throat). Its beats come from the bite's signals; its dt (hit-stop aware) runs this rig's own clock.
+var ex: AttackExaggerate
+## The body's girth and length factors the exaggeration gives now (1: at rest).
+var girth := 1.0
+var stretch := 1.0
+## The mouth's gape the exaggeration adds now (the pouch's balloon; negative: pinched before the swell).
+var gape_extra := 0.0
+## Probe/tooling override of the hunter_exaggeration setting (negative: use the setting).
+var _pin_master := -1.0
+## Rider homes at rest are kept so the eyes and lure follow the deflating body.
+var _body_scale := Vector3.ONE
 
 
 func setup(for_fish: FishController) -> void:
@@ -78,6 +106,8 @@ func setup(for_fish: FishController) -> void:
 	jaw.mouth_at = Vector3(0.0, MODEL.RIM_Y * k * 0.8, head_z + 2.0 * k) * unit  # in the model's space, not ours
 	_lag_yaw.resize(N)
 	_lag_pitch.resize(N)
+	ex = AttackExaggerate.new(AttackExaggerate.params_from(WhatStinksSettings.shared(), {"exaggerate": EXAGGERATE}))
+	ex.camera_punch.connect(_on_camera_punch)
 	_pose(0.0)
 
 
@@ -153,8 +183,60 @@ func _process(delta: float) -> void:
 	_last_basis = basis
 	_last_at = at
 	speed_frac = clampf(_speed / maxf(fish.max_boost_speed * fish.top_speed_scale * wave_full_speed, 0.1), 0.0, 1.0)
-	_pose(delta)
-	_dress(delta)
+	_connect_bite()
+	var dt := _exaggerate(delta)
+	_pose(dt)
+	_dress(dt)
+
+
+## The fish's bite, once it has one: its signals are the exaggeration's beats.
+func _connect_bite() -> void:
+	if _bite != null and is_instance_valid(_bite):
+		return
+	_bite = fish.get_node_or_null("HunterBite") as HunterBite
+	if _bite == null:
+		return
+	_bite.chomped.connect(func(_m: Vector3, _r: float, _d: float, _c: int) -> void: _on_bite_landed())
+	_bite.opened.connect(func() -> void: ex.press())
+	_bite.released.connect(func(at_charge: float) -> void: ex.release(at_charge))
+	_bite.aborted.connect(func() -> void: ex.abort())
+	_bite.landed.connect(func(taken: int) -> void:
+		var cap := float(maxi(_bite.capacity(), 1))
+		ex.contact(1.0 if taken < 0 else clampf(float(taken) / cap, 0.15, 1.0)))
+
+
+## Steps the kit (the panel's master live) and reads the girth, the pouch's balloon and the gulp off it. Returns the
+## hit-stop-aware delta for this rig's own clock.
+func _exaggerate(delta: float) -> float:
+	var settings := WhatStinksSettings.shared()
+	var master: Variant = settings.get("hunter_exaggeration")
+	var mult := float(_bite.form.get("exaggeration", 1.0)) if _bite != null and is_instance_valid(_bite) else 1.0
+	var want_master := _pin_master if _pin_master >= 0.0 else (float(master) if master != null else 1.0)
+	ex.set_strength(want_master, mult)
+	if _bite != null and is_instance_valid(_bite) and _bite.holding():
+		ex.hold(_bite.charge())
+	var dt := ex.tick(delta)
+	var body := ex.scale_of(&"body")
+	girth = body
+	stretch = pow(maxf(body, 0.05), -0.3)  # a deflated body lengthens a little, a puffed one shortens: the mass reads as kept
+	gape_extra = (ex.scale_of(&"jaw") - 1.0) * GAPE_PER_JAW
+	_body_scale = Vector3(girth, girth, stretch)
+	if skin != null and is_instance_valid(rig.instances[0]):
+		(rig.instances[0] as Node3D).scale = _body_scale
+	return dt
+
+
+## The padded radius a camera should keep clear of this rig now (the pouch's sail and the puffed body).
+func camera_margin(radius: float) -> float:
+	return ex.camera_margin(radius)
+
+
+func _on_camera_punch(amount: float, dir: Vector3) -> void:
+	if not is_instance_valid(fish) or fish.puppet:
+		return
+	var camera := ChompKit.view_camera(fish)
+	if camera != null:
+		camera.call("punch", amount, dir)
 
 
 ## Lays the spine along the body's lag: each segment a little behind the turn the one before it made.
@@ -176,14 +258,16 @@ func _pose(delta: float) -> void:
 		var node: Node3D = rider[0]
 		var rest: Vector3 = rider[1]
 		var frame := rig.frame_at(rest.z)
-		node.transform = Transform3D(frame.basis * (rider[2] as Basis), frame.origin + frame.basis.x * rest.x + frame.basis.y * rest.y)
+		var at: Vector3 = frame.origin + frame.basis.x * rest.x + frame.basis.y * rest.y
+		node.transform = Transform3D(frame.basis * (rider[2] as Basis), at * _body_scale)  # the eyes ride the body as it deflates
 
 
 ## A snap chomp opens and shuts in a few ticks: the pouch balloons wide on the strike instead, and the suction streams a moment.
 func _on_bite_landed() -> void:
 	_suck_left = 0.3
-	gape = 1.25
-	_gape_hold = 0.15
+	if WhatStinksSettings.shared().bite_mode == WhatStinksSettings.BiteMode.TAP:  # held, the kit snaps the pouch shut instead
+		gape = 1.25
+		_gape_hold = 0.15
 
 ## The look that follows the swim and the bite: the wave's size, the gape, the suction, the lure's light.
 func _dress(delta: float) -> void:
@@ -192,16 +276,15 @@ func _dress(delta: float) -> void:
 	skin.set_shader_parameter("spine_wave", Vector4(0.9 * k * swim, 0.2 / k, 3.0, 0.3))
 	_gape_hold = maxf(_gape_hold - delta, 0.0)
 	if _gape_hold <= 0.0:
-		gape = move_toward(gape, gape_idle + open * (1.25 - gape_idle), delta * 6.0)
-	skin.set_shader_parameter("gape", gape)
-	if _bite == null or not is_instance_valid(_bite):
-		_bite = fish.get_node_or_null("HunterBite") as HunterBite
-		if _bite:
-			_bite.chomped.connect(func(_m: Vector3, _r: float, _d: float, _c: int) -> void: _on_bite_landed())
+		var want := gape_idle + open * (1.25 - gape_idle)
+		gape = move_toward(gape, want, delta * (6.0 if want > gape else 24.0))  # opens slowly, shuts fast (the snap)
+	skin.set_shader_parameter("gape", clampf(gape + gape_extra, GAPE_PINCH, 4.0))
 	var suction := _bite.attack as SuctionAttack if _bite != null else null
 	if suction != null:  # the belly: full while fish crowd the mouth, a lump sliding down it after the snap
 		skin.set_shader_parameter("fullness", lerpf(REST_FULLNESS, 1.0, suction.fullness))
-		skin.set_shader_parameter("lump", suction.lump_vec(_bite, skin.get_shader_parameter("belly_span")))
+		var bulge := suction.lump_vec(_bite, skin.get_shader_parameter("belly_span"))
+		bulge.z *= 1.0 + (ex.scale_of(&"throat") - 1.0) + ex.strength * 0.6  # the gulp travels the body as a bigger bulge
+		skin.set_shader_parameter("lump", bulge)
 	_suck_left = maxf(_suck_left - delta, 0.0)
 	_suction.emitting = open > 0.3 or _suck_left > 0.0
 	_light.omni_range = 0.3 * fish.hitbox_length

@@ -25,6 +25,8 @@ var held: Array[Dictionary] = []
 var fullness := 0.0
 
 var _box := {}
+var _wired: HunterBite
+var _caught := 0
 var _budget := 0.0
 var _idle := 0.0
 var _strain_t := 0.0
@@ -43,7 +45,31 @@ func max_held(bite: HunterBite) -> int:
 	return maxi(1, roundi(float(bite.size.bite_capacity(bite.fish, bite.form)) * bite.settings.engulf_max_mult))
 
 
+## Hears the bite's beats once per bite object (the exaggeration's press, release and abort): wired on the first hook
+## that runs, before `opened` is emitted for the first press.
+func _wire(bite: HunterBite) -> void:
+	if _wired == bite:
+		return
+	_wired = bite
+	bite.opened.connect(func() -> void: _jaw_of(bite, &"ex_press"))
+	bite.released.connect(func(charge: float) -> void:
+		var jaw := bite._jaw as WhaleJaw
+		if jaw != null:
+			jaw.ex_release(charge))
+	bite.aborted.connect(func() -> void: _jaw_of(bite, &"ex_abort"))
+	var jaw := bite._jaw as WhaleJaw
+	if jaw != null:
+		jaw.ex_reset()
+
+
+func _jaw_of(bite: HunterBite, method: StringName) -> void:
+	var jaw := bite._jaw as WhaleJaw
+	if jaw != null:
+		jaw.call(method)
+
+
 func on_open(bite: HunterBite) -> void:
+	_wire(bite)
 	_release_all(bite)
 	_box.clear()
 	_budget = 1.0
@@ -54,6 +80,9 @@ func on_open(bite: HunterBite) -> void:
 
 func on_hold(bite: HunterBite, delta: float) -> void:
 	var settings := bite.settings
+	var whale := bite._jaw as WhaleJaw
+	if whale != null:
+		whale.ex_hold(bite.charge())
 	_update_box(bite, bite.bite.open)
 	_idle += delta
 	_strain_t -= delta
@@ -106,6 +135,10 @@ func on_hold(bite: HunterBite, delta: float) -> void:
 
 func on_tick(bite: HunterBite, delta: float) -> void:
 	var settings := bite.settings
+	_wire(bite)
+	var whale := bite._jaw as WhaleJaw
+	if whale != null:
+		whale.step(delta)  # the exaggeration's springs, before the jaw is posed this tick
 	var cap := max_held(bite)
 	# Prey in the mouth ride it: drawn in, then carried, with the dark-pink flush and a heartbeat on their own view.
 	_warn_t -= delta
@@ -162,10 +195,18 @@ func net_catch_rule(bite: HunterBite, _mouth: Vector3, _forward: Vector3, _charg
 
 
 func on_close(bite: HunterBite, _taken: Dictionary) -> void:
+	_caught = held.size()
 	_release_all(bite)
 
 
 func on_landed(bite: HunterBite) -> void:
+	_wire(bite)
+	var whale := bite._jaw as WhaleJaw
+	if whale != null:
+		# What the mouth held when it shut is what the bite caught (a miss still slams, smaller).
+		var caught := maxi(_caught, held.size())
+		_caught = 0
+		whale.ex_contact(clampf(float(caught) / maxf(float(max_held(bite)) * 0.5, 1.0), 0.0, 1.0) if caught > 0 else 0.25)
 	bite.fx().spray()
 	if bite.fish.puppet:
 		_expire = PUPPET_EXPIRE  # its guest's report may still come: judge_net_bite uses the list
@@ -174,6 +215,9 @@ func on_landed(bite: HunterBite) -> void:
 
 
 func on_cancel(bite: HunterBite) -> void:
+	var whale := bite._jaw as WhaleJaw
+	if whale != null and whale.ex != null:
+		whale.ex_abort()
 	_release_all(bite)
 	_box.clear()
 

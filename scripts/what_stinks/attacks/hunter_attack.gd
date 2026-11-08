@@ -33,6 +33,8 @@ const STYLES := {
 	"drill": "res://scripts/what_stinks/attacks/drill_attack.gd",
 	"lock": "res://scripts/what_stinks/attacks/lock_attack.gd",
 	"suction": "res://scripts/what_stinks/attacks/suction_attack.gd",
+	"whip": "res://scripts/what_stinks/attacks/whip_attack.gd",
+	"lure": "res://scripts/what_stinks/attacks/lure_attack.gd",
 }
 
 var key := "chomp"

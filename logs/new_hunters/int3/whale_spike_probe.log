@@ -1,0 +1,163 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+the Titans class:
+  PASS  TITAN is in the class table, key titan
+  PASS  from_key finds it
+  PASS  five species
+  PASS  species keys ["humpback", "orca", "beluga", "sperm", "blue"]
+  FAIL  hidden from the pickers (11 pickable of 13)
+hider lengths (m, model / hitbox):
+    skirmisher   model 1.17  hitbox 1.21
+    hunter       model 1.40  hitbox 1.30
+    glider       model 2.08  hitbox 1.31
+    lancer       model 1.39  hitbox 1.34
+    charmer      model 1.48  hitbox 1.30
+    bulwark      model 1.72  hitbox 1.23
+    scorcher     model 1.08  hitbox 1.21
+    drifter      model 1.85  hitbox 1.30
+    brawler      model 1.57  hitbox 1.30
+    breacher     model 1.09  hitbox 1.31
+    alchemist    model 1.33  hitbox 1.23
+    longest model 2.08 m, longest hitbox 1.34 m; the Titan class is 6.70 m (3.2x the model, 5.0x the hitbox)
+  PASS  the Titan is at least 4x the longest hider hitbox
+=== whale_length the class's (6.7 m) ===
+Ocean:
+  PASS  the local seeker is a Titan (titan)
+  PASS  body scale 1.00: hitbox 2.40 x 1.90 x 6.70 m
+  PASS  the model is scaled with it ((1.0, 1.0, 1.0))
+  PASS  the hitbox is the class's x the body scale
+  PASS  the collision box follows ((2.4, 1.9, 6.7))
+  PASS  whale handling: turn 0.55, top speed 1.30, accel 0.70, boost 1.30
+  PASS  Marco! is automatic, the button does nothing
+  PASS  the Titan's start is clear of solids (0 overlaps)
+    (Ocean: the seeker's start (0.0, 0.0, 0.0))
+  PASS  the round goes live
+    camera 25.8 m from the whale's centre, 20.6 m behind its tail, 9.6 up, 20.6 m clear of the body
+  PASS  the camera is outside the body (20.6 m clear)
+    drove 49.3 m in 8 s, top speed 31.1 m/s (cap 78.0), biggest step 0.26 m, 0 stuck ticks
+  PASS  no NaN positions or velocities
+  PASS  no teleporting (0.26 m in a tick)
+  PASS  speed within its cap (31.1 of 78.0)
+  PASS  it isn't wedged (0 stuck ticks of 840)
+  PASS  a hider at its nose is tagged (2 live of 3)
+Ocean: the swap back:
+  PASS  the old seeker is its own fish again (class hunter, body x1.00)
+  PASS  the new seeker is the Titan
+  PASS  no hider is a Titan
+Sunken Temple:
+  PASS  the local seeker is a Titan (titan)
+  PASS  body scale 1.00: hitbox 2.40 x 1.90 x 6.70 m
+  PASS  the model is scaled with it ((1.0, 1.0, 1.0))
+  PASS  the hitbox is the class's x the body scale
+  PASS  the collision box follows ((2.4, 1.9, 6.7))
+  PASS  whale handling: turn 0.55, top speed 1.30, accel 0.70, boost 1.30
+  PASS  Marco! is automatic, the button does nothing
+  PASS  the Titan's start is clear of solids (0 overlaps)
+    (Sunken Temple: the seeker's start (0.0, 4.0, 28.0))
+  PASS  the round goes live
+    camera 25.8 m from the whale's centre, 20.6 m behind its tail, 9.6 up, 20.6 m clear of the body
+  PASS  the camera is outside the body (20.6 m clear)
+    drove 18.8 m in 8 s, top speed 21.6 m/s (cap 78.0), biggest step 0.18 m, 107 stuck ticks
+  PASS  no NaN positions or velocities
+  PASS  no teleporting (0.18 m in a tick)
+  PASS  speed within its cap (21.6 of 78.0)
+  PASS  it isn't wedged (107 stuck ticks of 840)
+  PASS  a hider at its nose is tagged (2 live of 3)
+Sunken Temple: the swap back:
+  PASS  the old seeker is its own fish again (class hunter, body x1.00)
+  PASS  the new seeker is the Titan
+  PASS  no hider is a Titan
+Aquarium:
+  PASS  the local seeker is a Titan (titan)
+  PASS  body scale 1.00: hitbox 2.40 x 1.90 x 6.70 m
+  PASS  the model is scaled with it ((1.0, 1.0, 1.0))
+  PASS  the hitbox is the class's x the body scale
+  PASS  the collision box follows ((2.4, 1.9, 6.7))
+  PASS  whale handling: turn 0.55, top speed 1.30, accel 0.70, boost 1.30
+  PASS  Marco! is automatic, the button does nothing
+  PASS  the Titan's start is clear of solids (0 overlaps)
+    (Aquarium: the seeker's start (0.0, 8.0, 16.0))
+  PASS  the round goes live
+    camera 25.8 m from the whale's centre, 20.6 m behind its tail, 9.6 up, 20.6 m clear of the body
+  PASS  the camera is outside the body (20.6 m clear)
+    drove 34.6 m in 8 s, top speed 27.8 m/s (cap 78.0), biggest step 0.23 m, 0 stuck ticks
+  PASS  no NaN positions or velocities
+  PASS  no teleporting (0.23 m in a tick)
+  PASS  speed within its cap (27.8 of 78.0)
+  PASS  it isn't wedged (0 stuck ticks of 840)
+  PASS  a hider at its nose is tagged (2 live of 3)
+Aquarium: the swap back:
+  PASS  the old seeker is its own fish again (class hunter, body x1.00)
+  PASS  the new seeker is the Titan
+  PASS  no hider is a Titan
+=== whale_length 10.4 m ===
+Ocean:
+  PASS  the local seeker is a Titan (titan)
+  PASS  body scale 1.55: hitbox 3.73 x 2.95 x 10.40 m
+  PASS  the model is scaled with it ((1.552239, 1.552239, 1.552239))
+  PASS  the hitbox is the class's x the body scale
+  PASS  the collision box follows ((3.725373, 2.949254, 10.4))
+  PASS  whale handling: turn 0.55, top speed 1.30, accel 0.70, boost 1.30
+  PASS  Marco! is automatic, the button does nothing
+  PASS  the Titan's start is clear of solids (0 overlaps)
+    (Ocean: the seeker's start (0.0, 0.0, 0.0))
+  PASS  the round goes live
+    camera 35.9 m from the whale's centre, 28.1 m behind its tail, 13.4 up, 28.1 m clear of the body
+  PASS  the camera is outside the body (28.1 m clear)
+    drove 37.2 m in 8 s, top speed 27.2 m/s (cap 78.0), biggest step 0.22 m, 0 stuck ticks
+  PASS  no NaN positions or velocities
+  PASS  no teleporting (0.22 m in a tick)
+  PASS  speed within its cap (27.2 of 78.0)
+  PASS  it isn't wedged (0 stuck ticks of 840)
+  PASS  a hider at its nose is tagged (1 live of 2)
+Ocean: the swap back:
+  PASS  the old seeker is its own fish again (class hunter, body x1.00)
+  PASS  the new seeker is the Titan
+  PASS  no hider is a Titan
+Sunken Temple:
+  PASS  the local seeker is a Titan (titan)
+  PASS  body scale 1.55: hitbox 3.73 x 2.95 x 10.40 m
+  PASS  the model is scaled with it ((1.552239, 1.552239, 1.552239))
+  PASS  the hitbox is the class's x the body scale
+  PASS  the collision box follows ((3.725373, 2.949254, 10.4))
+  PASS  whale handling: turn 0.55, top speed 1.30, accel 0.70, boost 1.30
+  PASS  Marco! is automatic, the button does nothing
+  PASS  the Titan's start is clear of solids (0 overlaps)
+    (Sunken Temple: the seeker's start (0.0, 4.0, 28.0))
+  PASS  the round goes live
+    camera 35.9 m from the whale's centre, 28.1 m behind its tail, 13.4 up, 28.1 m clear of the body
+  PASS  the camera is outside the body (28.1 m clear)
+    drove 12.2 m in 8 s, top speed 20.6 m/s (cap 78.0), biggest step 0.17 m, 10 stuck ticks
+  PASS  no NaN positions or velocities
+  PASS  no teleporting (0.17 m in a tick)
+  PASS  speed within its cap (20.6 of 78.0)
+  PASS  it isn't wedged (10 stuck ticks of 840)
+  PASS  a hider at its nose is tagged (2 live of 3)
+Sunken Temple: the swap back:
+  PASS  the old seeker is its own fish again (class hunter, body x1.00)
+  PASS  the new seeker is the Titan
+  PASS  no hider is a Titan
+Aquarium:
+  PASS  the local seeker is a Titan (titan)
+  PASS  body scale 1.55: hitbox 3.73 x 2.95 x 10.40 m
+  PASS  the model is scaled with it ((1.552239, 1.552239, 1.552239))
+  PASS  the hitbox is the class's x the body scale
+  PASS  the collision box follows ((3.725373, 2.949254, 10.4))
+  PASS  whale handling: turn 0.55, top speed 1.30, accel 0.70, boost 1.30
+  PASS  Marco! is automatic, the button does nothing
+  FAIL  the Titan's start is clear of solids (1 overlaps: @StaticBody3D@16280)
+    (Aquarium: the seeker's start (0.000003, 7.999686, 15.18028))
+  PASS  the round goes live
+    camera 35.9 m from the whale's centre, 28.1 m behind its tail, 13.4 up, 28.1 m clear of the body
+  PASS  the camera is outside the body (28.1 m clear)
+    drove 40.7 m in 8 s, top speed 26.8 m/s (cap 78.0), biggest step 0.22 m, 5 stuck ticks
+  PASS  no NaN positions or velocities
+  PASS  no teleporting (0.22 m in a tick)
+  PASS  speed within its cap (26.8 of 78.0)
+  PASS  it isn't wedged (5 stuck ticks of 840)
+  PASS  a hider at its nose is tagged (2 live of 3)
+Aquarium: the swap back:
+  PASS  the old seeker is its own fish again (class hunter, body x1.00)
+  PASS  the new seeker is the Titan
+  PASS  no hider is a Titan
+whale_spike_probe: 2 failure(s)

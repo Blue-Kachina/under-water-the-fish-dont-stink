@@ -1,0 +1,39 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    the rig owns the exaggeration kits
+cycle:
+ok    rest: the body is at rest scale (1.000)
+ok    press: the bite opens
+      press dip: wing 0.61, body 0.83
+ok    press: the wings fold in before the swell (anticipation, 0.61 of rest)
+ok    press: the body coils back (0.83 of its length)
+      hold: charge 1.00, wing 1.67, crown 1.91, body 1.13
+ok    hold: the wings flare wide (1.67 x)
+ok    hold: the crown reaches out past its rest length (1.91 x)
+ok    the tail stays planted through the lunge (drift 0.00000)
+ok    release: the bite shuts
+      release: wing 2.39, ring 2.00, body 1.43, lash crown 2.40, landed 1, hit-stop [3], punches [0.7]
+ok    release: the wings snap out (2.39 x)
+ok    release: the body lunges (1.43 x its length)
+ok    contact: the tentacles lash out well past rest (2.40 x)
+ok    the bite lands once
+ok    contact: a 2-4 tick hit-stop ([3])
+ok    contact: a camera punch is asked for ([0.7])
+ok    camera: the margin grows with the lunge (x2.29)
+ok    settle: back to rest (body 1.000)
+      worst step between physics frames: 0.460 (crown) at 9 of 384
+        6: { "wing": 0.98237609863281, "crown": 0.02747212612766, "ring": 0.86751967668533, "body": 1.00501789040015, "girth": 0.971888955142, "light": 1.67924964427948, "open": 0.296538 }
+        7: { "wing": 0.98237609863281, "crown": 0.02747212612766, "ring": 0.86751967668533, "body": 1.00501789040015, "girth": 0.971888955142, "light": 1.67924964427948, "open": 0.296538 }
+        8: { "wing": 0.98237609863281, "crown": 0.02747212612766, "ring": 0.86751967668533, "body": 1.00501789040015, "girth": 0.971888955142, "light": 1.67924964427948, "open": 0.296538 }
+        9: { "wing": 0.62335872650146, "crown": 0.48709623882305, "ring": 0.63709139823914, "body": 0.84241801802697, "girth": 1.04004107143507, "light": 2.35948252677917, "open": 0.608742 }
+        10: { "wing": 0.60771650075912, "crown": 0.48666214356567, "ring": 0.62137877941132, "body": 0.83404099861934, "girth": 1.04504475636237, "light": 2.45674848556519, "open": 0.64173 }
+        11: { "wing": 0.62913590669632, "crown": 0.49105496259038, "ring": 0.60399466753006, "body": 0.83458485247293, "girth": 1.04492415492179, "light": 2.58467388153076, "open": 0.68313 }
+ok    smooth: no pop between frames (worst step 0.460 in crown)
+exaggeration off:
+ok    press with the multiplier at 0
+      off: body deviation 0.0000, wing 1.000..1.000, hit stops []
+ok    off: the body never stretches (0.00000)
+ok    off: the wings keep their rest span (1.000..1.000)
+ok    off: no hit-stop
+ok    off: peak scale is 1
+b3_angel_probe: 23 checks, 0 failed

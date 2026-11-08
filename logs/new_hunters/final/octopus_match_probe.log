@@ -1,0 +1,57 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+registry:
+  PASS  the form is registered and in card order
+  PASS  it is ready and the card lists it
+  PASS  it plays as itself, not the fallback
+  PASS  its sheet names the Ember Octopus and the whip style
+  PASS  the style table builds a WhipAttack
+  PASS  the bite fx has a sound row for the whip style
+  PASS  every rig and attack tuning value is a panel setting (missing: [])
+  PASS  and each has a doc line (missing: [])
+  PASS  every octopus sound id is in the catalog (missing: [])
+  PASS  the settings' form picker offers it
+player match:
+  PASS  the local fish is the Hunter with a bite
+  PASS  the Hunter wears the OctopusRig and its model
+  PASS  the model carries the hunter_octopus meta (the lash finds it)
+  PASS  the model is built at the hitbox length (6.00 of 6.00)
+  PASS  the bite's style is the whip
+  PASS  under throttle it fires jet pulses (6 in 5 s)
+  PASS  and the jets move it (top 16.3 m/s, 48.9 m)
+  PASS  the thrust is real (velocity added in the physics tick)
+  PASS  the lash found the octopus model
+  PASS  the lash is wired to the rig (the rig runs blend_pose after its gait)
+  PASS  a held press locks arms onto the school (8 locks)
+  PASS  the HUD's ring shows the lock count while held (8)
+  PASS  arms are posed by the lash while held (8)
+  PASS  the release lashed (bites 1)
+  PASS  arms hit (7 arm hits)
+  PASS  and ate fish (13 of 24)
+  PASS  the lash's recoil pushed the octopus (6.58 m/s)
+  PASS  the arms were let go back to the gait
+  PASS  no bone is left stretched after the lash
+  PASS  the settled arms sit on the gait pose (worst joint 0.12 m of 6.00 m body)
+  PASS  a tap lashes too
+  PASS  air roll with the octopus stays finite
+bot match:
+ERROR: Condition "!is_inside_tree()" is true. Returning: Transform3D()
+   at: get_global_transform (scene/3d/node_3d.cpp:649)
+   GDScript backtrace (most recent call first):
+       [0] mouth_point (res://scripts/what_stinks/hunter_bite.gd:186)
+       [1] _origin_of (res://scripts/what_stinks/attacks/whip_attack.gd:681)
+       [2] on_tick (res://scripts/what_stinks/attacks/whip_attack.gd:364)
+       [3] _physics_process (res://scripts/what_stinks/hunter_bite.gd:350)
+  PASS  the Hunter is a WhatStinksBot
+  PASS  the bot's Hunter wears the octopus
+  PASS  its style is the whip
+  PASS  the bot presses the bite (5 presses)
+  PASS  and releases it (4 lashes)
+  PASS  its arms lock on prey (most 3 at once)
+  PASS  and it eats (5 fish gone)
+net:
+  PASS  a puppet's bite opens from the host's message (the lash visuals run)
+  PASS  the puppet's arms flare (beat 2)
+  PASS  and its release runs out to the end
+  PASS  the arms settle
+octopus_match_probe: all checks passed (43 checks)

@@ -1,0 +1,76 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+starting:
+  PASS  the mode plays in the Ocean
+  PASS  it waits on a card
+  PASS  Play starts a match
+  PASS  four fish, three of them bots (4, 3)
+  PASS  the round starts counting down
+  PASS  the local fish is the Hunter in round 0
+  PASS  three prey
+  PASS  the Hunter wears the monster form
+  PASS  it has a bite
+  PASS  the Hunter is held while the prey scatter
+  PASS  the schools are placed (4)
+  PASS  each has its own size (smallest 12)
+  PASS  Tetra is plain prey
+  PASS  Cory is plain prey
+  PASS  Molly is plain prey
+  PASS  prey scattered inside the arena (61 m of 90)
+  PASS  the murk wall is at the arena radius
+live:
+  PASS  the countdown ends
+  PASS  the Hunter is released
+the bite on a school:
+  PASS  the bite starts
+  PASS  the jaws shut and a bite lands
+  PASS  it ate 2 school fish (capacity 4)
+  PASS  the school lost exactly those fish
+  PASS  no prey player was in it
+  PASS  the school panicked (alarm 1.00)
+the bite on a prey player:
+  PASS  the second bite starts
+  PASS  and lands
+  PASS  the prey player is eaten
+  PASS  and gone from the water
+  PASS  two prey left
+  PASS  the Hunter's count is one
+  PASS  and its points rose by tag_points (100)
+snap chomp vs wind-up:
+  PASS  snap true: the bite starts
+  PASS  snap: it chomps at once (0.063 s after the press)
+  PASS  snap: no lunge forward (-0.00 m)
+  PASS  snap false: the bite starts
+  PASS  wind-up: it lands later (0.82 s, bite_wind 0.75)
+  PASS  wind-up: it lunges forward (11.99 m)
+every prey eaten:
+  PASS  the round is over
+  PASS  the Hunter won, three eaten
+  PASS  its points include 3 x tag_points (431)
+  PASS  they're in the match totals
+round 2: a bot hunts:
+  PASS  the next round starts
+  PASS  everyone is back in
+  PASS  the local fish is prey in its own class again (1)
+  PASS  its body is back to normal
+  PASS  and it's in the water
+  PASS  a bot is the Hunter now
+  PASS  driven by the Hunter bot
+  PASS  live
+  PASS  the bot Hunter swims at the fish and bites by itself
+      its first bite took 0 school fish and 0 prey
+eaten spectates:
+  PASS  the local player is eaten and spectating
+  PASS  watching someone else
+  PASS  the camera follows them
+  PASS  left / right switches the watched fish
+the clock runs out:
+  PASS  the round ends
+  PASS  the prey won
+  PASS  a survivor has its bonus
+  PASS  the match is over after the last round
+  PASS  with a winner (Blue Kachina)
+ending:
+  PASS  leaving the mode ends the match
+  PASS  the fish is handed back as it was
+what_stinks_probe: 62 checks, 0 failed

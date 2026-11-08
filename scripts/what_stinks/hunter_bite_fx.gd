@@ -27,6 +27,8 @@ const SOUNDS := {
 	"suction": {"open": "gulper/suck", "hold": "gulper/suck", "strike": "hunter/strike", "chomp": "gulper/snap"},
 	"coil": {"open": "king/coil", "hold": "king/coil", "strike": "king/whip", "chomp": "king/whip"},
 	"drill": {"open": "lamprey/rasp", "hold": "lamprey/rasp", "strike": "lamprey/drill", "chomp": "lamprey/drill"},
+	"whip": {"open": "octopus/flare", "hold": "octopus/charge", "strike": "octopus/lash", "chomp": "octopus/crack"},
+	"lure": {"open": "angler/flare", "hold": "angler/hum", "strike": "angler/snap", "chomp": "angler/snap"},
 	"lash": {"open": "hunter/jaw_open", "hold": "hunter/jaw_hold", "strike": "hunter/strike", "chomp": "hunter/chomp"},
 }
 ## Beats every style shares.

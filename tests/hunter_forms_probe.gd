@@ -278,7 +278,7 @@ func _jaw_shot(key: String, s: float) -> void:
 	free.queue_free()
 
 
-const EXPECTED := ["drowned_shark", "humpback", "orca", "beluga", "sperm", "blue", "king_of_herrings", "gulper_mother", "whale_fall", "lamprey_queen", "fallen_angel"]
+const EXPECTED := ["drowned_shark", "humpback", "orca", "beluga", "sperm", "blue", "king_of_herrings", "gulper_mother", "whale_fall", "lamprey_queen", "fallen_angel", "ember_octopus", "lantern_angler"]
 
 
 ## The registry itself: no scene needed.

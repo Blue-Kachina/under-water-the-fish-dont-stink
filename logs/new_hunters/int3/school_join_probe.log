@@ -1,0 +1,126 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+claiming a place:
+  PASS  the nearest free fish is claimed (36)
+  PASS  the school knows who has it
+  PASS  one place claimed
+  PASS  a claimed place can't be claimed again
+  PASS  a fish can't hold two places
+  PASS  the next free fish is a different one
+  PASS  bad indices are refused
+easing in, then lockstep:
+  PASS  it starts where the player was (0.14 m moved, progress 0.01)
+  PASS  no snap on the way in (biggest step 0.051 m a tick)
+  PASS  progress rises (0.97)
+  PASS  eased in by join_ease
+  PASS  the fish sits on its place (0.15 m off)
+  PASS  and moves with it (0.00 m/s apart)
+  PASS  facing the way the fish does (0.01 rad)
+  PASS  still in lockstep 2 s later
+  PASS  the claim left every other fish exactly where the unclaimed twin has it
+  PASS  and its own place too, with no lean
+leaning:
+  PASS  the stick leans the place about its range (2.00 m of 2)
+  PASS  sideways for a sideways stick
+  PASS  the fish follows its place
+  PASS  an upward stick leans up (1.96 m)
+  PASS  centred again
+release:
+  PASS  release says where and how it was
+  PASS  the place is free
+  PASS  the school fish stays
+  PASS  releasing twice gives nothing
+a claimed place eaten:
+  PASS  the fish is told its place is gone
+  PASS  the place is gone, the claim with it
+  PASS  it can claim another
+  PASS  a battery does the same
+  PASS  a mask that kills a place drops its claim
+startle:
+  PASS  the whole school is at full alarm
+  PASS  every fish bolts (top speed 18.0 from 7.3 m/s)
+  PASS  it splits (farthest 10.7 m, school radius 3.8)
+  PASS  and re-forms (farthest 4.2 m)
+the round:
+  PASS  the match has a join system
+  PASS  the local fish is prey
+  PASS  a bot hunts
+  PASS  a school of the player's own class exists (3 of 6)
+  PASS  every class the prey play has a school (3 classes)
+  PASS  live
+  PASS  an own-class school and another class's to test with
+the radius and the class:
+  PASS  a school fish within the radius: joinable
+  PASS  the prompt says so ("Jump  Join the Krill Seekers")
+  PASS  well outside it: nothing to join
+  PASS  join() refuses out of range
+  PASS  another class's school isn't joinable (join_any_class off)
+  PASS  even when told which
+  PASS  join_any_class on: it is
+joining:
+  PASS  the player joins
+  PASS  it holds a place in the school (7)
+  PASS  joined was announced
+  PASS  its place is a real school fish, none added or taken
+  PASS  the fish is frozen and its own controls are off (the school moves it)
+  PASS  and touches nothing
+  PASS  its own model is hidden: the school fish shows in its place
+  PASS  it can't join twice
+  PASS  the prompt is Leave now ("Boost  Leave     Powerslide  Spook (1)")
+  PASS  in lockstep with its place (0.24 m off)
+  PASS  same velocity (0.05 m/s apart)
+  PASS  joined prey are still live prey
+the view:
+  PASS  a prey player sees its own marker
+  PASS  a Hunter's view has no markers
+  PASS  the Hunter sees no prey's name plate
+  PASS  but another Hunter's
+  PASS  prey see markers and plates
+  PASS  prey see every plate
+Spook:
+  PASS  a second prey joins the same school
+  PASS  on a different place
+  PASS  one spook this round
+  PASS  the spook goes off
+  PASS  it was announced
+  PASS  the school is at full alarm (1.00)
+  PASS  every joined echo in the school is back to 0
+  PASS  the echo reset was announced for both
+  PASS  a second spook is refused
+  PASS  both are still joined
+  PASS  the player moves with its school through the panic
+Leave:
+  PASS  the player leaves
+  PASS  out of the school
+  PASS  announced as a loud leave
+  PASS  counted as loud
+  PASS  its echo is back to 0
+  PASS  the fish is its own again
+  PASS  collisions are back
+  PASS  it dashed out (14.0 m/s over the school's)
+  PASS  its marker is gone
+  PASS  leaving twice does nothing
+  PASS  the rejoin cooldown holds it out
+  PASS  and says so ("Can join again in 1")
+  PASS  the cooldown ends
+  PASS  it can rejoin
+lean through the stick:
+      lean from the stick: 1.20 m (join_lean 1.2)
+  PASS  the stick leans the player's place by join_lean
+  PASS  and centres when released (0.00 m)
+eaten with its place:
+  PASS  the bite took the joined player
+  PASS  and its school fish with it
+  PASS  counted as a player, not a school fish
+  PASS  the join system let it go
+  PASS  its model and collisions are restored (the match then hides the eaten)
+bots join:
+  PASS  a bot within the radius joins a school by itself
+a new round:
+  PASS  begin_round lets everyone go
+  PASS  spooks and cooldowns are fresh
+  PASS  a started round has nobody joined
+  PASS  and its schools are made of the prey's classes
+school_join_probe: 0 of 104 checks failed
+WARNING: 5 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

@@ -837,6 +837,8 @@ class FishShowcase extends SubViewportContainer:
 	var _model: FishModel
 	## A Hunter form's fish (show_form), in place of _model.
 	var _fish: FishController
+	## The swimming (HunterPreview) that owns _fish, when a Hunter form is shown.
+	var _preview: HunterPreview
 	var _shown_form := ""
 	var _shown := -1
 	var _shown_species := -1
@@ -893,23 +895,16 @@ class FishShowcase extends SubViewportContainer:
 	## the bosses' share the Monster's and take their body from the form's dress hook,
 	## which wants a fish: a frozen one here, at the form's own size.
 	func show_form(key: String) -> void:
-		var form := HunterForms.sheet(key)
-		if key == "drowned_shark" or form["class"] != FishCharacter.FishClass.MONSTER:
-			show_fish(form["class"], int(form["species"]))
-			return
-		if _fish and _shown_form == key:
+		if _preview and _shown_form == key:
 			return
 		_shown = -1
 		_shown_species = -1
 		_drop_shown()
 		_shown_form = key
-		_fish = load("res://scenes/fish.tscn").instantiate()
-		_fish.set("controls", null)
-		_fish.set("freeze", true)
-		_pivot.add_child(_fish)
-		_fish.set_look(form["class"], int(form["species"]), 0)
-		HunterSize.new().apply(_fish, form)  # a fresh one: 1x, not the size picked for the match
-		HunterForms.dress(_fish, key)
+		_preview = HunterPreview.new()
+		_pivot.add_child(_preview)
+		_preview.setup(key)  # dressed as a match dresses it, then swimming in place with the form's own gait
+		_fish = _preview.fish
 		_reach = maxf(_fish.hitbox_length, 1.0) * 2.2  # the long ones (the King's 16 m) still fit
 		_place_camera()
 
@@ -917,9 +912,10 @@ class FishShowcase extends SubViewportContainer:
 		if _model:
 			_model.queue_free()
 			_model = null
-		if _fish:
-			_fish.queue_free()
-			_fish = null
+		if _preview:
+			_preview.queue_free()
+			_preview = null
+		_fish = null
 		_shown_form = ""
 
 	func _process(delta: float) -> void:
@@ -927,7 +923,10 @@ class FishShowcase extends SubViewportContainer:
 			return
 		_time += delta
 		steer(_right_stick(), delta)
-		_pivot.position.y = sin(_time * 1.3) * 0.04
+		if _preview:
+			_place_camera()  # the Hunter swims on, so the camera goes with it
+		else:
+			_pivot.position.y = sin(_time * 1.3) * 0.04
 		if _model:
 			_model.react(delta, _model.global_basis * Vector3(0.0, 0.0, -3.0))
 
@@ -943,12 +942,17 @@ class FishShowcase extends SubViewportContainer:
 			_since_steered += delta
 		if _since_steered >= SPIN_RESUME_DELAY:
 			_spin += delta * 0.35
-		_pivot.rotation.y = _spin
+		_pivot.rotation.y = 0.0 if _preview else _spin  # a swimming Hunter is orbited by the camera instead (its own path is its turning)
 
 	func _place_camera() -> void:
-		var from := Vector3(sin(_yaw) * cos(_pitch), sin(_pitch), cos(_yaw) * cos(_pitch))
-		_camera.position = from * _reach
-		_camera.look_at(Vector3.ZERO, Vector3.UP)
+		var yaw := _yaw
+		var focus := Vector3.ZERO
+		if _preview:
+			yaw += _preview.camera_heading() - _spin  # round the fish with the turn it is at, and slowly on from there
+			focus = _preview.focus()
+		var from := Vector3(sin(yaw) * cos(_pitch), sin(_pitch), cos(yaw) * cos(_pitch))
+		_camera.position = focus + from * _reach
+		_camera.look_at(focus, Vector3.UP)
 
 	## Any controller's right stick (past its deadzone, rescaled to start at 0).
 	## Read straight off the pads: the keys on camera_* (I, K) mean other things here.

@@ -1,0 +1,50 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    style: the Queen's sheet names the drill and the bite wears it
+      numbers
+ok    reach: holding does not lengthen it (3.20 m)
+ok    capacity: 1 at no charge, 6 at full (x6.0)
+ok    capacity: it grows with the charge (4 at half)
+      a tap
+ok    a tap lands at almost no charge (0.00) and does not dash
+ok    and it is the plain bite: she latches and rolls (latch 1.07 s left)
+      the hold
+ok    the press opens
+ok    held to full charge
+ok    the body is wound back against the roll (wind 1.00, twist 5.38 rad against a spin of 6.28)
+ok    no dash while held (top speed x0.80 of the hold cost)
+      the dash
+ok    the release starts the dash
+ok    its speed: 30.4 m/s (2.0 x her top speed)
+ok    the integrator's cap is lifted for it (x1.10)
+ok    she drives forward (30.4 m/s of 30.4)
+ok    for drill_time (0.48 s of 0.60)
+ok    and gets somewhere (18.0 m)
+ok    rolling at lamprey_spin (2.9 rad through the dash)
+ok    the top speed is given back (x1.000)
+ok    no latch without prey
+      switches
+ok    drill_dash 0: a full hold does not dash
+ok    match: the local fish is the Hunter with a bite
+ok    match: the Hunter wears the Queen: the drill style
+      A: through a school
+ok    the release dashes with a budget of 6 fish
+ok    the disc took 4 fish on the run, within the budget of 6 (13 judgments)
+ok    and they are gone from the school (26 of 30 left)
+ok    the budget is what is left (2)
+ok    top speed given back
+ok    one chew delay on the cooldown (2.41 s)
+      B: a plain tap
+ok    a tap does not dash and takes the plain bite's one (0)
+      C: prey in the path
+ok    prey: the match has prey to test with (4)
+ok    half charge: a player three reaches ahead is drilled
+ok    half charge: no latch, the dash runs its time (0.59 s)
+ok    full charge: the player is drilled
+ok    and the dash ends on it (0.02 s of 0.60)
+ok    and she latches: the roll goes on (1.04 s left)
+ok    top speed given back after a latch
+      D: a guest's Queen (the host runs the dash on the puppet)
+ok    net: the host drilled 3 fish along the puppet's path
+ok    net: the puppet's top speed was never lifted
+drill_probe: 38 checks, 0 failed

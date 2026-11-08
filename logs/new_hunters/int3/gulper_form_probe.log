@@ -1,0 +1,99 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+sheet:
+ok    the Gulper Mother reports ready
+ok    and the card would list it
+ok    its sheet: name and class
+ok    the cone is deeper and wider than the shark's chomp
+ok    it opens slower and takes more
+ok    a half angle past 26 degrees at the far end (radius over reach 0.67)
+size x0.5:
+ok    x0.5: the Gulper's rig is on the model
+ok    x0.5: the bite's jaw is the Gulper's
+ok    x0.5: dressing twice leaves one rig (1)
+ok    x0.5: the shark's own parts are hidden
+ok    x0.5: body scale 3.73, hitbox 4.50 m
+      model extent (0.909351, 1.275213, 4.373784) m for a hitbox of 4.50 m long
+ok    x0.5: model length 4.37 m is about the hitbox's
+ok    x0.5: its girth sits near the box (0.91 x 1.28 m for 2.09 x 1.49)
+ok    x0.5: straight at rest (tail off the axis by 0.000 of its length)
+ok    x0.5: the head is the box's front
+ok    x0.5: the swim reads speed (1.00 of full at 18.8 m/s)
+ok    x0.5: the wave grows with speed (0.90, was 0.75 at rest, idle size 0.18)
+      tail trailed 0.83 of its length (x 0.83) in the turn
+ok    x0.5: the body trails a turn (tail 0.83 of its length off the axis)
+ok    x0.5: the bite's mouth is at the front of the body (0.31 m off the nose)
+      bite: 1 landed, jaw opened to 0.99, the pouch gaped to 1.25 (rest 0.15)
+ok    x0.5: one bite lands from one press
+ok    x0.5: the pouch gapes on the wind-up (1.25 from 0.15)
+ok    x0.5: the suction streams in while it is open
+ok    x0.5: reach 3.00 m, radius 2.00 m
+ok    x0.5: the far end takes fish most of the radius off the nose
+ok    x0.5: and the near end is narrow
+ok    x0.5: nothing behind the mouth or past the reach
+      camera: 11.01 m away (2.45 body lengths), zoom 3.33, the body's box spans 9% of the screen width
+ok    x0.5: the body fills a fair share of the screen (9%)
+size x1.0:
+ok    x1.0: the Gulper's rig is on the model
+ok    x1.0: the bite's jaw is the Gulper's
+ok    x1.0: dressing twice leaves one rig (1)
+ok    x1.0: the shark's own parts are hidden
+ok    x1.0: body scale 7.47, hitbox 9.00 m
+      model extent (1.818702, 2.550426, 8.747568) m for a hitbox of 9.00 m long
+ok    x1.0: model length 8.75 m is about the hitbox's
+ok    x1.0: its girth sits near the box (1.82 x 2.55 m for 4.18 x 2.99)
+ok    x1.0: straight at rest (tail off the axis by 0.000 of its length)
+ok    x1.0: the head is the box's front
+ok    x1.0: the swim reads speed (1.00 of full at 26.6 m/s)
+ok    x1.0: the wave grows with speed (0.90, was 0.69 at rest, idle size 0.18)
+      tail trailed 0.75 of its length (x 0.75) in the turn
+ok    x1.0: the body trails a turn (tail 0.75 of its length off the axis)
+ok    x1.0: the bite's mouth is at the front of the body (0.62 m off the nose)
+      bite: 1 landed, jaw opened to 0.99, the pouch gaped to 1.25 (rest 0.15)
+ok    x1.0: one bite lands from one press
+ok    x1.0: the pouch gapes on the wind-up (1.25 from 0.15)
+ok    x1.0: the suction streams in while it is open
+ok    x1.0: reach 6.00 m, radius 4.00 m
+ok    x1.0: the far end takes fish most of the radius off the nose
+ok    x1.0: and the near end is narrow
+ok    x1.0: nothing behind the mouth or past the reach
+      camera: 21.86 m away (2.43 body lengths), zoom 6.67, the body's box spans 9% of the screen width
+ok    x1.0: the body fills a fair share of the screen (9%)
+size x3.0:
+ok    x3.0: the Gulper's rig is on the model
+ok    x3.0: the bite's jaw is the Gulper's
+ok    x3.0: dressing twice leaves one rig (1)
+ok    x3.0: the shark's own parts are hidden
+ok    x3.0: body scale 22.41, hitbox 27.00 m
+      model extent (5.456105, 7.651275, 26.2427) m for a hitbox of 27.00 m long
+ok    x3.0: model length 26.24 m is about the hitbox's
+ok    x3.0: its girth sits near the box (5.46 x 7.65 m for 12.55 x 8.96)
+ok    x3.0: straight at rest (tail off the axis by 0.000 of its length)
+ok    x3.0: the head is the box's front
+ok    x3.0: the swim reads speed (1.00 of full at 46.0 m/s)
+ok    x3.0: the wave grows with speed (0.90, was 0.64 at rest, idle size 0.18)
+      tail trailed 0.56 of its length (x 0.56) in the turn
+ok    x3.0: the body trails a turn (tail 0.56 of its length off the axis)
+ok    x3.0: the bite's mouth is at the front of the body (1.87 m off the nose)
+      bite: 1 landed, jaw opened to 0.99, the pouch gaped to 1.25 (rest 0.15)
+ok    x3.0: one bite lands from one press
+ok    x3.0: the pouch gapes on the wind-up (1.25 from 0.15)
+ok    x3.0: the suction streams in while it is open
+ok    x3.0: reach 18.00 m, radius 12.00 m
+ok    x3.0: the far end takes fish most of the radius off the nose
+ok    x3.0: and the near end is narrow
+ok    x3.0: nothing behind the mouth or past the reach
+      camera: 65.30 m away (2.42 body lengths), zoom 20.00, the body's box spans 9% of the screen width
+ok    x3.0: the body fills a fair share of the screen (9%)
+in a match:
+ok    round 0: the match card offers the Gulper Mother (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    round 0: a match with the local fish as Hunter
+ok    round 0: the Hunter wears the Gulper's rig
+ok    round 0: the bite is the Gulper's, with its mouth (reach 6.0 m)
+ok    round 0: and bites from the front, not the middle
+ok    round 1: the match card offers the Gulper Mother (["Drowned Shark", "Humpback", "Orca", "Beluga", "Sperm Whale", "Blue Whale", "King of Herrings", "Gulper Mother", "Lamprey Queen", "Fallen Angel", "Ember Octopus", "Lantern Angler"])
+ok    round 1: a match with the local fish as Hunter
+ok    round 1: the Hunter wears the Gulper's rig
+ok    round 1: the bite is the Gulper's, with its mouth (reach 6.0 m)
+ok    round 1: and bites from the front, not the middle
+gulper_form_probe: 79 checks, 0 failed

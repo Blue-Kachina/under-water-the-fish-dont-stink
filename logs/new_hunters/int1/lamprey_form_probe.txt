@@ -1,0 +1,100 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+card:
+ok    the Queen is ready and on the card
+ok    a Queen pick plays as the Queen
+ok    its sheet: Lamprey Queen, class MONSTER
+      cone half angle 17.4 deg (shark 24.6), reach 3.2 m, capacity 1, wind 0.80 s
+ok    the latch is a narrow, short cone for one target (narrower than the shark's)
+ok    it is slower to wind up and to come back than the shark
+ok    sound_chomp: boss/grab is a catalogue id
+ok    sound_arrive: boss/leviathan_arrive is a catalogue id
+ok    sound_miss: boss/chomp_miss is a catalogue id
+lamprey x0.5:
+ok    lamprey x0.5: a LampreyRig on the visual
+ok    lamprey x0.5: hitbox 7.00 m
+ok    lamprey x0.5: the body is 7.00 m, the hitbox's length
+ok    lamprey x0.5: the shark's parts are hidden
+ok    lamprey x0.5: the bite gets the Queen's jaw
+      model extent (1.241446, 1.241273, 7.043447) m for a hitbox length 7.00
+ok    lamprey x0.5: model length 7.04 m is about the hitbox's
+ok    lamprey x0.5: dressing again keeps the body
+ok    lamprey x0.5: swims (19.6 m/s)
+ok    lamprey x0.5: the spine's head is at the front of the box (0.28 m off)
+ok    lamprey x0.5: the body is laid out 6.9 m behind the head going straight
+      turn: spin 3.55 rad/s, chord 6.6 of 7.0 m
+ok    lamprey x0.5: turns (3.55 rad/s)
+ok    lamprey x0.5: the body bends through the turn (tightest chord 6.3 of 7.0)
+ok    lamprey x0.5: the head moved
+ok    lamprey x0.5: the swim wave has amplitude (0.210)
+ok    lamprey x0.5: the mouth is at the head (0.13 m)
+ok    lamprey x0.5: one bite lands
+ok    lamprey x0.5: the disc flares wide (1.87)
+ok    lamprey x0.5: the skin warns through the wind-up
+ok    lamprey x0.5: a landed bite latches: she rolls (latch 0.52 s left, spin 2.90 rad)
+ok    lamprey x0.5: the disc clamps down after the bite lands
+ok    lamprey x0.5: reach 1.60 m radius 0.50 m
+ok    lamprey x0.5: capacity 1
+ok    lamprey x0.5: the far end takes a fish 0.5 m to the side
+ok    lamprey x0.5: past the reach is out
+ok    lamprey x0.5: a size change rebuilds the body at 14.0 m
+ok    lamprey x0.5: still one body (1)
+lamprey x1.0:
+ok    lamprey x1.0: a LampreyRig on the visual
+ok    lamprey x1.0: hitbox 14.00 m
+ok    lamprey x1.0: the body is 14.00 m, the hitbox's length
+ok    lamprey x1.0: the shark's parts are hidden
+ok    lamprey x1.0: the bite gets the Queen's jaw
+      model extent (2.479823, 2.47965, 14.0854) m for a hitbox length 14.00
+ok    lamprey x1.0: model length 14.09 m is about the hitbox's
+ok    lamprey x1.0: dressing again keeps the body
+ok    lamprey x1.0: swims (27.7 m/s)
+ok    lamprey x1.0: the spine's head is at the front of the box (0.26 m off)
+ok    lamprey x1.0: the body is laid out 13.9 m behind the head going straight
+      turn: spin 2.51 rad/s, chord 13.7 of 14.0 m
+ok    lamprey x1.0: turns (2.51 rad/s)
+ok    lamprey x1.0: the body bends through the turn (tightest chord 12.1 of 14.0)
+ok    lamprey x1.0: the head moved
+ok    lamprey x1.0: the swim wave has amplitude (0.420)
+ok    lamprey x1.0: the mouth is at the head (0.25 m)
+ok    lamprey x1.0: one bite lands
+ok    lamprey x1.0: the disc flares wide (1.84)
+ok    lamprey x1.0: the skin warns through the wind-up
+ok    lamprey x1.0: a landed bite latches: she rolls (latch 0.52 s left, spin 2.90 rad)
+ok    lamprey x1.0: the disc clamps down after the bite lands
+ok    lamprey x1.0: reach 3.20 m radius 1.00 m
+ok    lamprey x1.0: capacity 1
+ok    lamprey x1.0: the far end takes a fish 0.9 m to the side
+ok    lamprey x1.0: past the reach is out
+ok    lamprey x1.0: a size change rebuilds the body at 28.0 m
+ok    lamprey x1.0: still one body (1)
+lamprey x3.0:
+ok    lamprey x3.0: a LampreyRig on the visual
+ok    lamprey x3.0: hitbox 42.00 m
+ok    lamprey x3.0: the body is 42.00 m, the hitbox's length
+ok    lamprey x3.0: the shark's parts are hidden
+ok    lamprey x3.0: the bite gets the Queen's jaw
+      model extent (7.433328, 7.433155, 42.2532) m for a hitbox length 42.00
+ok    lamprey x3.0: model length 42.25 m is about the hitbox's
+ok    lamprey x3.0: dressing again keeps the body
+ok    lamprey x3.0: swims (48.0 m/s)
+ok    lamprey x3.0: the spine's head is at the front of the box (0.56 m off)
+ok    lamprey x3.0: the body is laid out 41.9 m behind the head going straight
+      turn: spin 1.45 rad/s, chord 38.9 of 42.0 m
+ok    lamprey x3.0: turns (1.45 rad/s)
+ok    lamprey x3.0: the body bends through the turn (tightest chord 33.4 of 42.0)
+ok    lamprey x3.0: the head moved
+ok    lamprey x3.0: the swim wave has amplitude (1.260)
+ok    lamprey x3.0: the mouth is at the head (0.76 m)
+ok    lamprey x3.0: one bite lands
+ok    lamprey x3.0: the disc flares wide (1.88)
+ok    lamprey x3.0: the skin warns through the wind-up
+ok    lamprey x3.0: a landed bite latches: she rolls (latch 0.52 s left, spin 2.90 rad)
+ok    lamprey x3.0: the disc clamps down after the bite lands
+ok    lamprey x3.0: reach 9.60 m radius 3.00 m
+ok    lamprey x3.0: capacity 5
+ok    lamprey x3.0: the far end takes a fish 2.7 m to the side
+ok    lamprey x3.0: past the reach is out
+ok    lamprey x3.0: a size change rebuilds the body at 84.0 m
+ok    lamprey x3.0: still one body (1)
+lamprey_form_probe: 86 checks, 0 failed

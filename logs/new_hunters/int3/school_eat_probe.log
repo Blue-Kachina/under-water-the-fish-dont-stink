@@ -1,0 +1,24 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+eating:
+  PASS  six gone, bad and repeated indices ignored (34 left)
+  PASS  it says where each was (6 spots)
+  PASS  the spots are where the fish were
+  PASS  fish 0 is gone
+  PASS  fish 22 is gone
+  PASS  fish 15 is gone
+  PASS  fish 29 is gone
+  PASS  fish 8 is gone
+  PASS  fish 36 is gone
+  PASS  eating a gone fish takes nothing
+  PASS  the alive mask shows six gone of 40
+  PASS  a guest given the mask has the same fish
+panic:
+  PASS  the school goes to full alarm (1.00)
+  PASS  survivors are flung harder than a battery (18.9 vs 9.3 m/s)
+scatter and reform:
+  PASS  the school splits up (farthest 11.7 m, school radius 3.8)
+  PASS  it reforms (farthest 4.6 m, from 11.7)
+  PASS  no fish came back
+  PASS  it's still roaming near home
+school_eat_probe: 0 failed

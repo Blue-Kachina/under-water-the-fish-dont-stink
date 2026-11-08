@@ -1,0 +1,103 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+  drowned_shark still: body rolled 358 deg, model 358 deg, widest gap 0 deg, biggest frame jump 1.5 deg
+ok    drowned_shark still: the body rolls (358 deg)
+ok    drowned_shark still: the model rolls with it (358 vs 358 deg)
+ok    drowned_shark still: without a snap (biggest frame jump 1.5 deg)
+ok    drowned_shark still: and stays on it (widest gap 0 deg)
+  drowned_shark swimming: body rolled 358 deg, model 358 deg, widest gap 0 deg, biggest frame jump 1.5 deg
+ok    drowned_shark swimming: the body rolls (358 deg)
+ok    drowned_shark swimming: the model rolls with it (358 vs 358 deg)
+ok    drowned_shark swimming: without a snap (biggest frame jump 1.5 deg)
+ok    drowned_shark swimming: and stays on it (widest gap 0 deg)
+  humpback still: body rolled 330 deg, model 330 deg, widest gap 0 deg, biggest frame jump 1.4 deg
+ok    humpback still: the body rolls (330 deg)
+ok    humpback still: the model rolls with it (330 vs 330 deg)
+ok    humpback still: without a snap (biggest frame jump 1.4 deg)
+ok    humpback still: and stays on it (widest gap 0 deg)
+  humpback swimming: body rolled 330 deg, model 330 deg, widest gap 0 deg, biggest frame jump 1.4 deg
+ok    humpback swimming: the body rolls (330 deg)
+ok    humpback swimming: the model rolls with it (330 vs 330 deg)
+ok    humpback swimming: without a snap (biggest frame jump 1.4 deg)
+ok    humpback swimming: and stays on it (widest gap 0 deg)
+  orca still: body rolled 358 deg, model 358 deg, widest gap 0 deg, biggest frame jump 1.5 deg
+ok    orca still: the body rolls (358 deg)
+ok    orca still: the model rolls with it (358 vs 358 deg)
+ok    orca still: without a snap (biggest frame jump 1.5 deg)
+ok    orca still: and stays on it (widest gap 0 deg)
+  orca swimming: body rolled 358 deg, model 358 deg, widest gap 0 deg, biggest frame jump 1.5 deg
+ok    orca swimming: the body rolls (358 deg)
+ok    orca swimming: the model rolls with it (358 vs 358 deg)
+ok    orca swimming: without a snap (biggest frame jump 1.5 deg)
+ok    orca swimming: and stays on it (widest gap 0 deg)
+  beluga still: body rolled 358 deg, model 358 deg, widest gap 0 deg, biggest frame jump 1.5 deg
+ok    beluga still: the body rolls (358 deg)
+ok    beluga still: the model rolls with it (358 vs 358 deg)
+ok    beluga still: without a snap (biggest frame jump 1.5 deg)
+ok    beluga still: and stays on it (widest gap 0 deg)
+  beluga swimming: body rolled 358 deg, model 358 deg, widest gap 0 deg, biggest frame jump 1.5 deg
+ok    beluga swimming: the body rolls (358 deg)
+ok    beluga swimming: the model rolls with it (358 vs 358 deg)
+ok    beluga swimming: without a snap (biggest frame jump 1.5 deg)
+ok    beluga swimming: and stays on it (widest gap 0 deg)
+  sperm still: body rolled 330 deg, model 330 deg, widest gap 0 deg, biggest frame jump 1.4 deg
+ok    sperm still: the body rolls (330 deg)
+ok    sperm still: the model rolls with it (330 vs 330 deg)
+ok    sperm still: without a snap (biggest frame jump 1.4 deg)
+ok    sperm still: and stays on it (widest gap 0 deg)
+  sperm swimming: body rolled 330 deg, model 330 deg, widest gap 0 deg, biggest frame jump 1.4 deg
+ok    sperm swimming: the body rolls (330 deg)
+ok    sperm swimming: the model rolls with it (330 vs 330 deg)
+ok    sperm swimming: without a snap (biggest frame jump 1.4 deg)
+ok    sperm swimming: and stays on it (widest gap 0 deg)
+  blue still: body rolled 272 deg, model 272 deg, widest gap 0 deg, biggest frame jump 1.2 deg
+ok    blue still: the body rolls (272 deg)
+ok    blue still: the model rolls with it (272 vs 272 deg)
+ok    blue still: without a snap (biggest frame jump 1.2 deg)
+ok    blue still: and stays on it (widest gap 0 deg)
+  blue swimming: body rolled 272 deg, model 272 deg, widest gap 0 deg, biggest frame jump 1.2 deg
+ok    blue swimming: the body rolls (272 deg)
+ok    blue swimming: the model rolls with it (272 vs 272 deg)
+ok    blue swimming: without a snap (biggest frame jump 1.2 deg)
+ok    blue swimming: and stays on it (widest gap 0 deg)
+  king_of_herrings still: body rolled 301 deg, model 299 deg, widest gap 2 deg, biggest frame jump 1.1 deg
+ok    king_of_herrings still: the body rolls (301 deg)
+ok    king_of_herrings still: the model rolls with it (299 vs 301 deg)
+ok    king_of_herrings still: without a snap (biggest frame jump 1.1 deg)
+ok    king_of_herrings still: and stays on it (widest gap 2 deg)
+  king_of_herrings swimming: body rolled 301 deg, model 299 deg, widest gap 2 deg, biggest frame jump 1.1 deg
+ok    king_of_herrings swimming: the body rolls (301 deg)
+ok    king_of_herrings swimming: the model rolls with it (299 vs 301 deg)
+ok    king_of_herrings swimming: without a snap (biggest frame jump 1.1 deg)
+ok    king_of_herrings swimming: and stays on it (widest gap 2 deg)
+  gulper_mother still: body rolled 331 deg, model 331 deg, widest gap 0 deg, biggest frame jump 1.4 deg
+ok    gulper_mother still: the body rolls (331 deg)
+ok    gulper_mother still: the model rolls with it (331 vs 331 deg)
+ok    gulper_mother still: without a snap (biggest frame jump 1.4 deg)
+ok    gulper_mother still: and stays on it (widest gap 0 deg)
+  gulper_mother swimming: body rolled 330 deg, model 330 deg, widest gap 0 deg, biggest frame jump 1.4 deg
+ok    gulper_mother swimming: the body rolls (330 deg)
+ok    gulper_mother swimming: the model rolls with it (330 vs 330 deg)
+ok    gulper_mother swimming: without a snap (biggest frame jump 1.4 deg)
+ok    gulper_mother swimming: and stays on it (widest gap 0 deg)
+  lamprey_queen still: body rolled 301 deg, model 299 deg, widest gap 2 deg, biggest frame jump 1.1 deg
+ok    lamprey_queen still: the body rolls (301 deg)
+ok    lamprey_queen still: the model rolls with it (299 vs 301 deg)
+ok    lamprey_queen still: without a snap (biggest frame jump 1.1 deg)
+ok    lamprey_queen still: and stays on it (widest gap 2 deg)
+  lamprey_queen swimming: body rolled 301 deg, model 300 deg, widest gap 2 deg, biggest frame jump 1.1 deg
+ok    lamprey_queen swimming: the body rolls (301 deg)
+ok    lamprey_queen swimming: the model rolls with it (300 vs 301 deg)
+ok    lamprey_queen swimming: without a snap (biggest frame jump 1.1 deg)
+ok    lamprey_queen swimming: and stays on it (widest gap 2 deg)
+  fallen_angel still: body rolled 443 deg, model 443 deg, widest gap 0 deg, biggest frame jump 1.9 deg
+ok    fallen_angel still: the body rolls (443 deg)
+ok    fallen_angel still: the model rolls with it (443 vs 443 deg)
+ok    fallen_angel still: without a snap (biggest frame jump 1.9 deg)
+ok    fallen_angel still: and stays on it (widest gap 0 deg)
+  fallen_angel swimming: body rolled 445 deg, model 445 deg, widest gap 0 deg, biggest frame jump 1.9 deg
+ok    fallen_angel swimming: the body rolls (445 deg)
+ok    fallen_angel swimming: the model rolls with it (445 vs 445 deg)
+ok    fallen_angel swimming: without a snap (biggest frame jump 1.9 deg)
+ok    fallen_angel swimming: and stays on it (widest gap 0 deg)
+hunter_roll_probe: 80 checks, 0 failed

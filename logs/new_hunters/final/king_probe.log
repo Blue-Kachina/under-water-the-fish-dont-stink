@@ -1,0 +1,97 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+card:
+ok    the King is ready and on the card
+ok    a King pick plays as the King
+ok    its sheet: King of Herrings, class MONSTER
+      cone half angle 39.3 deg (shark 24.6), reach 5.5 m, capacity 7, wind 1.00 s
+ok    the Coil sweep's cone is much wider than the shark's
+ok    it takes more, and is slower to wind up and to come back
+ok    sound_chomp: boss/chomp is a catalogue id
+ok    sound_arrive: boss/leviathan_arrive is a catalogue id
+ok    sound_miss: boss/chomp_miss is a catalogue id
+ok    sound_grab: boss/grab is a catalogue id
+king x0.5:
+ok    king x0.5: a KingRig on the visual
+ok    king x0.5: hitbox 8.00 m
+ok    king x0.5: the body is 8.00 m, the hitbox's length
+ok    king x0.5: the shark's parts are hidden
+ok    king x0.5: the bite gets the King's jaw
+      model extent (0.66777, 2.871323, 8.126667) m for a hitbox length 8.00
+ok    king x0.5: model length 8.13 m is about the hitbox's
+ok    king x0.5: dressing again keeps the body
+ok    king x0.5: swims (19.6 m/s)
+ok    king x0.5: the spine's head is at the front of the box (0.21 m off)
+ok    king x0.5: the body is laid out 7.9 m behind the head going straight
+      turn: spin 3.55 rad/s, chord 7.5 of 8.0 m
+ok    king x0.5: turns (3.55 rad/s)
+ok    king x0.5: the body bends through the turn (tightest chord 7.1 of 8.0)
+ok    king x0.5: the head moved
+ok    king x0.5: the swim wave has amplitude (0.118)
+ok    king x0.5: the mouth is at the head (0.24 m)
+ok    king x0.5: one bite lands
+ok    king x0.5: the jaw drops on its hinge (0.54 rad)
+ok    king x0.5: the skin warns through the wind-up
+ok    king x0.5: reach 2.75 m radius 2.25 m
+ok    king x0.5: capacity 2
+ok    king x0.5: the far end takes a fish 2.0 m to the side (the sweep)
+ok    king x0.5: past the reach is out
+ok    king x0.5: a size change rebuilds the body at 16.0 m
+ok    king x0.5: still one body (1)
+king x1.0:
+ok    king x1.0: a KingRig on the visual
+ok    king x1.0: hitbox 16.00 m
+ok    king x1.0: the body is 16.00 m, the hitbox's length
+ok    king x1.0: the shark's parts are hidden
+ok    king x1.0: the bite gets the King's jaw
+      model extent (1.33554, 5.742645, 16.25333) m for a hitbox length 16.00
+ok    king x1.0: model length 16.25 m is about the hitbox's
+ok    king x1.0: dressing again keeps the body
+ok    king x1.0: swims (27.7 m/s)
+ok    king x1.0: the spine's head is at the front of the box (0.30 m off)
+ok    king x1.0: the body is laid out 15.9 m behind the head going straight
+      turn: spin 2.51 rad/s, chord 15.6 of 16.0 m
+ok    king x1.0: turns (2.51 rad/s)
+ok    king x1.0: the body bends through the turn (tightest chord 13.6 of 16.0)
+ok    king x1.0: the head moved
+ok    king x1.0: the swim wave has amplitude (0.236)
+ok    king x1.0: the mouth is at the head (0.48 m)
+ok    king x1.0: one bite lands
+ok    king x1.0: the jaw drops on its hinge (0.54 rad)
+ok    king x1.0: the skin warns through the wind-up
+ok    king x1.0: reach 5.50 m radius 4.50 m
+ok    king x1.0: capacity 7
+ok    king x1.0: the far end takes a fish 4.0 m to the side (the sweep)
+ok    king x1.0: past the reach is out
+ok    king x1.0: a size change rebuilds the body at 32.0 m
+ok    king x1.0: still one body (1)
+king x3.0:
+ok    king x3.0: a KingRig on the visual
+ok    king x3.0: hitbox 48.00 m
+ok    king x3.0: the body is 48.00 m, the hitbox's length
+ok    king x3.0: the shark's parts are hidden
+ok    king x3.0: the bite gets the King's jaw
+      model extent (4.00662, 17.22794, 48.76) m for a hitbox length 48.00
+ok    king x3.0: model length 48.76 m is about the hitbox's
+ok    king x3.0: dressing again keeps the body
+ok    king x3.0: swims (48.0 m/s)
+ok    king x3.0: the spine's head is at the front of the box (0.62 m off)
+ok    king x3.0: the body is laid out 47.9 m behind the head going straight
+      turn: spin 1.45 rad/s, chord 44.5 of 48.0 m
+ok    king x3.0: turns (1.45 rad/s)
+ok    king x3.0: the body bends through the turn (tightest chord 36.7 of 48.0)
+ok    king x3.0: the head moved
+ok    king x3.0: the swim wave has amplitude (0.707)
+ok    king x3.0: the mouth is at the head (1.43 m)
+ok    king x3.0: one bite lands
+ok    king x3.0: the jaw drops on its hinge (0.54 rad)
+ok    king x3.0: the skin warns through the wind-up
+ok    king x3.0: reach 16.50 m radius 13.50 m
+ok    king x3.0: capacity 36
+ok    king x3.0: the far end takes a fish 12.2 m to the side (the sweep)
+ok    king x3.0: past the reach is out
+ok    king x3.0: a size change rebuilds the body at 96.0 m
+ok    king x3.0: still one body (1)
+king_probe: 81 checks, 0 failed
+WARNING: 5 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

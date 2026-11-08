@@ -1,0 +1,35 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    the shark's sheet carries its exaggeration preset
+ok    dress puts a SharkRig on the model
+ok    dressing twice keeps one rig
+ok    the tooth rows are split per tooth (32 teeth)
+ok    every upper tooth is rooted on the lip line
+ok    both eyes found (2)
+      rest: model length 7.58 m, eye glow 0.70
+ok    at rest the model is untouched
+ok    master 0: the model never moves
+ok    master 0: teeth and eyes never change
+      plain steps: jaw 0.262 rad
+ok    master 0: the plain gape is the bite's own (1.26 rad)
+      bold: angle 1.97 rad (plain 1.26), thrust fwd 0.202 L back 0.041 L, teeth 0.63..2.25, glow 2.53, peak 2.17, hit-stop ticks 2
+ok    the hold gapes wider than the plain bite (1.97 vs 1.26 rad)
+ok    the press pulls the head back first (0.041 L)
+ok    the release thrusts the head forward (0.202 L)
+ok    the release thrust is past the hold's lean (0.202 vs 0.096 L)
+ok    the teeth shrink in the anticipation (0.63)
+ok    the teeth grow to at least 1.7x (2.25)
+ok    the eyes flare (2.53 from 0.70)
+ok    the teeth are already big on the hold (1.71)
+ok    the thrust rings out past rest (overshoot) before settling
+ok    the landing hit-stops the rig (2 ticks)
+ok    no pops: largest steps 0.0279 L, teeth 0.135, jaw 0.348 rad per tick
+ok    peak scale 2.17 inside 1.5-3.5, margin 1.00 m for a 1 m camera
+ok    after the settle the model, teeth, eyes and jaw sit exactly at rest
+ok    the landing asks the camera for a punch
+ok    hunter_exaggeration 2 is bigger than 1 (thrust 0.423 L, jaw 2.38 rad)
+ok    extreme is clamped at max_scale (3.35)
+ok    extreme settles back to exact rest
+ok    an aborted bite eases back to rest
+ok    and the eyes cool back to their base
+b2_shark_probe: 29 checks, 0 failed

@@ -1,0 +1,34 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+holding:
+  PASS  nothing is held to begin with
+  PASS  fish 0 is held
+  PASS  fish 15 is held
+  PASS  fish 22 is held
+  PASS  fish 29 is held
+  PASS  fish 27 is held
+  PASS  five held
+  PASS  a held fish can't be held again
+  PASS  a bad index can't be held
+  PASS  no holder, no hold
+  PASS  the held fish are in their places in the holder
+  PASS  they ride along as the holder moves
+  PASS  a held fish is not swimming on its own
+the school:
+  PASS  the middle leaves the held fish out (0.13 m off the others' mean, 6.20 m off everyone's; the holder is far off)
+  PASS  held fish are still alive (30)
+  PASS  a fish not held keeps swimming
+  PASS  nudge() knocks a free fish
+  PASS  ...and leaves a held one alone
+eaten and released:
+  PASS  an eaten fish is no longer held, the other four still are
+  PASS  a dead fish can't be held
+  PASS  a released fish is a school fish again
+  PASS  ...and swims off with its school (1.8 m)
+  PASS  the ones still held stayed
+  PASS  a free fish of another school can be held
+  PASS  a claimed fish (a joined player) can't be held
+  PASS  a holder that is freed lets its fish go
+Nature:
+  PASS  two schools of the same seed swim identically when nothing is held
+school_hold_probe: 0 failed

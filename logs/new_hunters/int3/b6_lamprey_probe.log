@@ -1,0 +1,34 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    the Queen wears the drill
+ok    the exaggeration is seated on the rig by the jaw
+ok    the skin shader took the spin / girth patch
+ok    the Queen's skin runs the patched copy
+ok    the boss's own shader is untouched
+      strength 1: rest_len 13.4 m  press stretch 0.85 disc -0.09 | hold stretch 0.72 (tail 9.5 m) disc 2.75 spin 14.1 rad/s | release peak stretch 1.83 | max disc 3.77 | per-frame max d_stretch 0.097 d_disc 0.15 d_spin 0.21 rad | hit-stop true
+ok    strength 1: the press dips first (stretch 0.85, disc -0.09)
+ok    strength 1: the held body draws in (stretch 0.72)
+ok    strength 1: the spine is measurably shorter at the hold peak (9.5 of 13.4 m)
+ok    strength 1: the disc is flared wide at the hold peak (2.75)
+ok    strength 1: the drawn-in body fattens (girth 1.16)
+ok    strength 1: the teeth are spinning up on the hold (14.1 rad/s)
+ok    strength 1: the release telescopes the body long (peak 1.83)
+ok    strength 1: release is a big swing from the hold (0.72 to 1.83)
+ok    strength 1: it settles back to rest (stretch 1.000)
+ok    strength 1: the disc settles back (0.00 vs 0.00)
+ok    strength 1: the body never pops between frames (0.097)
+ok    strength 1: the disc never pops between frames (0.15)
+ok    strength 1: the teeth never jump between frames (0.21 rad)
+ok    strength 1: contact hit-stops the rig
+ok    strength 1: ring-out recorded
+ok    strength 1: the camera margin is published on the fish
+      strength 0: rest_len 14.0 m  press stretch 1.00 disc 0.37 | hold stretch 1.00 (tail 12.3 m) disc 1.00 spin 0.0 rad/s | release peak stretch 1.00 | max disc 1.00 | per-frame max d_stretch 0.000 d_disc 0.02 d_spin 0.00 rad | hit-stop false
+ok    strength 0: the body never stretches (1.000..1.000)
+ok    strength 0: the disc is the rig's own (1.00 vs 1.00)
+ok    strength 0: the teeth do not spin up (0.00 rad)
+      strength 2: rest_len 14.0 m  press stretch 0.71 disc -0.51 | hold stretch 0.50 (tail 5.9 m) disc 4.38 spin 17.5 rad/s | release peak stretch 1.90 | max disc 5.87 | per-frame max d_stretch 0.189 d_disc 0.31 d_spin 0.31 rad | hit-stop true
+ok    strength 2 flares wider than 1 (5.87 > 3.77)
+ok    strength 2 stays under the telescope cap (1.90)
+ok    strength 2 draws in at least as far on the wind (0.50 vs 0.72)
+ok    strength 2: the camera margin stays sane (1.90x)
+b6_lamprey_probe: 28 checks, 0 failed

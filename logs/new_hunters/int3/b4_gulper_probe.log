@@ -1,0 +1,30 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    wiring: the rig owns the kit and the attack is the suction
+      A: rest
+ok    rest: body at rest scale (1.000)
+ok    rest: pouch near shut (gape 0.15)
+      B: press / hold / release
+ok    press: the pouch pinches before it swells (gape 0.02 from 0.15)
+ok    press: the body puffs up a touch (girth 1.18)
+ok    hold: the charge built (1.00)
+ok    hold: the pouch balloons to a sail (gape 2.70, 1.25 was the most before)
+ok    hold: the body deflates (girth 0.70)
+ok    hold: the camera margin grows (2.30)
+ok    hold: a deflated body lengthens a little (1.113)
+ok    release: the pouch clamps shut (gape -0.22 from 2.70)
+ok    release: the body rebounds fat on the gulp (girth 1.33)
+ok    contact: camera punch (1) and hit-stop ([3] ticks)
+ok    contact: the rig's own clock slowed during the hit-stop
+ok    settle: back to rest (girth 1.000, gape 0.15)
+ok    settle: the kit is idle
+ok    smooth: at 60 fps the biggest frame step is gape 0.47, girth 0.143 (the snap spans several frames)
+      C: the gulp bulge
+ok    gulp: the school gave a lump (0.50)
+ok    gulp: the bulge is bigger than the plain lump (1.62 vs 0.50)
+      D: master 0 is the old look
+ok    master 0: the body never moves off 1.0 through a hold
+ok    master 0: no extra gape
+      E: abort and puppets
+ok    abort: the kit eases back to rest
+b4_gulper_probe: 22 checks, 0 failed

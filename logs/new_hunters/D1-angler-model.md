@@ -1,0 +1,10 @@
+# D1-angler-model log
+1. Read plan, standards, hunter_forms, boss_mesh/spine_rig/spine_bend, gulper_model, boss_gulper shader, reference image.
+2. Decision: build with BossMesh (one spine-bent mesh + hinge channel) like the bosses; skull = loft whose bottom edge is the slanted mouth line (no cut needed); lower jaw = separate hinged loft; teeth in a second BossMesh so they can alpha-blend; stalk deformed in shader by the 6-point spring chain; pectorals flap by shader uniforms.
+3. Wrote angler_contract.md first (API for D2/D3).
+4. Built shaders/angler_skin.gdshader (one shader, parts by UV2.x; hinge, pectoral flap, tail bend, 6-point stalk chain, bump, photophores, ragged fins, esca emissive; the teeth copy writes ALPHA via a `//@alpha` text swap).
+5. Built angler_model.gd (BossMesh body + jaw + lips + fins + tufts + illicium + bulb; second mesh for teeth; eyes, esca light with static cap, halo fallback; spring chain).
+6. Looked at turntable + close-ups with tests/angler_shots.tscn. Fixes from review: eyes were unit-sized (global_transform dropped scale), leopard blotches then cracked-lava web (crest now faint), jaw rear poking below belly (closed the jaw rear, deeper belly), teeth clumped/white (fewer, spread chin fangs, dimmer), tufts like bristles (fewer, thinner), halo had a visible edge (smoother gradient), esca fringe double-scaled at k != 1 (probe caught at 18 m), mouth fully shut hid teeth (JAW_REST 0.1 rad).
+7. tests/angler_model_probe.gd: 82 checks, 0 failed (headless; shaders only compile in the windowed shots, which showed no shader errors).
+8. Findings: BossMesh tube() has one `extra` for the whole tube so the stalk is built with a custom ring loop (per-vertex t). SpineRig.place() drops the z beyond the head, so the model has its own _place(). Headless cannot compile shaders: visual QA is windowed only.
+9. Open: no pectoral membrane waviness (flat fans), tufts still a touch straight, skin has no true normal map (screen-space bump), HunterJaw wrapper and form file are D2-D4's.

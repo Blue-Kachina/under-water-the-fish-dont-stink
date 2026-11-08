@@ -28,8 +28,24 @@ var _total := 0
 var _on := false
 
 
+## The default lunge scale: the dash was too far (A3 feedback), this is about 55 percent of the travel it had.
+const LUNGE_IMPULSE_DEFAULT := 0.55
+
+
 func _init() -> void:
 	key = "drill"
+
+
+## lamprey_lunge_impulse: scales the dash's speed, and so how far the lunge (and its coast) carries her. 1.0 is the old,
+## too-long lunge. Read from the panel setting; until the setting is registered a meta of the same name on the settings
+## object stands in (the probe's override), then the default.
+static func lunge_impulse(settings: Object) -> float:
+	if settings == null:
+		return LUNGE_IMPULSE_DEFAULT
+	var v: Variant = settings.get("lamprey_lunge_impulse")
+	if v == null and settings.has_meta("lamprey_lunge_impulse"):
+		v = settings.get_meta("lamprey_lunge_impulse")
+	return maxf(float(v), 0.0) if v != null else LUNGE_IMPULSE_DEFAULT
 
 
 func reach_mult_at(_bite: HunterBite, _charge: float) -> float:
@@ -43,6 +59,14 @@ func capacity_mult_at(bite: HunterBite, charge: float) -> float:
 ## Whether the dash is on.
 func active() -> bool:
 	return dash_left > 0.0
+
+
+## The dash's envelope for the exaggeration (0..1): up over the first 0.08 s, down over the last 0.25 s, 0 when it is not on. LampreyExaggerate
+## eases the body's telescope, the disc's flare and the teeth's spin by it, so none of them pops when the dash starts or ends.
+func dash_envelope() -> float:
+	if dash_left <= 0.0:
+		return 0.0
+	return minf(smoothstep(0.0, 0.08, dash_age), smoothstep(0.0, 0.25, dash_left))
 
 
 ## The rig's: whether a latch has come up since it last asked (it then rolls on her prey for her latch time).
@@ -103,9 +127,9 @@ func _start(bite: HunterBite) -> void:
 	_latch_ok = settings.drill_latch and charge >= 0.999
 	_prev = bite.mouth_point()
 	var base := fish.max_boost_speed * fish.top_speed_scale
-	speed = base * settings.drill_dash * charge
+	speed = base * settings.drill_dash * charge * lunge_impulse(settings)
 	if not fish.puppet:
-		_raised = maxf(settings.drill_dash * charge, 1.0)
+		_raised = maxf(speed / maxf(base, 0.001), 1.0)
 		fish.top_speed_scale *= _raised  # the integrator caps a fish at its top speed: lift it for the dash
 
 

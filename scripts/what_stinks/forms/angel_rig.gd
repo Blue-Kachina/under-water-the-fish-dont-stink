@@ -47,6 +47,32 @@ var halo: MeshInstance3D
 var beam: MeshInstance3D
 var count_label: Label3D
 
+## Exaggeration (AttackExaggerate, planning_new_hunters.md B3). `ex` runs the bite's press / hold / release / contact and drives
+## the crown's reach (jaw), the wings (limb), the lock ring and glow (throat) and the body's lunge (head); `ex_lash` is a second
+## spring released when the bite lands, so the tentacles' lash snaps out at contact, not at the release before it.
+## Presets live here (the form's own); the panel's hunter_exaggeration scales them (0 = rest).
+const EXAGGERATE := {
+	"channels": {
+		"jaw": {"hold_peak": 1.9, "squash": 0.6, "release_peak": 1.5, "omega": 22.0, "zeta": 0.36, "volume": 0.0},
+		"limb": {"hold_peak": 1.5, "squash": 0.7, "release_peak": 1.85, "omega": 22.0, "zeta": 0.34, "volume": 0.3},
+		"throat": {"hold_peak": 1.15, "squash": 0.82, "release_peak": 2.3, "omega": 16.0, "zeta": 0.4, "volume": 0.0},
+		"head": {"hold_peak": 1.08, "squash": 0.86, "release_peak": 1.28, "omega": 20.0, "zeta": 0.42, "volume": 0.5},
+	},
+}
+const LASH_EXAGGERATE := {
+	"channels": {"jaw": {"hold_peak": 1.0, "squash": 1.0, "release_peak": 1.9, "omega": 20.0, "zeta": 0.34, "volume": 0.0}},
+	"snap_time": 0.09,
+}
+## Most the wings flare out over their rest angle at full exaggeration (rad per unit of scale above 1).
+const WING_FLARE := 0.5
+## Longest the lash throws a tentacle (x its rest length).
+const LASH_REACH_MAX := 2.4
+var ex: AttackExaggerate
+var ex_lash: AttackExaggerate
+var _form := {}
+var _body_scale := Vector3.ONE
+var _body_shift := 0.0
+
 var _bite: HunterBite
 var _bites_seen := 0
 var _lag_yaw := PackedFloat32Array()
@@ -127,7 +153,51 @@ func setup(for_fish: FishController) -> void:
 	jaw.mouth_at = Vector3(0.0, h * 0.012, head_z - h * 0.06) * unit  # in the model's space, not ours: the crown's base, a little ahead of the hood
 	_lag_yaw.resize(N)
 	_lag_pitch.resize(N)
+	_make_kits(HunterForms.sheet("fallen_angel"))
 	_pose(0.0)
+
+
+## The exaggeration kits for `form` (its sheet or the bite's): the panel's master and tuning over this form's presets.
+func _make_kits(form: Dictionary) -> void:
+	_form = form
+	var settings := WhatStinksSettings.shared()
+	var params := AttackExaggerate.params_from(settings, AttackExaggerate.merged(form, {"exaggerate": EXAGGERATE}))
+	ex = AttackExaggerate.new(params)
+	var lash_params := AttackExaggerate.merged(params, LASH_EXAGGERATE)
+	ex_lash = AttackExaggerate.new(lash_params)
+	ex.camera_punch.connect(_on_punch)
+	# Parts that grow need room to be drawn: the culling box follows the most they can reach.
+	var peak := maxf(ex.potential_peak(), ex_lash.potential_peak())
+	for wing in _wings:
+		wing.extra_cull_margin = MODEL.H * 0.3 * peak
+	for node in _tentacles:
+		node.extra_cull_margin = MODEL.H * 0.5 * peak
+
+
+func _on_punch(amount: float, dir: Vector3) -> void:
+	if not is_instance_valid(fish) or fish.puppet:
+		return
+	var cam := ChompKit.view_camera(fish)
+	if cam != null and cam.has_method("punch"):
+		cam.call("punch", amount, dir)
+
+
+## The bite's beats into the kit (connected once, when the rig finds its bite).
+func _wire_bite() -> void:
+	_bite.opened.connect(func() -> void: ex.press())
+	_bite.released.connect(func(charge: float) -> void: ex.release(charge))
+	_bite.aborted.connect(func() -> void: ex.abort())
+	_bite.landed.connect(_on_landed)
+	if not _bite.form.is_empty() and str(_bite.form.get("key", "")) == str(_form.get("key", "")) and _bite.form.has("exaggeration"):
+		ex.set_strength(float(ex.params["master"]), float(_bite.form["exaggeration"]))
+
+
+func _on_landed(taken: int) -> void:
+	var share := 1.0
+	if _bite != null and taken >= 0:
+		share = clampf(float(taken) / float(maxi(_bite.capacity(), 1)), 0.0, 1.0)
+	ex.contact(share)
+	ex_lash.release(1.0)
 
 
 ## The ring that shows the bite's lock-on: the end of the cone, closing in as the crown opens.
@@ -199,15 +269,17 @@ func _find_bite() -> void:
 		if child is HunterBite:
 			_bite = child
 			_bites_seen = _bite.bites
+			_wire_bite()
 			return
 
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(fish) or delta <= 0.0 or not is_visible_in_tree():
 		return
-	_age += delta
 	if _bite == null or not is_instance_valid(_bite):
 		_find_bite()
+	var dt := _step_exaggeration(delta)
+	_age += dt
 	var basis := fish.global_basis.orthonormalized()
 	var at := fish.global_position
 	if _fresh or at.distance_to(_last_at) > 20.0 or (basis * _last_basis.inverse()).get_rotation_quaternion().get_angle() > 1.0:  # the first frame, or put somewhere new: nothing to trail
@@ -227,9 +299,35 @@ func _process(delta: float) -> void:
 	_last_basis = basis
 	_last_at = at
 	speed_frac = clampf(_speed / maxf(fish.max_boost_speed * fish.top_speed_scale * wave_full_speed, 0.1), 0.0, 1.0)
-	beat_clock += delta * lerpf(beat_idle, beat_swim, speed_frac)
+	beat_clock += dt * lerpf(beat_idle, beat_swim, speed_frac)
 	_pose(delta)
-	_dress(delta)
+	_dress(dt)
+
+
+## Advances the kits (the panel's master read live), returns the hit-stop-aware delta for the rig's own clocks, and lays the
+## body's lunge: stretched along its length about the tail, so the head thrusts out and the tail stays put.
+func _step_exaggeration(delta: float) -> float:
+	var master: Variant = WhatStinksSettings.shared().get("hunter_exaggeration")
+	var form_mult := float(ex.params["form_mult"])
+	if master != null:
+		ex.set_strength(float(master), form_mult)
+		ex_lash.set_strength(float(master), form_mult)
+	if _bite != null and is_instance_valid(_bite) and _bite.holding():
+		ex.hold(_bite.charge())
+	var dt := ex.tick(delta)
+	ex_lash.tick(dt)
+	var stretch := ex.scale_basis(&"head", Vector3.BACK)
+	var along := stretch.z.length()
+	var across := stretch.x.length()
+	_body_scale = Vector3(across, across, along)
+	scale = Vector3.ONE * unit * _body_scale
+	position.z = MODEL.H * 0.5 * unit * (1.0 - along)  # pivot at the tail
+	return dt
+
+
+## The largest the body and its parts are drawn right now over rest: cameras pad their collision by it.
+func camera_margin(radius: float) -> float:
+	return radius * maxf(maxf(ex.peak_scale(), ex_lash.peak_scale()), _body_scale.z)
 
 
 ## Lays the spine along the body's lag: each segment a little behind the turn the one before it made.
@@ -258,11 +356,14 @@ func _pose_wings() -> void:
 	var flap := sin(stroke * TAU) * 0.75 - 0.1
 	var h := MODEL.H
 	var frame := rig.frame_at(h * 0.24)
+	# The wings flare: wide on the swell, folded in on the press, thrown out on the release (spread angle and span).
+	var flare := (ex.scale_of(&"limb") - 1.0) * WING_FLARE
+	var spread := ex.scale_basis(&"limb", Vector3.RIGHT)
 	for w in _wings.size():
 		var sign_x := -1.0 if w == 0 else 1.0
 		var root := frame.origin + frame.basis.x * sign_x * h * 0.095 + frame.basis.y * h * 0.01
-		var turn := Basis(frame.basis.z, sign_x * flap * 0.6) * Basis(frame.basis.y, -flap * 0.5 * sign_x)
-		_wings[w].transform = Transform3D(turn * frame.basis * Basis.from_scale(Vector3(sign_x, 1.0, 1.0)), root)
+		var turn := Basis(frame.basis.z, sign_x * (flap * 0.6 + flare)) * Basis(frame.basis.y, -flap * 0.5 * sign_x)
+		_wings[w].transform = Transform3D(turn * frame.basis * Basis.from_scale(Vector3(sign_x, 1.0, 1.0)) * spread, root)
 
 
 ## The crown: six tentacles out of the top of the head, folded inside it when closed, splayed into a starburst as it
@@ -275,17 +376,19 @@ func _pose_crown() -> void:
 	var right := up.cross(front).normalized()
 	var base := rig.place(Vector3(0.0, h * 0.012, h * 0.03))  # out of the top of the hood
 	var length := h * 0.36
+	var grow := ex.scale_of(&"jaw")  # the crown's reach: curled in on the press, thrown wide on the swell
+	var lash_grow := ex_lash.scale_of(&"jaw")
 	for t in _tentacles.size():
 		var around := TAU * t / MODEL.TENTACLES + 0.3
 		var radial := (front * cos(around) + right * sin(around)).normalized()
-		var root := base + radial * h * 0.05 * crown_open  # round the opened crown's rim
-		var splay := lerpf(0.05, 1.25, crown_open)
+		var root := base + radial * h * 0.05 * crown_open * grow  # round the opened crown's rim
+		var splay := clampf(lerpf(0.05, 1.25, crown_open) + (grow - 1.0) * 0.35 * crown_open, 0.0, 1.5)
 		var dir := (up * cos(splay) + radial * sin(splay)).normalized()
-		var reach := lerpf(0.04, 1.0, smoothstep(0.0, 0.6, crown_open))
+		var reach := lerpf(0.04, 1.0, smoothstep(0.0, 0.6, crown_open)) * grow
 		var bend := lerpf(0.0, -1.1, crown_open)  # curling back at the tips
 		if lash > 0.0:
 			dir = dir.slerp(up, lash).normalized()
-			reach = 1.0
+			reach = lerpf(reach, minf(lash_grow * grow, LASH_REACH_MAX), minf(lash * 3.0, 1.0))
 			bend = lerpf(bend, 0.4, lash)
 		var tentacle := _tentacles[t]
 		tentacle.visible = crown_open > 0.02 or lash > 0.0
@@ -313,11 +416,12 @@ func _dress(delta: float) -> void:
 	skin.set_shader_parameter("spine_wave", Vector4(MODEL.H * 0.01 * swim, 0.4, 2.2, 0.55))
 	var warn := (0.5 + 0.5 * sin(_age * 26.0)) * 0.6 * crown_open if open > 0.05 else 0.0
 	skin.set_shader_parameter("warn", warn)
-	organs.set_shader_parameter("glow", 0.6 + crown_open * 0.9 + lash * 0.6)
+	var pulse := ex.scale_of(&"throat") - 1.0  # the ring and the glow swell with the charge, burst on the release
+	organs.set_shader_parameter("glow", maxf(0.6 + crown_open * 0.9 + lash * 0.6 + pulse * 0.9, 0.2))
 	for material in _tentacle_skins:
 		material.set_shader_parameter("flush", crown_open)
-	_light.omni_range = 0.6 * fish.hitbox_length
-	_light.light_energy = 1.2 + crown_open * 3.0 + lash * 2.0
+	_light.omni_range = 0.6 * fish.hitbox_length * (1.0 + maxf(pulse, 0.0) * 0.4)
+	_light.light_energy = maxf(1.2 + crown_open * 3.0 + lash * 2.0 + pulse * 3.0, 0.2)
 	_pose_halo()
 
 
@@ -355,13 +459,15 @@ func _pose_halo() -> void:
 		if not lock.active() and lock.lost_age < 0.4:  # the lock snapped: the ring bursts outward and fades
 			size *= 1.0 + 1.5 * lock.lost_age / 0.4
 			fade = 1.0 - lock.lost_age / 0.4
+	var burst := ex.scale_of(&"throat")  # the ring flares on the release and ticks in tight on the press
+	size *= burst
 	var up := forward.cross(fish.global_basis.x.normalized())
 	if up.length_squared() < 0.0001:
 		up = fish.global_basis.y.normalized()
 	var across := up.cross(forward).normalized()
 	halo.global_transform = Transform3D(Basis(across, forward, across.cross(forward).normalized()) * Basis.from_scale(Vector3.ONE * size), at)
 	var color := Color(1.0, 0.88, 0.75).lerp(Color(1.0, 0.45, 0.1), crown_open)
-	color.a = lerpf(0.2, 0.85, crown_open) * (0.75 + 0.25 * sin(_age * 10.0)) * fade
+	color.a = clampf(lerpf(0.2, 0.85, crown_open) * (0.75 + 0.25 * sin(_age * 10.0)) * fade * maxf(burst, 0.6), 0.0, 1.0)
 	_halo_skin.albedo_color = color
 
 

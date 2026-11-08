@@ -1,0 +1,18 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+only inputs:
+  PASS  the bot's script never moves its fish itself
+  PASS  it drives its fish through its FishInput
+speed from strides:
+  PASS  it reaches batter speed (10.0 m/s) in 0.98 s
+  PASS  faster than throttle alone (32.9 m/s top, throttle caps at 12.0)
+  PASS  on strides (12 of them in 5 s)
+  PASS  loosely timed: 0.76 on average, 7 of 12 perfect
+  PASS  but some land on the peak
+hunting:
+  PASS  it batters a player sitting still (after 8.5 s)
+evading:
+  PASS  always evading, it escapes 5 of 6 straight rams
+  PASS  never evading, it escapes 0 of 6
+  PASS  set to dodge, it dodges out of the way (2 dodges)
+hunter_bot_probe: all checks passed

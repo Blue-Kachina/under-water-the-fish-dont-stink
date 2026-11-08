@@ -16,9 +16,11 @@ static func sheet() -> Dictionary:
 		"bite_reach_m": 2.5, "bite_radius_m": 1.7, "bite_wind": 0.75, "bite_every": 2.6,
 		"capacity": 5.0, "cam": Vector2(1.1, 1.05),
 		"attack": "engulf",
+		# Attack exaggeration (AttackExaggerate over WhaleJaw's whale preset, B1): long rod swings wide, teeth pop
+		"exaggerate": {"channels": {"jaw": {"hold_peak": 2.4}, "head": {"hold_peak": 1.4}, "teeth": {"hold_peak": 1.7, "release_peak": 2.8}}},
 	}
 
 
 ## The hinged jaw (WhaleJaw: meta hunter_jaw), the same one every round. Called every round, so keep it safe to repeat.
-static func dress(fish: FishController, _sheet: Dictionary) -> void:
-	WhaleJaw.wear(fish)
+static func dress(fish: FishController, sheet: Dictionary) -> void:
+	WhaleJaw.wear(fish, sheet)

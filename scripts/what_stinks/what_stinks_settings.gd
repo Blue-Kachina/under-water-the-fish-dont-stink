@@ -62,7 +62,7 @@ static func shared() -> WhatStinksSettings:
 
 @export_group("Hunter")
 ## The form the Hunter takes (a HunterForms key; one that is not ready plays as the Drowned Shark). Picked on the match card.
-@export_enum("drowned_shark", "humpback", "orca", "beluga", "sperm", "blue", "king_of_herrings", "gulper_mother", "whale_fall", "lamprey_queen", "fallen_angel") var form := "drowned_shark"
+@export_enum("drowned_shark", "humpback", "orca", "beluga", "sperm", "blue", "king_of_herrings", "gulper_mother", "whale_fall", "lamprey_queen", "fallen_angel", "ember_octopus", "lantern_angler") var form := "drowned_shark"
 ## How long after a bite the Hunter is held (s), chewing: no second bite (on top of the form's bite cooldown).
 @export_range(0.0, 10.0, 0.1, "or_greater") var chew_delay := 0.0
 
@@ -210,6 +210,254 @@ static func shared() -> WhatStinksSettings:
 @export_range(0.0, 1.0, 0.05) var drill_min_charge := 0.2
 ## ...and at full charge the first prey player the disc meets is latched: the dash ends and she rolls on it.
 @export var drill_latch := true
+## How hard the Lamprey Queen's corkscrew dash propels her, as a multiple of the old lunge. 1.0 is the old, too-long lunge; 0.55 is about half the travel; 0 switches the lunge off.
+@export_range(0.0, 3.0, 0.05, "or_greater") var lamprey_lunge_impulse := 0.55
+## ...her body telescopes no longer than this (cap on the spine stretch)...
+@export_range(1.0, 4.0, 0.05, "or_greater") var lamprey_telescope_max := 1.9
+## ...each unit of disc scale adds this many skin 'disc' units (the lip radius is 1 + 0.4 x disc)...
+@export_range(0.0, 6.0, 0.05, "or_greater") var lamprey_disc_flare := 1.35
+## ...the teeth spin this many rad/s per unit of spin scale above rest...
+@export_range(0.0, 40.0, 0.5, "or_greater") var lamprey_teeth_spin := 7.0
+## ...and through the corkscrew dash the body stretches this much more (sustained)...
+@export_range(1.0, 2.5, 0.05, "or_greater") var lamprey_dash_stretch := 1.3
+## ...the disc flares this much more...
+@export_range(1.0, 4.0, 0.05, "or_greater") var lamprey_dash_flare := 1.7
+## ...and the teeth spin this many rad/s faster.
+@export_range(0.0, 60.0, 0.5, "or_greater") var lamprey_dash_spin := 14.0
+
+@export_group("Exaggeration")
+## Master multiplier on how far every Hunter attack part departs from rest (squash, swell, smear, gape); 0 disables all exaggeration, hit-stop and punch, 1 is bold, 2 extreme.
+@export_range(0.0, 4.0, 0.05, "or_greater") var hunter_exaggeration := 1.0
+## Frames the attacker's rig freezes on a bite landing (scaled by hunter_exaggeration, capped 1.5x).
+@export_range(0.0, 12.0, 0.5, "or_greater") var hunter_hit_stop_frames := 2.5
+## Base camera punch emitted on a bite landing (x exaggeration).
+@export_range(0.0, 5.0, 0.05, "or_greater") var hunter_camera_punch := 0.5
+## Depth multiplier on the anticipation squash before the swell.
+@export_range(0.0, 3.0, 0.05, "or_greater") var hunter_exaggerate_squash := 1.0
+## Smear stretch per unit of scale speed.
+@export_range(0.0, 0.5, 0.01, "or_greater") var hunter_exaggerate_smear := 0.05
+## Hard cap on any exaggerated part scale (camera and mesh safety).
+@export_range(1.0, 8.0, 0.1, "or_greater") var hunter_exaggerate_max_scale := 3.5
+
+@export_group("Shark")
+## The Drowned Shark's extra jaw swing in radians per unit of jaw growth.
+@export_range(0.0, 3.0, 0.05, "or_greater") var shark_jaw_gape := 1.0
+## The Drowned Shark's head thrust in body lengths per unit of head growth.
+@export_range(0.0, 0.5, 0.01, "or_greater") var shark_head_thrust := 0.10
+## The Drowned Shark's body stretch along its length with the head thrust.
+@export_range(0.0, 0.6, 0.01, "or_greater") var shark_body_stretch := 0.12
+## Multiplier on the Drowned Shark's tooth growth.
+@export_range(0.0, 3.0, 0.05, "or_greater") var shark_teeth_gain := 1.0
+## Multiplier on the Drowned Shark's eye growth and glow.
+@export_range(0.0, 3.0, 0.05, "or_greater") var shark_eye_flare := 1.0
+
+@export_group("Whales")
+## The most the exaggerated whale jaw can open (degrees; soft limit: whale_gape_deg x the jaw channel is eased into it).
+@export_range(20.0, 180.0, 1.0, "or_greater") var whale_gape_max_deg := 135.0
+## How far the shut whale jaw bounces open after the bite lands (degrees; scaled by hunter_exaggeration).
+@export_range(0.0, 60.0, 0.5, "or_greater") var whale_rebound_deg := 16.0
+## How much the whole whale squashes, swells and lunges on press, charge and release (0: the body is never scaled).
+@export_range(0.0, 3.0, 0.05, "or_greater") var whale_body_pulse := 1.0
+## How far the throat pleats balloon while the mouth is held open, even empty.
+@export_range(0.0, 4.0, 0.05, "or_greater") var whale_throat_balloon := 1.0
+## How much baleen plates and teeth grow, and the tongue rises, with the exaggeration (0: no species pop).
+@export_range(0.0, 3.0, 0.05, "or_greater") var whale_tooth_pop := 1.0
+
+@export_group("King and Lamprey bodies")
+## How stiff the King of Herrings' and Lamprey Queen's bodies are: 0 is the old floppy body, 1 a rigid bar (the default 0.4 keeps 0.6 of the old flex).
+@export_range(0.0, 1.0, 0.05) var body_stiffness := 0.4
+## The King's tail stretch on the release (the kit adds smear).
+@export_range(1.0, 4.0, 0.05, "or_greater") var king_whip_stretch := 1.5
+## The King's curl multiplier at full charge.
+@export_range(1.0, 3.0, 0.05, "or_greater") var king_coil_tighten := 1.55
+## How far the King's tail trails the head's sweep.
+@export_range(0.0, 3.0, 0.05, "or_greater") var king_whip_lag := 0.45
+## The coil level the press winds the King to at once (share of full).
+@export_range(0.0, 0.95, 0.05) var coil_press_floor := 0.4
+
+@export_group("Lantern Angler")
+## The Lantern Angler's Lure: how far the esca's light reaches (m)...
+@export_range(5.0, 120.0, 1.0, "or_greater") var lure_radius := 42.0
+## ...the half angle of the light cone about where the Angler faces (degrees)...
+@export_range(10.0, 180.0, 1.0) var lure_cone := 75.0
+## ...the acceleration drawing a fish toward the esca at full ramp, next to it (m/s^2)...
+@export_range(0.0, 30.0, 0.1, "or_greater") var lure_pull := 7.0
+## ...the hardest any fish is ever drawn (m/s^2)...
+@export_range(0.0, 40.0, 0.1, "or_greater") var lure_cap := 11.0
+## ...the share of the pull a person cancels by swimming straight away from the light...
+@export_range(0.0, 1.0, 0.01) var lure_resist := 0.9
+## ...the same for a bot (which also has a steering bias toward the light)...
+@export_range(0.0, 1.0, 0.01) var lure_bot_resist := 0.35
+## ...the share of the pull a dash cancels...
+@export_range(0.0, 1.0, 0.01) var lure_dash_cancel := 1.0
+## ...the seconds of immunity after a dash breaks the hold...
+@export_range(0.0, 5.0, 0.05, "or_greater") var lure_break_s := 1.2
+## ...the seconds of holding to full attraction...
+@export_range(0.05, 8.0, 0.05, "or_greater") var lure_ramp_s := 2.0
+## ...the extra cooldown after the snap (s)...
+@export_range(0.0, 10.0, 0.1, "or_greater") var lure_cooldown := 1.5
+## ...the multiplier on the pull on school fish (0 off)...
+@export_range(0.0, 4.0, 0.05, "or_greater") var lure_school_pull := 1.0
+## ...how far a bot's swim target bends toward the lure at full hold...
+@export_range(0.0, 1.0, 0.01) var lure_bot_bias := 0.8
+## ...the distance (m) from where it is aiming at which the pull eases off, so nothing jitters at the mouth...
+@export_range(0.1, 10.0, 0.1, "or_greater") var lure_fade_m := 1.5
+## ...the esca's flicker rate with nothing near (Hz)...
+@export_range(0.5, 20.0, 0.1, "or_greater") var lure_flicker_min := 2.5
+## ...and with prey at the mouth (Hz)...
+@export_range(2.0, 40.0, 0.1, "or_greater") var lure_flicker_max := 14.0
+## ...the esca's brightness while held (1 is normal)...
+@export_range(1.0, 6.0, 0.05, "or_greater") var lure_flare := 2.6
+## ...and the jaw's opening multiplier while the lure is held.
+@export_range(1.0, 2.5, 0.05, "or_greater") var lure_gape := 1.35
+## The Angler's body: the stiffness of the lure stalk's spring (pull back to rest)...
+@export_range(5.0, 120.0, 1.0, "or_greater") var angler_stalk_stiffness := 38.0
+## ...its damping...
+@export_range(1.0, 20.0, 0.1, "or_greater") var angler_stalk_damping := 5.5
+## ...the idle sway of the esca...
+@export_range(0.0, 3.0, 0.05, "or_greater") var angler_stalk_sway := 0.5
+## ...the most point lights the esca may use (0 is halo only; the murk can lower it)...
+@export_range(0, 32, 1) var angler_esca_light_cap := 6
+## ...how rigid the body is (1 is a plank)...
+@export_range(0.2, 1.0, 0.01) var angler_body_stiffness := 0.85
+## ...the idle body sway (degrees)...
+@export_range(0.0, 30.0, 0.5) var angler_sway_deg := 9.0
+## ...the tail's peak angle in a lunge snap (degrees)...
+@export_range(0.0, 90.0, 1.0) var angler_tail_snap_deg := 40.0
+## ...the tail's ringing frequency after a snap (Hz)...
+@export_range(0.5, 4.0, 0.05) var angler_tail_hz := 1.6
+## ...the damping of that ringing...
+@export_range(0.1, 1.0, 0.01) var angler_tail_zeta := 0.3
+## ...the forward acceleration at 6 m that fires a tail-snap lunge (scaled with the square root of size)...
+@export_range(2.0, 40.0, 0.5, "or_greater") var angler_burst_accel := 9.0
+## ...the pectoral fins' scull rate (Hz)...
+@export_range(0.2, 3.0, 0.05) var angler_pectoral_hz := 0.8
+## ...and their sweep (degrees).
+@export_range(0.0, 70.0, 1.0) var angler_pectoral_deg := 28.0
+
+@export_group("Octopus lash")
+## The Ember Octopus's Tendril Lash: a press rears the arms into a crown and locks them on prey; the release whips them out. At most this many arms lock on (one prey each).
+@export_range(0, 8, 1) var whip_arms := 8
+## An arm locks on prey within this many bite reaches of the mouth (x the charge's reach, below)...
+@export_range(0.2, 5.0, 0.05, "or_greater") var whip_range := 1.15
+## ...inside a cone this wide (degrees, the half angle) round the nose...
+@export_range(5.0, 180.0, 1.0) var whip_cone := 75.0
+## ...a lock already made is kept until its prey leaves the cone by this much (x the cone)...
+@export_range(1.0, 3.0, 0.05, "or_greater") var whip_cone_slack := 1.2
+## ...or the range by this much (x the range).
+@export_range(1.0, 3.0, 0.05, "or_greater") var whip_range_slack := 1.25
+## How much a target's angle off the nose counts against its distance when arms pick prey (0: nearest first).
+@export_range(0.0, 4.0, 0.05, "or_greater") var whip_angle_weight := 0.6
+## Free arms look for new prey this often (s) while the press is held (0: arms lock only at the press).
+@export_range(0.0, 3.0, 0.05, "or_greater") var whip_refill_s := 0.25
+## How hard a lashing arm steers after a moving target (0: a straight line to where it was, 1: fully homing).
+@export_range(0.0, 1.0, 0.01) var whip_homing := 0.8
+## How long (s) an arm takes to fly to its target.
+@export_range(0.03, 1.5, 0.01, "or_greater") var whip_fly_s := 0.14
+## Arms leave this soon after each other on the release (s, the least and the most).
+@export_range(0.0, 0.5, 0.005, "or_greater") var whip_stagger_min := 0.03
+@export_range(0.0, 0.5, 0.005, "or_greater") var whip_stagger_max := 0.06
+## Fish each arm that lands takes (at the plain bite)...
+@export_range(0, 10, 1, "or_greater") var whip_per_arm := 1
+## ...and how many times that a full charge takes.
+@export_range(0, 20, 1, "or_greater") var whip_charge_capacity := 2
+## A full charge's reach (x the plain bite's) and, with it, the lock range.
+@export_range(1.0, 4.0, 0.05, "or_greater") var whip_charge_reach := 1.4
+## In the tap bite mode, the share of the locked arms a tap lashes.
+@export_range(0.0, 1.0, 0.01) var whip_tap_share := 0.5
+## How wide a lashing arm's hit is (x the bite's radius).
+@export_range(0.1, 4.0, 0.05, "or_greater") var whip_hit_radius := 0.55
+## The push the octopus takes (m/s) for each arm that lands, away from the prey...
+@export_range(0.0, 30.0, 0.1, "or_greater") var whip_recoil := 2.2
+## ...the share of that an arm that misses gives...
+@export_range(0.0, 2.0, 0.01) var whip_miss_recoil := 0.35
+## ...and the most one lash pushes it (m/s).
+@export_range(0.0, 60.0, 0.5, "or_greater") var whip_recoil_cap := 7.0
+## How wide the crown flares on the press (degrees from the nose).
+@export_range(10.0, 170.0, 1.0) var whip_flare := 75.0
+## How far an arm curls in its cocked coil: the least and the most (degrees, more with the charge).
+@export_range(0.0, 540.0, 1.0) var whip_sweep_min := 140.0
+@export_range(0.0, 720.0, 1.0) var whip_sweep_max := 290.0
+## The most an arm may lengthen to reach a target (x its length).
+@export_range(1.0, 4.0, 0.05, "or_greater") var whip_stretch := 1.6
+## The crack that runs down a lashing arm: its size.
+@export_range(0.0, 0.5, 0.005, "or_greater") var whip_wave := 0.07
+## The crown takes this long (s) to open on the press...
+@export_range(0.02, 2.0, 0.01, "or_greater") var whip_flare_s := 0.2
+## ...arms reel in this long (s) after a lash that landed...
+@export_range(0.05, 3.0, 0.01, "or_greater") var whip_retract_s := 0.4
+## ...and after one that missed.
+@export_range(0.05, 3.0, 0.01, "or_greater") var whip_miss_retract_s := 0.22
+## A lash with no prey in reach still whips this many of the front arms into the water.
+@export_range(0, 8, 1) var whip_whiff_arms := 4
+## The strike waits this long (s) for the first arm to land before it goes on.
+@export_range(0.02, 2.0, 0.01, "or_greater") var whip_stall_max := 0.45
+## The lunge forward while the press is held (the bite's lunge gain; 0: none).
+@export_range(0.0, 3.0, 0.05, "or_greater") var whip_lunge := 0.0
+## The targeting aura sweeping the cone while held (0: off, 1: on).
+@export_range(0.0, 1.0, 1.0) var whip_aura := 1.0
+
+@export_group("Octopus body")
+## The Ember Octopus's swim: seconds per jet pulse at idle throttle (shorter at speed, x0.62 on a dash)...
+@export_range(0.3, 4.0, 0.05, "or_greater") var octopus_jet_period := 1.1
+## ...the share of each pulse that is the power stroke (the mantle squeezes and the jet fires)...
+@export_range(0.08, 0.8, 0.01) var octopus_jet_power := 0.3
+## ...the thrust at the peak of a power stroke (m/s^2)...
+@export_range(0.0, 80.0, 0.5, "or_greater") var octopus_jet_accel := 14.0
+## ...and the thrust multiplier of a boost (dash) pulse.
+@export_range(1.0, 5.0, 0.05, "or_greater") var octopus_dash_mult := 1.8
+## How far the siphon swivels at full stick (rad): it steers the jet...
+@export_range(0.0, 1.4, 0.01, "or_greater") var octopus_jet_vector := 0.6
+## ...how much the siphon's off-centre thrust turns the body...
+@export_range(0.0, 3.0, 0.05, "or_greater") var octopus_jet_torque := 0.5
+## ...and how much the drag of asymmetrically flared arms turns it.
+@export_range(0.0, 3.0, 0.05, "or_greater") var octopus_flare_torque := 0.5
+## How far each arm trails behind the one before it along its length (follow the leader)...
+@export_range(0.0, 1.5, 0.01, "or_greater") var octopus_arm_lag := 0.55
+## ...the arm spring's stiffness...
+@export_range(4.0, 80.0, 0.5, "or_greater") var octopus_arm_stiffness := 26.0
+## ...and its damping ratio.
+@export_range(0.2, 2.0, 0.01, "or_greater") var octopus_arm_damping := 0.8
+## How much the arms keep their world direction when the body turns or rolls (they swing wide).
+@export_range(0.0, 1.5, 0.01, "or_greater") var octopus_inertia := 0.9
+## How far the flow bends the arm tips back at speed.
+@export_range(0.0, 2.0, 0.01, "or_greater") var octopus_drag_bend := 0.8
+## The cruise scull's undulation size and its frequency (Hz).
+@export_range(0.0, 3.0, 0.05, "or_greater") var octopus_scull_amp := 1.0
+@export_range(0.2, 4.0, 0.05, "or_greater") var octopus_scull_hz := 1.3
+## The lazy arm sway at rest.
+@export_range(0.0, 3.0, 0.05, "or_greater") var octopus_idle_sway := 1.0
+## How much slack arms hang toward the world's down...
+@export_range(0.0, 1.0, 0.01) var octopus_droop := 0.35
+## ...and how far the arm tips curl toward the sucker side.
+@export_range(0.0, 1.0, 0.01) var octopus_tip_curl := 0.3
+## The crawl: within this many body lengths of a floor the arms plant and walk (0: no crawl)...
+@export_range(0.0, 2.0, 0.05, "or_greater") var octopus_crawl_range := 0.8
+## ...seconds per arm step...
+@export_range(0.1, 1.5, 0.01, "or_greater") var octopus_crawl_step_time := 0.42
+## ...how far a foot may lag its home before the arm steps (share of the arm's length)...
+@export_range(0.05, 1.0, 0.01) var octopus_crawl_step_len := 0.3
+## ...how high a step arcs and the elbows arch...
+@export_range(0.0, 1.5, 0.01, "or_greater") var octopus_crawl_lift := 0.4
+## ...how fast the crawl blends in and out (per s)...
+@export_range(0.5, 10.0, 0.1, "or_greater") var octopus_crawl_blend_rate := 2.5
+## ...the height (share of its length) it settles to over a floor with no throttle (0: off)...
+@export_range(0.0, 1.0, 0.01) var octopus_crawl_height := 0.3
+## ...and how fast it settles there.
+@export_range(0.0, 10.0, 0.1, "or_greater") var octopus_crawl_pull := 2.5
+## The skin's glow.
+@export_range(0.0, 3.0, 0.05, "or_greater") var octopus_glow := 1.0
+## Suckers draw at full detail within this many body lengths, and at all within the second (0: no limit).
+@export_range(0.0, 12.0, 0.1, "or_greater") var octopus_sucker_hi_range := 3.0
+@export_range(0.0, 30.0, 0.1, "or_greater") var octopus_sucker_range := 7.0
+
+@export_group("Preview")
+## The card's Hunter preview: share of full throttle it swims at.
+@export_range(0.0, 1.0, 0.05) var preview_throttle := 0.75
+## ...its speed as a multiple of the default (a share of its body length a second).
+@export_range(0.0, 5.0, 0.05, "or_greater") var preview_speed := 1.0
+## ...and how far it wanders in yaw and pitch (1 the default gentle S-curves, 0 straight).
+@export_range(0.0, 4.0, 0.05, "or_greater") var preview_wander := 1.0
 
 @export_group("Stomach")
 ## Upset Stomach (what_stinks.md 1b). The satiation bar's size (the Hunter wins by filling it)...
