@@ -1,5 +1,5 @@
-## OctopusRig (C2) gait on a bare rig (no fish): the direction -> bends converter is exact, the jet cycle (mantle squeeze and refill, arms
-## bundle then flare, thrust only in the power stroke along the siphon), cruise scull, idle life, crawl (feet plant on a floor, world fixed
+## OctopusRig (C2) gait on a bare rig (no fish): the direction -> bends converter is exact, the jet cycle (mantle squeeze and refill, the
+## trailing delta narrows then re-spreads, the arms always trailing behind the head, thrust only in the power stroke along the siphon), cruise scull, idle life, crawl (feet plant on a floor, world fixed
 ## while planted, they step, arms reach them, blend in and out), gait transitions without pops (per-frame tip steps and jerk), inertia in a
 ## spin, finite everywhere, and the per-frame cost of 8 arms x 14 segments.
 ##   --trace prints gait frame summaries.
@@ -184,8 +184,12 @@ func _jet() -> void:
 	_check(rig.shown["jets"] >= 3 and rig.shown["jets"] <= 6, "jet: a pulse about every period (%d jets in 5 s)" % rig.shown["jets"])
 	_check(r.mantle_max > 0.8, "jet: the mantle squeezes (peak %.2f)" % r.mantle_max)
 	_check(r.mantle_min < -0.15, "jet: and refills past rest (low %.2f)" % r.mantle_min)
-	_check(r.spread_min < -0.8, "jet: the arms bundle into a spear (spread low %.2f)" % r.spread_min)
-	_check(r.spread_max > 0.25, "jet: and flare on recovery (spread high %.2f)" % r.spread_max)
+	_check(r.spread_min < -0.3 and r.spread_min > -0.8, "jet: the delta narrows a little on the power stroke, not into a spear (spread low %.2f)" % r.spread_min)
+	_check(r.spread_max > 0.25, "jet: and re-spreads on recovery (spread high %.2f)" % r.spread_max)
+	var worst_lead := 99.0
+	for p in _tips():
+		worst_lead = minf(worst_lead, p.z / L)
+	_check(worst_lead > 0.2, "jet: the arms trail behind the head, never a crown ahead (nearest tip %.2f of length behind)" % worst_lead)
 	var gb := rig.model.global_basis.orthonormalized()
 	_check(r.dv_sum.dot(-gb.z) > 1.0, "jet: thrust drives it forward along the siphon (dv along travel %.1f m/s over 5 s)" % r.dv_sum.dot(-gb.z))
 	_check(absf(r.dv_sum.y) < 0.5 * absf(r.dv_sum.z) + 0.01, "jet: and level (rest siphon points back and a little down: dv up %.2f, forward %.2f)" % [r.dv_sum.y, r.dv_sum.z])
@@ -352,13 +356,20 @@ func _spin() -> void:
 	_check(finite, "spin: finite through two and a half turns of roll")
 	_check(max_tip_step < 0.04, "spin: smooth (biggest tip step %.4f of length per frame)" % max_tip_step)
 	_check(worst_gap > 0.15, "spin: the arm tips swing out against the roll (%.2f rad from rest)" % worst_gap)
-	# a hard turn: yaw 90 deg in half a second, the mantle trails to the outside
+	# a hard turn: yaw 90 deg in half a second: the leading mantle bends into the turn, the trailing arms lag (they keep their world direction a while)
 	await _fresh()
+	var rest_x := 0.0
+	for p in _tips():
+		rest_x += p.x / 8.0
 	for i in 30:
 		rig.rotate_y(deg_to_rad(90.0) / 30.0)
 		rig.step(1.0 / 60.0, {"throttle": 0.0, "vel": Vector3.ZERO})
 	var tip := rig.model.mantle_tip_local()
-	_check(tip.x > 0.0, "turn: turning left (yaw +) the mantle trails out to the right (tip x %.2f)" % tip.x)
+	_check(tip.x < 0.0, "turn: turning left (yaw +) the leading mantle bends into the turn (tip x %.2f)" % tip.x)
+	var arms_x := 0.0
+	for p in _tips():
+		arms_x += p.x / 8.0
+	_check(arms_x < rest_x - 0.02 * L, "turn: and the trailing arms lag, following the path round the inside like a tail (mean tip x %.2f from %.2f)" % [arms_x, rest_x])
 
 
 func _perf() -> void:

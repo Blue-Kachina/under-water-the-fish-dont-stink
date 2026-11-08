@@ -118,15 +118,17 @@ func _at(s: float) -> void:
 			hidden = false
 	_check(hidden, "%s: the shark's own parts are hidden" % tag)
 	_check(absf(fish.hitbox_length - float(form["length_m"]) * s) < 0.05 * s + 0.01, "%s: hitbox %.2f m" % [tag, fish.hitbox_length])
-	# the model against the hitbox: arm tips at the front, mantle tip at the back
+	# the model against the hitbox: the mantle tip leads at the box's front, the arms trail toward its back (soft: at rest they
+	# droop and curl, so the tips fall a little short of the box's end; swimming straightens them)
 	var front := rig.model.global_position.z
 	var mantle := rig.model.to_global(rig.model.mantle_tip_local()).z
-	var arm_front := 1.0e9
+	var arm_back := -1.0e9
 	for a in 8:
-		arm_front = minf(arm_front, rig.model.arm_tip_global(a).z)
-	var span := mantle - arm_front
-	_check(absf(span - fish.hitbox_length) < fish.hitbox_length * 0.12, "%s: model span %.2f m = hitbox %.2f m" % [tag, span, fish.hitbox_length])
-	_check(absf(arm_front - (fish.global_position.z - fish.hitbox_length * 0.5)) < fish.hitbox_length * 0.13, "%s: arms reach the front of the box (front %.2f vs box %.2f, mantle %.2f)" % [tag, arm_front, fish.global_position.z - fish.hitbox_length * 0.5, mantle])
+		arm_back = maxf(arm_back, rig.model.arm_tip_global(a).z)
+	var span := arm_back - mantle
+	_check(span > fish.hitbox_length * 0.78 and span < fish.hitbox_length * 1.1, "%s: model span %.2f m ~ hitbox %.2f m" % [tag, span, fish.hitbox_length])
+	var box_front := fish.global_position.z - fish.hitbox_length * 0.5
+	_check(absf(mantle - box_front) < fish.hitbox_length * 0.06, "%s: the mantle leads at the front of the box (mantle %.2f vs box %.2f, arms back to %.2f)" % [tag, mantle, box_front, arm_back])
 	_check(front < fish.global_position.z + 0.01, "%s: the head is ahead of the centre" % tag)
 	await _gait(rig, tag)
 	if is_equal_approx(s, 1.0):

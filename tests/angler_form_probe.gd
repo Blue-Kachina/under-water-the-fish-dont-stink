@@ -114,7 +114,7 @@ func _at(s: float) -> void:
 	_check(hidden, "%s: the shark's own parts are hidden" % tag)
 	_check(absf(fish.hitbox_length - float(form["length_m"]) * s) < 0.05 * s + 0.01, "%s: hitbox %.2f m (body scale %.2f)" % [tag, fish.hitbox_length, fish.body_scale])
 	var model: AnglerModel = rig.model
-	var box := model.body_node.mesh.get_aabb()
+	var box := model.rest_aabb()
 	_check(absf(box.end.z - fish.hitbox_length) < fish.hitbox_length * 0.06, "%s: model length %.2f m = hitbox %.2f m" % [tag, box.end.z, fish.hitbox_length])
 	_check(absf(rig.rig.points[0].z - (fish.global_position.z - fish.hitbox_length * 0.5)) < 0.1 * s + 0.05, "%s: head at the front of the box" % tag)
 	var off := _tail_offset(rig)

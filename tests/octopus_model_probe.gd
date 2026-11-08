@@ -113,7 +113,12 @@ func _structure(o: OctopusModel) -> void:
 func _size_and_budget(o: OctopusModel) -> void:
 	var box := _bounds(_skinned(o, o.body_mesh))
 	_check(absf(box.size.z - 1.0) < 0.06, "rest extent along Z is length_m (%.3f)" % box.size.z)
-	_check(box.position.z < -0.3 and box.end.z > 0.58, "arms ahead (-Z), mantle behind (+Z): z %.2f .. %.2f" % [box.position.z, box.end.z])
+	_check(box.position.z < -0.3 and box.end.z > 0.5, "mantle ahead (-Z), arms trailing behind (+Z): z %.2f .. %.2f" % [box.position.z, box.end.z])
+	var tips_behind := true
+	for a in 8:
+		tips_behind = tips_behind and o.arm_rest_joints(a)[14].z > 0.3 * o.length_m
+	_check(tips_behind, "every arm tip trails well behind the head")
+	_check(box.size.x > box.size.y * 1.4, "the arms spread in a flat delta: wider than tall (%.2f x %.2f)" % [box.size.x, box.size.y])
 	_check(box.size.x < 1.25 and box.size.y < 1.25, "not wider than long (%.2f x %.2f)" % [box.size.x, box.size.y])
 	var counts := {"body": o.body_mesh, "web": o.web_mesh, "suckers": o.sucker_mesh, "suckers_lo": o.sucker_mesh_lo}
 	var total_tris := 0
@@ -203,7 +208,7 @@ func _poses(o: OctopusModel) -> void:
 
 func _mantle(o: OctopusModel) -> void:
 	o.reset_pose()
-	var mid_z := 0.34 * o.unit
+	var mid_z := -0.34 * o.unit
 	var rest_w := _mantle_width(o, mid_z)
 	o.set_mantle_pulse(1.0)
 	var squeezed := _mantle_width(o, mid_z)
@@ -226,7 +231,7 @@ func _mantle(o: OctopusModel) -> void:
 func _mantle_width(o: OctopusModel, mid_z: float) -> float:
 	var best := 0.0
 	for p in _skinned(o, o.body_mesh):
-		if absf(p.z - mid_z) < 0.03 * o.unit and p.z > 0.0:
+		if absf(p.z - mid_z) < 0.03 * o.unit and p.z < 0.0:
 			best = maxf(best, absf(p.x))
 	return best
 
@@ -268,7 +273,7 @@ func _readback(o: OctopusModel) -> void:
 	o.set_siphon_aim(0.0, 0.0)
 	_check(o.siphon_exhaust_dir().distance_to(dir) < 1e-4, "siphon aim 0,0 is rest")
 	_check(o.siphon_mouth_local().z > 0.05 * o.unit, "siphon mouth is behind the head")
-	_check(o.mouth_local().z < -0.08 * o.unit, "mouth is at the head front")
+	_check(o.mouth_local().z > 0.06 * o.unit and absf(o.mouth_local().y) < 0.03 * o.unit, "mouth (beak) is behind the head at the arms' junction")
 	var gl := o.arm_tip_global(1)
 	_check(gl.distance_to(o.global_transform * o.arm_tip_local(1)) < 1e-6, "arm_tip_global")
 

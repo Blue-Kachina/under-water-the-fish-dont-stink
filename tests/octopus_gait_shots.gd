@@ -1,12 +1,14 @@
 extends Node3D
 ## Not a probe: contact sheets of the Ember Octopus gait (OctopusRig, C2) on a bare rig stepped by hand, for checking blends by eye:
 ## each sheet is a grid of tiles taken every N frames. Needs a window (not --headless).
-##   Godot_console.exe --path . res://tests/octopus_gait_shots.tscn -- --out=DIR [--set=jet,dash,cruise,turn,crawl,roll]
+##   Godot_console.exe --path . res://tests/octopus_gait_shots.tscn -- --out=DIR [--set=jet,dash,cruise,turn,crawl,roll,strip]
+## `strip` is one jet cycle (12 tiles across one octopus_jet_period) twice: side view (octopus_gait_strip_side) and from above
+## (octopus_gait_strip_top), so the swim's motion can be judged frame by frame.
 ## Writes octopus_gait_<set>.png (the sheet) in DIR. The camera rides with the rig (side view, from above a little) so the
 ## body motion is the arms' and mantle's, not the travel.
 
 var out_dir := "user://octopus_gait_shots"
-var sets := ["jet", "dash", "cruise", "turn", "crawl", "roll"]
+var sets := ["jet", "dash", "cruise", "turn", "crawl", "roll", "strip"]
 var rig: OctopusRig
 var holder: Node3D
 var camera: Camera3D
@@ -87,7 +89,7 @@ func _sheet(name: String, tiles: int, every: int, ctx_fn: Callable, warm := 60, 
 			if _move:
 				holder.position += (c["vel"] as Vector3) / 60.0
 			frame += 1
-		var centre := rig.model.global_position + rig.model.global_basis * Vector3(0, 0, 0.0)
+		var centre := rig.model.global_position + rig.model.global_basis * Vector3(0, 0, rig.length * 0.12)
 		camera.position = centre + view.normalized() * dist
 		camera.look_at(centre, Vector3.UP)
 		var img := await _snap()
@@ -99,6 +101,12 @@ func _run() -> void:
 	await get_tree().process_frame
 	if "jet" in sets:
 		await _sheet("jet", 8, 8, func(_f: int) -> Dictionary: return {"throttle": 1.0, "vel": Vector3(0, 0, -6)})
+	if "strip" in sets:
+		var per := OctopusRig.opt("octopus_jet_period") * 0.8  # the period at speed (see _tick_jet)
+		var every := maxi(1, roundi(per * 60.0 / 12.0))
+		var jet := func(_f: int) -> Dictionary: return {"throttle": 1.0, "vel": Vector3(0, 0, -7)}
+		await _sheet("strip_side", 12, every, jet, 66, Vector3(-1.0, 0.1, 0.0), 7.5)
+		await _sheet("strip_top", 12, every, jet, 66 - 12 * every % 66, Vector3(0.0, 1.0, 0.02), 7.5)
 	if "dash" in sets:
 		await _sheet("dash", 8, 6, func(_f: int) -> Dictionary: return {"throttle": 1.0, "boost": true, "vel": Vector3(0, 0, -14)})
 	if "cruise" in sets:
@@ -106,7 +114,7 @@ func _run() -> void:
 	if "turn" in sets:
 		await _sheet("turn", 8, 10, func(f: int) -> Dictionary: return {"throttle": 1.0, "stick": Vector2(sin(float(f) * 0.03), 0.0), "vel": Vector3(0, 0, -6)}, 60, Vector3(0.0, 1.0, -0.3), 12.0)
 	if "roll" in sets:
-		await _sheet("roll", 8, 10, func(_f: int) -> Dictionary: return {"throttle": 1.0, "air_roll": true, "stick": Vector2(1.0, 0.0), "vel": Vector3(0, 0, -6)}, 30, Vector3(-0.2, 0.3, -1.0), 12.0)
+		await _sheet("roll", 8, 10, func(_f: int) -> Dictionary: return {"throttle": 1.0, "air_roll": true, "stick": Vector2(1.0, 0.0), "vel": Vector3(0, 0, -6)}, 30, Vector3(-0.2, 0.3, 1.0), 9.0)
 	if "crawl" in sets:
 		holder.position = Vector3(0, -0.4, 0)
 		_move = true

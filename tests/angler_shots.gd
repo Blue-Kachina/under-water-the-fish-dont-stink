@@ -3,6 +3,8 @@ extends Node3D
 ## close-ups (head, mouth open at 0 / 1 / 2, teeth, esca, eye, fins), the stalk swinging, and a gameplay-distance view.
 ## Needs a window. D1 tooling.
 ##   Godot_console.exe --path . res://tests/angler_shots.tscn -- --out=DIR [--set=turn,close,open,stalk,game,fins]
+## The sheet's length (lantern_angler.gd).
+const LENGTH := 7.0
 var out_dir := "user://angler_shots"
 var sets: Array[String] = ["turn", "close", "open", "stalk", "game", "fins"]
 var model: AnglerModel
@@ -49,7 +51,7 @@ func _ready() -> void:
 	camera.make_current()
 	model = AnglerModel.new()
 	add_child(model)
-	model.build(6.0)
+	model.build(LENGTH)
 	model.position = Vector3(0.0, 0.0, -2.2)
 	_run.call_deferred()
 
@@ -68,13 +70,14 @@ func _shot(name: String, at: Vector3, target: Vector3, fov := 38.0) -> void:
 
 func _run() -> void:
 	await get_tree().process_frame
-	var mid := model.position + Vector3(0.0, 0.2, 2.6)
+	var mid := model.position + Vector3(0.0, 0.2, LENGTH * 0.45)
 	var head := model.position + Vector3(0.0, 0.3, 0.9)
 	if "turn" in sets:
 		model.jaw_open = 0.0
 		for i in 8:
 			var a := TAU * i / 8.0
-			await _shot("turn_%d" % i, mid + Vector3(sin(a), 0.18, cos(a)) * 11.5, mid)
+			await _shot("turn_%d" % i, mid + Vector3(sin(a), 0.18, cos(a)) * 13.5, mid)
+		await _shot("side_profile", mid + Vector3(-14.0, 0.0, 0.0), mid)
 	if "close" in sets:
 		model.jaw_open = 0.0
 		await _shot("close_head_closed", head + Vector3(-4.2, 0.9, -4.6), head)
@@ -111,6 +114,11 @@ func _run() -> void:
 		model.tail_bend = 0.7
 		await _shot("tail_snap_top", mid + Vector3(0.0, 11.0, 2.0), mid)
 		model.tail_bend = 0.0
+		model.fin_flutter = 1.0
+		await _shot("fins_caudal", mid + Vector3(-3.2, 0.8, 3.6), mid + Vector3(0.0, 0.2, 3.0), 40.0)
+		await _shot("fins_dorsal", mid + Vector3(-4.0, 2.4, -0.5), mid + Vector3(0.0, 1.6, 0.0), 40.0)
+		await _shot("fins_pectoral", mid + Vector3(-4.2, 0.4, 0.5), mid + Vector3(-1.4, -0.3, -0.4), 40.0)
+		model.fin_flutter = 0.6
 	if "game" in sets:
 		await _shot("game_chase", mid + Vector3(0.0, 4.0, 15.0), model.position + Vector3(0, 0, -1.0), 55.0)
 		await _shot("game_far", mid + Vector3(-18.0, 3.0, -8.0), mid, 40.0)

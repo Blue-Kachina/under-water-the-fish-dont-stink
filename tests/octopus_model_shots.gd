@@ -62,7 +62,7 @@ func _save(file: String) -> void:
 	get_viewport().get_texture().get_image().save_png(out_dir.path_join(file))
 
 
-func _frame(dir: Vector3, dist: float, target: Vector3 = Vector3(0, 0, 0.02)) -> void:
+func _frame(dir: Vector3, dist: float, target: Vector3 = Vector3(0, 0, 0.08)) -> void:
 	camera.position = target + dir.normalized() * dist
 	camera.look_at(target, Vector3.UP)
 
@@ -73,26 +73,44 @@ func _run() -> void:
 		var views := {
 			"front34": Vector3(-0.8, 0.45, -1.0), "front": Vector3(0.0, 0.1, -1.0), "side": Vector3(-1.0, 0.05, 0.0),
 			"top": Vector3(0.0, 1.0, 0.01), "back34": Vector3(0.7, 0.4, 1.0), "below": Vector3(-0.5, -0.7, -0.6),
+			"back": Vector3(0.0, 0.25, 1.0),
 		}
 		for v: String in views:
 			_frame(views[v], 1.9)
 			await _save("octopus_turn_%s.png" % v)
 	if "close" in sets:
 		octo.reset_pose()
+		var k := octo.unit
 		var closes := {
-			"head": [Vector3(-0.7, 0.2, -1.0), 0.55, Vector3(0, 0.0, -0.05)],
-			"eye": [Vector3(-1.0, 0.2, -0.45), 0.28, Vector3(-0.1, 0.03, -0.04)],
-			"arm": [Vector3(-0.2, 1.0, -0.6), 0.55, octo.arm_rest_joints(1)[5]],
-			"arm_under": [Vector3(0.0, -1.0, -0.4), 0.5, octo.arm_rest_joints(6)[5]],
-			"mantle": [Vector3(-0.9, 0.5, 0.7), 0.8, Vector3(0, 0.03, 0.35)],
-			"siphon": [Vector3(-0.6, -0.8, 0.6), 0.32, Vector3(0, -0.08, 0.06)],
-			"web": [Vector3(0.0, 0.2, -1.0), 0.4, Vector3(0, 0.0, -0.18)],
-			"tips": [Vector3(-0.4, 0.7, -0.7), 0.5, octo.arm_rest_joints(2)[12]],
+			"head": [Vector3(-0.8, 0.35, -0.6), 0.55, Vector3(0, 0.0, -0.02) * k],
+			"eye": [Vector3(-1.0, 0.35, -0.3), 0.2, Vector3(-0.083, 0.044, 0.004) * k],
+			"arm": [Vector3(-0.2, 1.0, 0.6), 0.55, octo.arm_rest_joints(1)[5]],
+			"arm_under": [Vector3(0.0, -1.0, 0.4), 0.5, octo.arm_rest_joints(6)[5]],
+			"mantle": [Vector3(-0.9, 0.5, -0.7), 0.8, Vector3(0, 0.03, -0.3) * k],
+			"siphon": [Vector3(-0.6, -0.8, 0.5), 0.32, Vector3(0, -0.09, 0.02) * k],
+			"web": [Vector3(0.0, 0.5, 1.0), 0.5, Vector3(0, 0.0, 0.2) * k],
+			"tips": [Vector3(-0.4, 0.7, 0.7), 0.5, octo.arm_rest_joints(2)[12]],
+			"roots_top": [Vector3(-0.5, 1.0, 0.5), 0.45, Vector3(0, 0.0, 0.08) * k],
+			"roots_side": [Vector3(-1.0, 0.1, 0.25), 0.45, Vector3(0, 0.0, 0.08) * k],
+			"roots_below": [Vector3(-0.4, -1.0, 0.5), 0.45, Vector3(0, 0.0, 0.08) * k],
+			"roots_back": [Vector3(0.15, 0.25, 1.0), 0.5, Vector3(0, 0.0, 0.08) * k],
 		}
 		for c: String in closes:
 			var cfg: Array = closes[c]
 			_frame(cfg[0], float(cfg[1]), cfg[2])
 			await _save("octopus_close_%s.png" % c)
+		# the roots with the arms bent hard (they must stay on the body)
+		for a in 8:
+			var bends := PackedVector3Array()
+			bends.resize(14)
+			for j in 14:
+				bends[j] = Vector3(0.35 if j < 2 else 0.08, (0.3 if a % 2 == 0 else -0.3) if j < 2 else 0.0, 0.0)
+			octo.set_arm_pose(a, bends)
+		for c: String in ["roots_top", "roots_side", "roots_below"]:
+			var cfg: Array = closes[c]
+			_frame(cfg[0], float(cfg[1]), cfg[2])
+			await _save("octopus_close_%s_bent.png" % c)
+		octo.reset_pose()
 	if "pose" in sets:
 		_frame(Vector3(-0.8, 0.35, -1.0), 1.9)
 		octo.reset_pose()

@@ -8,7 +8,9 @@ extends Node3D
 ## Skinned on one Skeleton3D (118 bones), so rigs pose bones, not meshes.
 ## The public API (bones, joints, pose setters, shader uniforms) is
 ## `octopus_contract.md`; the skin is `shaders/octopus_skin.gdshader`.
-## -Z is the direction of travel: head, eyes and arms ahead, the mantle trails.
+## -Z is the direction of travel and the mantle leads (as a real octopus jets):
+## the head and eyes behind it, the arms trailing along +Z in a flat swept-back
+## delta (octopus_formation.png) with the web between their bases as the wing.
 
 const ARMS := 8
 const SEGMENTS := 14
@@ -24,23 +26,28 @@ const FIRST_ARM := 6
 const SKIN_SHADER := preload("res://shaders/octopus_skin.gdshader")
 
 # Design units (the head centre is the origin; scaled to metres by `unit`).
-const MANTLE_END := 0.64
-const FRONT_POLE := -0.118
-const ARM_LENGTH := 0.62
-const ARM_RADIUS := 0.047
-const ARM_BASE_RING := 0.055
-const ARM_BASE_Z := -0.07
-const MANTLE_Z := [0.10, 0.22, 0.34, 0.46]
+# The mantle LEADS (-Z, the travel direction); the arms trail along +Z in a flat, swept-back delta.
+const MANTLE_END := -0.56  ## the mantle tip, ahead of the head
+const ARM_LENGTH := 0.86
+const ARM_RADIUS := 0.042
+## The arm bases sit on a flat ellipse round the crown (wide in X, thin in Y), a little behind the head centre and inside the body.
+const ARM_BASE_RX := 0.058
+const ARM_BASE_RY := 0.036
+const ARM_BASE_Z := 0.072
+## Each arm's fan angle in the delta (degrees, toward +X), by arm: the dorsal arms 0-3 and the ventral arms 4-7 interleave.
+const ARM_FAN := [56.0, 20.0, -20.0, -56.0, -40.0, -7.0, 7.0, 40.0]
+const MANTLE_Z := [-0.10, -0.22, -0.34, -0.46]
 const MANTLE_PROFILE := [0.55, 0.9, 1.0, 0.75]  # how much each mantle bone swells with the pulse
-## Radius of the head and mantle along z: [z, radius]. Hermite through these,
-## flat (zero slope) at both ends where the caps join.
+## Radius of the head and mantle along zz = -z (toward the mantle tip): [zz, radius]. Hermite through these,
+## flat (zero slope) at both ends where the caps join. The first key is the crown (the arms' side), the last the mantle's widest.
 const BODY_KEYS := [
-	[-0.075, 0.082], [-0.04, 0.099], [0.0, 0.108], [0.045, 0.1], [0.085, 0.088], [0.13, 0.098],
-	[0.19, 0.126], [0.26, 0.15], [0.33, 0.162], [0.40, 0.162],
+	[-0.10, 0.074], [-0.06, 0.094], [-0.02, 0.1], [0.02, 0.097], [0.065, 0.088], [0.12, 0.102],
+	[0.19, 0.128], [0.26, 0.146], [0.33, 0.154], [0.38, 0.152],
 ]
-const FRONT_CAP := 0.043
-const REAR_TAIL := MANTLE_END - 0.40  ## the rear is an analytic bulb: r = r0 * (1 - t^2.2)^0.55
-const BODY_U_HEAD := 0.45  # body_u at the head front, tip of the mantle is 0, the arm tips 1
+const FRONT_CAP := 0.045  ## the crown's cap behind the head (toward +Z), hidden in the arm roots and the web
+const REAR_TAIL := -MANTLE_END - 0.38  ## the mantle's end is an analytic bulb: r = r0 * (1 - t^2.2)^0.55
+const CROWN_END := 0.10 + FRONT_CAP  ## z of the crown's pole
+const BODY_U_HEAD := 0.45  # body_u at the crown, tip of the mantle is 0, the arm tips 1
 
 ## Set by build().
 var length_m := 1.0
@@ -81,6 +88,7 @@ var _arm_glow_a := Vector4.ZERO
 var _arm_glow_b := Vector4.ZERO
 var _siphon_rest := Basis.IDENTITY
 var _mantle_pulse := 0.0
+var _mantle_pop := 0.0
 var _mantle_bend := Vector2.ZERO
 var _seed := 7
 var _bone_count := 0
@@ -130,6 +138,12 @@ func clear_arm_pose(arm: int = -1) -> void:
 			_pose_bone(bones[j], Vector3.ZERO)
 
 
+## The stride's exaggeration on the mantle (-1 thin .. 0 none .. +1 swollen): swells the bones' radius on top of the pulse, up to 45% at
+## 1. Takes effect with the next set_mantle_pulse (the rig calls it every frame).
+func set_mantle_pop(p: float) -> void:
+	_mantle_pop = clampf(p, -1.0, 1.0)
+
+
 ## -1 inflated .. 0 rest .. +1 contracted. Swells the mantle bones' radius
 ## (compensated down the chain so each bone's scale is its own).
 func set_mantle_pulse(p: float) -> void:
@@ -138,7 +152,7 @@ func set_mantle_pulse(p: float) -> void:
 	var previous := 1.0
 	for k in MANTLE_BONES:
 		var amount := 0.24 * p if p > 0.0 else 0.14 * p
-		var target := 1.0 - amount * float(MANTLE_PROFILE[k])
+		var target := (1.0 - amount * float(MANTLE_PROFILE[k])) * (1.0 + 0.45 * _mantle_pop * float(MANTLE_PROFILE[k]))
 		var local := target / previous
 		skeleton.set_bone_pose_scale(mantle_bones[k], Vector3(local, local, 1.0))
 		previous = target
@@ -247,7 +261,7 @@ func siphon_mouth_local() -> Vector3:
 
 func mouth_local() -> Vector3:
 	var head: Transform3D = skeleton.get_bone_global_pose(HEAD_BONE)
-	return head * Vector3(0.0, -0.012, -0.108) * unit
+	return head * Vector3(0.0, -0.004, 0.11) * unit
 
 
 func mantle_tip_local() -> Vector3:
@@ -335,16 +349,17 @@ func _construct(length: float, seed_value: int) -> void:
 	_seed = seed_value
 	set_meta("hunter_octopus", true)
 	var arms: Array[Dictionary] = []
-	var min_z := 0.0
+	var max_z := CROWN_END
 	for a in ARMS:
 		var d := _design_arm(a)
 		arms.append(d)
 		for p: Vector3 in d["pts"]:
-			min_z = minf(min_z, p.z)
-	var extent := MANTLE_END - min_z
+			max_z = maxf(max_z, p.z)
+	var extent := max_z - MANTLE_END
 	unit = length / extent
 	length_m = length
 	_make_materials()
+	set_param("unit_m", unit)
 	skeleton = Skeleton3D.new()
 	skeleton.name = "Skeleton3D"
 	add_child(skeleton)
@@ -396,37 +411,50 @@ func _mesh_instance(node_name: String, mesh: ArrayMesh, material: Material) -> M
 	return mi
 
 
-## One arm's rest curve in design units: a crown that flares, sweeps back and
-## curls at the tip, a little differently per arm.
+## One arm's rest curve in design units: from its base on the crown's flat
+## ellipse it fans out at its delta angle, sweeps back toward the axis along
+## its length, settles toward the delta's mid plane and curls its tip toward
+## its sucker side (inward), a little differently per arm.
 func _design_arm(a: int) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _seed * 7919 + a * 104729
 	var phi := arm_angle(a)
-	var rad := Vector3(cos(phi), sin(phi), 0.0)
-	var tang := Vector3(-sin(phi), cos(phi), 0.0)
+	var base := Vector3(cos(phi) * ARM_BASE_RX, sin(phi) * ARM_BASE_RY, ARM_BASE_Z)
+	# the sucker side: the outer arms' faces the delta's centre line, sideways in the wing's plane (a touch down), so their tips curl
+	# in that plane; the inner arms' faces down (the wing's underside), so the dorsal and ventral layers never cross
+	var outer := absf(cos(phi)) > 0.7
+	var inward := Vector3(-signf(base.x), -0.25, 0.0).normalized() if outer else Vector3(-signf(base.x) * 0.35, -1.0, 0.0).normalized()
 	var pair: float = [1.0, 1.04, 1.04, 1.0, 0.94, 0.9, 0.9, 0.94][a]
 	var length: float = ARM_LENGTH * pair * (1.0 + 0.05 * rng.randf_range(-1.0, 1.0))
-	var alpha0 := deg_to_rad(24.0 + 10.0 * rng.randf())
-	var sweep := deg_to_rad(58.0 + 34.0 * rng.randf())
-	var curl := deg_to_rad(40.0 + 45.0 * rng.randf()) * (1.0 if a % 2 == 0 else -1.0)
-	var wob := deg_to_rad(16.0 + 14.0 * rng.randf())
+	var theta0 := deg_to_rad(float(ARM_FAN[a]) + rng.randf_range(-2.5, 2.5))
+	var sweep := 0.2 + 0.12 * rng.randf()
+	var curl := deg_to_rad(35.0 + 40.0 * rng.randf()) * (1.0 if outer else 0.45)
+	var wob := deg_to_rad(4.0 + 5.0 * rng.randf())
 	var wob_phase := rng.randf() * TAU
-	var wob_freq := 1.1 + 0.5 * rng.randf()
+	var wob_freq := 0.9 + 0.5 * rng.randf()
 	var m := SEGMENTS * SUB
 	var pts := PackedVector3Array()
 	var radii := PackedFloat32Array()
 	var frames: Array[Basis] = []
-	var pos := Vector3(rad.x * ARM_BASE_RING, rad.y * ARM_BASE_RING, ARM_BASE_Z)
+	var pos := base
 	var tangent_prev := Vector3.ZERO
 	var normal := Vector3.ZERO
+	var ds := 1.0 / float(m)
 	for i in m + 1:
 		var s := float(i) / float(m)
-		var alpha := alpha0 + sweep * pow(s, 1.2) + wob * 0.6 * sin(TAU * wob_freq * s + wob_phase + 1.7) * s
-		var beta := curl * pow(s, 1.9) + wob * sin(TAU * wob_freq * s + wob_phase) * minf(s * 3.0, 1.0)
-		var d := (Vector3(0.0, 0.0, -cos(alpha)) + rad * sin(alpha)) * cos(beta) + tang * sin(beta)
-		d = d.normalized()
+		var theta := theta0 * (1.0 - sweep * pow(s, 1.3)) + wob * sin(TAU * wob_freq * s + wob_phase) * s
+		# the dorsal and ventral layers close toward the delta's mid plane (a thin wing), then run level
+		var y_now := base.y * (0.3 + 0.7 * pow(1.0 - s, 2.0))
+		var y_next := base.y * (0.3 + 0.7 * pow(maxf(1.0 - s - ds, 0.0), 2.0))
+		var slope := (y_next - y_now) / (length * ds)
+		var d := Vector3(sin(theta), slope, cos(theta)).normalized()
+		# the tip curls toward the sucker side (the transported oral normal)
+		var oral := inward if i == 0 else normal
+		oral = (oral - d * oral.dot(d)).normalized()
+		var beta := curl * pow(s, 3.2)
+		d = (d * cos(beta) + oral * sin(beta)).normalized()
 		if i == 0:
-			normal = (-rad - d * (-rad).dot(d)).normalized()
+			normal = (inward - d * inward.dot(d)).normalized()
 		else:
 			var q := Quaternion(tangent_prev, d)
 			normal = q * normal
@@ -443,9 +471,10 @@ func _design_arm(a: int) -> Dictionary:
 
 
 static func _arm_radius(s: float) -> float:
-	return ARM_RADIUS * (0.13 + 0.87 * pow(1.0 - s, 0.8)) * (1.0 + 0.3 * exp(-s * 7.0))
+	return ARM_RADIUS * (0.12 + 0.88 * pow(1.0 - s, 0.85)) * (1.0 + 0.32 * exp(-s * 9.0))
 
 
+## Body radius at zz = -z (positive toward the mantle tip).
 static func _body_radius(z: float) -> float:
 	var keys := BODY_KEYS
 	var n := keys.size()
@@ -473,13 +502,20 @@ static func _body_radius(z: float) -> float:
 	return (2.0 * t3 - 3.0 * t2 + 1.0) * r0 + (t3 - 2.0 * t2 + t) * h * m0 + (-2.0 * t3 + 3.0 * t2) * r1 + (t3 - t2) * h * m1
 
 
+## The body's centre line height at z: the mantle lifts a little toward its tip.
 static func _centre_y(z: float) -> float:
-	var f := clampf((z - 0.1) / 0.5, 0.0, 1.0)
-	return 0.075 * f * f
+	var f := clampf((-z - 0.1) / 0.46, 0.0, 1.0)
+	return 0.022 * f * f
+
+
+## The crown behind the head flattens into the delta's root: (x, y) scale of the body's cross-section at z.
+static func _section_scale(z: float) -> Vector2:
+	var c := smoothstep(-0.01, 0.1, z)
+	return Vector2(1.0 + 0.26 * c, 1.0 - 0.24 * c)
 
 
 static func _body_u(z: float) -> float:
-	return BODY_U_HEAD * (MANTLE_END - z) / (MANTLE_END - FRONT_POLE)
+	return BODY_U_HEAD * (z - MANTLE_END) / (CROWN_END - MANTLE_END)
 
 
 func _build_skeleton(arms: Array[Dictionary]) -> void:
@@ -551,26 +587,28 @@ func _build_skeleton(arms: Array[Dictionary]) -> void:
 
 # --------------------------------------------------------------- body surface
 
+## Skin weights of a body ring at z: the head and crown on the head bone, blending into the mantle chain toward the tip.
 func _body_weights(z: float) -> Array:
-	var z0: float = MANTLE_Z[0]
-	if z <= 0.015:
+	var zz := -z
+	var z0: float = -float(MANTLE_Z[0])
+	if zz <= 0.015:
 		return [[HEAD_BONE, 0, 0, 0], [1.0, 0.0, 0.0, 0.0]]
-	if z < z0:
-		var t := smoothstep(0.015, z0 + 0.02, z)
+	if zz < z0:
+		var t := smoothstep(0.015, z0 + 0.02, zz)
 		return [[HEAD_BONE, mantle_bones[0], 0, 0], [1.0 - t, t, 0.0, 0.0]]
 	for k in MANTLE_BONES - 1:
-		var a: float = MANTLE_Z[k]
-		var b: float = MANTLE_Z[k + 1]
-		if z < b:
-			var t := smoothstep(a, b, z)
+		var a: float = -float(MANTLE_Z[k])
+		var b: float = -float(MANTLE_Z[k + 1])
+		if zz < b:
+			var t := smoothstep(a, b, zz)
 			return [[mantle_bones[k], mantle_bones[k + 1], 0, 0], [1.0 - t, t, 0.0, 0.0]]
 	return [[mantle_bones[MANTLE_BONES - 1], 0, 0, 0], [1.0, 0.0, 0.0, 0.0]]
 
 
 func _build_body(arms: Array[Dictionary]) -> ArrayMesh:
 	var buf := _Buf.new()
-	# Rings along z: front cap, the spline, rear cap.
-	var rings: Array[Vector2] = []  # z, radius
+	# Rings along zz = -z: the crown's cap (behind the head), the spline, the mantle's bulb (ahead).
+	var rings: Array[Vector2] = []  # zz, radius
 	var front_z: float = BODY_KEYS[0][0]
 	var rear_z: float = BODY_KEYS[BODY_KEYS.size() - 1][0]
 	var front_r := _body_radius(front_z)
@@ -599,17 +637,17 @@ func _build_body(arms: Array[Dictionary]) -> ArrayMesh:
 	var bones := PackedInt32Array()
 	var weights := PackedFloat32Array()
 	for i in rows:
-		var rz := rings[i].x
+		var rz := -rings[i].x
 		var rr := rings[i].y
 		var cy := _centre_y(rz)
 		var wb := _body_weights(rz)
-		var mantle_w := 1.0 - smoothstep(0.02, 0.2, rz) * 0.0
-		var vein := 0.55 + 0.45 * smoothstep(0.05, 0.25, rz)
+		var sc := _section_scale(rz)
+		var vein := 0.55 + 0.45 * smoothstep(0.05, 0.25, -rz)
 		centres.append(Vector3(0.0, cy, rz) * unit)
 		for k in stride:
 			var th := TAU * float(k % cols) / float(cols)
-			var rx := rr
-			var ry := rr * (0.95 if rz < 0.1 else 0.93)
+			var rx := rr * sc.x
+			var ry := rr * sc.y * (0.95 if -rz < 0.1 else 0.93)
 			var p := Vector3(sin(th) * rx, cy + cos(th) * ry, rz)
 			pos.append(p * unit)
 			var belly := clampf(-cos(th) * 0.9 - 0.15, 0.0, 1.0) * 0.5
@@ -640,7 +678,9 @@ func _add_arm(buf: _Buf, d: Dictionary, a: int) -> void:
 	var frames: Array[Basis] = d["frames"]
 	var m := SEGMENTS * SUB
 	var cap_n := 3
-	var rows := m + 1 + cap_n
+	# root rings: the tube carries on back into the head, swelling, on the head bone, so the arm grows out of the body
+	var root_n := 4
+	var rows := root_n + m + 1 + cap_n
 	var cols := AROUND_ARM
 	var stride := cols + 1
 	var chain: PackedInt32Array = arm_bones[a]
@@ -651,20 +691,33 @@ func _add_arm(buf: _Buf, d: Dictionary, a: int) -> void:
 	var bones := PackedInt32Array()
 	var weights := PackedFloat32Array()
 	var tip_r := radii[m]
+	var d0 := -frames[0].z
 	for i in rows:
-		var ii := mini(i, m)
+		var ii := clampi(i - root_n, 0, m)
 		var c := pts[ii]
 		var fr := frames[ii]
 		var r := radii[ii]
 		var s := float(ii) / float(m)
-		if i > m:
-			var th := (float(i - m) / cap_n) * PI * 0.5
-			c = pts[m] + (-fr.z) * tip_r * 1.1 * sin(th)
-			r = tip_r * cos(th)
+		var bone_ids: Array[int] = []
+		var bone_w: Array[float] = []
+		if i < root_n:
+			var k := float(root_n - i)
+			c = pts[0] - d0 * (0.01 * k) - Vector3(pts[0].x, pts[0].y, 0.0) * (0.12 * k)
+			r = radii[0] * (1.0 + 0.05 * k)
+			var hb := 1.0 if k > 1.5 else 0.85
+			bone_ids = [HEAD_BONE, chain[0], chain[0], chain[0]]
+			bone_w = [hb, 1.0 - hb, 0.0, 0.0]
+		else:
+			if i - root_n > m:
+				var th := (float(i - root_n - m) / cap_n) * PI * 0.5
+				c = pts[m] + (-fr.z) * tip_r * 1.1 * sin(th)
+				r = tip_r * cos(th)
+			# the first segment leans on the head too, so a bent arm's root does not open a seam
+			var h := 0.75 * (1.0 - smoothstep(0.0, float(SUB) * 1.3, float(ii)))
+			var aw := _arm_weights(float(ii))
+			bone_ids = [chain[int(aw[0][0])], chain[int(aw[0][1])], HEAD_BONE, chain[int(aw[0][3])]]
+			bone_w = [float(aw[1][0]) * (1.0 - h), float(aw[1][1]) * (1.0 - h), h, 0.0]
 		centres.append(c * unit)
-		var aw := _arm_weights(float(ii))
-		var wsel: Array = aw[0]
-		var wval: Array = aw[1]
 		for k in stride:
 			var th2 := TAU * float(k % cols) / float(cols)
 			var dir := fr.y * cos(th2) + fr.x * sin(th2)
@@ -676,8 +729,8 @@ func _add_arm(buf: _Buf, d: Dictionary, a: int) -> void:
 			colors.append(Color(vein, 0.0, float(a) / 7.0, oral))
 			custom.append_array([p.x, p.y, p.z, BODY_U_HEAD + (1.0 - BODY_U_HEAD) * s])
 			for q in 4:
-				bones.append(chain[int(wsel[q])])
-				weights.append(float(wval[q]))
+				bones.append(bone_ids[q])
+				weights.append(bone_w[q])
 	buf.add_grid(pos, PackedVector3Array(), centres, rows, cols, colors, custom, bones, weights, true, false)
 
 
@@ -689,11 +742,12 @@ func _add_web(buf: _Buf, arms: Array[Dictionary], a: int) -> void:
 	var rb: PackedFloat32Array = arms[b]["radii"]
 	var chain_a: PackedInt32Array = arm_bones[a]
 	var chain_b: PackedInt32Array = arm_bones[b]
-	var rows := 10
+	# the web runs a long way down the arms (the delta's wing), deepest along each arm, scalloped between
+	var rows := 14
 	var cols := 8
 	var stride := cols + 1
-	var m_centre := 4.0
-	var m_edge := 9.0
+	var m_centre := 14.0
+	var m_edge := 25.0
 	var pos := PackedVector3Array()
 	var centres := PackedVector3Array()
 	var colors := PackedColorArray()
@@ -730,8 +784,14 @@ func _add_web(buf: _Buf, arms: Array[Dictionary], a: int) -> void:
 			var bj := mini(int(floor(jf)), SEGMENTS - 1)
 			var bn := mini(bj + 1, SEGMENTS - 1)
 			var f := smoothstep(0.0, 1.0, jf - float(bj))
-			bones.append_array([chain_a[bj], chain_a[bn], chain_b[bj], chain_b[bn]])
-			weights.append_array([(1.0 - cf) * (1.0 - f), (1.0 - cf) * f, cf * (1.0 - f), cf * f])
+			# near the crown the web leans on the head like the arm roots do
+			var h := 0.6 * (1.0 - smoothstep(0.0, float(SUB) * 1.2, mf))
+			if h > 0.0005:
+				bones.append_array([chain_a[bj], HEAD_BONE, chain_b[bj], chain_b[bn]])
+				weights.append_array([(1.0 - cf) * (1.0 - h), h, cf * (1.0 - f) * (1.0 - h), cf * f * (1.0 - h)])
+			else:
+				bones.append_array([chain_a[bj], chain_a[bn], chain_b[bj], chain_b[bn]])
+				weights.append_array([(1.0 - cf) * (1.0 - f), (1.0 - cf) * f, cf * (1.0 - f), cf * f])
 			colors.append(Color(0.55 * (1.0 - 0.4 * t), 0.0, float(a) / 7.0, 0.35))
 			custom.append_array([mid.x, mid.y, mid.z, BODY_U_HEAD + (1.0 - BODY_U_HEAD) * (mf / m_total)])
 	buf.add_grid(pos, PackedVector3Array(), centres, rows + 1, cols, colors, custom, bones, weights, false, true)
@@ -840,12 +900,13 @@ func _build_head_parts() -> void:
 	attach.bone_name = "head"
 	eyes.clear()
 	for side in [-1, 1]:
-		var eye_dir := Vector3(0.82 * side, 0.2, -0.53).normalized()
-		var centre := Vector3(0.094 * side, 0.03, -0.034)
+		# small, set high on the side of the head, looking out and a little ahead, under a heavy brow
+		var eye_dir := Vector3(0.86 * side, 0.36, -0.36).normalized()
+		var centre := Vector3(0.083 * side, 0.044, -0.012)
 		var basis := Basis.looking_at(-eye_dir, Vector3.UP)
 		var eye := MeshInstance3D.new()
 		eye.name = "EyeL" if side < 0 else "EyeR"
-		eye.mesh = _eye_mesh(0.037)
+		eye.mesh = _eye_mesh(0.024)
 		eye.material_override = materials[3]
 		eye.transform = Transform3D(basis, centre * unit)
 		attach.add_child(eye)
@@ -856,12 +917,12 @@ func _build_head_parts() -> void:
 		lid.material_override = materials[0]
 		lid.transform = Transform3D(basis, centre * unit)
 		attach.add_child(lid)
-	# The siphon: a funnel under the neck, exhaust (+Z local) pointing back and a little down.
+	# The siphon: a funnel from the mantle opening under the head, exhaust (+Z local) aimed back between the ventral arms, a little down.
 	siphon = Node3D.new()
 	siphon.name = "Siphon"
 	var exhaust := Vector3(0.0, -0.22, 1.0).normalized()
 	_siphon_rest = Basis.looking_at(-exhaust, Vector3.UP)
-	siphon.transform = Transform3D(_siphon_rest, Vector3(0.0, -0.078, 0.04) * unit)
+	siphon.transform = Transform3D(_siphon_rest, Vector3(0.0, -0.082, -0.03) * unit)
 	attach.add_child(siphon)
 	var sm := MeshInstance3D.new()
 	sm.name = "SiphonMesh"
@@ -895,29 +956,32 @@ func _eye_mesh(radius: float) -> ArrayMesh:
 	return buf.to_mesh(false)
 
 
-## The raised rim round an eye: a flattened torus, skin material.
+## The raised rim round an eye, swelling into a heavy brow ridge over its top
+## (a torus whose tube thickens and leans out over the eye), skin material.
 func _lid_mesh() -> ArrayMesh:
 	var buf := _Buf.new()
-	var rows := 10
-	var cols := 32
+	var rows := 12
+	var cols := 36
 	var pos := PackedVector3Array()
 	var nrm := PackedVector3Array()
 	var colors := PackedColorArray()
 	var custom := PackedFloat32Array()
 	var centres := PackedVector3Array()
-	var big := 0.039
-	var tube := 0.011
+	var big := 0.026
 	for i in rows + 1:
 		var th := TAU * float(i % rows) / float(rows)
 		centres.append(Vector3(0.0, 0.0, 0.0))
 		for k in cols + 1:
 			var ph := TAU * float(k % cols) / float(cols)
 			var ring := Vector3(cos(ph), sin(ph), 0.0)
-			var off := ring * (big + cos(th) * tube) + Vector3(0.0, 0.0, sin(th) * tube * 0.8 - 0.004)
+			var brow := smoothstep(-0.1, 0.85, sin(ph)) * (0.8 + 0.2 * cos(ph * 3.0))
+			var tube := 0.0065 + 0.0125 * brow
+			var lean := Vector3(0.0, 0.0, 0.009 * brow) - ring * (0.006 * brow)
+			var off := ring * (big + cos(th) * tube) + Vector3(0.0, 0.0, sin(th) * tube * 0.75 - 0.004) + lean
 			pos.append(off * unit)
 			nrm.append((ring * cos(th) + Vector3(0, 0, sin(th))).normalized())
 			colors.append(Color(0.3, 0, 0, 0.0))
-			custom.append_array([off.x + 0.094, off.y + 0.03, off.z, 0.4])
+			custom.append_array([off.x + 0.083, off.y + 0.044, off.z, 0.4])
 	buf.add_grid(pos, nrm, centres, rows + 1, cols, colors, custom, PackedInt32Array(), PackedFloat32Array(), true, false)
 	return buf.to_mesh(false)
 

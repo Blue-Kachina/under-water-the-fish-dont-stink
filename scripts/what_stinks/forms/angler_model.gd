@@ -3,14 +3,25 @@ extends Node3D
 ## The Lantern Angler's body (what_stinks: planning_new_hunters.md D1; the API is angler_contract.md). One seamless
 ## BossMesh bent along a SpineRig by angler_skin.gdshader, like the bosses: a heavy globe of a head whose underside slants
 ## up to the snout (that slant IS the mouth line, so the roof of the mouth is the skull's own bottom), a separate lower
-## jaw (hinge weight 1) that sticks out past the snout and turns in the shader about the corner of the mouth, needle teeth
-## in a second mesh (glassy, clear toward the tips), the illicium deformed in the shader by a 6-point spring chain with the
-## glowing esca at its end, ragged pectoral, dorsal, anal and caudal fins, hair-like tufts, cold eyes and photophores.
-## Design numbers are in metres at a 6 m body ("design"), times `k` = length / 6.
+## jaw (hinge weight 1) that sticks out past the snout and turns in the shader about the corner of the mouth, behind the head
+## a real fish body tapering to a narrow peduncle (angler_fish_side_profile.png), needle teeth in a second mesh (glassy, clear
+## toward the tips), the illicium deformed in the shader by a 6-point spring chain with the glowing esca at its end, hair-like
+## tufts, cold eyes and photophores. The fins (spiny and soft dorsal, anal, caudal fan, pectorals) are a third mesh of plain
+## membranes whose rays, translucent torn web, ragged edges, fraying filaments and ripple are all angler_fin.gdshader's.
+## Design numbers are in metres at a 7.5 m body ("design"), times `k` = length / 7.5.
 
 const SKIN := preload("res://shaders/angler_skin.gdshader")
+const FIN_SKIN := preload("res://shaders/angler_fin.gdshader")
 const EYE := preload("res://shaders/fish_eye.gdshader")
-const DESIGN_LENGTH := 6.0
+const DESIGN_LENGTH := 7.5
+## Where the body's loft ends (design m): the caudal fan carries on from the peduncle to DESIGN_LENGTH.
+const BODY_END := 6.25
+## Fin ids for angler_fin.gdshader (UV2.x in the fin mesh).
+const FIN_SPINY := 10.0
+const FIN_SOFT := 11.0
+const FIN_ANAL := 12.0
+const FIN_CAUDAL := 13.0
+const FIN_PECTORAL := 14.0
 ## The jaw's angle at jaw_open 1, and the most it can turn (rad).
 const GAPE_ANGLE := 0.9
 const MAX_JAW_ANGLE := 2.1
@@ -25,6 +36,10 @@ const STALK_REST: Array[Vector3] = [
 	Vector3(0.0, 2.8, 0.15), Vector3(0.0, 2.85, -0.35), Vector3(0.0, 2.62, -0.8),
 ]
 const BULB_DROP := 0.22  # design m the bulb's centre hangs below the chain's end
+## Where the tail snap starts (design m): the body behind the head, and the fins on it.
+const TAIL_FROM := 3.9
+## The right pectoral's root (design m, mirrored for the left): its hinge in the shader.
+const PECT_ROOT := Vector3(1.5, -0.25, 2.8)
 
 ## How many esca point lights may exist at once across all anglers (the murk system may lower it). The rest use the halo.
 static var light_cap := 6
@@ -39,8 +54,10 @@ var length := DESIGN_LENGTH
 var rig: SpineRig
 var skin: ShaderMaterial
 var teeth_skin: ShaderMaterial
+var fin_skin: ShaderMaterial
 var body_node: MeshInstance3D
 var teeth_node: MeshInstance3D
+var fin_node: MeshInstance3D
 var eyes: Array[MeshInstance3D] = []
 var stalk_nodes: Array[Node3D] = []
 var light_enabled := true
@@ -64,10 +81,14 @@ var eye_glint := 1.0:
 var tail_bend := 0.0:
 	set(value):
 		tail_bend = value
-		if skin:
-			skin.set_shader_parameter("tail_bend", value)
-		if teeth_skin:
-			teeth_skin.set_shader_parameter("tail_bend", value)
+		for m in _skins():
+			m.set_shader_parameter("tail_bend", value)
+## The stride's Battletoads swell of the tail (0 none): its girth and the caudal fan grow by this much at the tip.
+var tail_grow := 0.0:
+	set(value):
+		tail_grow = value
+		for m in _skins():
+			m.set_shader_parameter("tail_grow", value)
 var fin_flutter := 0.6:
 	set(value):
 		fin_flutter = clampf(value, 0.0, 2.0)
@@ -116,16 +137,25 @@ func build(length_m: float = DESIGN_LENGTH) -> AnglerModel:
 	_bulb_rest = _stalk_rest[5] + Vector3(0.0, -BULB_DROP * k, 0.0)
 	var body := BossMesh.new(length_m)
 	var teeth := BossMesh.new(length_m)
+	var fins := BossMesh.new(length_m)
 	_build_body(body)
 	_build_teeth(teeth)
+	_build_fins(fins)
 	var body_mesh: ArrayMesh = body.commit()
 	var teeth_mesh: ArrayMesh = teeth.commit()
+	var fin_mesh: ArrayMesh = fins.commit()
 	_make_materials()
 	body_node = rig.add_mesh(self, body_mesh, skin)
 	body_node.name = "Body"
 	teeth_node = rig.add_mesh(self, teeth_mesh, teeth_skin)
 	teeth_node.name = "Teeth"
-	_stats = {"vertices": body.count + teeth.count, "triangles": (body_mesh.surface_get_array_index_len(0) + teeth_mesh.surface_get_array_index_len(0)) / 3, "teeth": _tooth_count}
+	fin_node = rig.add_mesh(self, fin_mesh, fin_skin)
+	fin_node.name = "Fins"
+	fin_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var tris := 0
+	for mesh: ArrayMesh in [body_mesh, teeth_mesh, fin_mesh]:
+		tris += mesh.surface_get_array_index_len(0) / 3
+	_stats = {"vertices": body.count + teeth.count + fins.count, "triangles": tris, "teeth": _tooth_count, "fin_vertices": fins.count}
 	_build_eyes()
 	_build_esca()
 	_push_all()
@@ -135,6 +165,13 @@ func build(length_m: float = DESIGN_LENGTH) -> AnglerModel:
 
 func mesh_stats() -> Dictionary:
 	return _stats
+
+
+## The whole creature's rest-space bounds (body, teeth and fins): snout to the caudal fan's tip in z.
+func rest_aabb() -> AABB:
+	var box := body_node.mesh.get_aabb()
+	box = box.merge(teeth_node.mesh.get_aabb())
+	return box.merge(fin_node.mesh.get_aabb())
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -346,9 +383,19 @@ func _push_all() -> void:
 	_push_fins()
 	_push_flutter()
 	tail_bend = tail_bend
+	tail_grow = tail_grow
 
 
+## Every material the pose channels (tail, pectorals, flutter) reach: body, teeth, fins.
 func _skins() -> Array[ShaderMaterial]:
+	var out := _body_skins()
+	if fin_skin:
+		out.append(fin_skin)
+	return out
+
+
+## The skin shader's two copies (jaw hinge, esca, stalk).
+func _body_skins() -> Array[ShaderMaterial]:
 	var out: Array[ShaderMaterial] = []
 	if skin:
 		out.append(skin)
@@ -363,12 +410,12 @@ static func _jaw_angle(open: float) -> float:
 
 func _push_jaw() -> void:
 	var angle := _jaw_angle(jaw_open)
-	for m in _skins():
+	for m in _body_skins():
 		m.set_shader_parameter("hinge", Vector3(HINGE.x * k, HINGE.y * k, angle))
 
 
 func _push_esca() -> void:
-	for m in _skins():
+	for m in _body_skins():
 		m.set_shader_parameter("esca_intensity", esca_intensity)
 		m.set_shader_parameter("esca_color", esca_color)
 
@@ -402,14 +449,17 @@ func _make_materials() -> void:
 	alpha.code = SKIN.code.replace("//@alpha", "ALPHA = ta;")
 	teeth_skin = ShaderMaterial.new()
 	teeth_skin.shader = alpha
+	fin_skin = ShaderMaterial.new()
+	fin_skin.shader = FIN_SKIN
 	for m in _skins():
 		m.set_shader_parameter("k", k)
+		m.set_shader_parameter("tail_from", TAIL_FROM * k)
+		m.set_shader_parameter("pect_root", PECT_ROOT)
+		m.set_shader_parameter("spine_length", length)
+	for m in _body_skins():
 		m.set_shader_parameter("mouth_line", MOUTH_LINE)
-		m.set_shader_parameter("tail_from", 3.9 * k)
-		m.set_shader_parameter("pect_root", Vector3(1.55, -0.2, 2.75))
 		m.set_shader_parameter("stalk_rest", _stalk_rest)
 		m.set_shader_parameter("stalk_now", _stalk)
-		m.set_shader_parameter("spine_length", length)
 	skin.set_shader_parameter("bump_strength", 0.9)
 
 
@@ -449,11 +499,12 @@ static func _slope(knots: Array, i: int) -> float:
 
 
 const SKULL_TOP: Array = [Vector2(0.0, 0.3), Vector2(0.12, 0.62), Vector2(0.5, 1.0), Vector2(1.0, 1.42), Vector2(1.7, 1.85), Vector2(2.4, 1.97),
-		Vector2(3.2, 1.6), Vector2(4.0, 0.95), Vector2(4.7, 0.46), Vector2(5.2, 0.22)]
+		Vector2(3.1, 1.78), Vector2(3.8, 1.42), Vector2(4.5, 1.02), Vector2(5.2, 0.68), Vector2(5.8, 0.48), Vector2(6.25, 0.42)]
 const SKULL_BOTTOM: Array = [Vector2(0.0, 0.3), Vector2(0.12, 0.13), Vector2(0.5, -0.04), Vector2(1.0, -0.22), Vector2(1.7, -0.43), Vector2(2.2, -0.58),
-		Vector2(2.55, -1.02), Vector2(3.0, -1.55), Vector2(3.6, -1.5), Vector2(4.0, -1.0), Vector2(4.7, -0.5), Vector2(5.2, -0.2)]
+		Vector2(2.55, -1.02), Vector2(3.0, -1.66), Vector2(3.5, -1.62), Vector2(4.1, -1.2), Vector2(4.8, -0.62), Vector2(5.4, -0.26),
+		Vector2(5.9, -0.1), Vector2(6.25, -0.08)]
 const SKULL_WIDTH: Array = [Vector2(0.0, 0.0), Vector2(0.12, 0.45), Vector2(0.5, 0.88), Vector2(1.0, 1.22), Vector2(1.6, 1.52), Vector2(2.4, 1.68),
-		Vector2(3.2, 1.48), Vector2(4.0, 0.82), Vector2(4.7, 0.36), Vector2(5.2, 0.13)]
+		Vector2(3.2, 1.42), Vector2(4.0, 0.98), Vector2(4.8, 0.6), Vector2(5.5, 0.32), Vector2(6.0, 0.2), Vector2(6.25, 0.17)]
 const JAW_DEPTH: Array = [Vector2(-0.35, 0.0), Vector2(-0.25, 0.38), Vector2(0.3, 0.88), Vector2(1.0, 1.08), Vector2(1.8, 1.18), Vector2(2.4, 1.0), Vector2(2.9, 0.78), Vector2(3.3, 0.1)]
 const JAW_WIDTH: Array = [Vector2(-0.35, 0.0), Vector2(-0.2, 0.4), Vector2(0.3, 0.66), Vector2(1.0, 1.0), Vector2(1.8, 1.36), Vector2(2.4, 1.5), Vector2(2.9, 1.3), Vector2(3.3, 0.25)]
 const SQUARE := 3.0
@@ -473,10 +524,11 @@ static func skull_slice(z: float) -> Vector4:
 	var top := _curve(SKULL_TOP, z)
 	var bottom := _curve(SKULL_BOTTOM, z)
 	var w := _curve(SKULL_WIDTH, z)
-	# The tail closes in its last stretch.
-	var close := sqrt(maxf(1.0 - pow(maxf(z - 5.0, 0.0) / 0.2, 2.0), 0.0))
+	# The peduncle closes in its last stretch (the caudal fan carries on from there).
+	var close := sqrt(maxf(1.0 - pow(maxf(z - (BODY_END - 0.2), 0.0) / 0.2, 2.0), 0.0))
 	var h := (top - bottom) * 0.5 * close
-	return Vector4(w * close, h, (top + bottom) * 0.5, lerpf(SQUARE, 2.3, smoothstep(2.5, 3.5, z)) if z > 0.3 else 2.2)
+	var square := lerpf(lerpf(SQUARE, 2.3, smoothstep(2.5, 3.5, z)), 2.05, smoothstep(3.5, 5.0, z))
+	return Vector4(w * close, h, (top + bottom) * 0.5, square if z > 0.3 else 2.2)
 
 
 static func jaw_slice(z: float) -> Vector4:
@@ -499,21 +551,26 @@ var _tooth_count := 0
 
 func _build_body(m: BossMesh) -> void:
 	var kk := k
-	# The skull: a globe, closed at the snout and at the tail, its bottom the mouth's roof.
+	# The skull and body: a globe of a head, its bottom the mouth's roof, then a fish's body tapering to the peduncle.
 	var skull := func(a: float) -> Vector4:
-		var z := a * 5.2
+		var z := a * BODY_END
 		var s := skull_slice(z)
 		return Vector4(s.x * kk, s.y * kk, s.z * kk, s.w)
 	var wrinkles := func(a: float, angle: float) -> float:
-		var z := a * 5.2
+		var z := a * BODY_END
 		var mirror := minf(angle, TAU - angle)
 		# Brow ridges over the eyes, a sunk socket, fine folds across the face and heavy furrows along the cheeks.
 		var brow := 0.1 * exp(-pow((z - 0.95) / 0.45, 2.0)) * exp(-pow((mirror - 0.62) / 0.28, 2.0))
 		var socket := -0.05 * exp(-pow((z - 1.0) / 0.3, 2.0)) * exp(-pow((mirror - 1.15) / 0.22, 2.0))
 		var folds := 0.016 * sin(mirror * 7.0 + z * 4.5) * smoothstep(0.1, 0.7, z) * (1.0 - smoothstep(2.6, 3.8, z))
 		var chin := 0.025 * sin(z * 17.0 + mirror * 2.0) * (1.0 - smoothstep(0.4, 2.3, z)) * smoothstep(1.6, 2.6, mirror)
-		return 1.0 + brow + socket + folds + chin
-	m.loft(0.0, 5.2 * kk, skull, 210, 64, BossMesh.BODY, Callable(), 0.0, wrinkles)
+		# The gill cover's rim behind the head, loose folds of skin round the body, and warty knobs breaking the outline.
+		var gill := -0.035 * exp(-pow((z - 3.05 - 0.15 * cos(mirror)) / 0.09, 2.0)) * smoothstep(0.3, 0.9, mirror) * smoothstep(2.9, 2.2, mirror)
+		var body_folds := 0.02 * sin(z * 8.5 + sin(mirror * 3.0) * 1.6) * smoothstep(2.9, 3.6, z) * (1.0 - smoothstep(5.5, 6.1, z))
+		var knob := 0.045 * pow(maxf(sin(z * 19.0 + mirror * 11.0) * sin(z * 11.0 - mirror * 15.0 + 1.3), 0.0), 5.0)
+		knob *= smoothstep(0.5, 1.0, z) * smoothstep(2.6, 1.6, mirror) * (1.0 - smoothstep(5.4, 6.0, z))
+		return 1.0 + brow + socket + folds + chin + gill + body_folds + knob
+	m.loft(0.0, BODY_END * kk, skull, 260, 80, BossMesh.BODY, Callable(), 0.0, wrinkles)
 	# The lower jaw: a heavy chin turned up at its tip, hinged at the mouth's corner. Its top is the floor of the mouth.
 	m.hinge = 1.0
 	var jaw := func(a: float) -> Vector4:
@@ -559,8 +616,7 @@ func _build_body(m: BossMesh) -> void:
 			path.append(base + Vector3(sin(j * 2.1) * 0.08 * t, -0.34 * t * (0.7 + 0.1 * j) , -0.05 * t + 0.22 * t * t) * kk)
 		_tuft(m, path, 0.016 * kk)
 	m.hinge = 0.0
-	# Fins and tufts.
-	_build_fins(m)
+	_build_tufts(m)
 	_build_stalk(m)
 
 
@@ -568,68 +624,73 @@ func _tuft(m: BossMesh, path: PackedVector3Array, radius: float) -> void:
 	m.tube(path, func(t: float) -> float: return radius * (1.0 - t * 0.85), 4, BossMesh.FILAMENT, Vector2(0.15, 1.0), -1.0)
 
 
+## The fins: plain membranes (u along the root, v out to the tips) for angler_fin.gdshader to paint rays, torn web and filaments on.
+## Each membrane is longer than its web: the outer part is where the rays run on as hair-like filaments.
 func _build_fins(m: BossMesh) -> void:
+	var kk := k
+	# Spiny first dorsal: a few tall spines behind the lure's root, webbed only low down, raked back.
+	m.membrane(func(u: float) -> Vector3:
+			var z := lerpf(1.95, 3.35, u)
+			return Vector3(0.0, (_curve(SKULL_TOP, z) - 0.1) * kk, z * kk),
+		func(u: float) -> Vector3:
+			var h := 1.15 * (1.0 - 0.4 * u)
+			return Vector3(0.0, h * kk, 0.42 * h * kk),
+		30, 8, Vector2.ZERO, FIN_SPINY)
+	# Soft second dorsal, high on the tapering back.
+	m.membrane(func(u: float) -> Vector3:
+			var z := lerpf(4.25, 5.9, u)
+			return Vector3(0.0, (_curve(SKULL_TOP, z) - 0.06) * kk, z * kk),
+		func(u: float) -> Vector3:
+			var h := 0.95 * sin(u * PI * 0.85 + 0.12) * (0.8 + 0.2 * u)
+			return Vector3(0.0, h * kk, 0.5 * h * kk),
+		40, 8, Vector2.ZERO, FIN_SOFT)
+	# Anal fin, mirroring it underneath.
+	m.membrane(func(u: float) -> Vector3:
+			var z := lerpf(4.5, 5.9, u)
+			return Vector3(0.0, (_curve(SKULL_BOTTOM, z) + 0.06) * kk, z * kk),
+		func(u: float) -> Vector3:
+			var h := 0.8 * sin(u * PI * 0.85 + 0.12)
+			return Vector3(0.0, -h * kk, 0.5 * h * kk),
+		34, 8, Vector2.ZERO, FIN_ANAL)
+	# Caudal: a broad rounded fan from the peduncle to the body's full length.
+	var reach := DESIGN_LENGTH - 5.95
+	m.membrane(func(u: float) -> Vector3:
+			return Vector3(0.0, lerpf(-0.06, 0.4, u) * kk, 5.95 * kk),
+		func(u: float) -> Vector3:
+			var spread := (u - 0.5) * 2.0
+			return Vector3(0.0, spread * 1.2 * kk, (1.0 - 0.14 * spread * spread) * reach * kk),
+		48, 10, Vector2.ZERO, FIN_CAUDAL)
+	# Pectorals: fans behind the gill, rays spreading from back-and-up to back-and-down (turned in the shader at PECT_ROOT).
+	for side: float in [-1.0, 1.0]:
+		m.membrane(func(u: float) -> Vector3:
+				var z := lerpf(2.62, 3.0, u)
+				var sl := skull_slice(z)
+				return Vector3(side * sl.x * 0.9 * kk, lerpf(0.1, -0.6, u) * kk, z * kk),
+			func(u: float) -> Vector3:
+				var ang := lerpf(0.85, -0.75, u)
+				var l := 1.55 * (0.82 + 0.18 * sin(u * PI))
+				return Vector3(side * 0.6, sin(ang), cos(ang)).normalized() * l * kk,
+			34, 8, Vector2.ZERO, FIN_PECTORAL)
+
+
+## Hair-like tufts: a ragged mane off the back of the head and the cheeks (lit_angler_fish.png).
+func _build_tufts(m: BossMesh) -> void:
 	var kk := k
 	var rnd := RandomNumberGenerator.new()
 	rnd.seed = 70211
-	# Dorsal: a ragged sail on the back.
-	m.membrane(func(u: float) -> Vector3:
-			var z := lerpf(3.15, 4.85, u)
-			return Vector3(0.0, (_curve(SKULL_TOP, z) - 0.06) * kk, z * kk),
-		func(u: float) -> Vector3:
-			var z := lerpf(3.15, 4.85, u)
-			var h := 1.05 * sin(clampf(u, 0.0, 1.0) * PI * 0.92 + 0.08) * (0.55 + 0.45 * u)
-			return Vector3(0.0, h * kk, 0.32 * h * kk),
-		44, 6, Vector2(0.1, 1.0), BossMesh.FIN)
-	# Anal fin.
-	m.membrane(func(u: float) -> Vector3:
-			var z := lerpf(3.5, 4.8, u)
-			return Vector3(0.0, (_curve(SKULL_BOTTOM, z) + 0.06) * kk, z * kk),
-		func(u: float) -> Vector3:
-			var h := 0.65 * sin(u * PI * 0.95 + 0.05)
-			return Vector3(0.0, -h * kk, 0.28 * h * kk),
-		30, 5, Vector2(0.1, 1.0), BossMesh.FIN)
-	# Caudal: a fan of rays from the peduncle, torn at the edge.
-	m.membrane(func(u: float) -> Vector3:
-			return Vector3(0.0, lerpf(-0.17, 0.17, u) * kk, 5.0 * kk),
-		func(u: float) -> Vector3:
-			var spread := (u - 0.5) * 2.0
-			return Vector3(0.0, spread * 0.95 * kk, (1.0 - 0.28 * pow(absf(spread), 1.6)) * kk),
-		32, 6, Vector2(0.2, 1.0), BossMesh.FIN)
-	# Pectorals: broad ragged fans (turned in the shader, their roots at the sides).
-	for side: float in [-1.0, 1.0]:
-		m.membrane(func(u: float) -> Vector3:
-				var z := lerpf(2.45, 3.05, u)
-				var sl := skull_slice(z)
-				return Vector3(side * sl.x * 0.93 * kk, lerpf(0.05, -0.62, u) * kk, z * kk),
-			func(u: float) -> Vector3:
-				var r := sin(u * PI * 0.9 + 0.1)
-				return Vector3(side * (0.7 + 1.45 * r) * kk, (0.14 - 0.4 * u - 0.2 * r + 0.1 * sin(u * 9.0)) * kk, (0.5 + 1.1 * r) * kk),
-			28, 6, Vector2(0.0, 1.0), 7.0)
-	# Hair-like tufts: a mane off the back of the head, and torn strands from the fins' edges.
-	for i in 10:
+	for i in 16:
 		var angle := rnd.randf_range(0.25, 2.3)
 		var side := -1.0 if i % 2 == 0 else 1.0
-		var z0 := rnd.randf_range(2.4, 3.5)
+		var z0 := rnd.randf_range(2.2, 3.4)
 		var sl := skull_slice(z0)
-		var base := ring_point(sl, side * angle, z0) * kk
+		var base := ring_point(sl, side * angle, z0) * 0.98 * kk
 		var out := Vector3(side * sin(angle) * 0.5, cos(angle) * 0.4 + 0.15, 0.0)
-		var len := rnd.randf_range(0.55, 1.3)
+		var len := rnd.randf_range(0.5, 1.2)
 		var path := PackedVector3Array()
 		for j in 8:
 			var t := j / 7.0
-			path.append(base + (out.normalized() * 0.35 * t + Vector3(0.0, 0.0, 1.0) * t * len + Vector3(0.0, -0.1, 0.0) * t * t) * kk)
+			path.append(base + (out.normalized() * 0.3 * t + Vector3(0.0, 0.0, 1.0) * t * len + Vector3(0.0, -0.1, 0.0) * t * t) * kk)
 		_tuft(m, path, rnd.randf_range(0.01, 0.016) * kk)
-	for i in 6:
-		var z := rnd.randf_range(3.3, 4.9)
-		var top := _curve(SKULL_TOP, z) + 0.95 * rnd.randf_range(0.3, 1.0)
-		var base := Vector3(0.0, top - 0.3, z) * kk
-		var path := PackedVector3Array()
-		var len := rnd.randf_range(0.4, 0.9)
-		for j in 6:
-			var t := j / 5.0
-			path.append(base + Vector3(rnd.randf_range(-0.04, 0.04) * t, len * 0.5 * t, len * 0.6 * t) * kk)
-		_tuft(m, path, 0.012 * kk)
 
 
 func _catmull(pts: Array, t: float) -> Vector3:
@@ -707,12 +768,12 @@ func _build_teeth(m: BossMesh) -> void:
 			var fang := (i % 3 == 1)
 			var l := (rnd.randf_range(0.5, 0.82) if fang else rnd.randf_range(0.2, 0.42)) * (1.0 - 0.15 * (z / 2.2))
 			var dir := Vector3(-side * 0.2, -1.0, -0.12 + rnd.randf_range(-0.1, 0.1)).normalized()
-			m.tooth(edge * kk, dir * l * kk, rnd.randf_range(0.03, 0.05) * kk * (1.0 + float(fang) * 0.4), Vector3(-side * 0.22, 0.0, 0.5), 6)
+			m.tooth(edge * kk, dir * l * kk, rnd.randf_range(0.02, 0.032) * kk * (1.0 + float(fang) * 0.4), Vector3(-side * 0.22, 0.0, 0.5), 6)
 			_tooth_count += 1
 	for i in 5:
 		var x := lerpf(-0.2, 0.2, i / 4.0)
 		var z := 0.14 + 0.04 * absf(x)
-		m.tooth(Vector3(x, line_y(z) + 0.1, z) * kk, Vector3(0.0, -0.45 - 0.2 * float(i % 2), -0.06) * kk, 0.04 * kk, Vector3(0.0, 0.0, 0.5), 6)
+		m.tooth(Vector3(x, line_y(z) + 0.1, z) * kk, Vector3(0.0, -0.45 - 0.2 * float(i % 2), -0.06) * kk, 0.026 * kk, Vector3(0.0, 0.0, 0.5), 6)
 		_tooth_count += 1
 	# Lower teeth: up from the jaw's rim, the longest at the front, curved in toward the throat.
 	m.hinge = 1.0
@@ -725,7 +786,7 @@ func _build_teeth(m: BossMesh) -> void:
 			var fang := (i % 3 == 0 and z < 1.2)
 			var l := (rnd.randf_range(0.7, 1.05) if fang else rnd.randf_range(0.22, 0.5)) * lerpf(1.0, 0.7, clampf(z / 2.2, 0.0, 1.0))
 			var dir := Vector3(-side * 0.18, 1.0, -0.08 + rnd.randf_range(-0.08, 0.08)).normalized()
-			m.tooth(edge * kk, dir * l * kk, rnd.randf_range(0.032, 0.05) * kk * (1.0 + float(fang) * 0.5), Vector3(-side * 0.2, 0.0, 0.6), 6)
+			m.tooth(edge * kk, dir * l * kk, rnd.randf_range(0.022, 0.034) * kk * (1.0 + float(fang) * 0.5), Vector3(-side * 0.2, 0.0, 0.6), 6)
 			_tooth_count += 1
 	var chin := [[-0.6, 0.85], [-0.33, 0.7], [0.0, 1.0], [0.33, 0.7], [0.6, 0.85], [-0.8, 0.5], [0.8, 0.5]]
 	for c: Array in chin:
@@ -733,7 +794,7 @@ func _build_teeth(m: BossMesh) -> void:
 		var z := -0.3 + 0.55 * pow(absf(x) / 0.65, 1.5)
 		var l: float = c[1]
 		var dir := Vector3(x * 0.45, 1.0, -0.1 + 0.1 * absf(x)).normalized()
-		m.tooth(Vector3(x, jaw_top(z) + 0.04, z) * kk, dir * l * kk, 0.05 * kk, Vector3(-x * 0.3, 0.0, 0.7), 6)
+		m.tooth(Vector3(x, jaw_top(z) + 0.04, z) * kk, dir * l * kk, 0.034 * kk, Vector3(-x * 0.3, 0.0, 0.7), 6)
 		_tooth_count += 1
 	m.hinge = 0.0
 

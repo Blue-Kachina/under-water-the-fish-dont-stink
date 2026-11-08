@@ -35,6 +35,7 @@ const STYLES := {
 	"suction": "res://scripts/what_stinks/attacks/suction_attack.gd",
 	"whip": "res://scripts/what_stinks/attacks/whip_attack.gd",
 	"lure": "res://scripts/what_stinks/attacks/lure_attack.gd",
+	"grapple": "res://scripts/what_stinks/attacks/grapple_attack.gd",
 }
 
 var key := "chomp"

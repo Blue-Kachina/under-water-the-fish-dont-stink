@@ -17,12 +17,12 @@ static func ready() -> bool:
 
 
 ## An ambusher: a short, sudden cone (the globe jaw opens wide), a long wind-up and a long rest between bites; slow to turn and
-## to get going, but the tail snap lunge makes the speed. 6 m long; the camera sits back and high to keep the lure stalk in frame.
+## to get going, but the tail snap lunge makes the speed. 7 m long (a big head on a real fish body); the camera sits back and high to keep the lure stalk in frame.
 ## Sound ids are stand-ins.
 static func sheet() -> Dictionary:
 	return {
 		"name": "Lantern Angler", "class": FishCharacter.FishClass.MONSTER, "species": 0,
-		"length_m": 6.0, "speed": 1.1, "accel": 0.55, "turn": 0.5,
+		"length_m": 7.0, "speed": 1.1, "accel": 0.55, "turn": 0.5,
 		"bite_reach_m": 3.2, "bite_radius_m": 2.2, "bite_wind": 0.9, "bite_every": 2.6,
 		"capacity": 5.0, "cam": Vector2(1.0, 1.2), "attack": ATTACK,
 		"sound_chomp": "boss/chomp", "sound_miss": "boss/chomp_miss",

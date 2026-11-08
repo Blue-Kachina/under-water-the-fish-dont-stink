@@ -7,11 +7,14 @@ extends Node3D
 ##            rest bases (shortest arc from the rest direction: the twist is a pure function of the direction, so it cannot pop).
 ##            An FK travelling wave is added to the directions. The state is counter-rotated by the body's own rotation (inertia), so
 ##            arms swing wide in a turn and trail in an air roll; flow drag bends the tips back; a slack arm drapes with the water.
-##   jet      a cycle driven by the throttle: POWER (mantle squeezes, arms bundle forward into a spear, the siphon jets: an impulse along
-##            the siphon's vector with its torque about the centre) then RECOVERY (mantle refills past rest, arms flare and relax).
+##   swim     the mantle leads (-Z) and the arms trail behind in a flat swept-back delta (the model's rest pose), the web between
+##            their bases the wing (planning_hunter_refine.md: the video's motion, the photo's shape).
+##   jet      a cycle driven by the throttle: POWER (the mantle squeezes, the delta narrows a little, the siphon under the head jets back
+##            between the arms: an impulse along the siphon's vector with its torque about the centre, and a wave starts down the arms)
+##            then RECOVERY (the mantle refills past rest, the delta re-spreads slightly and relaxes). Never a crown opening ahead.
 ##            The jet's thrust is applied in the fish's physics tick, so it is real: the siphon's aim (the stick) turns the fish and
-##            asymmetric arm flare is a drag torque. Dash (boost) bundles the arms and pulses faster and harder.
-##   scull    a low amplitude arm undulation at cruise, for fine steering and between jets.
+##            asymmetric arm spread is a drag torque. Dash (boost) bundles the arms tight and pulses faster and harder.
+##   scull    a gentle travelling undulation down the trailing arms at cruise; turns and rolls bank the delta like a wing.
 ##   crawl    near a surface: the arms facing it plant their tips (ray cast), alternating, body gliding over: foot positions are world
 ##            fixed while planted (no slip), swing along an arc, and are solved with FABRIK into the same direction targets, blended in by
 ##            distance with a rate limited weight (no pops).
@@ -45,6 +48,13 @@ const DEFAULTS := {
 	"octopus_idle_sway": 1.0,
 	"octopus_droop": 0.35,
 	"octopus_tip_curl": 0.3,
+	"octopus_jet_narrow": 0.45,
+	"octopus_jet_respread": 0.35,
+	"octopus_jet_wave": 0.22,
+	"octopus_bank": 0.45,
+	"octopus_stride_sync": 1.0,
+	"octopus_stride_pop": 1.0,
+	"octopus_speed_tuck": 0.6,
 	"octopus_crawl_range": 0.8,
 	"octopus_crawl_step_time": 0.42,
 	"octopus_crawl_step_len": 0.3,
@@ -77,6 +87,8 @@ var glow_extra := 0.0
 var lash: Object
 ## How a gait step reads the floor: Callable(from: Vector3, to: Vector3) -> Dictionary({} for none, else {"pos", "normal"}); null: the physics world.
 var floor_query := Callable()
+## Probes: a stride to follow instead of the fish's Extra Swishy one ({"phase" (s, negative: none), "power", "peak", "fade", "strides"}); empty: the fish's.
+var stride_override: Dictionary = {}
 
 ## What the gait is doing now (probes, HUD and audio read these).
 var shown := {
@@ -105,6 +117,13 @@ var _roll_flare := 0.0
 var _vel := Vector3.ZERO
 var _phys_driven := false
 var _last_stride_count := -1
+var _last_stride_phase := -1.0
+## Whether the current jet is a stride's (it follows the stride's own clock) rather than the free-running beat.
+var _jet_stride := false
+## The stride's Battletoads pop: a ringing spring on the mantle's swell (visual side), kicked by the physics side on each stride's input.
+var _pop := 0.0
+var _pop_v := 0.0
+var _pop_impulse := 0.0
 # ---- floor and feet
 var _floor_hit := false
 var _floor_pos := Vector3.ZERO
@@ -152,6 +171,8 @@ var _seg_len: Array[PackedFloat32Array] = []
 var _crawl_dirs: Array[PackedVector3Array] = []
 var _tips_model: Array[Vector3] = []
 var _front_z := 0.0
+var _crown_local := Vector3.ZERO  # the arm bases' centre, model space (the crawl stands round it)
+var _wave_age := 99.0  # seconds since the last jet started its wave down the arms
 
 
 ## A setting's value, or its default here while it is not registered.
@@ -222,7 +243,8 @@ func _init_tables() -> void:
 	override_w = PackedFloat32Array()
 	override_w.resize(ARMS)
 	_head_gb = model.skeleton.get_bone_global_rest(model.head_bone).basis.orthonormalized()
-	_front_z = 0.0
+	_front_z = model.mantle_tip_local().z  # the mantle leads: the model's front
+	_crown_local = Vector3.ZERO
 	for a in ARMS:
 		var rest := PackedVector3Array()
 		var bundle := PackedVector3Array()
@@ -242,10 +264,11 @@ func _init_tables() -> void:
 			var d := (-gb.z).normalized()
 			rest.append(d)
 			var s := float(j) / float(SEGS - 1)
-			# bundled into a spear ahead: parallel, a touch convergent, with a slow spiral so the arms wrap rather than clump
-			var b := Vector3(0.0, 0.0, -1.0) + radial * lerpf(0.05, -0.05, s) + tang * 0.05 * s
+			# bundled tight behind (a dash): streamlined along +Z, converging a touch, a slow spiral so the arms wrap rather than clump
+			var b := Vector3(0.0, 0.0, 1.0) - Vector3(radial.x, radial.y * 0.5, 0.0) * (0.07 * s) + tang * 0.03 * s
 			bundle.append(b.normalized())
-			flare.append((d + radial * 0.75 + Vector3(0.0, 0.0, 0.25)).normalized())
+			# spread: the delta widens in its own plane (sideways, hardly up or down); never forward
+			flare.append((d + Vector3(radial.x, radial.y * 0.2, 0.0) * 0.5).normalized())
 			lens.append(pts[j].distance_to(pts[j + 1]))
 		_rest_dirs.append(rest)
 		_bundle_dirs.append(bundle)
@@ -263,6 +286,7 @@ func _init_tables() -> void:
 		_tips_model.append(pts[SEGS])
 		for p in pts:
 			_front_z = minf(_front_z, p.z)
+		_crown_local += pts[0] / float(ARMS)
 	_feet_plant.clear()
 	_feet_from.clear()
 	_feet_to.clear()
@@ -361,12 +385,28 @@ func _tick_jet(dt: float, vel: Vector3, gb: Basis) -> void:
 	var period := opt("octopus_jet_period")
 	var speed_t := clampf(vel.length() / maxf(length * 1.6, 3.0), 0.0, 1.0)
 	period *= lerpf(1.0, 0.8, speed_t) * (0.62 if _boost else 1.0)
-	if fish != null and is_instance_valid(fish) and fish.swim_style == FishController.SwimStyle.EXTRA_SWISHY:
-		# Extra Swishy: every stride is a jet (the stride's own timing is the clock)
-		var count: int = fish.swishy.strides
-		if _last_stride_count >= 0 and count != _last_stride_count:
+	# Extra Swishy: once the player strides, each stride is a jet on its own clock, so the mantle swells on the input instead of on the
+	# free-running beat (which only runs between strides and when the setting is off)
+	var st: Dictionary = _stride_info() if opt("octopus_stride_sync") > 0.5 else {}
+	var stride_on := not st.is_empty() and float(st["phase"]) >= 0.0
+	if not st.is_empty():
+		var count := int(st["strides"])
+		var phase := float(st["phase"])
+		if stride_on and (_last_stride_phase < 0.0 or phase < _last_stride_phase - 0.0001 or count != _last_stride_count):
 			_begin_jet(vel, forward)
+			_jet_t = 0.0
+			_pop_impulse += opt("octopus_stride_pop")
+		_last_stride_phase = phase
 		_last_stride_count = count
+	else:
+		_last_stride_phase = -1.0
+	if stride_on:
+		_jet_stride = true
+		_stride_shape(st)
+		return
+	if _jet_stride:
+		_jet_stride = false
+		_jet_t = -1.0  # the stride ran out: the free-running beat starts afresh if the throttle is still held
 	if _jet_t < 0.0:
 		if want:
 			_begin_jet(vel, forward)
@@ -391,18 +431,20 @@ func _tick_jet(dt: float, vel: Vector3, gb: Basis) -> void:
 	var m := 0.0
 	var s := 0.0
 	var env := 0.0
+	# the delta narrows a little on the power stroke and re-spreads a little on the recovery (a dash bundles it tight throughout)
+	var narrow := opt("octopus_jet_narrow")
+	var respread := opt("octopus_jet_respread")
 	if u < p0:
 		var x := u / p0
 		m = sin(x * PI * 0.5)
-		s = -smoothstep(0.0, 0.7, x)
+		s = -narrow * smoothstep(0.0, 0.7, x)
 		if _jet_dash:
 			s = -lerpf(0.35, 1.0, smoothstep(0.0, 0.7, x))  # carries on from the last dash stroke
 		env = sin(x * PI)
 	else:
 		var r := (u - p0) / (1.0 - p0)
 		m = 1.0 - 1.35 * smoothstep(0.0, 0.35, r) if r < 0.35 else -0.35 * (1.0 - smoothstep(0.0, 1.0, (r - 0.35) / 0.65))
-		var bundle_hold := 0.0 if _jet_dash else 1.0
-		s = -1.0 + (1.0 + 0.6 * bundle_hold) * smoothstep(0.0, 0.55, r) if r < 0.55 else lerpf(0.6 * bundle_hold, 0.0, smoothstep(0.0, 1.0, (r - 0.55) / 0.45))
+		s = -narrow + (narrow + respread) * smoothstep(0.0, 0.55, r) if r < 0.55 else lerpf(respread, 0.0, smoothstep(0.0, 1.0, (r - 0.55) / 0.45))
 		if _jet_dash:
 			s = lerpf(-1.0, -0.35, smoothstep(0.0, 1.0, r))  # a dash keeps the arms bundled the whole stroke
 	_mantle_raw = m * clampf(_jet_amp, 0.0, 1.0)
@@ -413,6 +455,60 @@ func _tick_jet(dt: float, vel: Vector3, gb: Basis) -> void:
 	stride_power = env * _jet_amp
 
 
+## The Extra Swishy stride the fish is in, for the jet to follow: {"phase" (s since it began, negative: none), "power", "peak", "fade",
+## "strides"}; empty when the fish is not striding.
+func _stride_info() -> Dictionary:
+	if not stride_override.is_empty():
+		return stride_override
+	if fish == null or not is_instance_valid(fish) or fish.swim_style != FishController.SwimStyle.EXTRA_SWISHY or not fish.swim_strokes:
+		return {}
+	var sw: SwishySwim = fish.swishy
+	if sw == null:
+		return {}
+	return {"phase": sw.phase, "power": sw.power, "peak": sw.peak_time(), "fade": sw.fade_time(), "strides": sw.strides}
+
+
+## One stride as a jet, on the stride's own clock (its build to the peak, then its fade). On the input the mantle swells at once and the
+## arms flare (the expansion); as the push builds to its peak the mantle squeezes and the delta bundles (the jet); then it refills and
+## relaxes through the fade. The next stride cuts this off and starts it again.
+func _stride_shape(st: Dictionary) -> void:
+	var phase := float(st["phase"])
+	var peak := maxf(float(st["peak"]), 0.05)
+	var fade := maxf(float(st["fade"]), 0.05)
+	var narrow := opt("octopus_jet_narrow")
+	var respread := opt("octopus_jet_respread")
+	var flare := clampf(0.55 * opt("octopus_stride_pop"), 0.0, 1.0)
+	var inhale := peak * 0.22
+	var m := 0.0
+	var s := 0.0
+	var env := 0.0
+	var squeezed := -1.0 if _jet_dash else -narrow  # where the squeeze leaves the delta
+	_jet_t = phase
+	if phase < inhale:
+		var x := phase / inhale
+		m = -sin(x * PI * 0.5)
+		s = flare * sin(x * PI * 0.5)
+	elif phase < peak:
+		var e := smoothstep(0.0, 1.0, (phase - inhale) / maxf(peak - inhale, 0.001))
+		m = lerpf(-1.0, 1.0, e)
+		s = lerpf(flare, squeezed, e)
+		env = e
+	else:
+		var r := clampf((phase - peak) / fade, 0.0, 1.0)
+		m = 1.0 - 1.35 * smoothstep(0.0, 0.35, r) if r < 0.35 else -0.35 * (1.0 - smoothstep(0.0, 1.0, (r - 0.35) / 0.65))
+		if _jet_dash:
+			s = lerpf(-1.0, -0.35, smoothstep(0.0, 1.0, r))
+		else:
+			s = -narrow + (narrow + respread) * smoothstep(0.0, 0.55, r) if r < 0.55 else lerpf(respread, 0.0, smoothstep(0.0, 1.0, (r - 0.55) / 0.45))
+		env = 1.0 - smoothstep(0.0, 0.5, r)
+	_mantle_raw = m * clampf(_jet_amp, 0.0, 1.0)
+	_spread_raw = s
+	_thrust_env = env
+	_vein_t = (phase / 0.35) * 1.1 if phase < 0.35 else -1.0
+	stride_phase = clampf(phase / (peak + fade), 0.0, 1.0)
+	stride_power = env * _jet_amp
+
+
 func _begin_jet(_vel_now: Vector3, _forward: Vector3) -> void:
 	_jet_dash = _boost
 	_jet_amp = lerpf(0.5, 1.0, clampf(absf(_throttle), 0.0, 1.0))
@@ -420,6 +516,7 @@ func _begin_jet(_vel_now: Vector3, _forward: Vector3) -> void:
 		_jet_amp *= 0.5
 	if _jet_t < 0.0:
 		_jet_t = 0.0
+	_wave_age = 0.0
 	_jets += 1
 	jet_fired.emit(_jet_amp)
 
@@ -473,7 +570,6 @@ func _ray(from: Vector3, to: Vector3) -> Dictionary:
 ## Whether arm `a` can stand on the floor from where the model is, and where its foot belongs (world).
 func _home(a: int, gb: Basis) -> Dictionary:
 	var n := _floor_n
-	var origin := model.global_position
 	var radial := gb * OctopusModel.arm_radial(a)
 	var out_t := (radial - n * radial.dot(n))
 	var fwd := -gb.z
@@ -481,9 +577,11 @@ func _home(a: int, gb: Basis) -> Dictionary:
 	fwd_t = fwd_t.normalized() if fwd_t.length() > 0.05 else Vector3.ZERO
 	var reach := model.arm_length(a)
 	var on_floor_side := -radial.dot(n)   # 1: radial straight down
-	var under := origin - n * ((origin - _floor_pos).dot(n))
+	# the arms stand round the crown (behind the head; the mantle leads), spread out and a little back
+	var crown := model.global_transform * _crown_local
+	var under := crown - n * ((crown - _floor_pos).dot(n))
 	var spread := out_t.limit_length(1.0)
-	var home := under + fwd_t * reach * 0.42 + spread * reach * 0.62
+	var home := under + spread * reach * 0.5 - fwd_t * reach * 0.2
 	var hit := _ray(home + n * reach * 0.7, home - n * reach * 1.1)
 	if not hit.is_empty():
 		home = hit["pos"]
@@ -578,6 +676,7 @@ func step(delta: float, ctx: Dictionary) -> void:
 		return
 	_sync_scale()
 	_age += delta
+	_wave_age = minf(_wave_age + delta, 99.0)
 	var gb := model.global_basis.orthonormalized()
 	if ctx.has("throttle"):
 		_throttle = float(ctx["throttle"])
@@ -647,6 +746,8 @@ func step(delta: float, ctx: Dictionary) -> void:
 		siphon_pitch = 0.0
 	_siphon = _siphon.lerp(Vector2(siphon_yaw, siphon_pitch), 1.0 - exp(-9.0 * delta))
 	_solve_arms(delta, counter, vel_local, gb)
+	_step_pop(delta)
+	model.set_mantle_pop(_pop)
 	model.set_mantle_pulse(clampf(_mantle + breath, -1.0, 1.0))
 	model.set_mantle_bend(_mbend.x, _mbend.y)
 	model.set_siphon_aim(_siphon.x, _siphon.y)
@@ -679,6 +780,21 @@ func gait_joints(arm: int) -> PackedVector3Array:
 	return pts
 
 
+## The stride's pop: each stride's input kicks the mantle's swell, and it rings out on an underdamped spring (a Battletoads overshoot:
+## it swells past the jet's own inflation, then dips thin and settles). `hunter_exaggeration` scales the kick.
+func _step_pop(delta: float) -> void:
+	if _pop_impulse > 0.0:
+		var master: Variant = WhatStinksSettings.shared().get("hunter_exaggeration")
+		_pop_v += 40.0 * _pop_impulse * (float(master) if master != null else 1.0)
+		_pop_impulse = 0.0
+	var steps := maxi(1, ceili(delta / 0.008))
+	var h := delta / float(steps)
+	for i in steps:
+		_pop_v += (-24.0 * 24.0 * _pop - 2.0 * 0.28 * 24.0 * _pop_v) * h
+		_pop += _pop_v * h
+	_pop = clampf(_pop, -1.0, 1.0)
+
+
 ## Critically damped chase with an optional overshoot-free clamp; returns the new value.
 func _damp(x: float, target: float, omega: float, dt: float, mantle_channel: bool) -> float:
 	# the same semi-implicit spring for every channel, substepped for stability
@@ -701,7 +817,7 @@ func _shader(delta: float, jet_on: bool) -> void:
 	model.set_vein_travel(_vein_t)
 	model.set_charge(charge)
 	model.set_glow(opt("octopus_glow") + glow_extra)
-	model.set_eye_glow(0.35 + 0.35 * _speed_t + 0.8 * charge)
+	model.set_eye_glow(0.35 + 0.35 * _speed_t + 0.8 * charge + 0.5 * maxf(_pop, 0.0))
 	model.set_sucker_glow(0.15 + 0.5 * _crawl_w + 0.8 * charge)
 
 
@@ -713,8 +829,10 @@ func _solve_arms(delta: float, counter: Basis, vel_local: Vector3, gb: Basis) ->
 	var lag := opt("octopus_arm_lag")
 	var inertia := opt("octopus_inertia")
 	var drag_bend := opt("octopus_drag_bend")
-	var droop := opt("octopus_droop") * (1.0 - clampf(_speed_t * 2.0, 0.0, 1.0)) * (1.0 - _crawl_w)
-	var scull_amp := opt("octopus_scull_amp")
+	var droop := opt("octopus_droop") * (1.0 - clampf(_speed_t * 3.5, 0.0, 1.0)) * (1.0 - _crawl_w)  # the swimming arms stream straight
+	# speed pulls the arms into a tighter, streamlined bundle (and calms their undulation); a crawl is not a swim, so it lets go
+	var tuck := opt("octopus_speed_tuck") * _speed_t * (1.0 - _crawl_w)
+	var scull_amp := opt("octopus_scull_amp") * (1.0 - 0.35 * _speed_t)
 	var sway := opt("octopus_idle_sway")
 	var substeps := maxi(1, ceili(delta / (1.0 / 90.0)))
 	var h := delta / float(substeps)
@@ -722,6 +840,14 @@ func _solve_arms(delta: float, counter: Basis, vel_local: Vector3, gb: Basis) ->
 	var tip_world_inv := global_transform.affine_inverse()
 	var torque := Vector3.ZERO
 	var down_local := -_up_local
+	# a turn (or a roll) banks the delta like a wing: the arms' targets turn about the body's axis, the outside of the turn rising
+	var bank_angle := (-_turn_flare.x + _roll_flare * 0.5) * opt("octopus_bank") * (0.4 + 0.6 * _speed_t)
+	var bank := Basis(Vector3.BACK, bank_angle)
+	var wave_up := bank * Vector3.UP
+	# the jet's wave: one travelling undulation down the arms after each jet, easing in and dying away
+	var jet_wave := 0.0
+	if _wave_age < 6.0:
+		jet_wave = opt("octopus_jet_wave") * clampf(_jet_amp, 0.0, 1.2) * smoothstep(0.0, 0.15, _wave_age) * exp(-_wave_age / 0.8)
 	for a in ARMS:
 		var radial := OctopusModel.arm_radial(a)
 		var dirs: PackedVector3Array = _dirs[a]
@@ -731,7 +857,7 @@ func _solve_arms(delta: float, counter: Basis, vel_local: Vector3, gb: Basis) ->
 		var flare: PackedVector3Array = _flare_dirs[a]
 		# the spread of this arm: the jet's, plus the turn's asymmetric flare
 		var asym := (_turn_flare.x * radial.x - _turn_flare.y * radial.y) * 0.4 + _roll_flare * radial.y * 0.45
-		var spread := clampf(_spread + asym * (0.5 + 0.5 * absf(_throttle)), -1.0, 1.4)
+		var spread := clampf(_spread + asym * (0.5 + 0.5 * absf(_throttle)) - tuck, -1.0, 1.4)
 		torque += Vector3(radial.y, -radial.x, 0.0) * maxf(spread, 0.0)
 		# crawl: where this arm's tip wants to be, solved into directions
 		var crawl_w := _crawl_w * _feet_ok[a] if _feet_init else 0.0
@@ -747,6 +873,7 @@ func _solve_arms(delta: float, counter: Basis, vel_local: Vector3, gb: Basis) ->
 			var s := float(j) / float(SEGS - 1)
 			var t := rest[j]
 			t = t.slerp(bundle[j], -spread) if spread < 0.0 else t.slerp(flare[j], minf(spread, 1.0))
+			t = bank * t
 			var tip_w := pow(s, 1.2) * 0.9 + 0.1
 			# the water bends the tips back along the flow, and a slack arm drapes
 			t += _flow_dir * (drag_bend * _speed_t * tip_w * 0.9)
@@ -759,11 +886,17 @@ func _solve_arms(delta: float, counter: Basis, vel_local: Vector3, gb: Basis) ->
 				t = t.slerp((_crawl_dirs[a] as PackedVector3Array)[j], crawl_w)
 			if ow > 0.001:
 				t = t.slerp(ov[j], ow)
-			# FK wave: lazy sway at rest, undulation at cruise, both travelling tip-ward
-			var amp := (0.05 * sway * (1.0 - _scull_w) + 0.16 * scull_amp * _scull_w) * (0.3 + tip_w) * (1.0 - crawl_w * 0.6)
-			var ph := _age * 1.05 * (1.0 - _scull_w) + _scull_phase * _scull_w - float(j) * 0.55 + phase_a
+			# FK wave: lazy sway at rest, a gentle undulation at cruise (mostly up and down, the delta rippling like a wing), both
+			# travelling tip-ward; and the jet's wave on top
+			var amp := (0.05 * sway * (1.0 - _scull_w) + 0.12 * scull_amp * _scull_w) * (0.3 + tip_w) * (1.0 - crawl_w * 0.6)
+			var ph := _age * 1.05 * (1.0 - _scull_w) + _scull_phase * _scull_w - float(j) * 0.55 + phase_a * (1.0 - 0.6 * _scull_w)
 			var gbj: Basis = (_rest_gb[a] as Array)[j]
-			t = (t + gbj.x * (amp * sin(ph)) + gbj.y * (amp * 0.7 * sin(ph + 1.3 + _scull_w))).normalized()
+			var lat := gbj.x * (1.0 - _scull_w * 0.65) + wave_up * (_scull_w * 0.9)
+			var orl := gbj.y * (1.0 - _scull_w * 0.6)
+			t += lat * (amp * sin(ph)) + orl * (amp * 0.7 * sin(ph + 1.3 + _scull_w))
+			if jet_wave > 0.0005:
+				t += wave_up * (jet_wave * (0.2 + tip_w) * sin(s * TAU * 0.9 - _wave_age * TAU * 1.4 + float(a % 4) * 0.25)) * (1.0 - crawl_w)
+			t = t.normalized()
 			d_target[j] = t
 		# inertia: the state does not turn with the body (more at the tips)
 		if inertia > 0.0 and counter != Basis.IDENTITY:
@@ -885,6 +1018,7 @@ func jet_now(strength := 1.0, dash := false) -> void:
 	_jet_dash = dash
 	_jet_amp = clampf(strength, 0.1, 1.5)
 	_jet_t = 0.0
+	_wave_age = 0.0
 	_jets += 1
 	jet_fired.emit(_jet_amp)
 

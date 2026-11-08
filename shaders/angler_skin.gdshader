@@ -4,7 +4,7 @@ render_mode cull_disabled;
 // swim path (spine_bend.gdshaderinc). One shader for every part, told apart by UV2.x:
 //   0 body and jaw skin  - dark teal, wrinkle ridges lifted by a derivative bump, pale crests, wet sheen, rows of cyan photophores,
 //                          the mouth's inside (palate, jaw floor) dark crimson-black with pale ridges;
-//   1 / 7 fins           - ragged, ray-lined membranes torn between the rays (7: the pectorals, which flap and fan in the shader);
+//   (fins are their own mesh and shader now: angler_fin.gdshader)
 //   2 teeth              - glassy needles, clear toward the tips (the translucent copy of this shader, see AnglerModel);
 //   3 filaments          - the illicium (extra >= 0: follows the spring chain) and the hair-like tufts (extra < 0);
 //   4 inside             - tongue and throat flesh;
@@ -14,14 +14,14 @@ render_mode cull_disabled;
 
 #include "res://shaders/fish_skin.gdshaderinc"
 #include "res://shaders/spine_bend.gdshaderinc"
+#include "res://shaders/angler_pose.gdshaderinc"
 
-uniform float k = 1.0;  // the body's scale over the 6 m design: patterns are painted in design metres
 uniform vec4 skin_dark : source_color = vec4(0.045, 0.075, 0.085, 1.0);
 uniform vec4 skin_pale : source_color = vec4(0.36, 0.5, 0.52, 1.0);
 uniform vec4 belly_tint : source_color = vec4(0.16, 0.2, 0.22, 1.0);
 uniform vec4 flesh_dark : source_color = vec4(0.07, 0.012, 0.02, 1.0);
 uniform vec4 flesh_lit : source_color = vec4(0.34, 0.07, 0.09, 1.0);
-uniform vec4 fin_color : source_color = vec4(0.07, 0.1, 0.12, 1.0);
+
 uniform vec4 tooth_color : source_color = vec4(0.62, 0.7, 0.66, 1.0);
 uniform vec4 photo_color : source_color = vec4(0.25, 0.85, 1.0, 1.0);
 uniform vec4 esca_color : source_color = vec4(0.3, 0.9, 1.0, 1.0);
@@ -29,12 +29,6 @@ uniform float esca_intensity = 1.0;
 uniform float bump_strength = 0.9;
 
 uniform vec4 mouth_line = vec4(0.0, 0.25, -0.297, 2.3);  // design m: the mouth line's y at z0 (x: y, y: z0), its slope dy/dz, where the mouth ends (w)
-uniform float tail_from = 4.7;  // m, where the tail snap starts (its own scale)
-uniform float tail_bend = 0.0;  // rad at the tip
-uniform float pect_flap_l = 0.0;
-uniform float pect_flap_r = 0.0;
-uniform float pect_sweep = 0.0;
-uniform vec3 pect_root = vec3(1.55, -0.2, 2.75);  // design m, the right fin's root (mirrored)
 uniform vec3 stalk_rest[6];
 uniform vec3 stalk_now[6];
 
@@ -63,12 +57,6 @@ vec3 chain_at(vec3 pts[6], float t) {
 	return 0.5 * ((2.0 * p1) + (-p0 + p2) * f + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * f2 + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * f3);
 }
 
-vec3 rot_about(vec3 v, vec3 axis, float a) {
-	float c = cos(a);
-	float s = sin(a);
-	return v * c + cross(axis, v) * s + axis * dot(axis, v) * (1.0 - c);
-}
-
 void vertex() {
 	rest = VERTEX;
 	ring = COLOR.rg * 2.0 - 1.0;
@@ -77,24 +65,7 @@ void vertex() {
 	extra = COLOR.a;
 	jaw = CUSTOM0.x;
 	spine_hinge(VERTEX, NORMAL, CUSTOM0.x);
-	if (part > 6.5) {
-		// A pectoral fin: its tip turns about the fore-aft line through the root (flap), and fans back (sweep).
-		float side = VERTEX.x >= 0.0 ? 1.0 : -1.0;
-		vec3 root = vec3(side * pect_root.x, pect_root.y, pect_root.z) * k;
-		float flap = (side > 0.0 ? pect_flap_r : pect_flap_l) * side;
-		vec3 d = VERTEX - root;
-		d = rot_about(d, vec3(0.0, 0.0, 1.0), flap);
-		d = rot_about(d, vec3(0.0, 1.0, 0.0), -pect_sweep * side);
-		VERTEX = root + d;
-		NORMAL = rot_about(rot_about(NORMAL, vec3(0.0, 0.0, 1.0), flap), vec3(0.0, 1.0, 0.0), -pect_sweep * side);
-	}
-	if (tail_bend != 0.0 && VERTEX.z > tail_from) {
-		float span = max(spine_length - tail_from, 0.001);
-		float s = (VERTEX.z - tail_from);
-		VERTEX.x += tail_bend * s * s / (2.0 * span);
-		float slope = tail_bend * s / span;
-		NORMAL = normalize(vec3(NORMAL.x + slope * NORMAL.z, NORMAL.y, NORMAL.z - slope * NORMAL.x));
-	}
+	angler_tail(VERTEX, NORMAL);
 	if ((part > 2.5 && part < 3.5 || part > 4.5 && part < 5.5) && extra >= 0.0) {
 		VERTEX += chain_at(stalk_now, extra) - chain_at(stalk_rest, extra);
 	}
@@ -111,20 +82,34 @@ float ridged(vec3 p) {
 	return 1.0 - abs(2.0 * n - 1.0);
 }
 
-// Bio-luminescent photophores: small discs scattered over the surface, a denser lateral row, pulsing slowly. 0..1.
-float photophores(vec3 p, float rowy) {
-	vec3 c = p * 7.0;
+// Bio-luminescent photophores: small discs scattered over the surface (`density` of the cells lit), a lateral row, pulsing slowly. 0..1.
+float photophores(vec3 p, float rowy, float density) {
+	vec3 c = p * 6.5;
 	vec3 id = floor(c);
 	vec3 f = fract(c) - 0.5;
 	vec3 jit = vec3(skin_hash(id + 1.3), skin_hash(id + 5.1), skin_hash(id + 9.7)) - 0.5;
-	float on = step(0.86, skin_hash(id + 3.0));
+	float on = step(1.0 - density, skin_hash(id + 3.0));
 	float d = length(f - jit * 0.55);
-	float disc = (1.0 - smoothstep(0.07, 0.13, d)) * on;
+	float size = mix(0.05, 0.1, skin_hash(id + 12.0));
+	float disc = (1.0 - smoothstep(size, size + 0.05, d)) * on;
 	float lat = (fract(p.z * 4.5) - 0.5);
-	float row = 1.0 - smoothstep(0.1, 0.17, length(vec2(lat, (p.y - rowy) * 4.5)));
-	row *= step(0.25, skin_hash(vec3(floor(p.z * 4.5), 2.0, 7.0)));
+	float row = 1.0 - smoothstep(0.08, 0.14, length(vec2(lat, (p.y - rowy) * 4.5)));
+	row *= step(0.3, skin_hash(vec3(floor(p.z * 4.5), 2.0, 7.0)));
 	float pulse = 0.6 + 0.4 * sin(TIME * 1.4 + skin_hash(id) * 40.0 + p.z * 2.0);
 	return clamp(disc + row, 0.0, 1.0) * pulse;
+}
+
+// Warty knobs on a jittered grid `scale` per metre, `density` of the cells holding one: x the dome's height 0..1, y its pale tip.
+vec2 warts(vec3 p, float scale, float density) {
+	vec3 c = p * scale;
+	vec3 id = floor(c);
+	vec3 f = fract(c) - 0.5;
+	vec3 jit = vec3(skin_hash(id + 2.1), skin_hash(id + 6.3), skin_hash(id + 8.9)) - 0.5;
+	float r = mix(0.16, 0.34, skin_hash(id + 4.4));
+	float on = step(1.0 - density, skin_hash(id + 7.7));
+	float d = length(f - jit * 0.4) / r;
+	float dome = sqrt(max(1.0 - d * d, 0.0)) * on;
+	return vec2(dome, smoothstep(0.5, 0.95, dome));
 }
 
 // Screen-space bump: perturbs `n` by the height `h`'s slope across the screen.
@@ -161,21 +146,28 @@ void fragment() {
 	float sss = 0.0;
 
 	if (part < 0.5) {
-		// Skin: dark, wrinkled, pale along the crests of the wrinkles and under the chin.
-		float ridge = ridged(p * vec3(4.2, 5.0, 4.2) + vec3(1.0, 2.0, 3.0));
-		float ridge2 = ridged(p * vec3(7.0, 6.0, 7.0) + 4.0);
+		// Skin: dark teal-black, heavily creased (folds running round the body, finer wrinkles between), pale along the crests,
+		// near black in the creases, warty knobs with pale tips and a fine rough grain.
+		vec3 q = p + vec3(0.0, skin_noise(p * 1.3 + 9.0) * 0.4, skin_noise(p * 1.7) * 0.7);
+		// Wrinkles run along the face (parallel to the lips and the brow) and round the body behind it, over a coarse network.
+		float net = ridged(q * vec3(2.4, 2.8, 6.0) + vec3(1.0, 2.0, 3.0));
+		float lines = mix(ridged(q * vec3(2.5, 9.0, 1.8) + 11.0), ridged(q * vec3(2.5, 2.0, 9.0) + 13.0), smoothstep(2.3, 3.3, p.z));
+		float fold = max(net * 0.85, lines);
+		float fine = ridged(p * vec3(8.5, 9.5, 7.5) + 4.0);
 		float broad = skin_fbm(p * 1.2);
-		height = ridge * 0.55 + ridge2 * 0.25 + skin_fbm(p * 14.0) * 0.12;
-		float crest = smoothstep(0.78, 0.99, ridge) * (0.35 + 0.65 * skin_noise(p * 2.5));
-		color = skin_dark.rgb * mix(0.9, 1.2, broad);
-		color = mix(color, skin_pale.rgb * 0.75, crest * 0.22);
-		color = mix(color, belly_tint.rgb, smoothstep(0.1, -0.9, ring.y) * 0.65);
-		// Warts and pale scars scattered on the head.
-		float wart = smoothstep(0.9, 0.97, skin_noise(p * 11.0 + 2.0));
-		color = mix(color, skin_pale.rgb * 0.8, wart * 0.35);
-		height += wart * 0.6;
-		rough = mix(0.5, 0.82, ridge) - 0.12 * (1.0 - broad);
-		clear = 0.2;
+		float grain = skin_fbm(p * 26.0);
+		vec2 big = warts(p, 4.5, 0.4) * smoothstep(0.3, 0.9, p.z);
+		vec2 small = warts(p + 3.3, 11.0, 0.35);
+		height = fold * 0.65 + fine * 0.3 + grain * 0.18 + big.x * 0.55 + small.x * 0.25;
+		float crest = smoothstep(0.8, 0.97, fold) * (0.35 + 0.65 * skin_noise(p * 3.1)) + smoothstep(0.86, 0.99, fine) * 0.45;
+		float crease = smoothstep(0.42, 0.05, fold);
+		color = skin_dark.rgb * mix(0.8, 1.3, broad) * mix(0.85, 1.1, grain);
+		color *= mix(1.0, 0.45, crease * 0.85);
+		color = mix(color, skin_pale.rgb * 0.85, clamp(crest, 0.0, 1.0) * 0.5);
+		color = mix(color, belly_tint.rgb, smoothstep(0.1, -0.9, ring.y) * 0.55);
+		color = mix(color, skin_pale.rgb * 0.95, max(big.y, small.y * 0.7) * 0.55);
+		rough = mix(0.62, 0.92, fold) - 0.08 * (1.0 - broad) + 0.1 * big.x;
+		clear = 0.1 * (1.0 - big.x) * (1.0 - crease);
 		sss = 0.12;
 		// Inside the mouth: the skull's underside above the mouth line and the jaw's floor (up-facing, near its lip).
 		float line_y = mouth_line.x + (p.z - mouth_line.y) * mouth_line.z;
@@ -196,41 +188,17 @@ void fragment() {
 		// The lips: a pale band along the mouth's edge.
 		float lip = band(p.y - line_y, 0.09) * in_mouth * (1.0 - inner);
 		color = mix(color, skin_pale.rgb, lip * 0.5);
-		// Photophores along the lateral line and the chin.
-		float ph = photophores(p, 0.1 + 0.15 * smoothstep(1.5, 3.5, p.z));
+		// Photophores scattered all over (sparser on the face) and along the lateral line.
+		float ph = photophores(p, 0.12, mix(0.12, 0.24, smoothstep(1.8, 3.2, p.z)));
 		ph *= (1.0 - inner) * smoothstep(0.1, 0.5, p.z);
 		emit += photo_color.rgb * ph * 1.4;
 		color = mix(color, photo_color.rgb * 0.5, ph * 0.5);
-	} else if (part < 1.5 || part > 6.5) {
-		// Fin membrane torn between the rays.
-		float rays = part > 6.5 ? 15.0 : 22.0;
-		float u = UV.x;
-		float v = UV.y;
-		float idx = floor(u * rays);
-		float ray_len = 0.45 + 0.55 * skin_hash(vec3(idx, part, 3.0));
-		float between = abs(fract(u * rays) - 0.5) * 2.0;
-		float notch = smoothstep(0.55, 0.8, skin_noise(vec3(u * 5.5, 3.0, part))) * 0.5;
-		float edge = ray_len * (0.86 + 0.14 * (1.0 - pow(between, 2.0))) * (1.0 - notch) + (skin_noise(vec3(u * 30.0, v * 6.0, part)) - 0.5) * 0.14;
-		if (v > edge) {
-			discard;
-		}
-		float ray = band(fract(u * rays) - 0.5, 0.09) * (0.55 + 0.45 * skin_noise(vec3(u * 9.0, v * 3.0, part)));
-		float thin = smoothstep(0.5, 1.0, v / max(edge, 0.05));
-		color = fin_color.rgb * mix(0.8, 1.6, skin_fbm(p * 3.0 + 1.0));
-		color = mix(color, skin_pale.rgb * 0.9, ray * 0.6);
-		emit += skin_pale.rgb * (0.04 + 0.06 * ray) * (1.0 - thin * 0.5);
-		height = ray * 0.35;
-		rough = 0.5;
-		sss = 0.3;
-		if (v < 0.04) {
-			color = skin_dark.rgb;
-		}
 	} else if (part < 2.5) {
 		// Needle teeth: glassy ivory, clear toward the tip, a cold glow in them.
 		float tip = smoothstep(0.35, 1.0, along);
 		float tt = UV.x;
 		color = mix(tooth_color.rgb * 0.8, tooth_color.rgb, 0.5 + 0.5 * skin_noise(p * 40.0));
-		ta = mix(0.95, 0.3, smoothstep(0.1, 1.0, tt));
+		ta = mix(0.85, 0.15, smoothstep(0.05, 0.9, tt));
 		emit += photo_color.rgb * 0.05 * smoothstep(0.3, 1.0, tt) + vec3(0.4, 0.6, 0.6) * graze * 0.12;
 		rough = 0.12;
 		spec = 0.9;

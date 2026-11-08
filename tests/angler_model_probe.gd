@@ -50,13 +50,13 @@ func _run() -> void:
 func _size(length: float) -> void:
 	print("length %.1f m:" % length)
 	var model := _make(length)
-	var k := length / 6.0
+	var k := length / AnglerModel.DESIGN_LENGTH
 	var stats := model.mesh_stats()
 	print("      vertices %d, triangles %d, teeth %d" % [stats["vertices"], stats["triangles"], stats["teeth"]])
 	_check(int(stats["vertices"]) < 40000 and int(stats["vertices"]) > 5000, "vertex budget under 40k")
 	_check(int(stats["teeth"]) >= 40, "needle teeth: %d" % int(stats["teeth"]))
-	_check(model.body_node != null and model.teeth_node != null and model.rig.instances.size() == 2, "body and teeth meshes on the rig")
-	var box := model.body_node.mesh.get_aabb()
+	_check(model.body_node != null and model.teeth_node != null and model.fin_node != null and model.rig.instances.size() == 3, "body, teeth and fin meshes on the rig")
+	var box := model.rest_aabb()
 	_check(box.end.z <= length + 0.05 * k and box.end.z >= length * 0.97, "tail reaches the body length (%.2f of %.2f)" % [box.end.z, length])
 	_check(box.position.z >= -1.1 * k and box.position.z <= -0.2 * k, "the jaw and the lure stand past the snout (%.2f)" % box.position.z)
 	_check(box.size.x > 3.0 * k and box.size.x < 9.0 * k, "width reads as a globe (%.2f)" % box.size.x)
@@ -78,7 +78,7 @@ func _size(length: float) -> void:
 
 func _jaw() -> void:
 	print("jaw:")
-	var model := _make(6.0)
+	var model := _make(AnglerModel.DESIGN_LENGTH)  # k 1: the hinge maths below is in design metres
 	model.jaw_open = 0.0
 	var shut := model.mouth_world(0.0)
 	var open := model.mouth_world(1.0)
@@ -239,11 +239,11 @@ func _rebuild() -> void:
 	for child in model.get_children():
 		if child is MeshInstance3D:
 			live += 1
-	# Body, teeth, two eyes and the halo.
-	_check(live == 5, "rebuild leaves one set of parts (%d mesh nodes)" % live)
+	# Body, teeth, fins, two eyes and the halo.
+	_check(live == 6, "rebuild leaves one set of parts (%d mesh nodes)" % live)
 	model.build(12.0)
 	model.pose_straight(0.0, 0.0)
 	await _frames(2)
-	_check(absf(model.rig.length - 12.0) < 0.001 and model.body_node.mesh.get_aabb().end.z > 11.0, "a size change rebuilds at the new length")
+	_check(absf(model.rig.length - 12.0) < 0.001 and model.rest_aabb().end.z > 11.0, "a size change rebuilds at the new length")
 	model.queue_free()
 	await _frames(1)

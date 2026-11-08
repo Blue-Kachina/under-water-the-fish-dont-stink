@@ -66,16 +66,16 @@ func _registry() -> void:
 	_check(HunterForms.is_ready(KEY) and HunterForms.ready_keys().has(KEY), "it is ready and the card lists it")
 	_check(HunterForms.playable(KEY) == KEY, "it plays as itself, not the fallback")
 	var sheet := HunterForms.sheet(KEY)
-	_check(str(sheet["name"]) == "Ember Octopus" and str(sheet["attack"]) == "whip", "its sheet names the Ember Octopus and the whip style")
-	var attack := HunterAttack.make("whip")
-	_check(attack != null and attack.key == "whip" and attack is WhipAttack, "the style table builds a WhipAttack")
-	_check(HunterBiteFx.SOUNDS.has("whip"), "the bite fx has a sound row for the whip style")
+	_check(str(sheet["name"]) == "Ember Octopus" and str(sheet["attack"]) == "grapple", "its sheet names the Ember Octopus and the grapple style")
+	var attack := HunterAttack.make("grapple")
+	_check(attack != null and attack.key == "grapple" and attack is GrappleAttack, "the style table builds a GrappleAttack")
+	_check(HunterBiteFx.SOUNDS.has("grapple"), "the bite fx has a sound row for the grapple style")
 	var settings := WhatStinksSettings.shared()
 	var missing: Array[String] = []
 	var undocumented: Array[String] = []
 	var ids: Array = []
 	ids.append_array(OctopusRig.DEFAULTS.keys())
-	ids.append_array(WhipAttack.DEFAULTS.keys())
+	ids.append_array(GrappleAttack.DEFAULTS.keys())
 	for id: String in ids:
 		if settings.get(id) == null:
 			missing.append(id)
@@ -84,7 +84,7 @@ func _registry() -> void:
 	_check(missing.is_empty(), "every rig and attack tuning value is a panel setting (missing: %s)" % [missing])
 	_check(undocumented.is_empty(), "and each has a doc line (missing: %s)" % [undocumented])
 	var bad_sounds: Array[String] = []
-	for id: String in ["octopus/flare", "octopus/charge", "octopus/lock", "octopus/lock_lost", "octopus/lash", "octopus/crack", "octopus/hit", "octopus/miss", "octopus/jet", "octopus/foot"]:
+	for id: String in ["octopus/flare", "octopus/charge", "octopus/grab", "octopus/snap_off", "octopus/torn", "octopus/yank", "octopus/beak", "octopus/whiff", "octopus/jet", "octopus/foot"]:
 		if not SoundCatalog.events().has(id):
 			bad_sounds.append(id)
 	_check(bad_sounds.is_empty(), "every octopus sound id is in the catalog (missing: %s)" % [bad_sounds])
@@ -151,8 +151,8 @@ func _player_match() -> void:
 	_check(rig.model.has_meta("hunter_octopus"), "the model carries the hunter_octopus meta (the lash finds it)")
 	_check(absf(rig.length - fish.hitbox_length) < 0.05, "the model is built at the hitbox length (%.2f of %.2f)" % [rig.length, fish.hitbox_length])
 	var bite: HunterBite = game.bites[fish]
-	var attack := bite.attack as WhipAttack
-	_check(attack != null and attack.key == "whip", "the bite's style is the whip")
+	var attack := bite.attack as GrappleAttack
+	_check(attack != null and attack.key == "grapple", "the bite's style is the grapple")
 	# the lash is wired to the rig once the bite has started (find_model); a press wires it
 	var input := FishInput.new()
 	fish.controls = input
@@ -190,35 +190,35 @@ func _player_match() -> void:
 	var alive_before := school.alive_count()
 	var bites_before := bite.bites
 	var arm_hits: Array = []
-	attack.arm_hit.connect(func(arm: int, _at: Vector3) -> void: arm_hits.append(arm))
+	attack.grabbed.connect(func(arm: int, _at: Vector3) -> void: arm_hits.append(arm))
 	input.jump = true
 	await _until(func() -> bool: return bite.holding(), tps)
 	await _frames(tps / 2)
 	_check(attack.has_model(), "the lash found the octopus model")
 	_check(not attack.auto_pose and rig.lash == attack, "the lash is wired to the rig (the rig runs blend_pose after its gait)")
-	_check(attack.locks.size() >= 1, "a held press locks arms onto the school (%d locks)" % attack.locks.size())
-	_check(bite.attack.ring_count(bite) == attack.locks.size(), "the HUD's ring shows the lock count while held (%d)" % bite.attack.ring_count(bite))
+	_check(attack.held_count() >= 1, "a held press latches arms onto the school (%d held)" % attack.held_count())
+	_check(bite.attack.ring_count(bite) == attack.held_count(), "the HUD's ring shows the held count while held (%d)" % bite.attack.ring_count(bite))
 	await _until(func() -> bool: return bite.charge() >= 1.0, tps * 3)
-	var driven_while_held := attack.driven_arms().size()
+	var driven_while_held := _driven(attack)
 	_check(driven_while_held >= 1, "arms are posed by the lash while held (%d)" % driven_while_held)
 	var push_before := fish.linear_velocity
 	input.jump = false
 	await _until(func() -> bool: return not bite.busy() and bite.bites > bites_before, tps * 4)
 	await _frames(tps / 2)
-	_check(bite.bites > bites_before, "the release lashed (bites %d)" % (bite.bites - bites_before))
-	_check(arm_hits.size() >= 1, "arms hit (%d arm hits)" % arm_hits.size())
+	_check(bite.bites > bites_before, "the release snapped the beak (bites %d)" % (bite.bites - bites_before))
+	_check(arm_hits.size() >= 1, "arms grabbed (%d grabs)" % arm_hits.size())
 	_check(school.alive_count() < alive_before, "and ate fish (%d of %d)" % [alive_before - school.alive_count(), alive_before])
-	_check(attack.recoil_total.length() > 0.1, "the lash's recoil pushed the octopus (%.2f m/s)" % attack.recoil_total.length())
+	_check(attack.eaten_total >= 1, "the attack counted what it ate (%d)" % attack.eaten_total)
 	# --- the arms settle back on the gait
-	await _until(func() -> bool: return attack.driven_arms().is_empty(), tps * 3)
-	_check(attack.driven_arms().is_empty(), "the arms were let go back to the gait")
+	await _until(func() -> bool: return _driven(attack) == 0, tps * 3)
+	_check(_driven(attack) == 0, "the arms were let go back to the gait")
 	var stretched := false
 	for a in 8:
 		for j in 14:
 			var bone: int = rig.model.arm_bones[a][j]
 			if not rig.model.skeleton.get_bone_pose_scale(bone).is_equal_approx(Vector3.ONE) and rig.model.skeleton.get_bone_pose_scale(bone).distance_to(Vector3.ONE) > 0.02:
 				stretched = true
-	_check(not stretched, "no bone is left stretched after the lash")
+	_check(not stretched, "no bone is left stretched after the grapple")
 	var worst := 0.0
 	for a in 8:
 		var want := rig.gait_joints(a)
@@ -236,7 +236,7 @@ func _player_match() -> void:
 	await _frames(3)
 	input.jump = false
 	await _until(func() -> bool: return not bite.busy() and bite.bites > bites_before, tps * 4)
-	_check(bite.bites > bites_before, "a tap lashes too")
+	_check(bite.bites > bites_before, "a tap bites too")
 	settings.bite_mode = WhatStinksSettings.BiteMode.HOLD
 	await _until(func() -> bool: return not bite.busy(), tps * 3)
 	# --- air roll is the rig's, with the stick's x as roll
@@ -266,7 +266,7 @@ func _bot_match() -> void:
 	var bite: HunterBite = game.bites[hunter]
 	var visual := hunter.get("_visual") as Node3D
 	_check(visual != null and visual.has_meta("octopus_rig"), "the bot's Hunter wears the octopus")
-	_check(bite.attack.key == "whip", "its style is the whip")
+	_check(bite.attack.key == "grapple", "its style is the grapple")
 	var presses := [0]
 	var lashes := [0]
 	var max_locks := [0]
@@ -278,9 +278,9 @@ func _bot_match() -> void:
 	await _until(func() -> bool: return game.phase == WhatStinksMatch.Phase.LIVE, tps * 12)
 	for i in tps * 90:
 		await get_tree().physics_frame
-		var att := bite.attack as WhipAttack
+		var att := bite.attack as GrappleAttack
 		if att != null:
-			max_locks[0] = maxi(max_locks[0], att.locks.size())
+			max_locks[0] = maxi(max_locks[0], att.held_count())
 		if lashes[0] >= 4 and i > tps * 20:
 			break
 	var alive_after := 0
@@ -288,7 +288,7 @@ func _bot_match() -> void:
 		alive_after += s.alive_count()
 	_check(presses[0] >= 2, "the bot presses the bite (%d presses)" % presses[0])
 	_check(lashes[0] >= 2, "and releases it (%d lashes)" % lashes[0])
-	_check(max_locks[0] >= 1, "its arms lock on prey (most %d at once)" % max_locks[0])
+	_check(max_locks[0] >= 1, "its arms hold prey (most %d at once)" % max_locks[0])
 	_check(alive_after < eaten_before, "and it eats (%d fish gone)" % (eaten_before - alive_after))
 
 
@@ -300,17 +300,31 @@ func _net() -> void:
 		return
 	var hunter: FishController = game.hunters[0]
 	var bite: HunterBite = game.bites[hunter]
-	var attack := bite.attack as WhipAttack
+	var attack := bite.attack as GrappleAttack
 	hunter.puppet = true  # as another machine's Hunter: it follows messages, it does not decide
+	game.bots.erase(hunter)  # and no local bot decides for it either (the bot would close the hold itself)
+	bite.abort()
+	await _until(func() -> bool: return not bite.busy(), tps * 4)  # net_open waits for a bite in progress (the bot's last)
 	bite.cooldown = 0.0
 	await _frames(5)
 	var landed := [0]
 	bite.chomped.connect(func(_m: Vector3, _r: float, _rad: float, _c: int) -> void: landed[0] += 1)
 	bite.net_open()
+	await _frames(3)
+	_check(attack.beat == GrappleAttack.Beat.HOLD, "the puppet's grapple opens on the message (beat %d)" % attack.beat)
 	await _frames(tps / 2)
-	_check(bite.holding() or bite.busy(), "a puppet's bite opens from the host's message (the lash visuals run)")
-	_check(attack.beat != WhipAttack.Beat.IDLE, "the puppet's arms flare (beat %d)" % attack.beat)
+	_check(bite.holding() or bite.busy(), "a puppet's bite opens from the host's message (the grapple visuals run)")
+	_check(attack.beat != GrappleAttack.Beat.IDLE, "the puppet's grapple opens (beat %d)" % attack.beat)
 	bite.net_close(1.0)
 	await _until(func() -> bool: return not bite.busy(), tps * 4)
 	_check(not bite.busy(), "and its release runs out to the end")
-	_check(attack.driven_arms().is_empty() or await _until(func() -> bool: return attack.driven_arms().is_empty(), tps * 3), "the arms settle")
+	_check(_driven(attack) == 0 or await _until(func() -> bool: return _driven(attack) == 0, tps * 3), "the arms settle")
+
+
+## Arms the grapple is posing now (any phase but resting on the gait).
+func _driven(attack: GrappleAttack) -> int:
+	var n := 0
+	for t in attack.arms:
+		if t.phase != GrappleAttack.ArmPhase.REST:
+			n += 1
+	return n

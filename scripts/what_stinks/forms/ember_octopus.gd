@@ -1,15 +1,16 @@
 extends RefCounted
 ## Hunter form: Ember Octopus (planning_new_hunters.md phase C; the sheet's keys are in hunter_forms.md).
-## A giant glowing copper-to-violet octopus: octopus_rig.gd wraps OctopusModel (C1: skinned, 118 bones, emissive veins) and gives it the
-## hybrid gait: siphon-vectored jet pulses in open water (real thrust and torque in the fish's physics tick), a cruise scull, a dash jet
-## with the arms bundled, and an arm crawl near a surface. The Tendril Lash attack is C3's (attacks/whip_attack.gd, style "lash");
-## until it lands the sheet's attack plays as the plain chomp.
+## A giant wine-red octopus glowing with ember sparks: octopus_rig.gd wraps OctopusModel (skinned, 118 bones) and gives it the hybrid
+## gait: it swims mantle first, the arms trailing in a flat swept-back delta (planning_hunter_refine.md), on siphon-vectored jet pulses
+## (real thrust and torque in the fish's physics tick), a cruise undulation, a dash jet with the arms bundled tight, and an arm crawl near
+## a surface. Its attack is the Grapple (attacks/grapple_attack.gd, style "grapple"): press shoots a tentacle, hold tows and grabs
+## more fish, release eats them all.
 ## This file is the form's own: its sheet, its ready flag and its dress hook (see HunterForms).
 
 const OctopusRigScript := preload("res://scripts/what_stinks/forms/octopus_rig.gd")
 
-## The attack style the sheet names. C3 sets this to "lash" when `HunterAttack.STYLES` knows it.
-const ATTACK := "whip"
+## The attack style the sheet names (registered in `HunterAttack.STYLES`).
+const ATTACK := "grapple"
 
 
 ## Offered on the match card only once this is true (the form plays end to end: model, swim, bite, camera, hitbox).
@@ -19,7 +20,9 @@ static func ready() -> bool:
 
 
 ## A jet swimmer: quick to burst, slow to get going from rest and to turn (the jet does the work), short reach (the arms are the
-## weapon). 6 m long; the camera sits back and a little high to keep the trailing arms in frame. Sound ids are stand-ins.
+## weapon). 6 m long, mantle tip to the trailing arm tips; the camera sits back and a little high to keep the trailing arms in frame.
+## The hitbox is the MONSTER class box at this length (about 2.8 x 2 x 6 m): the delta's arm tips spread to about 4 m wide at rest and
+## 3.3 m while jetting, a little past the box's sides; soft arm tips, so the box is kept. Sound ids are stand-ins.
 static func sheet() -> Dictionary:
 	return {
 		"name": "Ember Octopus", "class": FishCharacter.FishClass.MONSTER, "species": 0,

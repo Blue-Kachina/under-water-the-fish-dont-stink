@@ -19,11 +19,16 @@ var relocations := 0
 
 var _school: School
 var _avoid: School
+var _grip_s := 0.0
+var _will_tear := false
+var _turn := 1.0
 
 
 func _physics_process(delta: float) -> void:
 	input.clear()
 	if game == null or not is_instance_valid(fish) or fish.battered or game.phase == WhatStinksMatch.Phase.OVER:
+		return
+	if _struggle(delta):
 		return
 	if game.join != null and game.join.is_joined(fish):
 		if _avoid != null and game.join.school_of(fish) != _avoid:
@@ -46,6 +51,33 @@ func _physics_process(delta: float) -> void:
 	var gap := fish.global_position.distance_to(at)
 	input.forward = 1.0  # a school keeps moving: no cruising up to it
 	input.boost = gap > 15.0 and fish.boost_enabled  # it rushes for cover
+
+
+## Grabbed by an Ember Octopus' arm (GrappleAttack): with grapple_bot_break's chance per grab it tries to tear free after
+## grapple_bot_react_s. Joined, it leaves its school (a dash out); free, it dashes and turns hard (both tear the arm off). Returns
+## whether it is struggling (then it drives itself this tick).
+func _struggle(delta: float) -> bool:
+	if not GrappleAttack.gripped_now(fish):
+		_grip_s = 0.0
+		return false
+	var settings := game.settings
+	if _grip_s <= 0.0:
+		_will_tear = randf() < GrappleAttack.cfg_of(settings, {}, "grapple_bot_break")
+		var from_at := GrappleAttack.grip_from(fish)
+		_turn = 1.0 if not from_at.is_finite() or (fish.global_position - from_at).dot(fish.global_basis.x) >= 0.0 else -1.0
+	_grip_s += delta
+	if not _will_tear or _grip_s < GrappleAttack.cfg_of(settings, {}, "grapple_bot_react_s"):
+		return false
+	if game.join != null and game.join.is_joined(fish):
+		_avoid = game.join.school_of(fish)
+		if game.join.leave(fish):
+			relocations += 1
+			_school = _pick_school()
+		return true
+	input.stick = Vector2(_turn, 0.0)  # a hard turn, one way (away from the arm's side when it was grabbed)
+	input.forward = 1.0
+	input.boost = fish.boost_enabled
+	return true
 
 
 ## Joined: leave once a Hunter has read it long enough.

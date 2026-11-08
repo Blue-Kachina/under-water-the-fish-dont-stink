@@ -1,0 +1,96 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+length 3.0 m:
+      vertices 34349, triangles 66804, teeth 54
+ok    vertex budget under 40k
+ok    needle teeth: 54
+ok    body, teeth and fin meshes on the rig
+ok    tail reaches the body length (3.00 of 3.00)
+ok    the jaw and the lure stand past the snout (-0.39)
+ok    width reads as a globe (1.79)
+ok    height with the stalk (1.93)
+ok    the spine runs from the head along +Z, 3.00 m
+ok    6 stalk nodes and 2 eyes
+ok    eyes mirror each other
+ok    eyes sit high on the head, a metre back ((-0.45663, 0.427367, 0.387572))
+ok    the esca hangs over and ahead of the mouth ((0.0, 0.96, -0.32))
+ok    esca_world at rest is esca_rest placed
+ok    stalk base node sits on the forehead
+ok    the mouth point is inside the head's front ((0.0, -0.230256, 0.395709))
+length 6.0 m:
+      vertices 34349, triangles 66804, teeth 54
+ok    vertex budget under 40k
+ok    needle teeth: 54
+ok    body, teeth and fin meshes on the rig
+ok    tail reaches the body length (6.00 of 6.00)
+ok    the jaw and the lure stand past the snout (-0.78)
+ok    width reads as a globe (3.57)
+ok    height with the stalk (3.86)
+ok    the spine runs from the head along +Z, 6.00 m
+ok    6 stalk nodes and 2 eyes
+ok    eyes mirror each other
+ok    eyes sit high on the head, a metre back ((-0.91326, 0.854733, 0.775145))
+ok    the esca hangs over and ahead of the mouth ((0.0, 1.92, -0.64))
+ok    esca_world at rest is esca_rest placed
+ok    stalk base node sits on the forehead
+ok    the mouth point is inside the head's front ((0.0, -0.460513, 0.791418))
+length 18.0 m:
+      vertices 34349, triangles 66804, teeth 54
+ok    vertex budget under 40k
+ok    needle teeth: 54
+ok    body, teeth and fin meshes on the rig
+ok    tail reaches the body length (18.00 of 18.00)
+ok    the jaw and the lure stand past the snout (-2.33)
+ok    width reads as a globe (10.72)
+ok    height with the stalk (11.58)
+ok    the spine runs from the head along +Z, 18.00 m
+ok    6 stalk nodes and 2 eyes
+ok    eyes mirror each other
+ok    eyes sit high on the head, a metre back ((-2.739779, 2.5642, 2.325433))
+ok    the esca hangs over and ahead of the mouth ((0.0, 5.76, -1.92))
+ok    esca_world at rest is esca_rest placed
+ok    stalk base node sits on the forehead
+ok    the mouth point is inside the head's front ((0.0, -1.381539, 2.374256))
+jaw:
+ok    the mouth point drops with jaw_open (-0.58, -1.58, -1.79)
+ok    the hinge point stays put
+ok    the lip swings about the hinge keeping its radius (y -2.00)
+ok    jaw_open clamps at the widest (2.22)
+ok    jaw_open clamps shut tight
+ok    skin and teeth turn together (1.90 rad)
+ok    exaggerated gape: 1.0 is 57 deg, 2.0 is 109 deg
+stalk:
+ok    no push, no sway: the chain stays at rest (0.0000 m)
+ok    a push swings the esca (0.62 m) but not off the rod
+ok    the rod keeps each segment's length (error 0.00000 m)
+ok    kick_stalk flicks the esca sideways (0.35 m)
+ok    the chain settles back to rest (0.0000 m after 10 s)
+ok    no NaN in the chain
+ok    the last stalk node follows the chain's end
+ok    the skin has the chain
+ok    half-second frames and huge pushes stay bounded
+lights:
+ok    cap 2 across 4 anglers: 2 lights, 2 in use
+ok    the one over budget glows with its halo alone
+ok    a freed light is handed to the next angler
+ok    light_enabled false drops the light
+ok    esca dark: no light, no halo
+ok    a flare grows the halo
+ok    cap 0 releases every light (in use 0)
+ok    no light leaks with the models gone (0)
+uniforms:
+ok    esca intensity and colour reach the skin
+ok    tail_bend reaches both skins
+ok    pectoral flap and sweep
+ok    per-side flap for a roll
+ok    fin_flutter clamps
+ok    eye_glint lights the eyes (0.75)
+ok    only the teeth's copy of the shader blends
+ok    both skins are fed the spine
+ok    the spine uniforms reach the skin
+ok    pose_straight(bend) curves the tail (x 1.09)
+rebuild:
+ok    building twice gives the same body
+ok    rebuild leaves one set of parts (6 mesh nodes)
+ok    a size change rebuilds at the new length
+angler_model_probe: 82 checks, 0 failed

@@ -1,0 +1,94 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+A: the core
+  PASS  reach is 4.05 m (1.35 arm lengths of 3.00 m)
+  PASS  press: one arm shoots out (reaching 1, held 0)
+  PASS  press: it latches on the fish ahead, not the nearer one behind ([1])
+  PASS  the latched tip sits on its fish (0.000 m off)
+  PASS  the arm still grows out of its base (0.0000 m)
+  PASS  hold: the one behind in reach is grabbed next; past the behind reach and out of reach never ([1, 2])
+  PASS  front bias 0: the nearest (behind) is grabbed first ([2])
+  PASS  hold: eight arms hold eight fish of ten (8)
+  PASS  hold: one grab every 0.30 s (8 grabs, closest 0.300 s apart)
+  PASS  one fish per arm (8 distinct arms)
+  PASS  every latched tip is on its fish
+  PASS  a fish past the max stretch tears loose (["stretch"], held 7)
+  PASS  a free arm grabs another while held (held 8)
+  PASS  release: the arms yank first (the snap waits 0.10 s)
+  PASS  release: the snap takes all eight held (8, ate 8) after 0.11 s
+  PASS  the contact is taken once per release
+  PASS  reel: the catch rides the tips to the beak
+  PASS  the arms settle and the attack is idle (beat 0)
+  PASS  grapple_arms 3: three held at most (3)
+  PASS  a tap with nothing in reach whiffs (one arm flicks out)
+  PASS  the whiff's snap takes nothing
+  PASS  and the arm comes back
+  PASS  a tap with a fish in reach takes it (1, after 0.25 s)
+B: on an OctopusModel
+  PASS  the model is attached (no rig: the attack poses it)
+  PASS  three fish held (3)
+  PASS  the posed arm tips reach their fish (worst 0% of an arm)
+  PASS  the fish past the arm's length is reached by stretching
+  PASS  the arms stay on their bases on the body (0.0000 m)
+  PASS  reeled in: no arm left stretched (0.0000)
+C: a real match
+  PASS  three prey players to work with (3)
+  PASS  the grapple poses the rig's arms (rig.lash)
+  PASS  press: one arm goes for the nearest fish
+  PASS  hold: more arms grab fish of the school (8 held)
+  PASS  the HUD ring shows the arms holding (8)
+  PASS  the held arms are posed by the grapple (8)
+  PASS  release: the beak takes every fish held at once (8 of 8 held)
+  PASS  and they are gone from the school (8)
+  PASS  the arms reel in and settle
+  PASS  the settled arms sit on the gait (worst 0.10 m)
+  PASS  a prey player is grabbed
+  PASS  its HUD cue is on (1.00)
+    dbg t=0.00 gap=1.12 oct=0.00 prey=1.12 twin=0.78 taut=0.00 push=0.000 centre_gap=4.27
+    dbg t=0.13 gap=1.38 oct=0.00 prey=3.25 twin=2.78 taut=0.00 push=0.000 centre_gap=4.53
+    dbg t=0.25 gap=1.88 oct=0.00 prey=4.77 twin=4.37 taut=0.00 push=0.000 centre_gap=5.03
+    dbg t=0.38 gap=2.52 oct=0.63 prey=5.65 twin=5.36 taut=0.56 push=0.127 centre_gap=5.67
+    dbg t=0.50 gap=3.01 oct=3.49 prey=6.06 twin=5.85 taut=1.00 push=0.202 centre_gap=6.16
+    dbg t=0.63 gap=3.22 oct=5.63 prey=6.39 twin=6.20 taut=1.00 push=0.122 centre_gap=6.36
+    dbg t=0.75 gap=3.26 oct=6.71 prey=6.69 twin=6.52 taut=1.00 push=0.071 centre_gap=6.40
+    dbg t=0.88 gap=3.24 oct=7.20 prey=6.96 twin=6.81 taut=1.00 push=0.045 centre_gap=6.39
+    dbg t=1.00 gap=3.21 oct=7.43 prey=7.20 twin=7.07 taut=1.00 push=0.035 centre_gap=6.35
+    dbg t=1.13 gap=3.18 oct=7.58 prey=7.42 twin=7.30 taut=1.00 push=0.033 centre_gap=6.33
+    dbg t=1.25 gap=3.17 oct=7.71 prey=7.62 twin=7.51 taut=1.00 push=0.033 centre_gap=6.31
+    dbg t=1.38 gap=3.16 oct=7.84 prey=7.79 twin=7.70 taut=1.00 push=0.034 centre_gap=6.31
+    dbg t=1.50 gap=3.15 oct=7.98 prey=7.95 twin=7.87 taut=1.00 push=0.035 centre_gap=6.30
+    dbg t=1.63 gap=3.15 oct=8.11 prey=8.10 twin=8.02 taut=1.00 push=0.035 centre_gap=6.30
+    dbg t=1.75 gap=3.15 oct=8.24 prey=8.23 twin=8.16 taut=1.00 push=0.034 centre_gap=6.30
+    dbg t=1.88 gap=3.15 oct=8.35 prey=8.34 twin=8.28 taut=1.00 push=0.034 centre_gap=6.30
+    dbg t=2.00 gap=3.15 oct=8.46 prey=8.45 twin=8.39 taut=1.00 push=0.034 centre_gap=6.29
+    dbg t=2.13 gap=3.15 oct=8.55 prey=8.54 twin=8.49 taut=1.00 push=0.033 centre_gap=6.29
+    dbg t=2.25 gap=3.14 oct=8.63 prey=8.63 twin=8.58 taut=1.00 push=0.033 centre_gap=6.29
+    dbg t=2.38 gap=3.14 oct=8.71 prey=8.70 twin=8.66 taut=1.00 push=0.033 centre_gap=6.29
+  PASS  the prey stays held while it swims (2.5 s)
+  PASS  the tow does not slow the prey: it swam 17.6 m, its free twin 17.2 m (speed off by 0.4%)
+  PASS  the octopus is towed behind it (15.6 m of the prey's 17.6 m)
+  PASS  it trails within the max stretch (widest 3.3 m of 7.4 m; rope taut 1.00)
+  PASS  the prey's dash tears the arm off (["torn"])
+  PASS  the cue fades once it is free
+  FAIL  swimming hard across the arm tears free (after 3.00 s)
+  FAIL  a prey yanked past the max stretch tears loose (["gone", "gone", "gone", "gone"])
+  PASS  a held prey is eaten on the release
+  FAIL  a grabbed prey bot struggles free ([])
+  PASS  tap mode: a tap grabs the nearest and the beak takes it (1)
+  PASS  net_state names what each arm holds (2)
+  PASS  a puppet is not towed
+  PASS  a puppet's grapple holds what the owner said (2 of 2)
+  PASS  and lets go when told
+  PASS  bot_plan presses with a fish in reach, not without
+D: a bot Hunter
+ERROR: Condition "!is_inside_tree()" is true. Returning: Transform3D()
+   at: get_global_transform (scene/3d/node_3d.cpp:649)
+   GDScript backtrace (most recent call first):
+       [0] mouth_point (res://scripts/what_stinks/hunter_bite.gd:186)
+       [1] on_tick (res://scripts/what_stinks/attacks/grapple_attack.gd:326)
+       [2] _physics_process (res://scripts/what_stinks/hunter_bite.gd:350)
+  PASS  the bot presses (4)
+  PASS  and releases (4)
+  PASS  its arms hold several fish at once (most 4)
+  PASS  and its releases eat (11 fish)
+grapple_probe: 3 FAILED (61 checks)

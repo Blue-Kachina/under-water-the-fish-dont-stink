@@ -2,34 +2,45 @@ shader_type spatial;
 render_mode diffuse_burley, specular_schlick_ggx, cull_back;
 // The Ember Octopus's skin (scripts/what_stinks/forms/octopus_model.gd, octopus_contract.md).
 // One shader for every part: mode 0 skin, 1 web, 2 sucker, 3 eye.
-// Vertex data: COLOR r = vein weight, g = cavity darkness (siphon inside) / sucker depth is in r for suckers,
+// Look (private_content/giant_glowing_octopus.png): deep wine / maroon-violet wet skin, wrinkled and studded with papillae, the
+// glow a fine sparkle of ember photophores under the skin with a warm gold core in the mantle; pale-rimmed suckers; a small dark
+// slit-pupil eye. The papillae and wrinkles are also pushed into the silhouette in vertex() (skin only).
+// Vertex data: COLOR r = glow weight, g = cavity darkness (siphon inside) / sucker depth is in r for suckers,
 // b = arm id / 7, a = oral (sucker side) mask. CUSTOM0 = rest position (design units) + body_u (0 mantle tip .. 1 arm tips).
 
 uniform int mode = 0;
+uniform float unit_m = 1.0;  // metres per design unit (set by the model)
 
 group_uniforms palette;
-uniform vec3 copper : source_color = vec3(0.58, 0.18, 0.07);
-uniform vec3 violet : source_color = vec3(0.31, 0.10, 0.36);
-uniform vec3 deep_tone : source_color = vec3(0.13, 0.035, 0.10);
-uniform vec3 belly_tone : source_color = vec3(0.90, 0.52, 0.52);
-uniform vec3 vein_hot : source_color = vec3(1.0, 0.50, 0.14);
-uniform vec3 vein_white : source_color = vec3(1.0, 0.86, 0.62);
+uniform vec3 copper : source_color = vec3(0.36, 0.05, 0.08);  // the warm wine end of the skin (chroma_shift -1 pushes here)
+uniform vec3 violet : source_color = vec3(0.22, 0.05, 0.17);  // maroon-violet (chroma_shift +1)
+uniform vec3 deep_tone : source_color = vec3(0.07, 0.012, 0.04);
+uniform vec3 belly_tone : source_color = vec3(0.62, 0.36, 0.40);
+uniform vec3 vein_hot : source_color = vec3(1.0, 0.46, 0.12);   // ember
+uniform vec3 vein_white : source_color = vec3(1.0, 0.84, 0.55); // gold-white, the hottest sparks
+uniform vec3 core_gold : source_color = vec3(1.0, 0.5, 0.13);
 group_uniforms;
 
 group_uniforms skin;
-uniform float chroma_speed : hint_range(0.0, 2.0) = 0.16;
+uniform float chroma_speed : hint_range(0.0, 2.0) = 0.12;
 uniform float chroma_scale = 5.5;
 uniform float spot_scale = 34.0;
-uniform float bump_amount : hint_range(0.0, 4.0) = 0.4;
-uniform float roughness_base : hint_range(0.05, 1.0) = 0.40;
+uniform float bump_amount : hint_range(0.0, 4.0) = 1.8;
+uniform float roughness_base : hint_range(0.05, 1.0) = 0.38;
+uniform float wrinkle_scale = 26.0;
+uniform float papilla_scale = 62.0;
+uniform float displace : hint_range(0.0, 0.03) = 0.007;  // design units the papillae and folds push the surface out
 group_uniforms;
 
 group_uniforms veins;
 uniform float vein_scale = 9.0;
-uniform float vein_width : hint_range(0.01, 0.5) = 0.10;
-uniform float vein_energy = 1.7;
+uniform float vein_width : hint_range(0.01, 0.5) = 0.05;
+uniform float vein_energy = 0.16;
 uniform float cell_scale = 24.0;
-uniform float cell_energy = 0.5;
+uniform float cell_energy = 0.0;
+uniform float speck_scale = 58.0;
+uniform float speck_energy = 3.2;
+uniform float core_energy = 0.2;
 group_uniforms;
 
 group_uniforms drivers;
@@ -50,7 +61,6 @@ group_uniforms;
 
 varying vec4 rest;
 varying vec4 reg;
-varying vec3 view_pos;
 
 float hash13(vec3 p) {
 	p = fract(p * 0.1031);
@@ -146,9 +156,32 @@ float arm_glow_of(float id_f) {
 	return v;
 }
 
+// Folds: ridges stretched along the body (Z), so they ring the mantle and cross the trailing arms; deeper on the head and arm roots.
+float folds(vec3 p, float u) {
+	vec3 warp = vec3(vnoise(p * 7.0), vnoise(p * 7.0 + 13.0), 0.0) * 0.35;
+	float r = ridge(vec3(p.x * wrinkle_scale * 0.6, p.y * wrinkle_scale * 0.6, p.z * wrinkle_scale * 1.25) + warp * 9.0);
+	return pow(r, 3.0);
+}
+
+// Papillae: low round warts on a voronoi lattice; each fades out before its cell's edge (F2 - F1), so there are no seams.
+float warts(vec3 p, float scale) {
+	vec3 v = voronoi(p * scale);
+	float r = 0.22 + 0.16 * fract(v.z * 7.0);
+	float dome = 1.0 - smoothstep(0.0, r, v.x);
+	return dome * dome * (3.0 - 2.0 * dome) * smoothstep(0.0, 0.18, v.y - v.x) * step(0.3, v.z);
+}
+
 void vertex() {
 	rest = CUSTOM0;
 	reg = COLOR;
+	if (mode == 0 && reg.g < 0.01) {
+		// coarse papillae and folds into the silhouette (fine ones are in the normal)
+		float u = rest.w;
+		float taper = mix(1.0, 0.35, smoothstep(0.45, 1.0, u));
+		float h = warts(rest.xyz, 17.0) + 0.3 * vnoise(rest.xyz * 9.0);
+		h *= taper * (1.0 - 0.6 * reg.a);  // the sucker side is smooth
+		VERTEX += NORMAL * (h * displace * unit_m);
+	}
 }
 
 void fragment() {
@@ -157,105 +190,132 @@ void fragment() {
 	float ag = arm_glow_of(reg.b);
 	float pulse_pos = max(mantle_pulse, 0.0);
 	float lum_hurt = 1.0 - hurt * 0.5;
+	float tp = vein_travel >= 0.0 && vein_travel <= 1.3 ? exp(-pow((u - vein_travel) * 6.5, 2.0)) * vein_travel_gain : 0.0;
 
 	if (mode == 3) {
-		// Eye: rest.xyz is the unit sphere position, +Z is the front.
+		// Eye: rest.xyz is the unit sphere position, +Z is the front. Small and dark: a bronze iris, a black horizontal slit.
 		vec3 q = normalize(P);
 		vec2 d = q.xy;
 		float rad = length(d);
 		float front = smoothstep(-0.05, 0.1, q.z);
-		vec2 pp = vec2(d.x / 0.56, d.y / 0.17);
-		float pup = 1.0 - smoothstep(0.86, 1.0, length(pp));
-		float iris_mask = (1.0 - smoothstep(0.80, 0.88, rad)) * front;
+		vec2 pp = vec2(d.x / 0.62, d.y / 0.12);
+		float pup = 1.0 - smoothstep(0.8, 1.0, length(pp));
+		float iris_mask = (1.0 - smoothstep(0.78, 0.9, rad)) * front;
 		float ang = atan(d.y, d.x);
-		float fib = 0.5 + 0.5 * sin(ang * 21.0 + vnoise(vec3(ang * 2.0, rad * 7.0, 1.0)) * 5.0);
-		float inner = 1.0 - smoothstep(0.1, 0.8, rad);
-		vec3 iris = mix(vec3(0.42, 0.14, 0.04), vec3(0.98, 0.62, 0.16), fib * 0.35 + inner * 0.55);
-		iris = mix(iris, vec3(0.13, 0.04, 0.02), smoothstep(0.64, 0.82, rad));
-		vec3 outer = mix(vec3(0.19, 0.07, 0.07), vec3(0.34, 0.13, 0.17), vnoise(P * 9.0));
+		float fib = 0.5 + 0.5 * sin(ang * 23.0 + vnoise(vec3(ang * 2.0, rad * 7.0, 1.0)) * 5.0);
+		float inner = 1.0 - smoothstep(0.1, 0.75, rad);
+		vec3 iris = mix(vec3(0.025, 0.012, 0.006), vec3(0.09, 0.045, 0.014), fib * 0.4 + inner * 0.2);
+		iris = mix(iris, vec3(0.05, 0.015, 0.01), smoothstep(0.6, 0.82, rad));
+		vec3 outer = mix(vec3(0.07, 0.02, 0.03), vec3(0.14, 0.04, 0.07), vnoise(P * 9.0));
 		ALBEDO = mix(outer, iris, iris_mask) * (1.0 - pup);
-		ROUGHNESS = mix(0.45, 0.04, iris_mask);
+		ROUGHNESS = mix(0.4, 0.03, iris_mask);
 		SPECULAR = 0.9;
-		CLEARCOAT = iris_mask;
-		CLEARCOAT_ROUGHNESS = 0.03;
-		float glint = (1.0 + charge * 2.2 + flash * 2.0);
-		EMISSION = vec3(1.0, 0.52, 0.12) * eye_glow * glint * iris_mask * (1.0 - pup) * (0.35 + 0.65 * inner) * glow * lum_hurt;
+		CLEARCOAT = 1.0;
+		CLEARCOAT_ROUGHNESS = 0.02;
+		float glint = (1.0 + charge * 2.5 + flash * 2.0);
+		EMISSION = vec3(1.0, 0.4, 0.08) * eye_glow * 0.25 * glint * iris_mask * (1.0 - pup) * (0.3 + 0.7 * fib * inner) * glow * lum_hurt;
 	} else if (mode == 2) {
-		// Sucker: pale wet cup, darker in the pit, warm when the arm lights.
+		// Sucker: a pale, wet, fleshy rim, the cup darkening to a deep maroon pit; embers at the rim when the arm lights.
 		float depth = reg.r;
-		vec3 pale = vec3(0.64, 0.36, 0.32);
-		vec3 pit = vec3(0.42, 0.12, 0.16);
-		ALBEDO = mix(pale, pit, smoothstep(0.1, 0.9, depth));
-		ALBEDO = mix(ALBEDO, ALBEDO * vec3(0.75, 0.8, 1.0), chroma_shift * 0.3);
-		ROUGHNESS = 0.5 + 0.15 * (1.0 - depth);
-		SPECULAR = 0.3;
-		RIM = 0.25;
+		vec3 rim_c = vec3(0.7, 0.5, 0.47);
+		vec3 wall = vec3(0.42, 0.2, 0.23);
+		vec3 pit = vec3(0.16, 0.03, 0.06);
+		vec3 c = mix(rim_c, wall, smoothstep(0.0, 0.25, depth));
+		c = mix(c, pit, smoothstep(0.35, 1.0, depth));
+		c *= 0.85 + 0.3 * vnoise(P * 140.0);
+		ALBEDO = mix(c, c * vec3(0.8, 0.8, 1.0), chroma_shift * 0.3) * lum_hurt;
+		ROUGHNESS = 0.22 + 0.25 * depth;
+		SPECULAR = 0.6;
+		CLEARCOAT = 0.6;
+		CLEARCOAT_ROUGHNESS = 0.1;
+		RIM = 0.2;
 		RIM_TINT = 0.8;
 		float breathe = 0.7 + 0.3 * sin(TIME * 1.4 + u * 9.0 + reg.b * 6.0);
 		float e = sucker_glow * breathe + charge * 0.55 + flash * 0.7 + ag * 0.8;
-		float tp = vein_travel >= 0.0 && vein_travel <= 1.3 ? exp(-pow((u - vein_travel) * 6.0, 2.0)) * vein_travel_gain : 0.0;
-		EMISSION = mix(vein_hot, vein_white, clamp(charge * 0.6 + flash, 0.0, 1.0)) * (e + tp) * (0.35 + 0.65 * depth) * glow * lum_hurt * 0.55;
+		float rim_glow = 1.0 - smoothstep(0.0, 0.5, depth);
+		EMISSION = mix(vein_hot, vein_white, clamp(charge * 0.6 + flash, 0.0, 1.0)) * (e + tp) * (0.25 + 0.75 * rim_glow) * glow * lum_hurt * 0.45;
 	} else {
 	// ---- skin (0) and web (1)
 	bool web = mode == 1;
-	float mantle_w = 1.0 - smoothstep(0.2, 0.4, u);
-	// chromatophores: colour drifting along the body, speckle that swells and shrinks
-	float drift = fbm(P * chroma_scale + vec3(0.0, 0.0, TIME * chroma_speed));
-	float tcol = clamp(u * 1.25 - 0.1 + (drift - 0.5) * 0.7 + chroma_shift * 0.5, 0.0, 1.0);
-	vec3 base = mix(copper, violet, smoothstep(0.22, 0.88, tcol));
-	base = mix(base, deep_tone, smoothstep(0.55, 1.0, fbm(P * 3.0 + 4.0)) * 0.45);
-	vec3 vor = voronoi(P * spot_scale);
-	float breathe_spot = 0.20 + 0.07 * sin(TIME * 0.7 + vor.z * 6.283 + chroma_shift * 3.0);
-	float spot = 1.0 - smoothstep(breathe_spot - 0.06, breathe_spot + 0.05, vor.x);
+	float mantle_w = 1.0 - smoothstep(0.2, 0.42, u);
+	float on_arm = smoothstep(0.43, 0.5, u);
 	float oral = reg.a;
-	base = mix(base, vec3(0.30, 0.05, 0.05), spot * 0.40 * (1.0 - oral));
-	base = mix(base, belly_tone, oral * 0.55);
-	// a pearly sheen at grazing angles
+	// colour: wine to maroon-violet, mottled, darker in the folds, the papilla tips catching a paler pink
+	float drift = fbm(P * chroma_scale + vec3(0.0, 0.0, TIME * chroma_speed));
+	float tcol = clamp(0.35 + u * 0.35 + (drift - 0.5) * 0.9 + chroma_shift * 0.5, 0.0, 1.0);
+	vec3 base = mix(copper, violet, smoothstep(0.15, 0.9, tcol));
+	base = mix(base, deep_tone, smoothstep(0.5, 1.0, fbm(P * 3.0 + 4.0)) * 0.55);
+	float fold = folds(P, u);
+	float wart = warts(P, papilla_scale * mix(1.0, 1.6, on_arm));
+	float wart_big = warts(P, 17.0);
+	vec3 vor = voronoi(P * spot_scale);
+	float breathe_spot = 0.18 + 0.06 * sin(TIME * 0.7 + vor.z * 6.283 + chroma_shift * 3.0);
+	float spot = 1.0 - smoothstep(breathe_spot - 0.06, breathe_spot + 0.05, vor.x);
+	base = mix(base, deep_tone, spot * 0.25 * (1.0 - oral));
+	base *= 0.72 + 0.28 * (1.0 - fold * 0.9);                          // creases darker
+	base = mix(base, base * vec3(1.6, 1.25, 1.3) + vec3(0.03, 0.0, 0.01), (wart * 0.4 + wart_big * 0.25) * (1.0 - oral));
+	base = mix(base, belly_tone, oral * (web ? 0.25 : 0.5));
 	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
-	base = mix(base, base * vec3(0.8, 0.85, 1.3), fres * 0.15);
+	base = mix(base, base * vec3(0.85, 0.85, 1.3), fres * 0.2);
 	float lum = dot(base, vec3(0.299, 0.587, 0.114));
 	base = mix(base, vec3(lum) * vec3(1.1, 0.95, 0.95), hurt * 0.6);
 	ALBEDO = base * lum_hurt;
-	ROUGHNESS = clamp(roughness_base + 0.22 * (drift - 0.5) - 0.1 * spot, 0.1, 0.9);
-	SPECULAR = 0.55;
-	RIM = 0.45;
-	RIM_TINT = 0.55;
+	// wet: glossy with a thin clear film; the folds hold less shine
+	ROUGHNESS = clamp(roughness_base + 0.18 * (drift - 0.5) + 0.12 * fold - 0.08 * wart, 0.08, 0.85);
+	SPECULAR = 0.6;
+	CLEARCOAT = web ? 0.15 : 0.3;
+	CLEARCOAT_ROUGHNESS = 0.18;
+	RIM = 0.35;
+	RIM_TINT = 0.6;
 
-	// fine skin bump from the spots and a pore noise
-	float h = vor.x * 0.6 + vnoise(P * 120.0) * 0.4;
+	// relief: papillae, folds, pores
+	float h = wart * 0.3 + wart_big * 0.5 + fold * 0.7 + vnoise(P * 170.0) * 0.18;
+	h *= 1.0 - 0.6 * oral;
 	NORMAL = bump_normal(NORMAL, VERTEX, h, 0.0016 * bump_amount);
 
-	// ---- the emissive vein network
+	// ---- the glow: ember photophores sparkling under the skin, a gold core in the mantle, faint threads between
+	float weight = reg.r * (web ? 0.7 : 1.0);
+	float drive = 1.0 + stroke * 0.9 + charge * 0.8 + pulse_pos * 0.7 + tp * 2.2 + ag * 1.2 + flash * 1.0;
+	// sparks: two voronoi layers; each cell's spark has its own size and twinkle
+	float density = mix(0.52, 0.3, mantle_w) - 0.12 * on_arm * (1.0 - smoothstep(0.1, 0.6, oral)) + 0.15 * oral;
+	vec3 s1 = voronoi(P * speck_scale + vec3(0.0, 0.0, 1.7));
+	float r1 = (0.1 + 0.12 * fract(s1.z * 13.7)) * (1.0 + charge * 0.6 + stroke * 0.25);
+	float tw1 = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(TIME * (1.2 + 3.0 * fract(s1.z * 7.3)) + s1.z * 40.0), 3.0);
+	float sp1 = (1.0 - smoothstep(r1 * 0.35, r1, s1.x)) * step(density, s1.z) * tw1;
+	vec3 s2 = voronoi(P * speck_scale * 2.3 + vec3(3.1, 0.0, 0.0));
+	float r2 = 0.13 + 0.08 * fract(s2.z * 5.1);
+	float tw2 = 0.4 + 0.6 * (0.5 + 0.5 * sin(TIME * (2.0 + 4.0 * fract(s2.z * 3.9)) + s2.z * 25.0));
+	float sp2 = (1.0 - smoothstep(r2 * 0.3, r2, s2.x)) * step(density + 0.12, s2.z) * tw2 * 0.55;
+	float sparks = (sp1 + sp2) * (1.0 - 0.6 * fold) * (1.0 - 0.5 * oral);
+	vec3 spark_col = mix(vein_hot, vein_white, clamp(sp1 * 0.6 + charge * 0.4 + flash * 0.7 + tp * 0.4, 0.0, 1.0));
+	vec3 emit = spark_col * sparks * speck_energy * weight * drive * (0.75 + 0.25 * (1.0 - fres));
+	// faint glowing threads (what is left of the vein network): only really show on a stroke, the charge, a pulse
 	vec3 warp = (vec3(vnoise(P * 5.0), vnoise(P * 5.0 + 11.0), vnoise(P * 5.0 + 23.0)) - 0.5) * 0.32;
-	float w = vein_width * (1.0 + charge * 0.55 + stroke * 0.25 + pulse_pos * 0.2);
+	float w = vein_width * (1.0 + charge * 0.8 + stroke * 0.3 + pulse_pos * 0.2);
 	float v1 = ridge(P * vein_scale + warp * vein_scale);
-	float v2 = ridge(P * vein_scale * 3.1 + warp * 9.0 + 5.0);
-	float line = max(smoothstep(1.0 - w, 1.0, v1), smoothstep(1.0 - w * 0.8, 1.0, v2) * 0.55);
-	float halo = smoothstep(1.0 - w * 3.6, 1.0, v1) * 0.16;
-	float flow = 0.5 + 0.5 * sin(TIME * (1.4 + stroke * 2.6 + charge * 5.0) - u * 9.0 + vnoise(P * 4.0) * 4.0);
+	float line = smoothstep(1.0 - w, 1.0, v1);
 	float idle = 0.55 + 0.45 * sin(TIME * 1.1 + u * 6.0 + vnoise(P * 3.0) * 5.0);
-	float vein_level = mix(idle, flow, clamp(0.25 + stroke * 0.6 + charge * 0.5, 0.0, 1.0));
-	float tp = vein_travel >= 0.0 && vein_travel <= 1.3 ? exp(-pow((u - vein_travel) * 6.5, 2.0)) * vein_travel_gain : 0.0;
-	float weight = reg.r * (web ? 0.55 : 1.0);
-	float drive = 1.0 + stroke * 0.8 + charge * 0.45 + pulse_pos * 0.8 + tp * 1.6 + ag * 0.9 + flash * 1.0;
-	vec3 vcol = mix(vein_hot, vein_white, clamp(charge * 0.25 + flash * 0.7 + tp * 0.35 + pulse_pos * 0.2, 0.0, 1.0));
-	vec3 emit = vcol * (line * (0.5 + 0.5 * vein_level) + halo) * vein_energy * weight * drive;
+	emit += vein_hot * line * vein_energy * weight * (0.4 + 0.6 * idle) * (0.3 + stroke * 0.9 + charge * 1.2 + tp * 1.5 + ag * 0.8 + pulse_pos * 0.5);
 
-	// mantle cells: glowing rings like the cells in the reference's mantle
+	// the mantle's gold core: glowing from within, strongest through the thick middle of the mantle, cells showing in it
 	if (mantle_w > 0.02 && !web) {
+		float thick = 1.0 - fres;
+		float mottle = smoothstep(0.3, 0.85, fbm(P * 7.0 + vec3(0.0, TIME * 0.05, 0.0))) * 0.8 + 0.2;
+		// brightest through the swollen middle of the mantle, fading to the head and the tip
+		float mid = smoothstep(0.0, 0.12, u) * (1.0 - smoothstep(0.26, 0.42, u));
+		float core_mask = mid * thick * thick * (1.0 - oral * 0.6);
+		vec3 core = core_gold * core_energy * core_mask * mottle * (0.75 + 0.25 * idle) * (1.0 + stroke * 0.7 + pulse_pos * 0.9 + charge * 0.6 + tp * 0.8);
 		vec3 cv = voronoi(P * cell_scale + vec3(0.0, 0.0, 3.0));
-		float ring = 1.0 - smoothstep(0.0, 0.06, abs(cv.x - 0.30 - 0.03 * sin(TIME * 0.9 + cv.z * 6.0)));
-		float edge = 1.0 - smoothstep(0.0, 0.10, cv.y - cv.x);
-		float cells = (ring * 0.25 + edge * 0.1) * mantle_w * cell_energy;
-		emit += mix(vein_hot, vein_white, 0.25 + charge * 0.3) * cells * (0.5 + 0.5 * vein_level) * (1.0 + stroke * 0.6 + charge * 0.35 + pulse_pos * 0.6 + tp * 1.2) * (1.0 - oral);
-		// the mantle glows from within, brightest high up
-		emit += vein_hot * 0.07 * mantle_w * (0.6 + 0.4 * idle) * (1.0 + charge * 0.7);
+		float edge = 1.0 - smoothstep(0.0, 0.07, cv.y - cv.x);
+		float cells = edge * core_mask * cell_energy * (0.6 + 0.4 * idle);
+		emit += core + mix(core_gold, vein_white, 0.3) * cells * (1.0 + stroke * 0.6 + pulse_pos * 0.6 + charge * 0.4);
+		emit *= 1.0 - 0.5 * fold;
 	}
-	emit += vec3(0.28, 0.10, 0.55) * fres * 0.12;
+	emit += vec3(0.22, 0.06, 0.32) * fres * 0.08;
 	EMISSION = emit * glow * lum_hurt;
 
-	// translucent flesh: light through the thin mantle and webs
-	BACKLIGHT = vec3(0.45, 0.16, 0.07) * (web ? 1.4 : 0.55 * mantle_w + 0.2);
+	// translucent flesh: light through the thin webs and the mantle
+	BACKLIGHT = vec3(0.4, 0.1, 0.08) * (web ? 1.3 : 0.5 * mantle_w + 0.15);
 	// siphon interior and other cavities
 	if (reg.g > 0.01) {
 		ALBEDO = mix(ALBEDO, deep_tone * 0.5, reg.g);

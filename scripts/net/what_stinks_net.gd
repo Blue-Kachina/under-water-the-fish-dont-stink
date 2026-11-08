@@ -52,6 +52,8 @@ var _status_left := 0.0
 var sent_views := {}
 ## What the last join, bite and spit messages carried (for the probe): counts per RPC name.
 var sent_counts := {}
+## Our own Hunters' grapples (GrappleAttack): the net_version last sent, per Hunter.
+var _grapple_sent := {}
 
 
 func _ready() -> void:
@@ -330,8 +332,37 @@ func tick(delta: float) -> void:
 			net.fish.visible = not game.eaten.has(net.fish)
 			if not game.join.is_joined(net.fish):
 				net.apply()
+	_grapple_tick()
 	if is_host():
 		_host_tick(delta)
+
+
+## The Ember Octopus' grapple: what our own Hunters' arms hold goes out when it changes, so other machines' puppets hold the same
+## fish (a guest's goes to the host, which passes it on). The release and the judging are the bite's own messages.
+func _grapple_tick() -> void:
+	for key: Variant in game.bites.keys():
+		if not is_instance_valid(key):
+			continue
+		var hunter := key as FishController
+		if hunter == null or hunter.puppet:
+			continue
+		var bite: HunterBite = game.bites[hunter]
+		var grapple: GrappleAttack = bite.attack as GrappleAttack if bite != null else null
+		if grapple == null or int(_grapple_sent.get(hunter, -1)) == grapple.net_version:
+			continue
+		_grapple_sent[hunter] = grapple.net_version
+		var state := grapple.net_state(id_of)
+		if is_host():
+			_send_all("_ws_grapple", [id_of(hunter), state])
+		elif hunter == game.local_fish():
+			coop.send_from(self, 1, "_ws_grapple_up", [_own_pid(), state], true)
+
+
+func _apply_grapple(fish: FishController, state: PackedInt32Array) -> void:
+	var bite: HunterBite = game.bites.get(fish)
+	var grapple: GrappleAttack = bite.attack as GrappleAttack if bite != null else null
+	if grapple != null:
+		grapple.apply_net_state(state, fish_by_id, game.field)
 
 
 func _host_tick(delta: float) -> void:
@@ -616,6 +647,19 @@ func _ws_bite_land(pid: int, mouth: Vector3, forward: Vector3, charge: float, ex
 		game.judge_net_bite(fish, mouth, forward, charge, extra)
 
 
+## A guest's Hunter's grapple changed what it holds: its puppet here follows, and the other guests are told.
+@rpc("any_peer", "call_remote", "reliable")
+func _ws_grapple_up(pid: int, state: PackedInt32Array) -> void:
+	var fish := _sender_fish(pid)
+	if fish == null or not game.is_hunter(fish):
+		return
+	_apply_grapple(fish, state)
+	var sender := multiplayer.get_remote_sender_id()
+	for peer: int in _peers():
+		if peer != sender:
+			coop.send_from(self, peer, "_ws_grapple", [pid, state], true)
+
+
 @rpc("any_peer", "call_remote", "reliable")
 func _ws_buttons(pid: int, mask: int) -> void:
 	var fish := _sender_fish(pid)
@@ -688,6 +732,14 @@ func _ws_round_over(results: Dictionary, totals: Dictionary) -> void:
 func _ws_match_over(winner_id: int) -> void:
 	if game and not is_host():
 		game.apply_net_match_over(fish_by_id(winner_id))
+
+
+## What a Hunter's grapple holds now (8 x [kind, a, b]: GrappleAttack.net_state), from its machine.
+@rpc("authority", "call_remote", "reliable")
+func _ws_grapple(hunter_id: int, state: PackedInt32Array) -> void:
+	var fish := fish_by_id(hunter_id)
+	if game and fish and fish.puppet and not is_host():
+		_apply_grapple(fish, state)
 
 
 @rpc("authority", "call_remote", "reliable")

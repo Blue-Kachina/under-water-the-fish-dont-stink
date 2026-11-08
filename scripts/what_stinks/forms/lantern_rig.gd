@@ -25,6 +25,8 @@ const DEFAULTS := {
 	"angler_burst_accel": 9.0,
 	"angler_pectoral_hz": 0.8,
 	"angler_pectoral_deg": 28.0,
+	"angler_stride_tail_deg": 55.0,
+	"angler_stride_pop": 1.0,
 	"angler_stalk_stiffness": 38.0,
 	"angler_stalk_damping": 5.5,
 	"angler_stalk_sway": 0.5,
@@ -40,10 +42,12 @@ var jaw: LanternJaw
 var stiffness_override := -1.0
 ## Frozen by a probe: tick with this delta instead of the frame's (negative: off).
 var fixed_delta := -1.0
+## Probes: a stride to follow instead of the fish's Extra Swishy one ({"swing": Vector2, "power", "phase", "flow" (0..1), "growth"}); empty: the fish's.
+var stride_override: Dictionary = {}
 
 ## What the gait is doing now (probes read these).
 var shown := {"sway": 0.0, "snap": 0.0, "tail": 0.0, "flap_l": 0.0, "flap_r": 0.0, "sweep": 0.0, "burst": 0.0, "flutter": 0.0,
-	"speed_t": 0.0, "bursts": 0, "thrust": 0.0}
+	"speed_t": 0.0, "bursts": 0, "thrust": 0.0, "stride": 0.0, "stride_w": 0.0, "grow": 0.0}
 ## The largest per-second change of the tail, left fin and sweep since the last reset (probes: continuity).
 var peak_rate := {"tail": 0.0, "flap": 0.0, "sweep": 0.0}
 var _prev_tail := 99.0
@@ -82,6 +86,12 @@ var _roll := 0.0
 var _bite: HunterBite
 var _bound: HunterBite
 var _bursts := 0
+## Extra Swishy: 1 while the tail is being driven by strides (the free sway steps aside), the tail's stride sweep and its ring (a spring
+## chasing the stick's sweep, underdamped so it whips past), and the Battletoads swell of the tail.
+var _stride_w := 0.0
+var _stride_tail := 0.0
+var _stride_tail_v := 0.0
+var _tail_grow := 0.0
 
 
 ## A setting's value, or its default here while it is not registered.
@@ -99,6 +109,8 @@ func _init() -> void:
 func build(with_fish: FishController) -> void:
 	fish = with_fish
 	length = fish.hitbox_length
+	if not fish.strode.is_connected(_on_strode):
+		fish.strode.connect(_on_strode)
 	if model != null:
 		model.queue_free()
 	model = AnglerModelScript.new()
@@ -237,7 +249,7 @@ func _gait(delta: float) -> void:
 	# A lunge is the rising edge of the thrust (re-armed once it falls back), so a sustained boost fires once, not continuously.
 	if thrust < thr * 0.6:
 		_armed = true
-	if delta > 0.0 and thrust > thr and _refractory <= 0.0 and _armed:
+	if delta > 0.0 and thrust > thr and _refractory <= 0.0 and _armed and _stride_w < 0.3:  # a stride's own push is not a lunge
 		_armed = false
 		snap_tail(clampf(0.65 + 0.35 * (thrust / thr - 1.0), 0.65, 1.0))
 	# The burst envelope: quick up (set by snap_tail), a slow ease down.
@@ -252,12 +264,13 @@ func _gait(delta: float) -> void:
 		_snap_v += (-w * w * _snap - 2.0 * zeta * w * _snap_v) * h
 		_snap += _snap_v * h
 	_snap = clampf(_snap, -snap_rad * 1.3, snap_rad * 1.3)
+	_gait_stride(delta)
 	# The cruise sway: slow, low, a little bigger at speed, easing in and out.
 	var sway_target := settings_sway * lerpf(0.5, 1.0, _speed_t) * (1.0 - 0.7 * _burst)
 	_sway_amp = lerpf(_sway_amp, sway_target, _rate(delta, 0.5))
 	_tail_phase = fmod(_tail_phase + delta * TAU * lerpf(0.3, 1.1, _speed_t), TAU)
-	var sway := sin(_tail_phase) * _sway_amp
-	var tail := clampf(sway + _snap, -1.4, 1.4)
+	var sway := sin(_tail_phase) * _sway_amp * (1.0 - _stride_w)
+	var tail := clampf(sway + _snap + _stride_tail, -1.4, 1.4)
 	model.tail_bend = tail
 	# Pectorals: the scull.
 	var pect_hz := opt("angler_pectoral_hz") * lerpf(1.0, 1.7, _speed_t)
@@ -287,7 +300,72 @@ func _gait(delta: float) -> void:
 	_prev_flap = _flap_l
 	_prev_sweep = _sweep
 	shown = {"sway": sway, "snap": _snap, "tail": tail, "flap_l": _flap_l, "flap_r": _flap_r, "sweep": _sweep, "burst": _burst,
-		"flutter": _flutter, "speed_t": _speed_t, "bursts": _bursts, "thrust": thrust, "dt": delta, "age": _age}
+		"flutter": _flutter, "speed_t": _speed_t, "bursts": _bursts, "thrust": thrust, "dt": delta, "age": _age,
+		"stride": _stride_tail, "stride_w": _stride_w, "grow": _tail_grow}
+
+
+## The Extra Swishy stride the fish is in, for the tail to follow: {"swing" (the tail's place in the stick's terms), "power", "phase" (s,
+## negative: none), "flow" (0..1), "growth" (the fish's stride_tail_growth)}; empty when the fish is not striding.
+func _stride_info() -> Dictionary:
+	if not stride_override.is_empty():
+		return stride_override
+	if fish.swim_style != FishController.SwimStyle.EXTRA_SWISHY or not fish.swim_strokes or fish.swishy == null:
+		return {}
+	var sw: SwishySwim = fish.swishy
+	return {"swing": sw.tail_swing, "power": sw.power, "phase": sw.phase, "flow": sw.flow / maxf(fish.stride_flow_max, 0.01),
+		"growth": fish.stride_tail_growth}
+
+
+static func _master() -> float:
+	var got: Variant = WhatStinksSettings.shared().get("hunter_exaggeration")
+	return float(got) if got != null else 1.0
+
+
+## Extra Swishy: the tail rides the player's strides. It sweeps across to the side opposite each push (the stick's sweep), arriving at the
+## stride's peak, on an underdamped spring so it whips past the sweep and rings; the free sway steps aside while it does. The tail also
+## swells with flow, as every fish's does (Battletoads style), the caudal fan with it.
+func _gait_stride(delta: float) -> void:
+	var st := _stride_info()
+	var pop := opt("angler_stride_pop") * _master()
+	var goal := 0.0
+	var grow_goal := 0.0
+	var w_goal := 0.0
+	if not st.is_empty():
+		var swing: Vector2 = st["swing"]
+		var lateral := swing.x if absf(swing.x) >= absf(swing.y) else swing.y
+		goal = lateral * deg_to_rad(opt("angler_stride_tail_deg"))
+		grow_goal = ((1.0 + float(st["growth"]) * float(st["flow"])) * (1.0 + 0.2 * float(st["power"])) - 1.0) * 0.75 * pop
+		if float(st["phase"]) >= 0.0 or swing.length() > 0.03:
+			w_goal = 1.0
+	_stride_w = lerpf(_stride_w, w_goal, _rate(delta, 0.06 if w_goal > _stride_w else 0.3))
+	var omega := TAU * 4.2
+	var zeta := lerpf(0.85, 0.32, clampf(pop, 0.0, 1.0))
+	var sub := clampi(int(ceil(delta / 0.008)), 1, 8)
+	var h := minf(delta, 0.1) / sub
+	for i in sub:
+		_stride_tail_v += (-omega * omega * (_stride_tail - goal) - 2.0 * zeta * omega * _stride_tail_v) * h
+		_stride_tail += _stride_tail_v * h
+	_tail_grow = lerpf(_tail_grow, grow_goal, _rate(delta, 0.08))
+	model.tail_grow = _tail_grow
+
+
+## Each stride's input: the tail is flicked toward the side it is about to sweep to (so it whips past the sweep), the pectorals tuck and
+## the esca whips, like a lunge in miniature.
+func _on_strode(_timing: float, _flow: float) -> void:
+	if model == null:
+		return
+	var pop := opt("angler_stride_pop") * _master()
+	var side := -signf(_stride_tail) if absf(_stride_tail) > 0.05 else _snap_side
+	_snap_side = -side
+	_stride_tail_v += side * pop * deg_to_rad(opt("angler_stride_tail_deg")) * 9.0
+	_burst = minf(_burst + 0.4 * clampf(pop, 0.0, 1.0), 1.0)
+	if is_instance_valid(fish):
+		model.kick_stalk(fish.global_basis.z * 2.2 * clampf(pop, 0.0, 1.5) * model.k)
+
+
+func _exit_tree() -> void:
+	if is_instance_valid(fish) and fish.strode.is_connected(_on_strode):
+		fish.strode.disconnect(_on_strode)
 
 
 func _bind_bite() -> void:

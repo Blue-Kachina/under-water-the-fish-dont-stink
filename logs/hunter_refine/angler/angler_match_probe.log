@@ -1,0 +1,57 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+registry:
+  PASS  the form is registered and in card order
+  PASS  it is ready and the card lists it
+  PASS  it plays as itself, not the fallback
+  PASS  its sheet names the Lantern Angler and the lure style
+  PASS  the style table builds a LureAttack
+  PASS  the bite fx has a sound row for the lure style
+  PASS  every rig and lure tuning value is a panel setting (missing: [])
+  PASS  and each has a doc line (missing: [])
+  PASS  the panel defaults match the LureField built-ins (differ: [])
+  PASS  every angler sound id is in the catalog (missing: [])
+  PASS  the settings' form picker offers it
+player match:
+  PASS  the local fish is the Hunter with a bite
+  PASS  the Hunter wears the LanternRig and its model
+  PASS  the model is built at the hitbox length (7.00 of 7.00)
+  PASS  the jaw wrapper is registered for the bite
+  PASS  the bite's style is the lure
+  PASS  the angler swims (top 7.9 m/s)
+  PASS  there is prey to draw
+  PASS  the press starts a LureField source
+  PASS  and LureField lists it
+  PASS  the esca flares (level 2.23, model 2.25)
+  PASS  the jaw gapes wider while held (x1.35)
+  PASS  prey in the cone is drawn toward the light (1.81 m/s toward it; 22.0 m to 20.7 m)
+  PASS  its captivated level rises (0.54)
+  PASS  the attack counts it as drawn (1)
+  PASS  a person swimming straight away cancels most of the pull (3.77 to 0.38)
+  PASS  a dash cancels it (0.000)
+  PASS  and grants a short immunity
+  PASS  a fish behind the Angler is not drawn
+  PASS  LureField.is_human is callable
+  PASS  the release snaps shut (bites 1)
+  PASS  the field ends with the snap
+  PASS  and LureField has no live source
+  PASS  the esca drops dark (0.21)
+  PASS  the captivated level fades out, not pops (0.000)
+  PASS  the esca relights over the cooldown (1.00)
+  PASS  and the gape returns to normal (x1.00)
+  PASS  air roll with the angler stays finite
+bot match:
+  PASS  the Hunter is a WhatStinksBot
+  PASS  the bot's Hunter wears the angler
+  PASS  its style is the lure
+  PASS  the bot presses the bite (5 presses)
+  PASS  and releases it (5 snaps)
+  PASS  its lure field was live for 565 ticks
+  PASS  fish count is sane (10 gone)
+  PASS  a prey bot's target is bent toward the lure (blend_target)
+net:
+  PASS  a puppet's bite opens from the host's message (the lure visuals run)
+  PASS  the puppet's esca flares and its field runs (beat 2)
+  PASS  and its release runs out to the end
+  PASS  the puppet's field ends with the snap
+angler_match_probe: all checks passed (50 checks)

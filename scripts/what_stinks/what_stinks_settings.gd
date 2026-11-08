@@ -334,6 +334,10 @@ static func shared() -> WhatStinksSettings:
 @export_range(0.2, 3.0, 0.05) var angler_pectoral_hz := 0.8
 ## ...and their sweep (degrees).
 @export_range(0.0, 70.0, 1.0) var angler_pectoral_deg := 28.0
+## Extra Swishy strides: how far the tail sweeps to each side on a stride, following the stick (degrees at the tip)...
+@export_range(0.0, 120.0, 1.0, "or_greater") var angler_stride_tail_deg := 55.0
+## ...and how much each stride exaggerates (the tail rings past its sweep and grows with flow, the stalk whips, the fins tuck; 0: none).
+@export_range(0.0, 3.0, 0.05, "or_greater") var angler_stride_pop := 1.0
 
 @export_group("Octopus lash")
 ## The Ember Octopus's Tendril Lash: a press rears the arms into a crown and locks them on prey; the release whips them out. At most this many arms lock on (one prey each).
@@ -397,6 +401,74 @@ static func shared() -> WhatStinksSettings:
 ## The targeting aura sweeping the cone while held (0: off, 1: on).
 @export_range(0.0, 1.0, 1.0) var whip_aura := 1.0
 
+@export_group("Octopus grapple")
+## The Ember Octopus's grapple: a press shoots one arm out to the nearest fish in reach and latches on; while held, free arms grab more fish that come in reach and the octopus is towed behind them; the release reels everything held into the beak at once. At most this many arms hold fish (one each).
+@export_range(0, 8, 1) var grapple_arms := 8
+## How far ahead of the beak a free arm reaches for a fish (x an arm's length)...
+@export_range(0.2, 4.0, 0.05, "or_greater") var grapple_reach := 1.35
+## ...the share of that reach left straight behind the beak (the reach sphere sits forward; 1 is a plain sphere)...
+@export_range(0.0, 1.0, 0.01) var grapple_behind := 0.45
+## ...and how much squareness to the nose counts against distance when picking a fish (0: the nearest wins).
+@export_range(0.0, 4.0, 0.05, "or_greater") var grapple_front_bias := 0.6
+## Seconds an arm takes to shoot out to a fish at full reach (nearer is quicker)...
+@export_range(0.03, 1.5, 0.01, "or_greater") var grapple_latch_s := 0.16
+## ...and seconds between grabs while the button is held.
+@export_range(0.0, 3.0, 0.05, "or_greater") var grapple_regrab_s := 0.3
+## The tow: the rope's length, the gap the octopus trails behind what it holds at (x arm length)...
+@export_range(0.1, 4.0, 0.05, "or_greater") var grapple_tow_length := 0.9
+## ...the share of that length inside which the rope is slack (no tow)...
+@export_range(0.0, 0.99, 0.01) var grapple_tow_slack := 0.6
+## ...how hard a taut rope closes a stretch past its length (m/s per m)...
+@export_range(0.0, 30.0, 0.1, "or_greater") var grapple_tow_stiffness := 4.0
+## ...the share of the fish's sideways speed a taut rope matches...
+@export_range(0.0, 1.0, 0.01) var grapple_tow_follow := 0.9
+## ...how fast the tow brings the octopus's velocity round (per s)...
+@export_range(0.0, 60.0, 0.5, "or_greater") var grapple_tow_response := 10.0
+## ...and the octopus's own jet while it holds a fish (x; its swim then only adds a little steering).
+@export_range(0.01, 2.0, 0.01, "or_greater") var grapple_tow_thrust := 0.35
+## A fish further than this from its arm's base tears loose and the arm snaps back (x arm length).
+@export_range(1.0, 6.0, 0.05, "or_greater") var grapple_max_stretch := 2.2
+## A prey player's weight in the tow's pull (a school fish is 1).
+@export_range(0.0, 10.0, 0.1, "or_greater") var grapple_prey_weight := 2.0
+## Breaking free: 1 lets a grabbed prey's dash (boost, or leaving its school) tear the arm off (0: it does not)...
+@export_range(0.0, 1.0, 1.0) var grapple_break_dash := 1.0
+## ...a prey on another machine counts as dashing when it pulls away this much faster than the octopus (m/s)...
+@export_range(0.5, 40.0, 0.5, "or_greater") var grapple_break_rel := 9.0
+## ...a prey turning at least this fast is counter-steering (degrees per s)...
+@export_range(10.0, 720.0, 5.0, "or_greater") var grapple_break_turn := 120.0
+## ...and tears free after this long of it (s; 0: steering never frees it)...
+@export_range(0.0, 5.0, 0.05, "or_greater") var grapple_break_steer_s := 0.5
+## ...and a prey that tore free cannot be grabbed again for this long (s).
+@export_range(0.0, 10.0, 0.1, "or_greater") var grapple_break_immune_s := 1.2
+## Fish each held arm eats on the release...
+@export_range(1, 10, 1, "or_greater") var grapple_per_arm := 1
+## ...and the reach round each held fish its arm also eats from (x bite radius; with more than one per arm).
+@export_range(0.0, 2.0, 0.01, "or_greater") var grapple_eat_radius := 0.0
+## Seconds from the release to the beak's snap (the held arms yank taut first)...
+@export_range(0.0, 1.0, 0.01, "or_greater") var grapple_yank_s := 0.1
+## ...the most the snap waits for an arm still reaching for its fish...
+@export_range(0.02, 2.0, 0.01, "or_greater") var grapple_stall_max := 0.35
+## ...seconds an arm takes to reel its catch in to the beak...
+@export_range(0.05, 2.0, 0.01, "or_greater") var grapple_reel_s := 0.32
+## ...seconds an arm takes to settle back after letting go...
+@export_range(0.05, 2.0, 0.01, "or_greater") var grapple_retract_s := 0.3
+## ...and seconds a tap with nothing in reach takes to flick one arm out and back.
+@export_range(0.05, 2.0, 0.01, "or_greater") var grapple_whiff_s := 0.3
+## How much a slack arm sags (1: it keeps its full length)...
+@export_range(0.0, 1.5, 0.01) var grapple_sag := 0.55
+## ...and how much a taut arm trembles (x arm length).
+@export_range(0.0, 0.2, 0.005, "or_greater") var grapple_tremble := 0.025
+## How much of the bite's lunge moves the body while grappling (HunterBite.lunge_gain).
+@export_range(0.0, 3.0, 0.05, "or_greater") var grapple_lunge := 0.0
+## A Hunter bot lets go once it holds this many fish...
+@export_range(1, 8, 1) var grapple_bot_want := 4
+## ...or once it has held something this long (s).
+@export_range(0.2, 10.0, 0.1, "or_greater") var grapple_bot_hold_s := 2.5
+## A grabbed prey bot tries to tear free with this chance...
+@export_range(0.0, 1.0, 0.01) var grapple_bot_break := 0.65
+## ...after this long (s).
+@export_range(0.0, 3.0, 0.05, "or_greater") var grapple_bot_react_s := 0.4
+
 @export_group("Octopus body")
 ## The Ember Octopus's swim: seconds per jet pulse at idle throttle (shorter at speed, x0.62 on a dash)...
 @export_range(0.3, 4.0, 0.05, "or_greater") var octopus_jet_period := 1.1
@@ -431,6 +503,14 @@ static func shared() -> WhatStinksSettings:
 @export_range(0.0, 1.0, 0.01) var octopus_droop := 0.35
 ## ...and how far the arm tips curl toward the sucker side.
 @export_range(0.0, 1.0, 0.01) var octopus_tip_curl := 0.3
+## The swim (mantle first, arms trailing in a delta): how much the delta narrows on a jet's power stroke (1: bundled tight)...
+@export_range(0.0, 1.0, 0.01) var octopus_jet_narrow := 0.45
+## ...how much it re-spreads on the recovery...
+@export_range(0.0, 1.0, 0.01) var octopus_jet_respread := 0.35
+## ...the size of the wave each jet sends down the arms (0: none)...
+@export_range(0.0, 1.0, 0.01, "or_greater") var octopus_jet_wave := 0.22
+## ...and how far a turn or roll banks the delta like a wing (rad at full stick).
+@export_range(0.0, 1.5, 0.01, "or_greater") var octopus_bank := 0.45
 ## The crawl: within this many body lengths of a floor the arms plant and walk (0: no crawl)...
 @export_range(0.0, 2.0, 0.05, "or_greater") var octopus_crawl_range := 0.8
 ## ...seconds per arm step...
@@ -445,6 +525,12 @@ static func shared() -> WhatStinksSettings:
 @export_range(0.0, 1.0, 0.01) var octopus_crawl_height := 0.3
 ## ...and how fast it settles there.
 @export_range(0.0, 10.0, 0.1, "or_greater") var octopus_crawl_pull := 2.5
+## Extra Swishy strides: 1 makes each stride fire the jet on the input (the mantle swells at once, squeezes as the stride peaks) instead of the free-running beat; 0 keeps the beat...
+@export_range(0.0, 1.0, 1.0) var octopus_stride_sync := 1.0
+## ...how far each stride exaggerates the jet (the mantle pops past its swell and rings, the arms flare then snap tight; 0: none)...
+@export_range(0.0, 3.0, 0.05, "or_greater") var octopus_stride_pop := 1.0
+## ...and how tightly speed pulls the arms into a streamlined bundle (1: fully bundled at full speed).
+@export_range(0.0, 1.5, 0.01, "or_greater") var octopus_speed_tuck := 0.6
 ## The skin's glow.
 @export_range(0.0, 3.0, 0.05, "or_greater") var octopus_glow := 1.0
 ## Suckers draw at full detail within this many body lengths, and at all within the second (0: no limit).
