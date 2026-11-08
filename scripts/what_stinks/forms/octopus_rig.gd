@@ -54,6 +54,7 @@ const DEFAULTS := {
 	"octopus_bank": 0.45,
 	"octopus_stride_sync": 1.0,
 	"octopus_stride_pop": 1.0,
+	"octopus_stride_squeeze_push": 1.8,
 	"octopus_speed_tuck": 0.6,
 	"octopus_crawl_range": 0.8,
 	"octopus_crawl_step_time": 0.42,
@@ -120,6 +121,12 @@ var _last_stride_count := -1
 var _last_stride_phase := -1.0
 ## Whether the current jet is a stride's (it follows the stride's own clock) rather than the free-running beat.
 var _jet_stride := false
+## Which half of the jet the current stride plays (the squeeze, else the breathing in), the half the next one plays, and where the
+## channels stood when it began (so the half carries on from there without a pop).
+var _stride_contract := false
+var _stride_next_contract := false
+var _half_m0 := 0.0
+var _half_s0 := 0.0
 ## The stride's Battletoads pop: a ringing spring on the mantle's swell (visual side), kicked by the physics side on each stride's input.
 var _pop := 0.0
 var _pop_v := 0.0
@@ -393,9 +400,16 @@ func _tick_jet(dt: float, vel: Vector3, gb: Basis) -> void:
 		var count := int(st["strides"])
 		var phase := float(st["phase"])
 		if stride_on and (_last_stride_phase < 0.0 or phase < _last_stride_phase - 0.0001 or count != _last_stride_count):
-			_begin_jet(vel, forward)
+			# the strides alternate the two halves of one jet: breathe in (mantle swells, arms spread), then squeeze (mantle
+			# deflates, arms close, the push)
+			_stride_contract = _stride_next_contract
+			_stride_next_contract = not _stride_contract
+			_half_m0 = _mantle_raw
+			_half_s0 = _spread_raw
+			_begin_jet(vel, forward, not _stride_contract)
 			_jet_t = 0.0
-			_pop_impulse += opt("octopus_stride_pop")
+			if not _stride_contract:
+				_pop_impulse += opt("octopus_stride_pop")
 		_last_stride_phase = phase
 		_last_stride_count = count
 	else:
@@ -406,6 +420,7 @@ func _tick_jet(dt: float, vel: Vector3, gb: Basis) -> void:
 		return
 	if _jet_stride:
 		_jet_stride = false
+		_stride_next_contract = false  # a pause: the next stride breathes in again
 		_jet_t = -1.0  # the stride ran out: the free-running beat starts afresh if the throttle is still held
 	if _jet_t < 0.0:
 		if want:
@@ -477,45 +492,56 @@ func _stride_shape(st: Dictionary) -> void:
 	var fade := maxf(float(st["fade"]), 0.05)
 	var narrow := opt("octopus_jet_narrow")
 	var respread := opt("octopus_jet_respread")
-	var flare := clampf(0.55 * opt("octopus_stride_pop"), 0.0, 1.0)
-	var inhale := peak * 0.22
+	var flare := clampf(0.55 * opt("octopus_stride_pop"), 0.3, 1.0)
 	var m := 0.0
 	var s := 0.0
 	var env := 0.0
+	var amp := clampf(_jet_amp, 0.0, 1.0)
 	var squeezed := -1.0 if _jet_dash else -narrow  # where the squeeze leaves the delta
 	_jet_t = phase
-	if phase < inhale:
-		var x := phase / inhale
-		m = -sin(x * PI * 0.5)
-		s = flare * sin(x * PI * 0.5)
+	if not _stride_contract:
+		# The first half of the jet: breathe in. The mantle swells and the arms spread; it holds open for the stride that squeezes it
+		# (and eases back to rest if none comes).
+		if phase < peak:
+			var e := smoothstep(0.0, 1.0, phase / peak)
+			m = lerpf(_half_m0, -1.0 * amp, e)
+			s = lerpf(_half_s0, flare, e)
+		else:
+			var settle := smoothstep(0.5, 1.0, clampf((phase - peak) / fade, 0.0, 1.0))
+			m = lerpf(-1.0 * amp, 0.0, settle)
+			s = lerpf(flare, 0.0, settle)
 	elif phase < peak:
-		var e := smoothstep(0.0, 1.0, (phase - inhale) / maxf(peak - inhale, 0.001))
-		m = lerpf(-1.0, 1.0, e)
-		s = lerpf(flare, squeezed, e)
+		# The second half: the squeeze. The mantle deflates, the arms close into the delta and the push builds.
+		var e := smoothstep(0.0, 1.0, phase / peak)
+		m = lerpf(_half_m0, 1.0 * amp, e)
+		s = lerpf(_half_s0, squeezed, e)
 		env = e
 	else:
 		var r := clampf((phase - peak) / fade, 0.0, 1.0)
-		m = 1.0 - 1.35 * smoothstep(0.0, 0.35, r) if r < 0.35 else -0.35 * (1.0 - smoothstep(0.0, 1.0, (r - 0.35) / 0.65))
+		m = (1.0 - 1.35 * smoothstep(0.0, 0.35, r) if r < 0.35 else -0.35 * (1.0 - smoothstep(0.0, 1.0, (r - 0.35) / 0.65))) * amp
 		if _jet_dash:
 			s = lerpf(-1.0, -0.35, smoothstep(0.0, 1.0, r))
 		else:
 			s = -narrow + (narrow + respread) * smoothstep(0.0, 0.55, r) if r < 0.55 else lerpf(respread, 0.0, smoothstep(0.0, 1.0, (r - 0.55) / 0.45))
 		env = 1.0 - smoothstep(0.0, 0.5, r)
-	_mantle_raw = m * clampf(_jet_amp, 0.0, 1.0)
+	_mantle_raw = m
 	_spread_raw = s
-	_thrust_env = env
-	_vein_t = (phase / 0.35) * 1.1 if phase < 0.35 else -1.0
+	# only the squeeze pushes, so it carries both strides' worth of the push
+	_thrust_env = env * (opt("octopus_stride_squeeze_push") if _stride_contract else 0.0)
+	_vein_t = (phase / 0.35) * 1.1 if phase < 0.35 and _stride_contract else -1.0
 	stride_phase = clampf(phase / (peak + fade), 0.0, 1.0)
 	stride_power = env * _jet_amp
 
 
-func _begin_jet(_vel_now: Vector3, _forward: Vector3) -> void:
+func _begin_jet(_vel_now: Vector3, _forward: Vector3, quiet := false) -> void:
 	_jet_dash = _boost
 	_jet_amp = lerpf(0.5, 1.0, clampf(absf(_throttle), 0.0, 1.0))
 	if _throttle < -0.15:
 		_jet_amp *= 0.5
 	if _jet_t < 0.0:
 		_jet_t = 0.0
+	if quiet:
+		return  # a stride's breathing in: no wave down the arms, no jet cue yet
 	_wave_age = 0.0
 	_jets += 1
 	jet_fired.emit(_jet_amp)

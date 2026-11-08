@@ -407,7 +407,11 @@ func _stiffen(delta: float, head: Vector3, back: Vector3) -> void:
 	var dir := back.normalized() if back.length_squared() > 0.0001 else Vector3.BACK
 	var ease_rate := lerpf(30.0, 8.0, stiff)
 	var k := 1.0 if delta <= 0.0 or _offsets.size() != n or _dir == Vector3.ZERO else 1.0 - exp(-ease_rate * delta)
-	dir = dir if _dir == Vector3.ZERO else _dir.slerp(dir, k).normalized()
+	# The body's axis is a rigid bar: it keeps up with the fish's turn (a 180 in place carries the tail round with it), only the bend
+	# the trail adds (the offsets) is eased.
+	var k_dir := 1.0 if k >= 1.0 else 1.0 - exp(-lerpf(90.0, 28.0, stiff) * delta)
+	if _dir != Vector3.ZERO:
+		dir = dir if _dir.dot(dir) < -0.999 else _dir.slerp(dir, k_dir).normalized()
 	_dir = dir
 	var raw := rig.points.duplicate()
 	if _offsets.size() != n:

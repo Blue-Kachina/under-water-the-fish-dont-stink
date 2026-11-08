@@ -63,7 +63,7 @@ func _octopus() -> void:
 	var rig := _bare()
 	await _frames(2)
 	var ctx := {"throttle": 1.0, "vel": Vector3(0.0, 0.0, -3.0)}
-	# --- a single stride
+	# --- the first stride breathes in: the mantle swells and the arms spread, no jet yet
 	rig.stride_override = {"phase": -1.0, "power": 0.0, "peak": 0.3, "fade": 0.5, "strides": 0}
 	for i in 30:
 		rig.step(DT, ctx)
@@ -74,9 +74,8 @@ func _octopus() -> void:
 	var pop_max := -9.0
 	var pop_min := 9.0
 	var t := 0.0
-	var jets_during := 0
 	var first_inflate_t := -1.0
-	while t < 0.9:
+	while t < 0.45:  # cut off by the next stride while it holds open
 		rig.stride_override = _stride(t, 1)
 		rig.step(DT, ctx)
 		var m: float = rig.shown["mantle"]
@@ -84,33 +83,42 @@ func _octopus() -> void:
 		if first_inflate_t < 0.0 and m < -0.3:
 			first_inflate_t = t
 		if absf(t - 0.3) < DT * 0.6:
-			mantle_at_peak = rig.shown["mantle"]
 			spread_at_peak = rig.shown["spread"]
 		pop_max = maxf(pop_max, rig._pop)
 		pop_min = minf(pop_min, rig._pop)
 		t += DT
-	jets_during = int(rig.shown["jets"]) - jets0
-	_check(first_inflate_t >= 0.0 and first_inflate_t < 0.12, "the mantle swells on the input (past -0.3 at %.2f s into the stride)" % first_inflate_t)
+	_check(first_inflate_t >= 0.0 and first_inflate_t < 0.25, "the first stride swells the mantle (past -0.3 at %.2f s into it)" % first_inflate_t)
 	_check(mantle_min < -0.6, "...a real expansion, not a flicker (mantle %.2f)" % mantle_min)
-	_check(mantle_at_peak > 0.3, "...and it squeezes as the stride peaks (mantle %.2f at the peak)" % mantle_at_peak)
-	_check(spread_at_peak < -0.1, "...the delta bundling in the squeeze (spread %.2f)" % spread_at_peak)
-	_check(jets_during == 1, "one stride is one jet (%d), the free beat does not add its own" % jets_during)
+	_check(spread_at_peak > 0.2, "...the arms spread open (spread %.2f)" % spread_at_peak)
+	_check(int(rig.shown["jets"]) == jets0 and rig._thrust_env < 0.001, "...and it does not push (jets %d)" % (int(rig.shown["jets"]) - jets0))
 	_check(pop_max > 0.3 and pop_min < 0.0, "the Battletoads pop swells past the jet and rings thin (%.2f .. %.2f)" % [pop_min, pop_max])
-	# --- strides back to back: a jet each, on the input
+	# --- the second stride squeezes: the mantle deflates, the arms close, the push
+	var env_max := 0.0
+	t = 0.0
+	while t < 0.9:
+		rig.stride_override = _stride(t, 2)
+		rig.step(DT, ctx)
+		env_max = maxf(env_max, rig._thrust_env)
+		if absf(t - 0.3) < DT * 0.6:
+			mantle_at_peak = rig.shown["mantle"]
+			spread_at_peak = rig.shown["spread"]
+		t += DT
+	_check(mantle_at_peak > 0.3, "the second stride squeezes the mantle (mantle %.2f at the peak)" % mantle_at_peak)
+	_check(spread_at_peak < -0.1, "...the delta bundling in the squeeze (spread %.2f)" % spread_at_peak)
+	_check(int(rig.shown["jets"]) - jets0 == 1, "...two strides are one jet (%d)" % (int(rig.shown["jets"]) - jets0))
+	_check(env_max > 1.2, "...and the squeeze carries the push (peak %.2f)" % env_max)
+	# --- strides back to back alternate: four make two jets; a pause starts over by breathing in
 	rig.stride_override = {"phase": -1.0, "power": 0.0, "peak": 0.3, "fade": 0.5, "strides": 0}
 	for i in 90:
 		rig.step(DT, ctx)
 	var j1 := int(rig.shown["jets"])
-	var start_mantle := []
-	for n in 3:
+	for n in 4:
 		var tt := 0.0
 		while tt < 0.45:  # each cut off at 0.45 s by the next
 			rig.stride_override = _stride(tt, n + 1)
 			rig.step(DT, ctx)
-			if tt < 0.001:
-				start_mantle.append(float(rig.shown["mantle"]))
 			tt += DT
-	_check(int(rig.shown["jets"]) - j1 == 3, "three strides in a row make three jets (%d)" % (int(rig.shown["jets"]) - j1))
+	_check(int(rig.shown["jets"]) - j1 == 2, "four strides in a row make two jets (%d)" % (int(rig.shown["jets"]) - j1))
 	# --- no stride: the free beat runs, and sync off keeps it during strides
 	rig.stride_override = {}
 	var j2 := int(rig.shown["jets"])

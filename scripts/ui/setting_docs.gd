@@ -1933,6 +1933,7 @@ const DOCS := {
 	"what_stinks/octopus_crawl_pull": "...and how fast it settles there.",
 	"what_stinks/octopus_stride_sync": "Extra Swishy strides: 1 makes each stride fire the jet on the input (the mantle swells at once, squeezes as the stride peaks) instead of the free-running beat; 0 keeps the beat...",
 	"what_stinks/octopus_stride_pop": "...how far each stride exaggerates the jet (the mantle pops past its swell and rings, the arms flare then snap tight; 0: none)...",
+	"what_stinks/octopus_stride_squeeze_push": "...and how hard the squeeze stride pushes (strides alternate breathing in and squeezing; only the squeeze pushes, so 2 matches the old push per stride).",
 	"what_stinks/octopus_speed_tuck": "...and how tightly speed pulls the arms into a streamlined bundle (1: fully bundled at full speed).",
 	"what_stinks/octopus_crawl_range": "The crawl: within this many body lengths of a floor the arms plant and walk (0: no crawl)...",
 	"what_stinks/octopus_crawl_step_len": "...how far a foot may lag its home before the arm steps (share of the arm\'s length)...",

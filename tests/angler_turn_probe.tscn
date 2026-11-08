@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tests/angler_turn_probe.gd" id="1"]
+
+[node name="AnglerTurnProbe" type="Node"]
+script = ExtResource("1")

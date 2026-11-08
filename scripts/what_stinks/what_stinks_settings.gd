@@ -529,6 +529,8 @@ static func shared() -> WhatStinksSettings:
 @export_range(0.0, 1.0, 1.0) var octopus_stride_sync := 1.0
 ## ...how far each stride exaggerates the jet (the mantle pops past its swell and rings, the arms flare then snap tight; 0: none)...
 @export_range(0.0, 3.0, 0.05, "or_greater") var octopus_stride_pop := 1.0
+## ...and how hard the squeeze stride pushes (strides alternate breathing in and squeezing; only the squeeze pushes, so 2 matches the old push per stride).
+@export_range(0.0, 5.0, 0.05, "or_greater") var octopus_stride_squeeze_push := 1.8
 ## ...and how tightly speed pulls the arms into a streamlined bundle (1: fully bundled at full speed).
 @export_range(0.0, 1.5, 0.01, "or_greater") var octopus_speed_tuck := 0.6
 ## The skin's glow.
