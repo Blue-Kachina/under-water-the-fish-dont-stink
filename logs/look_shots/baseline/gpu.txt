@@ -1,0 +1,7 @@
+look_shots baseline  window (1920, 1080)  90 frames per reading  preset OURS
+view 1 kelp_up      gpu 0.69 ms  cpu 0.18 ms  (1 viewport)  draw calls 72
+view 2 ruin_shafts  gpu 1.33 ms  cpu 0.24 ms  (1 viewport)  draw calls 136
+view 3 reef_close   gpu 1.25 ms  cpu 0.24 ms  (1 viewport)  draw calls 183
+view 4 open_blue    gpu 1.42 ms  cpu 0.36 ms  (1 viewport)  draw calls 449
+view 5 floor_murk   gpu 1.08 ms  cpu 0.37 ms  (1 viewport)  draw calls 483
+view 6 split        gpu 1.51 ms  cpu 0.56 ms  (2 viewports)  draw calls 664

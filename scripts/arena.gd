@@ -56,6 +56,8 @@ func configure_environment(env: Environment) -> void:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.02, 0.1, 0.16)
 	env.sky = null
+	WaterLook.reset_grade(env)  # keeps its clean look: the water look's grade is the Ocean's
+	WaterLook.restore_fog(env)  # and the plain fog the Ocean modes' water model had changed
 
 
 func reset_course() -> void:

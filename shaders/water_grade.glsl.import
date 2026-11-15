@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bnj1hwqa62uyd"
+path="res://.godot/imported/water_grade.glsl-9089c572052dd4c87ba547e41bdf81e4.res"
+
+[deps]
+
+source_file="res://shaders/water_grade.glsl"
+dest_files=["res://.godot/imported/water_grade.glsl-9089c572052dd4c87ba547e41bdf81e4.res"]
+
+[params]
+

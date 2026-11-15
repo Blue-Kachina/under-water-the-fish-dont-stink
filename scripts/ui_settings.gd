@@ -30,9 +30,13 @@ var konami_entered := false
 var show_hidden_modes := false
 ## Shows the tuning options that aren't for everyday use (SELECT toggles it in Settings).
 var show_debug_tweaks := false
+## Graphics quality (WaterLook.Quality: 0 Low, 1 Medium, 2 High). High is the look as tuned; Low and Medium thin the snow, shafts, glints and bloom, and Low drops to one caustic tap and a 0.77 render scale (FSR). Never auto-detected.
+var graphics_quality := 2
+## Adaptive resolution: nudges the render scale down (and back up) to hold the GPU time near the frame time. Off by default.
+var adaptive_resolution := false
 
 const KEYS := ["show_stats", "show_input_overlay", "goal_replays", "fullscreen", "player_name", "konami_entered", "show_hidden_modes",
-		"show_debug_tweaks"]
+		"show_debug_tweaks", "graphics_quality", "adaptive_resolution"]
 
 
 func _ready() -> void:
@@ -45,6 +49,7 @@ func _ready() -> void:
 	if player_name.strip_edges().is_empty():
 		player_name = DEFAULT_NAME
 	fullscreen = true  # every start, whatever it was left on
+	_apply_quality()
 	_apply_fullscreen.call_deferred()  # once the scene's known
 
 
@@ -55,6 +60,8 @@ func set_value(key: String, value: Variant) -> void:
 	set(key, value)
 	if key == "fullscreen":
 		_apply_fullscreen()
+	elif key in ["graphics_quality", "adaptive_resolution"]:
+		_apply_quality()
 	var settings := ConfigFile.new()
 	settings.load(SETTINGS_PATH)
 	settings.set_value(SECTION, key, value)
@@ -86,3 +93,50 @@ func _apply_fullscreen() -> void:
 	var mode := DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED
 	if DisplayServer.window_get_mode() != mode:
 		DisplayServer.window_set_mode(mode)
+
+
+## Hands the graphics quality to the water look and puts its render scale on the window and the split-screen views.
+func _apply_quality() -> void:
+	WaterLook.quality = clampi(graphics_quality, 0, 2)
+	if not adaptive_resolution:
+		WaterLook.auto_scale = 1.0
+		_adapt_gpu_ms = 0.0
+	var scene := get_tree().current_scene if is_inside_tree() else null
+	if scene and scene.scene_file_path.begins_with("res://tests/") and WaterLook.shared().quality_force < 0:
+		return  # screenshot tools and probes keep native resolution unless they force a tier
+	WaterLook.shared().apply_scale_all(get_tree())
+	if DisplayServer.get_name() != "headless":
+		RenderingServer.viewport_set_measure_render_time(get_tree().root.get_viewport_rid(), adaptive_resolution)
+
+
+var _adapt_clock := 0.0
+var _adapt_gpu_ms := 0.0
+
+
+## Adaptive resolution (Settings): every half second, averages the GPU time and steps the render scale one notch down when it is over
+## the target share of the frame time, back up when there is plenty of room. Pixels only (the plan's draw-distance step is not done).
+func _process(delta: float) -> void:
+	if not adaptive_resolution or DisplayServer.get_name() == "headless":
+		return
+	var look := WaterLook.shared()
+	var ms := RenderingServer.viewport_get_measured_render_time_gpu(get_tree().root.get_viewport_rid())
+	if ms <= 0.0:
+		return
+	_adapt_gpu_ms = ms if _adapt_gpu_ms <= 0.0 else lerpf(_adapt_gpu_ms, ms, 0.1)
+	_adapt_clock += delta
+	if _adapt_clock < 0.5:
+		return
+	_adapt_clock = 0.0
+	var refresh := DisplayServer.screen_get_refresh_rate()
+	var frame_ms := 1000.0 / (refresh if refresh > 1.0 else 60.0)
+	var target := frame_ms * look.auto_target
+	var base := maxf(look.eff_scale() / maxf(WaterLook.auto_scale, 0.01), 0.01)  # the tier's own scale
+	var floor_factor := clampf(look.auto_floor / base, 0.1, 1.0)
+	var next := WaterLook.auto_scale
+	if _adapt_gpu_ms > target:
+		next = maxf(next - 0.05, floor_factor)
+	elif _adapt_gpu_ms < target * 0.6:
+		next = minf(next + 0.05, 1.0)
+	if not is_equal_approx(next, WaterLook.auto_scale):
+		WaterLook.auto_scale = next
+		look.apply_scale_all(get_tree())

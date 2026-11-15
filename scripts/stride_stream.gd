@@ -12,7 +12,7 @@ const MOST := 400
 const POOR := Color(0.78, 0.86, 0.94)
 const GOOD := Color(0.35, 0.82, 1.0)
 const PERFECT := Color(1.0, 0.82, 0.35)
-const SHADER := preload("res://shaders/stride_bubbles.gdshader")
+const SHADER := preload("res://shaders/water_bubble.gdshader")
 
 var _positions := PackedVector3Array()
 var _velocities := PackedVector3Array()
@@ -48,6 +48,7 @@ func _ready() -> void:
 	sphere.rings = 4
 	var material := ShaderMaterial.new()
 	material.shader = SHADER
+	material.set_shader_parameter("tone_from_color", 1.0)  # the stride's timing colour and fade come per bubble from the MultiMesh
 	sphere.material = material
 	multimesh = MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D

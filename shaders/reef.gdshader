@@ -8,6 +8,8 @@ render_mode cull_disabled;
 // A little self-light keeps its colours from drowning in the red murk.
 
 #include "res://shaders/scenery.gdshaderinc"
+#include "res://shaders/water_caustics.gdshaderinc"
+#include "res://shaders/water_materials.gdshaderinc"
 
 uniform int pattern = 0;
 uniform vec3 color_0 : source_color = vec3(0.62, 0.22, 0.75);
@@ -87,10 +89,13 @@ void fragment() {
 		color = mix(color, color * 0.4 + 0.5, speck * 0.5);
 		n = sc_bump(p, n, 20.0, 0.3);
 	}
+	// Ocean modes (phase 7): fluorescence (the blue-green light that reaches it, re-emitted) and a tip highlight.
+	vec3 flu_add = wm_fluor(color, world_pos, wm_flu_of(custom.r + custom.g));
+	flu_add += color * water_mat_coral.w * smoothstep(0.7, 1.0, up) * dot(wm_light(world_pos), vec3(0.2, 0.5, 0.3)) * (pattern == 0 || pattern == 3 ? 1.0 : 0.0);
 	ALBEDO = color;
 	ROUGHNESS = rough;
 	SPECULAR = 0.4;
-	EMISSION = color * lit + sc_bounce(color, n, 0.3);
+	EMISSION = flu_add + color * lit + sc_bounce(color, n, 0.3) + color * wc_caustics(world_pos, n, length(VERTEX));
 	BACKLIGHT = color * 0.25;
 	NORMAL = normalize((VIEW_MATRIX * vec4(n, 0.0)).xyz);
 }

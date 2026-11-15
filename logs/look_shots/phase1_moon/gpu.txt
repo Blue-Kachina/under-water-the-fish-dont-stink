@@ -1,0 +1,3 @@
+look_shots phase1_moon  window (1920, 1080)  90 frames per reading  preset OURS
+view 2 ruin_shafts  gpu 1.45 ms  cpu 0.23 ms  (1 viewport)  draw calls 137
+view 4 open_blue    gpu 1.49 ms  cpu 0.40 ms  (1 viewport)  draw calls 455

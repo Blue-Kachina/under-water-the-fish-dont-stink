@@ -6,6 +6,8 @@ shader_type spatial;
 // the piece.
 
 #include "res://shaders/scenery.gdshaderinc"
+#include "res://shaders/water_caustics.gdshaderinc"
+#include "res://shaders/water_materials.gdshaderinc"
 
 uniform vec3 base_color : source_color = vec3(0.86, 0.84, 0.79);
 uniform vec3 base_color_b : source_color = vec3(0.74, 0.72, 0.68);
@@ -18,6 +20,8 @@ uniform float coralline : hint_range(0.0, 1.0) = 0.22;
 uniform float bump_strength = 0.3;
 uniform float bounce = 0.35;
 uniform float bump_scale = 2.4;
+// How much of the Ocean modes' strata and encrustation this stone takes: 1 reef rock, less for polished marble.
+uniform float strata_weight : hint_range(0.0, 1.0) = 0.5;
 
 varying vec3 world_pos;
 varying vec3 world_normal;
@@ -48,11 +52,26 @@ void fragment() {
 	// Growth.
 	vec4 growth = sc_growth(p, n, COLOR.a, algae * (1.0 - wear * 0.8), coralline * (1.0 - wear * 0.8));
 	color = mix(color, growth.rgb, growth.a);
+	// Ocean modes (phase 7): strata, the baked detail map, algae on up faces, the biome tint, a rim light.
+	float ocean = step(0.0001, water_mat_rock.x + water_mat_rock.y + water_mat_rock.w);
+	vec3 rim_add = vec3(0.0);
+	if (ocean > 0.5) {
+		vec4 det = wm_detail(world_pos * 1.0, n);
+		color = mix(color, wm_strata(color, world_pos, n, det, variant), strata_weight);
+		color *= mix(1.0, 0.7 + 0.6 * det.x, water_mat_rock.y);
+		float alg = wm_algae(n, det) * (1.0 - wear * 0.7);
+		color = mix(color, mix(vec3(0.12, 0.2, 0.08), vec3(0.28, 0.34, 0.1), det.z), alg);
+		color = wm_biome(color, 0.6);
+		vec3 tang = normalize(cross(n, vec3(0.0, 1.0, 0.01)));
+		n = normalize(n + tang * (det.y - 0.5) * water_mat_rock.y * 0.8);
+		vec3 vw = normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xyz);
+		rim_add = color * pow(1.0 - clamp(dot(n, vw), 0.0, 1.0), 2.5) * water_mat_rock.w * wm_light(world_pos);
+	}
 	ALBEDO = color;
 	ROUGHNESS = clamp(roughness_base + pits * 0.3 + growth.a * 0.3 + wear * 0.15, 0.0, 1.0);
 	SPECULAR = 0.4;
 	NORMAL = normalize((VIEW_MATRIX * vec4(n, 0.0)).xyz);
-	EMISSION = sc_bounce(color, n, bounce);
+	EMISSION = rim_add + sc_bounce(color, n, bounce) + color * wc_caustics(world_pos, n, length(VERTEX));
 	AO = 1.0 - cavity * 0.6;
 	AO_LIGHT_AFFECT = 0.3;
 }

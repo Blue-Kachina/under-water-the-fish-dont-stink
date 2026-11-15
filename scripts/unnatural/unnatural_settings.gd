@@ -1423,14 +1423,16 @@ static func shared() -> UnnaturalSettings:
 
 ## The fog's amount `distance` m out at `density` (Godot's exponential fog).
 static func fog_at(distance: float, density: float) -> float:
-	return 1.0 - exp(-maxf(distance, 0.0) * maxf(density, 0.0))
+	return 1.0 - exp(-maxf(distance, 0.0) * maxf(WaterLook.fog_sigma(density), 0.0))
 
 
-## How far out the fog reaches `amount` at `density` (INF: never).
+## How far out the fog reaches `amount` at `density` (INF: never). With the water model on it is where green
+## light has died by `amount`: exp(-SIG.g * d) < 1 - amount, SIG scaled by density / density_ref.
 static func fog_reach(amount: float, density: float) -> float:
-	if density <= 0.0 or amount >= 1.0:
+	var sigma := WaterLook.fog_sigma(density)
+	if sigma <= 0.0 or amount >= 1.0:
 		return INF
-	return -log(1.0 - clampf(amount, 0.0, 0.999999)) / density
+	return -log(1.0 - clampf(amount, 0.0, 0.999999)) / sigma
 
 
 ## Murk is on (a density set).

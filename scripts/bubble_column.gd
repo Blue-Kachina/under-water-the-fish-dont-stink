@@ -18,6 +18,7 @@ const DRAW := 5.0
 ## The lift eases off over this far (m) below the top, so fish bob there.
 const EASE := 4.0
 const GROW_TIME := 0.8
+const WATER_BUBBLE_SHADER := preload("res://shaders/water_bubble.gdshader")
 
 ## Across (m), and from the floor up to where the lift gives out (m).
 var radius := 6.0
@@ -113,9 +114,15 @@ func _bubble_mesh(size: float) -> Mesh:
 	bubble.height = size * 2.0
 	bubble.radial_segments = 12
 	bubble.rings = 6
-	var material := ShaderMaterial.new()  # the ball's look: a clear rim and a little refraction
-	material.shader = Ball.BUBBLE_SHADER
-	material.set_shader_parameter("tint", Color(0.85, 0.97, 1.0).lerp(color, 0.3))
-	material.set_shader_parameter("wobble", 0.0)
+	var material := ShaderMaterial.new()
+	if WaterLook.fog_active:  # an Ocean mode: the water look's bubble (wobbly rim, highlights, the water reflected)
+		material.shader = WATER_BUBBLE_SHADER
+		material.set_shader_parameter("tint", Color(0.85, 0.97, 1.0).lerp(color, 0.3))
+		material.set_shader_parameter("base_alpha", 0.4)
+		material.set_shader_parameter("rim_alpha", 0.6)
+	else:  # the ball's look: a clear rim and a little refraction
+		material.shader = Ball.BUBBLE_SHADER
+		material.set_shader_parameter("tint", Color(0.85, 0.97, 1.0).lerp(color, 0.3))
+		material.set_shader_parameter("wobble", 0.0)
 	bubble.material = material
 	return bubble

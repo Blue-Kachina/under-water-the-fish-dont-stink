@@ -42,3 +42,82 @@ common/physics_interpolation=true
 [rendering]
 
 anti_aliasing/quality/msaa_3d=2
+
+[shader_globals]
+
+water_time={
+"type": "float",
+"value": 0.0
+}
+water_caustic_strength={
+"type": "float",
+"value": 0.0
+}
+water_caustic_scale={
+"type": "float",
+"value": 0.2
+}
+water_caustic_speed={
+"type": "float",
+"value": 1.0
+}
+water_caustic_fade_start={
+"type": "float",
+"value": 35.0
+}
+water_caustic_fade_end={
+"type": "float",
+"value": 100.0
+}
+water_caustic_split={
+"type": "float",
+"value": 1.0
+}
+water_surface_y={
+"type": "float",
+"value": 30.0
+}
+water_sun_dir={
+"type": "vec3",
+"value": Vector3(0.4, 0.84, 0.4)
+}
+water_kd={
+"type": "vec3",
+"value": Vector3(0.0, 0.0, 0.0)
+}
+water_bubble_color={
+"type": "vec3",
+"value": Vector3(0.1, 0.4, 0.6)
+}
+water_bubble_look={
+"type": "vec3",
+"value": Vector3(1.0, 0.35, 2.0)
+}
+water_mat_kelp={
+"type": "vec4",
+"value": Color(0, 0, 0, 0)
+}
+water_mat_kelp2={
+"type": "vec4",
+"value": Color(0, 0, 0, 0)
+}
+water_mat_coral={
+"type": "vec4",
+"value": Color(0, 0, 0, 0)
+}
+water_mat_rock={
+"type": "vec4",
+"value": Color(0, 0, 0, 0)
+}
+water_mat_sand={
+"type": "vec4",
+"value": Color(0, 0, 0, 0)
+}
+water_biome={
+"type": "vec4",
+"value": Color(0, 0, 0, 0)
+}
+water_rock_detail={
+"type": "sampler2D",
+"value": "res://textures/rock_detail.png"
+}

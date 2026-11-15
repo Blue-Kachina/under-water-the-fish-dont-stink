@@ -3,7 +3,7 @@ render_mode blend_mix, depth_draw_opaque, cull_back;
 // The Fallen Angel (FallenAngelBoss): a giant zombie sea angel. Its body is
 // glass-clear (the orange organs show through: boss_angel_organ), built head up
 // at z 0 and bent along its upright spine (spine_bend.gdshaderinc); its wings
-// (is_wing) are plain nodes beating at its shoulders, not bent.
+// (is_wing) are plain nodes beating at its shoulders; a Hunter's flex (wing_flex) so they bend in the stroke.
 // - The glass: milky blue-white, clearer face on and bright at the edges (a
 //   Fresnel rim that also glows faintly, so the shape reads in the dark), with
 //   fine muscle bands running down the body and a wet sheen.
@@ -19,6 +19,9 @@ render_mode blend_mix, depth_draw_opaque, cull_back;
 
 uniform float height = 40.0;
 uniform bool is_wing = false;
+uniform float wing_flex = 0.0;  // how soft a wing is (0 rigid, the boss's own; 1 a hunter's flapping membrane)
+uniform float wing_beat = 0.0;  // the stroke's phase (rad)
+uniform float wing_lag = 1.4;  // rad the tip trails the root
 uniform vec4 glass : source_color = vec4(0.8, 0.88, 0.95, 1.0);
 uniform vec4 rim_glow : source_color = vec4(0.62, 0.8, 1.0, 1.0);
 uniform vec4 inner_glow : source_color = vec4(1.0, 0.5, 0.18, 1.0);
@@ -42,6 +45,15 @@ void vertex() {
 	along = COLOR.b;
 	if (!is_wing) {
 		spine_bend(VERTEX, NORMAL, UV2.y);
+	} else if (wing_flex > 0.0) {
+		// A soft paddle, not a rigid one: the tip trails the stroke (a wave running out along the span, lagging the
+		// root by `wing_lag`) and the trailing edge ripples after it. The rig's beat is `wing_beat` (rad), so the
+		// flutter keeps to the wingbeat's cadence however fast it swims.
+		float s = clamp(VERTEX.x / (height * 0.2), 0.0, 1.0);
+		float lagged = sin(wing_beat - s * wing_lag);
+		float ripple = sin(wing_beat * 2.0 - s * 5.0 + VERTEX.z * 0.5) * s * 0.35;
+		VERTEX.y += wing_flex * height * s * s * (lagged * 0.07 + ripple * 0.03);
+		VERTEX.z -= wing_flex * height * s * s * 0.02 * (0.5 + 0.5 * lagged);  // swept back as the tip trails
 	}
 }
 

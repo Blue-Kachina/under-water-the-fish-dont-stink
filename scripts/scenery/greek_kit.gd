@@ -40,6 +40,7 @@ static func rock() -> ShaderMaterial:
 		_rock.set_shader_parameter("coralline", 0.35)
 		_rock.set_shader_parameter("bump_strength", 0.45)
 		_rock.set_shader_parameter("bump_scale", 1.6)
+		_rock.set_shader_parameter("strata_weight", 1.0)
 	return _rock
 
 

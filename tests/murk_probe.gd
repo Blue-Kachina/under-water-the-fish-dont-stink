@@ -41,9 +41,10 @@ func _run() -> void:
 
 	main.set_mode(main.FREE_SWIM)
 	await _ticks(3)
-	var ocean_env: Environment = main.get_node("Ocean").environment()
-	var clear_density := ocean_env.fog_density
-	var clear_sky := ocean_env.fog_sky_affect
+	var ocean_node: Ocean = main.get_node("Ocean")
+	var ocean_env: Environment = ocean_node.environment()
+	var clear_density := ocean_node.fog_density()  # the water model keeps the Environment's own fog thinner, so the arena's density is the Ocean's
+	var clear_sky := WaterLook.sky_murk  # and the sky is a shader that takes the murk as sky_murk (the Environment's sky fog is off)
 	settings.spawning = false
 	settings.stage_events = false
 	settings.chest_count = 0
@@ -80,8 +81,8 @@ func _run() -> void:
 
 	print("the murk:")
 	var env := ocean_env
-	check(absf(env.fog_density - 0.035) < 0.0005, "Unnatural's water is murky (%.4f)" % env.fog_density)
-	check(is_equal_approx(env.fog_sky_affect, 1.0), "and the sky's fogged with it")
+	check(absf(ocean_node.fog_density() - 0.035) < 0.0005, "Unnatural's water is murky (%.4f)" % ocean_node.fog_density())
+	check(is_equal_approx(WaterLook.sky_murk, 1.0), "and the sky's fogged with it")
 	check(absf(horde.cull_distance - (reach + 5.0)) < 0.5, "the Horde's cull distance is the 98%% line plus the margin (%.1f m)" % horde.cull_distance)
 	check(absf(horde.far_reach - UnnaturalSettings.fog_reach(0.85, 0.035)) < 0.5, "and steering slows past the 85%% line (%.1f m)" % horde.far_reach)
 	var surface := run.blood_moon.find_child("Surface", false, false) as MeshInstance3D
@@ -93,7 +94,7 @@ func _run() -> void:
 	settings.murk_density = 0.0
 	await _frames(3)
 	await _ticks(2)
-	check(absf(env.fog_density - clear_density * 1.25) < 0.0005 and is_equal_approx(env.fog_sky_affect, clear_sky),
+	check(absf(ocean_node.fog_density() - clear_density * 1.25) < 0.0005 and is_equal_approx(WaterLook.sky_murk, clear_sky),
 			"murk_density 0: the ocean's own fog (with the blood moon's), and its sky")
 	check(horde.cull_distance == INF and horde.glint_far == 0.0, "and nothing's culled for distance, no eyes")
 	settings.murk_density = 0.035
@@ -265,8 +266,8 @@ func _run() -> void:
 	School.view_cameras = [] as Array[Camera3D]
 	main.set_mode(main.FREE_SWIM)
 	await _ticks(5)
-	check(absf(env.fog_density - clear_density) < 0.0005 and is_equal_approx(env.fog_sky_affect, clear_sky),
-			"the ocean's fog and sky are back (%.4f, %.2f)" % [env.fog_density, env.fog_sky_affect])
+	check(absf(ocean_node.fog_density() - clear_density) < 0.0005 and is_equal_approx(WaterLook.sky_murk, clear_sky),
+			"the ocean's fog and sky are back (%.4f, %.2f)" % [ocean_node.fog_density(), env.fog_sky_affect])
 	print("FAILURES: %d" % failures if failures else "ALL PASS")
 	get_tree().quit(1 if failures else 0)
 

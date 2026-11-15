@@ -153,6 +153,8 @@ var _nature_tuning := {}
 ## The Obstacle Course's survivor cam is on, and its traversal (null: not on the course).
 var _course_cam := false
 var _course_skill: CourseSkill
+## The Look Tank (WaterLook, planning_abyssal_look.md) while one is on.
+var look_tank: LookTank
 ## Shown in a match mode until Play starts the match.
 var _match_card: MatchCard
 var _environment: Node3D
@@ -194,6 +196,7 @@ func _ready() -> void:
 	_panel.set_species(_fish.species)
 	_panel.character_selected.connect(set_character)
 	_panel.species_selected.connect(set_species)
+	WaterGradeEffect.attach(_camera as Camera3D)  # the water look's per-camera grade pass (only does anything in Ocean modes)
 	var arcade := ArcadeFx.new()
 	arcade.name = "ArcadeFx"
 	arcade.fish = _fish
@@ -243,6 +246,7 @@ func _ready() -> void:
 	_home.species_changed.connect(set_species)
 	add_child(_home)
 	NetSession.coop.attach_main(self)
+	Console.register_command("look_tank", "look_tank: the Look Tank, the water look's test scene (keys 1-6 or look_view n; 0 leaves)", _cmd_look_tank)
 	get_window().files_dropped.connect(func(files: PackedStringArray) -> void:
 		if files.is_empty():
 			return
@@ -711,6 +715,19 @@ func _come_back() -> void:
 		aquarium.reset_kickoff()
 	_camera.ball = aquarium.ball if aquarium else null
 	_fish.set_spawn(_environment.spawn_transform())
+
+
+## The console's look_tank: the Test Tank with a free camera on six fixed viewpoints (LookTank).
+func _cmd_look_tank(_args: PackedStringArray) -> String:
+	if is_instance_valid(look_tank):
+		return "the Look Tank is on already (look_view 0-6)"
+	if _home.is_open():
+		_home.close()
+	set_mode(TEST_TANK)
+	if _match_card:
+		play_match()
+	look_tank = LookTank.attach(self)
+	return "Look Tank: keys 1-6 or look_view n pick a viewpoint, 0 gives the camera back"
 
 
 ## Starts the match mode's match, from its card.

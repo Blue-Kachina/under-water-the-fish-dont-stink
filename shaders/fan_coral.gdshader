@@ -5,12 +5,15 @@ render_mode cull_disabled;
 // the water shows through; it sways a little at its edge.
 
 #include "res://shaders/scenery.gdshaderinc"
+#include "res://shaders/water_caustics.gdshaderinc"
+#include "res://shaders/water_materials.gdshaderinc"
 
 uniform vec3 color_a : source_color = vec3(0.85, 0.2, 0.35);
 uniform vec3 color_b : source_color = vec3(0.95, 0.55, 0.15);
 uniform vec3 color_c : source_color = vec3(0.6, 0.25, 0.8);
 
 varying vec3 local;
+varying vec3 world_pos;
 varying float up;
 varying vec4 custom;
 
@@ -21,6 +24,7 @@ void vertex() {
 	vec3 root = MODEL_MATRIX[3].xyz;
 	float bend = up * up * 0.08;
 	VERTEX.z += sin(TIME * 0.9 + root.x * 0.3 + root.z * 0.2) * bend;
+	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
 void fragment() {
@@ -44,6 +48,8 @@ void fragment() {
 	ALPHA = max(twig, 1.0 - edge);
 	ALPHA_SCISSOR_THRESHOLD = 0.5;
 	ROUGHNESS = 0.75;
-	EMISSION = color * 0.12;
+	vec3 flu_add = wm_fluor(color, world_pos, wm_flu_of(custom.r + custom.g));
+	flu_add += color * water_mat_coral.w * smoothstep(0.75, 1.0, up) * dot(wm_light(world_pos), vec3(0.2, 0.5, 0.3));
+	EMISSION = flu_add + color * 0.12 + color * wc_caustics(world_pos, normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz), length(VERTEX));
 	BACKLIGHT = color * 0.4;
 }

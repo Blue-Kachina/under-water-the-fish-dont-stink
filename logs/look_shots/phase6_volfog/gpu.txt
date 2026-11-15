@@ -1,0 +1,7 @@
+look_shots phase6_volfog  window (1920, 1080)  90 frames per reading  preset OURS
+view 1 kelp_up      gpu 0.67 ms  cpu 0.23 ms  (1 viewport)  draw calls 78
+view 2 ruin_shafts  gpu 1.65 ms  cpu 0.26 ms  (1 viewport)  draw calls 152
+view 3 reef_close   gpu 1.55 ms  cpu 0.28 ms  (1 viewport)  draw calls 200
+view 4 open_blue    gpu 1.62 ms  cpu 0.45 ms  (1 viewport)  draw calls 481
+view 5 floor_murk   gpu 1.26 ms  cpu 0.43 ms  (1 viewport)  draw calls 513
+view 6 split        gpu 1.68 ms  cpu 0.68 ms  (2 viewports)  draw calls 706

@@ -65,6 +65,15 @@ const LASH_EXAGGERATE := {
 }
 ## Most the wings flare out over their rest angle at full exaggeration (rad per unit of scale above 1).
 const WING_FLARE := 0.5
+## How soft the wings are (boss_angel.gdshader's wing_flex): the tip trails each stroke and the edge ripples.
+const WING_FLEX := 1.0
+## The body's swim wave at full swim, as a fraction of its height (the boss's own 0.01 reads as a stiff plank on a hunter),
+## and its stroke rate (rad/s) at rest and at full speed: the cadence follows how fast it swims.
+const WAVE_AMP := 0.04
+@export_range(0.1, 20.0, 0.1, "or_greater") var stroke_idle := 1.0
+@export_range(0.1, 20.0, 0.1, "or_greater") var stroke_full := 6.0
+var _wing_skin: ShaderMaterial
+var _wave_clock := 0.0
 ## Longest the lash throws a tentacle (x its rest length).
 const LASH_REACH_MAX := 2.4
 var ex: AttackExaggerate
@@ -126,6 +135,8 @@ func setup(for_fish: FishController) -> void:
 		wing.name = "Wing"
 		wing.mesh = look.wing
 		wing.material_override = look.wing_skin
+		_wing_skin = look.wing_skin
+		_wing_skin.set_shader_parameter("wing_flex", WING_FLEX)
 		wing.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		wing.extra_cull_margin = h * 0.3
 		add_child(wing)
@@ -413,7 +424,10 @@ func _dress(delta: float) -> void:
 		crown_open = 1.0  # snap chomp: the crown and lock-on ring flash shut on the strike (no wind-up opened them)
 	lash = maxf(lash - delta / maxf(lash_time, 0.01), 0.0)
 	var swim := lerpf(wave_idle, wave_swim, speed_frac)
-	skin.set_shader_parameter("spine_wave", Vector4(MODEL.H * 0.01 * swim, 0.4, 2.2, 0.55))
+	_wave_clock = fposmod(_wave_clock + delta * lerpf(stroke_idle, stroke_full, speed_frac), TAU)
+	skin.set_shader_parameter("wave_clock", _wave_clock)
+	skin.set_shader_parameter("spine_wave", Vector4(MODEL.H * WAVE_AMP * swim, 0.4, 1.0, 0.45))
+	_wing_skin.set_shader_parameter("wing_beat", beat_clock * TAU)
 	var warn := (0.5 + 0.5 * sin(_age * 26.0)) * 0.6 * crown_open if open > 0.05 else 0.0
 	skin.set_shader_parameter("warn", warn)
 	var pulse := ex.scale_of(&"throat") - 1.0  # the ring and the glow swell with the charge, burst on the release

@@ -1,0 +1,7 @@
+look_shots phase8_medium  window (1920, 1080)  90 frames per reading  preset OURS
+view 1 kelp_up      gpu 0.74 ms  cpu 0.23 ms  (1 viewport)  draw calls 66
+view 2 ruin_shafts  gpu 1.66 ms  cpu 0.27 ms  (1 viewport)  draw calls 152
+view 3 reef_close   gpu 1.57 ms  cpu 0.29 ms  (1 viewport)  draw calls 200
+view 4 open_blue    gpu 1.64 ms  cpu 0.42 ms  (1 viewport)  draw calls 481
+view 5 floor_murk   gpu 1.26 ms  cpu 0.44 ms  (1 viewport)  draw calls 513
+view 6 split        gpu 1.63 ms  cpu 0.68 ms  (2 viewports)  draw calls 707

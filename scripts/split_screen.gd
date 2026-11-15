@@ -65,6 +65,8 @@ func _add_view() -> void:
 	view.audio_listener_enable_3d = _views.is_empty()  # one set of ears: the first player's
 	view.size_2d_override_stretch = true
 	container.add_child(view)
+	view.add_to_group(WaterLook.SCALED_GROUP)  # the graphics quality scales every view
+	WaterLook.shared().apply_scale(view)
 	_root.add_child(container)
 	container.resized.connect(_fit_hud_canvases)
 	_containers.append(container)

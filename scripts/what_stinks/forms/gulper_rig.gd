@@ -34,6 +34,11 @@ const GAPE_PINCH := -0.22
 @export_range(0.0, 3.0, 0.05, "or_greater") var wave_swim := 1.0
 ## The speed the wave is full at (x the fish's top boost speed).
 @export_range(0.1, 2.0, 0.05, "or_greater") var wave_full_speed := 0.6
+## The wave's reach at full swim in girth units (the boss's own 0.9 reads as a stiff plank on a hunter).
+const WAVE_AMP := 2.6
+## The stroke rate (rad/s) at rest and at full speed: the cadence follows how fast it swims.
+@export_range(0.1, 20.0, 0.1, "or_greater") var stroke_idle := 1.2
+@export_range(0.1, 20.0, 0.1, "or_greater") var stroke_full := 7.0
 ## How wide the mouth rests (0 shut to 1.25 gaping).
 @export_range(0.0, 1.25, 0.05) var gape_idle := 0.15
 
@@ -55,6 +60,7 @@ var _turn := Vector2.ZERO
 var _last_basis := Basis.IDENTITY
 var _last_at := Vector3.ZERO
 var _speed := 0.0
+var _wave_clock := 0.0
 var _riders: Array = []
 var _light: OmniLight3D
 var _suction: CPUParticles3D
@@ -273,7 +279,12 @@ func _on_bite_landed() -> void:
 func _dress(delta: float) -> void:
 	var open := jaw.opened
 	var swim := lerpf(wave_idle, wave_swim, speed_frac)
-	skin.set_shader_parameter("spine_wave", Vector4(0.9 * k * swim, 0.2 / k, 3.0, 0.3))
+	# The stroke's rate follows the speed (rad/s: a slow eel ripples, a fast one thrashes); the clock is advanced here so
+	# a change of rate never jumps the phase.
+	_wave_clock = fposmod(_wave_clock + delta * lerpf(stroke_idle, stroke_full, speed_frac), TAU)
+	skin.set_shader_parameter("wave_clock", _wave_clock)
+	skin.set_shader_parameter("spine_wave", Vector4(WAVE_AMP * k * swim, 0.2 / k, 1.0, 0.3))
+	skin.set_shader_parameter("pouch_ripple", lerpf(0.05, 0.16, speed_frac) + gape * 0.04)
 	_gape_hold = maxf(_gape_hold - delta, 0.0)
 	if _gape_hold <= 0.0:
 		var want := gape_idle + open * (1.25 - gape_idle)

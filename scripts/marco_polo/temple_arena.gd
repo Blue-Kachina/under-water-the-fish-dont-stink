@@ -245,14 +245,24 @@ func _shaft_material() -> ShaderMaterial:
 	var shader := Shader.new()
 	shader.code = """shader_type spatial;
 render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled;
+// Phase 6 (planning_abyssal_look.md): softer where it meets stone, brighter looking toward the light (phase .2 + 2 mu^3), a slow dapple.
+uniform sampler2D depth_tex : hint_depth_texture, repeat_disable, filter_nearest;
 uniform vec3 tint : source_color = vec3(0.55, 0.8, 0.7);
 uniform float strength = 0.09;
+uniform vec3 light_dir = vec3(0.18, 0.95, 0.08);
 varying float height;
-void vertex() { height = VERTEX.y + 0.5; }
+varying vec3 wpos;
+void vertex() { height = VERTEX.y + 0.5; wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 void fragment() {
 	float edge = pow(abs(dot(NORMAL, VIEW)), 1.5);
+	float sd = textureLod(depth_tex, SCREEN_UV, 0.0).r;
+	vec4 vv = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, sd, 1.0);
+	float soft = clamp((-vv.z / vv.w + VERTEX.z) / 2.0, 0.0, 1.0);
+	vec3 rd = normalize(wpos - CAMERA_POSITION_WORLD);
+	float mu = max(dot(rd, normalize(light_dir)), 0.0);
+	float dapple = 0.75 + 0.25 * sin(wpos.x * 0.9 + wpos.z * 0.7 + TIME * 0.6 + wpos.y * 0.15);
 	ALBEDO = tint;
-	ALPHA = strength * edge * smoothstep(0.0, 0.9, height);
+	ALPHA = strength * edge * soft * dapple * (0.7 + 2.0 * mu * mu * mu) * smoothstep(0.0, 0.9, height);
 }
 """
 	var material := ShaderMaterial.new()

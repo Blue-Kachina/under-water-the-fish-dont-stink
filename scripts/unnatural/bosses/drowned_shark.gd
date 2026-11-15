@@ -74,16 +74,7 @@ func _ready() -> void:
 	_length = hitbox.z * settings.shark_size
 	var half_width := hitbox.x * 0.5 * settings.shark_size
 	var half_height := hitbox.y * 0.5 * settings.shark_size
-	# Its own eyes gone red: a red iris round a thin dark slit, glowing like an ember.
-	for node in _model.find_children("Eye*", "MeshInstance3D", true, false):
-		var material := (node as MeshInstance3D).material_override as ShaderMaterial
-		if material and material.shader == FishModel.FISH_EYE:
-			material.set_shader_parameter("iris", EYE_RED)
-			material.set_shader_parameter("iris_inner", EYE_RED.darkened(0.6))
-			material.set_shader_parameter("sheen", 0.1)
-			material.set_shader_parameter("pupil", 0.5)
-			material.set_shader_parameter("pupil_stretch", 0.3)
-			_eyes.append(material)
+	# Its eyes are the shark model's own (regular coloured; the red slit eyes were dropped), so `_eyes` stays empty.
 	_glow.light_color = Color(1.0, 0.1, 0.05)
 	_glow.omni_range = _length * 1.5
 	_glow.light_energy = 0.0

@@ -1,0 +1,50 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok    rest directions reproduce the rest pose (worst joint error 0.0000 of length)
+ok    arbitrary direction fields come out as the bones' directions (worst error 0.0002 rad)
+ok    idle: everything finite
+ok    idle: the arms are alive (mean tip step 0.00007 of length per frame)
+ok    idle: lazy (biggest tip step 0.0002 of length per frame)
+ok    idle: no jets fire
+ok    idle: no thrust
+ok    jet: everything finite
+ok    jet: a pulse about every period, quickening with the speed (8 jets in 5 s)
+ok    jet: the mantle squeezes (peak 0.95)
+ok    jet: and refills past rest (low -0.31)
+ok    jet: the delta narrows a little on the power stroke, not into a spear (spread low -0.41)
+ok    jet: and re-spreads on recovery (spread high 0.28)
+ok    jet: the arms trail behind the head, never a crown ahead (nearest tip 0.55 of length behind)
+ok    jet: thrust drives it forward along the siphon (dv along travel 14.2 m/s over 5 s)
+ok    jet: and level (rest siphon points back and a little down: dv up 0.24, forward -14.20)
+ok    jet: smooth (biggest tip step 0.0145 of length per frame)
+ok    jet: no jerks (biggest second difference 0.0019)
+ok    jet: thrust lives in the power stroke only (power 2.392, recovery 0.0000)
+ok    vector: stick right aims the exhaust left (x -0.55)
+ok    vector: so the thrust has a rightward part (0.115)
+ok    dash: much more thrust than a normal pulse (15.5 vs 8.1 m/s)
+ok    dash: the arms stay bundled (highest spread -0.05)
+ok    cruise: a light throttle does not jet
+ok    cruise: the scull is in (0.53)
+ok    cruise: the arms undulate more than at idle (0.00110 vs 0.00007)
+ok    cruise: smooth (biggest tip step 0.0095)
+ok    transitions: finite through idle, cruise, jet, dash, reverse, idle
+ok    transitions: no pops (biggest tip step 0.0122 of length per frame)
+ok    transitions: no jerks (biggest second difference 0.0032)
+ok    transitions: arm segments keep their length (worst ratio 1.000)
+ok    crawl: blends in near the floor (weight 1.00)
+ok    crawl: the arms take steps as the body glides (32)
+ok    crawl: feet stand on the floor (worst height error 0.000 m)
+ok    crawl: the arm tips reach their feet (mean error 0.050 of length, 1308 samples)
+ok    crawl: a planted foot does not slip (moved 0.00000 m)
+ok    crawl: at most 3 arms swing at once (3)
+ok    crawl: neighbouring arms never swing together
+ok    crawl to swim: no pop (biggest tip step 0.0313)
+ok    crawl to swim: the crawl fades out (0.00)
+ok    spin: finite through two and a half turns of roll
+ok    spin: smooth (biggest tip step 0.0112 of length per frame)
+ok    spin: the arm tips swing out against the roll (0.51 rad from rest)
+ok    turn: turning left (yaw +) the leading mantle bends into the turn (tip x -0.71)
+ok    turn: and the trailing arms lag, following the path round the inside like a tail (mean tip x -0.63 from 0.06)
+  step cost: 0.303 ms per frame (8 arms x 14 segments, jet + scull)
+ok    perf: step under 1.5 ms (0.303 ms)
+octopus_gait_probe: 46 checks, 0 failed

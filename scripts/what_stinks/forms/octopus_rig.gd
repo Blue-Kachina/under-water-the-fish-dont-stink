@@ -50,7 +50,8 @@ const DEFAULTS := {
 	"octopus_tip_curl": 0.3,
 	"octopus_jet_narrow": 0.45,
 	"octopus_jet_respread": 0.35,
-	"octopus_jet_wave": 0.22,
+	"octopus_jet_wave": 0.4,
+	"octopus_accel_lag": 1.0,
 	"octopus_bank": 0.45,
 	"octopus_stride_sync": 1.0,
 	"octopus_stride_pop": 1.0,
@@ -180,6 +181,10 @@ var _tips_model: Array[Vector3] = []
 var _front_z := 0.0
 var _crown_local := Vector3.ZERO  # the arm bases' centre, model space (the crawl stands round it)
 var _wave_age := 99.0  # seconds since the last jet started its wave down the arms
+var _prev_vel := Vector3.ZERO
+var _have_accel := false
+var _accel_local := Vector3.ZERO  # the body's smoothed acceleration, model frame (m/s^2)
+var _accel_ref := 12.0  # the acceleration (m/s^2) that bends the tips fully; set from the fish's speed each frame
 
 
 ## A setting's value, or its default here while it is not registered.
@@ -391,7 +396,7 @@ func _tick_jet(dt: float, vel: Vector3, gb: Basis) -> void:
 	var want := absf(_throttle) > 0.15 or _boost
 	var period := opt("octopus_jet_period")
 	var speed_t := clampf(vel.length() / maxf(length * 1.6, 3.0), 0.0, 1.0)
-	period *= lerpf(1.0, 0.8, speed_t) * (0.62 if _boost else 1.0)
+	period *= lerpf(1.0, 0.55, speed_t) * (0.62 if _boost else 1.0)  # the pulse quickens with the speed
 	# Extra Swishy: once the player strides, each stride is a jet on its own clock, so the mantle swells on the input instead of on the
 	# free-running beat (which only runs between strides and when the setting is off)
 	var st: Dictionary = _stride_info() if opt("octopus_stride_sync") > 0.5 else {}
@@ -741,6 +746,13 @@ func step(delta: float, ctx: Dictionary) -> void:
 	var speed_t := clampf(speed / speed_ref, 0.0, 1.0)
 	_speed_t = lerpf(_speed_t, speed_t, 1.0 - exp(-6.0 * delta))
 	_flow_dir = (-vel_local / speed) if speed > 0.05 else _flow_dir
+	# The body's acceleration in its own frame (smoothed): the arms are masses in the water, so the tips lag a push (trail
+	# opposite it) and swing on past a stop (a jet's kick throws them back, the coast after it swings them forward again).
+	if _have_accel:
+		var accel_w := (_vel - _prev_vel) / delta
+		_accel_local = _accel_local.lerp((gb.inverse() * accel_w).limit_length(speed_ref * 6.0), 1.0 - exp(-6.0 * delta))
+	_prev_vel = _vel
+	_have_accel = true
 	_up_local = (gb.inverse() * Vector3.UP).normalized()
 	# jet shape: critically damped chase of the physics side's raw values (no step edges)
 	var w := 38.0
@@ -855,6 +867,8 @@ func _solve_arms(delta: float, counter: Basis, vel_local: Vector3, gb: Basis) ->
 	var lag := opt("octopus_arm_lag")
 	var inertia := opt("octopus_inertia")
 	var drag_bend := opt("octopus_drag_bend")
+	var accel_lag := opt("octopus_accel_lag")
+	_accel_ref = maxf(opt("octopus_jet_accel") * 0.8, 1.0)  # a jet's own push reads as a strong kick
 	var droop := opt("octopus_droop") * (1.0 - clampf(_speed_t * 3.5, 0.0, 1.0)) * (1.0 - _crawl_w)  # the swimming arms stream straight
 	# speed pulls the arms into a tighter, streamlined bundle (and calms their undulation); a crawl is not a swim, so it lets go
 	var tuck := opt("octopus_speed_tuck") * _speed_t * (1.0 - _crawl_w)
@@ -902,7 +916,10 @@ func _solve_arms(delta: float, counter: Basis, vel_local: Vector3, gb: Basis) ->
 			t = bank * t
 			var tip_w := pow(s, 1.2) * 0.9 + 0.1
 			# the water bends the tips back along the flow, and a slack arm drapes
-			t += _flow_dir * (drag_bend * _speed_t * tip_w * 0.9)
+			t += _flow_dir * (drag_bend * pow(_speed_t, 0.7) * tip_w * 0.9)
+			# physics: the tips trail the acceleration (heavier at the tips, quadratically), so a jet's kick whips them back and the
+			# coast swings them on; a hard turn's sideways accel throws them out the other way
+			t += -(_accel_local / _accel_ref).limit_length(1.0) * (accel_lag * tip_w * tip_w)
 			t += down_local * (droop * tip_w)
 			# the tips keep a curl toward the sucker side (a flared arm is not a stick); it opens a little in a bundle
 			var gbc: Basis = (_rest_gb[a] as Array)[j]

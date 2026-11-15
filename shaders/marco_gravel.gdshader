@@ -14,6 +14,8 @@ uniform vec3 crack : source_color = vec3(0.06, 0.07, 0.05);
 uniform float calm : hint_range(0.0, 1.0) = 0.8;
 uniform float dim = 0.72;
 
+#include "res://shaders/water_caustics.gdshaderinc"
+
 varying vec3 world_pos;
 
 vec2 hash2(vec2 p) {
@@ -47,6 +49,7 @@ void fragment() {
 	colour = mix(colour, vec3(grey) * vec3(0.9, 1.0, 0.9), calm * 0.7) * mix(1.0, dim, calm);
 	float edge = smoothstep(0.0, 0.18, second - best);
 	ALBEDO = mix(crack, colour, edge);
+	EMISSION = ALBEDO * wc_caustics(world_pos, vec3(0.0, 1.0, 0.0), length(VERTEX));
 	ROUGHNESS = mix(1.0, 0.45, edge);
 	SPECULAR = 0.8;
 }

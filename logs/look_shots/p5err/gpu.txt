@@ -1,0 +1,2 @@
+look_shots p5err  window (1920, 1080)  90 frames per reading  preset OURS
+view 1 kelp_up      gpu 0.60 ms  cpu 0.22 ms  (1 viewport)  draw calls 65

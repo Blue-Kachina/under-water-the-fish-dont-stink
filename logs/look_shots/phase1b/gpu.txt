@@ -1,0 +1,4 @@
+look_shots phase1b  window (1920, 1080)  90 frames per reading  preset OURS
+view 2 ruin_shafts  gpu 1.46 ms  cpu 0.25 ms  (1 viewport)  draw calls 136
+view 3 reef_close   gpu 1.30 ms  cpu 0.28 ms  (1 viewport)  draw calls 183
+view 4 open_blue    gpu 1.47 ms  cpu 0.38 ms  (1 viewport)  draw calls 449

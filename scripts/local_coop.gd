@@ -166,6 +166,7 @@ func join(pad: int, pick_character := false) -> PlayerSlot:
 	slot.camera = Camera3D.new()
 	slot.camera.set_script(CAMERA_SCRIPT)
 	slot.camera.name = "FollowCamera%d" % (slot.index + 1)
+	WaterGradeEffect.attach(slot.camera)
 	slot.camera.fish = slot.fish
 	slot.camera.input = slot.input
 	_copy_camera(first.camera, slot.camera)

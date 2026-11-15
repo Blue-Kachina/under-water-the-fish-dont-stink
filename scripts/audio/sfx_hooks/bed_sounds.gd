@@ -79,4 +79,5 @@ func _thickness(ocean: Ocean) -> float:
 	var environment := ocean.environment()
 	if environment == null or not environment.fog_enabled:
 		return 0.0
-	return clampf((environment.fog_density - CLEAR_FOG) / THICKEST_FOG, 0.0, 1.0)
+	var density := ocean.fog_density() if WaterLook.fog_active else environment.fog_density  # the Environment's own is thinner under the water model
+	return clampf((density - CLEAR_FOG) / THICKEST_FOG, 0.0, 1.0)

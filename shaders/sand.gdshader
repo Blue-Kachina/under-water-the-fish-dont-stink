@@ -4,6 +4,8 @@ shader_type spatial;
 // drifts, and shell grit. World-space, so it never tiles.
 
 #include "res://shaders/scenery.gdshaderinc"
+#include "res://shaders/water_caustics.gdshaderinc"
+#include "res://shaders/water_materials.gdshaderinc"
 
 uniform vec3 light_sand : source_color = vec3(0.62, 0.54, 0.42);
 uniform vec3 dark_sand : source_color = vec3(0.36, 0.31, 0.25);
@@ -34,8 +36,18 @@ void fragment() {
 	color *= 0.88 + h * 0.18;
 	float grit = smoothstep(0.88, 0.94, sc_noise(vec3(p * 30.0, 0.0)));
 	color = mix(color, vec3(0.8, 0.76, 0.68), grit * 0.3);
+	// Ocean modes (phase 7): encrusting magenta cover in patches (it fluoresces), then the run's biome tint.
+	vec3 flu_add = vec3(0.0);
+	if (water_mat_sand.x > 0.0) {
+		float cover = smoothstep(0.58, 0.72, sc_fbm(vec3(p * 0.045, 9.0)) + (sc_noise(vec3(p * 3.0, 2.0)) - 0.5) * 0.12) * water_mat_sand.x;
+		vec3 crust = mix(vec3(0.5, 0.16, 0.34), vec3(0.72, 0.3, 0.5), sc_noise(vec3(p * 9.0, 5.0)));
+		color = mix(color, crust, cover * 0.75);
+		flu_add = wm_fluor(crust, world_pos, 0.6) * cover;
+		color = wm_biome(color, 1.0);
+	}
 	ALBEDO = color;
 	ROUGHNESS = 0.95;
 	SPECULAR = 0.2;
 	NORMAL = normalize((VIEW_MATRIX * vec4(n, 0.0)).xyz);
+	EMISSION = flu_add + color * wc_caustics(world_pos, n, length(VERTEX));
 }

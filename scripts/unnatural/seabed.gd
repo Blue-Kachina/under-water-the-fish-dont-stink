@@ -36,6 +36,7 @@ func setup(settings: UnnaturalSettings, rng_seed := 11, edge_tall := 40.0) -> vo
 	radius = settings.arena_radius
 	edge_height = edge_tall
 	rng.seed = rng_seed
+	WaterLook.biome_seed = rng_seed
 	for child in get_children():
 		child.queue_free()
 	_clusters.clear()
@@ -217,7 +218,7 @@ func _build_reef() -> void:
 			var spot := centre + Vector2(rng.randf_range(-3.0, 3.0), rng.randf_range(-3.0, 3.0))
 			_put(kelp, ReefKit.mesh("kelp", rng.randi() % ReefKit.VARIANTS), spot, rng.randf_range(0.8, 1.25), 0.06, 0.0, false)
 			planted += 1
-	_flush(kelp)
+	_flush_kelp(kelp)
 	# Sea-grass meadows, out on the sand.
 	var grass := {}
 	for n in _settings.seagrass:
@@ -250,6 +251,15 @@ func _put(into: Dictionary, mesh: Mesh, spot: Vector2, size: float, tilt: float,
 func _flush(sets: Dictionary) -> void:
 	for mesh: Mesh in sets:
 		scatter.add(mesh, sets[mesh][0], sets[mesh][1])
+
+
+## Kelp, and its glints: a second mesh scattered with the plants' own transforms, so tiles and culling treat them as one.
+func _flush_kelp(sets: Dictionary) -> void:
+	_flush(sets)
+	for mesh: Mesh in sets:
+		var glints := KelpGlints.mesh_for(mesh)
+		if glints:
+			scatter.add(glints, sets[mesh][0], sets[mesh][1])
 
 
 ## A random point that passes `test` and is clear of the start (INF: none found in `tries`).
@@ -320,7 +330,7 @@ func _build_edge() -> void:
 		for i in _settings.edge_kelp:
 			var at := Vector2.from_angle(rng.randf() * TAU) * radius * rng.randf_range(0.95, 1.06)
 			_put(band, ReefKit.mesh("kelp", rng.randi() % ReefKit.VARIANTS), at, rng.randf_range(most * 0.45, most), 0.05, 0.0, false)
-		_flush(band)
+		_flush_kelp(band)
 	var wall := MeshInstance3D.new()
 	wall.name = "EdgeGlow"
 	var tube := CylinderMesh.new()

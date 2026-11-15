@@ -18,6 +18,9 @@ uniform float spine_length = 60.0;
 uniform vec4 spine_wave = vec4(0.0, 0.3, 2.0, 0.3);
 uniform vec3 flutter = vec3(0.0, 1.2, 4.0);  // m at weight 1, rad/m, rad/s
 uniform float flutter_phase = 0.0;
+// A rig-driven wave phase (rad): >= 0 replaces TIME * spine_wave.z, so a hunter's stroke rate can follow its speed
+// without the phase jumping (the rig advances the clock by rate * dt). -1: the boss's own free-running TIME.
+uniform float wave_clock = -1.0;
 
 // Bends `v` (and `n`) from the rest shape onto the path. `weight`: flutter.
 void spine_bend(inout vec3 v, inout vec3 n, float weight) {
@@ -31,7 +34,8 @@ void spine_bend(inout vec3 v, inout vec3 n, float weight) {
 	vec3 b = normalize(cross(r, u));
 	u = cross(b, r);
 	float along = z / max(spine_length, 0.001);
-	float side = spine_wave.x * smoothstep(spine_wave.w, 1.0, along) * sin(z * spine_wave.y - TIME * spine_wave.z);
+	float phase = wave_clock >= 0.0 ? wave_clock : TIME * spine_wave.z;
+	float side = spine_wave.x * smoothstep(spine_wave.w, 1.0, along) * sin(z * spine_wave.y - phase);
 	side += flutter.x * weight * sin(z * flutter.y + v.y * 0.6 - TIME * flutter.z + flutter_phase);
 	float over = v.z - z;  // past either end: carried on straight
 	vec3 world = p + r * (v.x + side) + u * v.y + b * over;

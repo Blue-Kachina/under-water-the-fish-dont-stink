@@ -181,7 +181,7 @@ func _jet() -> void:
 	var r := Run.new()
 	_go(5.0, func(_t: float) -> Dictionary: return {"throttle": 1.0, "boost": false, "stick": Vector2.ZERO, "roll": 0.0}, r, Vector3(0, 0, -2.0))
 	_check(r.finite, "jet: everything finite")
-	_check(rig.shown["jets"] >= 3 and rig.shown["jets"] <= 6, "jet: a pulse about every period (%d jets in 5 s)" % rig.shown["jets"])
+	_check(rig.shown["jets"] >= 3 and rig.shown["jets"] <= 9, "jet: a pulse about every period, quickening with the speed (%d jets in 5 s)" % rig.shown["jets"])
 	_check(r.mantle_max > 0.8, "jet: the mantle squeezes (peak %.2f)" % r.mantle_max)
 	_check(r.mantle_min < -0.15, "jet: and refills past rest (low %.2f)" % r.mantle_min)
 	_check(r.spread_min < -0.3 and r.spread_min > -0.8, "jet: the delta narrows a little on the power stroke, not into a spear (spread low %.2f)" % r.spread_min)

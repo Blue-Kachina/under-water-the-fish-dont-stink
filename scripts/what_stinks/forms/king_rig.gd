@@ -25,6 +25,9 @@ var _riders: Array = []
 var _trail := PackedVector3Array()
 var _age := 0.0
 var _wave := 0.0
+var _wave_clock := 0.0
+var _speed := 0.0
+var _last_at := Vector3.ZERO
 var _offsets := PackedVector3Array()
 var _dir := Vector3.ZERO
 var _last_head := Vector3.ZERO
@@ -130,12 +133,19 @@ func _coil_attack() -> CoilAttack:
 ## The swim: a wave down the body that grows with the speed and the turn (the bend itself is the trail's).
 func _swim_look() -> void:
 	var k := girth / 6.0
-	var speed := fish.linear_velocity.length()
-	var t := clampf(speed / maxf(length * 0.5, 1.0), 0.0, 1.0)
+	var dt := get_process_delta_time()
+	var at := fish.global_position
+	if dt > 0.0:  # measured as well as read: a hunter's velocity is not always the body's
+		_speed = lerpf(_speed, maxf(fish.linear_velocity.length(), at.distance_to(_last_at) / dt), 1.0 - exp(-8.0 * dt))
+	_last_at = at
+	var t := clampf(_speed / maxf(fish.max_boost_speed * fish.top_speed_scale * 0.6, 0.1), 0.0, 1.0)  # of its own top speed (a long body never reached length / 2 m/s)
 	var turn := clampf(absf(fish.angular_velocity.y) / 1.5, 0.0, 1.0)
-	var amp := k * (WAVE_REST + WAVE_SWIM * t + WAVE_TURN * turn) * 2.5 * _flex()
+	var amp := k * (WAVE_REST + WAVE_SWIM * t + WAVE_TURN * turn) * 4.0 * _flex()
 	_wave = lerpf(_wave, amp, 0.1)
-	skin.set_shader_parameter("spine_wave", Vector4(_wave, 0.12 * 109.0 / length, 1.6, 0.15))
+	# The stroke's rate follows the speed (rad/s); the clock is advanced here so a change of rate never jumps the phase.
+	_wave_clock = fposmod(_wave_clock + dt * lerpf(1.0, 6.5, t), TAU)
+	skin.set_shader_parameter("wave_clock", _wave_clock)
+	skin.set_shader_parameter("spine_wave", Vector4(_wave, 0.12 * 109.0 / length, 1.0, 0.15))
 	var warn := 0.0
 	var bite := _find_bite()
 	if bite and bite.bite and bite.bite.winding():

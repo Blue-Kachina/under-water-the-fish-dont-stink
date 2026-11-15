@@ -1,0 +1,4 @@
+look_shots phase6_moon  window (1920, 1080)  90 frames per reading  preset OURS
+view 1 kelp_up      gpu 0.76 ms  cpu 0.22 ms  (1 viewport)  draw calls 66
+view 2 ruin_shafts  gpu 1.70 ms  cpu 0.27 ms  (1 viewport)  draw calls 152
+view 4 open_blue    gpu 1.57 ms  cpu 0.39 ms  (1 viewport)  draw calls 481

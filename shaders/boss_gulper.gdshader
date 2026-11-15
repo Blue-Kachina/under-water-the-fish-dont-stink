@@ -24,6 +24,7 @@ uniform float rim_y = -3.2;  // m, the mouth's middle at its rim, and at the hin
 uniform float hinge_y = 0.0;
 uniform float gape = 0.0;  // 0 shut-ish, 1 wide open
 uniform vec2 belly_span = vec2(17.0, 35.0);  // m along the body
+uniform float pouch_ripple = 0.0;  // how far the pouch's skin billows as it swims (a fraction of its girth)
 uniform float fullness = 0.3;
 // A swallowed player: a lump at rest z lump.x (m), lump.y m long, pressing out
 // by lump.z (of the girth there); 0: none.
@@ -52,6 +53,18 @@ void vertex() {
 		v.x *= 1.0 + gape * 0.45 * m;
 		v.y = cy + (v.y - cy) * (1.0 + gape * 0.55 * m);
 		v.y += gape * m * m * -1.5;
+	}
+	if (pouch_ripple > 0.0 && part > 3.5 && part < 4.5 && v.z < mouth_len) {
+		// The pouch is a loose membrane: water runs back along it in waves, pulsing the girth (more as it swims),
+		// pinned at the jaws' hinge and the throat (sin of the pouch's length), slower than the body's wave.
+		float a = clamp(v.z / mouth_len, 0.0, 1.0);
+		float cy = mix(rim_y, hinge_y, a);
+		float clk = (wave_clock >= 0.0 ? wave_clock : TIME * 3.0) * 1.6;
+		float around = atan(v.x, v.y - cy);
+		float r = pouch_ripple * sin(a * PI) * (0.6 * sin(a * 11.0 - clk + around * 2.0) + 0.4 * sin(a * 5.0 - clk * 0.7 - around));
+		v.x *= 1.0 + r;
+		v.y = cy + (v.y - cy) * (1.0 + r);
+		v.y -= pouch_ripple * 8.0 * sin(a * PI) * (1.0 + gape * 0.5) * (0.5 + 0.5 * sin(clk * 0.5));  // the floor sags and lifts with the stroke
 	}
 	if (lump.z > 0.0 && part < 0.5) {
 		float d = (v.z - lump.x) / max(lump.y, 0.01);

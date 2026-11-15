@@ -170,7 +170,7 @@ func _run() -> void:
 	camera.snap()
 	await _ticks(5)
 	var env: Environment = main.get_node("WorldEnvironment").environment
-	check(env.fog_density > base_density * 1.5, "out there the water's thicker (fog %.4f, was %.4f)" % [env.fog_density, base_density])
+	check(ocean.fog_density() > base_density * 1.5, "out there the water's thicker (fog %.4f, was %.4f)" % [ocean.fog_density(), base_density])
 	var from := fish.global_position.distance_to(hunt.center)
 	await _ticks(240)
 	var now := fish.global_position.distance_to(hunt.center)
@@ -180,7 +180,7 @@ func _run() -> void:
 	main.set_mode(main.FREE_SWIM)
 	await _ticks(3)
 	check(main.hunt_match == null and camera.ball == null, "the match is over")
-	check(ocean.boundary_radius == 0.0 and absf(env.fog_density - base_density) < 0.0001, "the edge and its fog are gone")
+	check(ocean.boundary_radius == 0.0 and absf(ocean.fog_density() - base_density) < 0.0001, "the edge and its fog are gone")
 	check(fish.team == -1 and fish.team_color == Color.TRANSPARENT and not fish.controls_locked, "the player's fish is handed back")
 	check(fish.swim_style == FishController.SwimStyle.ORIGINAL and fish.boost_enabled, "Original strokes and boost back")
 	check(is_equal_approx(fish.max_speed, max_speed_before), "the tuning from before is back (max_speed %.1f)" % fish.max_speed)

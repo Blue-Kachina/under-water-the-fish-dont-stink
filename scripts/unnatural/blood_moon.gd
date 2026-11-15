@@ -16,6 +16,8 @@ const SKY_HORIZON := Color(0.14, 0.02, 0.03)
 const MOON_COLOR := Color(1.0, 0.2, 0.12)
 const RAY_COLOR := Color(1.0, 0.25, 0.15, 0.05)
 const RAYS := 9
+## Where the moon sits relative to the camera (over the surface's height).
+const MOON_OFFSET := Vector3(60.0, 160.0, -80.0)
 
 var ocean: Ocean
 ## The murk's settings (null: no murk).
@@ -32,6 +34,7 @@ var _before := {}
 var _sky: ProceduralSkyMaterial
 var _sky_before := []
 var _pulse := 0.0
+var _surface_plane: MeshInstance3D  # the old red plane, used when the water model's surface is off
 var _moon := MeshInstance3D.new()
 var _moon_material := StandardMaterial3D.new()
 var _rays: Array[MeshInstance3D] = []
@@ -39,6 +42,7 @@ var _ray_material := StandardMaterial3D.new()
 
 
 func _ready() -> void:
+	WaterLook.surface_override = centre.y + surface_height  # the water model's depth is measured from the surface overhead
 	_build()
 	if ocean:
 		_env = ocean.environment()
@@ -49,7 +53,7 @@ func _ready() -> void:
 		if base.size() == 2:  # the fog before the arena edge's shift
 			_before.fog_light_color = base[0]
 			_before.fog_density = base[1]
-		_sky = _env.sky.sky_material as ProceduralSkyMaterial if _env.sky else null
+		_sky = ocean.procedural_sky() if ocean else (_env.sky.sky_material as ProceduralSkyMaterial if _env.sky else null)
 		if _sky:
 			_sky_before = [_sky.sky_top_color, _sky.sky_horizon_color, _sky.ground_horizon_color]
 	_apply()
@@ -76,12 +80,14 @@ func _process(delta: float) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera:
 		# The moon sits far overhead, off to one side, wherever the camera is.
-		_moon.global_position = Vector3(camera.global_position.x, surface_height, camera.global_position.z) + Vector3(60.0, 160.0, -80.0)
+		_moon.global_position = Vector3(camera.global_position.x, surface_height, camera.global_position.z) + MOON_OFFSET
 
 
 func _apply() -> void:
 	var red := clampf(strength * (1.0 + 0.6 * _pulse), 0.0, 2.0)
 	var share := clampf(red, 0.0, 1.0)
+	WaterLook.shared().moon_share = share
+	WaterLook.sky_murk = settings.murk_sky if settings and settings.murky() else 1.0
 	if _env and not _before.is_empty():
 		var fog := (_before.fog_light_color as Color).lerp(FOG_COLOR, share)
 		var density := fog_density()
@@ -90,24 +96,32 @@ func _apply() -> void:
 		else:
 			_env.fog_light_color = fog
 			_env.fog_density = density
-		_env.fog_sky_affect = settings.murk_sky if settings and settings.murky() else _before.fog_sky_affect
+		if not WaterLook.fog_active:  # the water sky carries its own fog (sky_murk), and Ocean keeps the Environment's sky fog off
+			_env.fog_sky_affect = settings.murk_sky if settings and settings.murky() else _before.fog_sky_affect
 		_env.ambient_light_color = (_before.ambient_light_color as Color).lerp(AMBIENT_COLOR, share)
 		_env.ambient_light_energy = _before.ambient_light_energy * (1.0 + 0.2 * _pulse)
 	if _sky and not _sky_before.is_empty():
 		_sky.sky_top_color = (_sky_before[0] as Color).lerp(SKY_TOP, share)
 		_sky.sky_horizon_color = (_sky_before[1] as Color).lerp(SKY_HORIZON, share)
 		_sky.ground_horizon_color = (_sky_before[2] as Color).lerp(SKY_HORIZON, share)
-	_moon.visible = share > 0.01
+	# With the water model's surface on (phase 4), the moon is the sun's disc seen through Snell's window and the old red plane is not drawn.
+	var new_surface := WaterLook.fog_active and WaterLook.shared().surface_enabled
+	WaterLook.moon_dir = MOON_OFFSET.normalized() if new_surface else Vector3.ZERO
+	_moon.visible = share > 0.01 and not new_surface
+	if _surface_plane:
+		_surface_plane.visible = not new_surface
 	_moon_material.emission_energy_multiplier = 2.0 + 2.0 * _pulse
 	_ray_material.albedo_color = Color(RAY_COLOR, RAY_COLOR.a * share * (1.0 + _pulse))
+	var new_shafts := WaterLook.fog_active and WaterLook.shared().shafts_enabled  # phase 6: the Ocean's shaft field (red by moon_share) replaces these
 	for ray in _rays:
-		ray.visible = share > 0.01
+		ray.visible = share > 0.01 and not new_shafts
 
 
 func _build() -> void:
 	# The surface: seen from below, faintly red.
 	var surface := MeshInstance3D.new()
 	surface.name = "Surface"
+	_surface_plane = surface
 	var plane := PlaneMesh.new()
 	plane.size = Vector2.ONE * maxf(radius * 12.0, 2000.0)
 	plane.flip_faces = true
@@ -168,6 +182,10 @@ func _build() -> void:
 
 
 func _exit_tree() -> void:
+	WaterLook.shared().moon_share = 0.0  # the water look's grade multiplies by it (Ocean re-grades)
+	WaterLook.surface_override = NAN
+	WaterLook.moon_dir = Vector3.ZERO
+	WaterLook.sky_murk = 1.0
 	if _env and not _before.is_empty():
 		for key: String in _before:
 			_env.set(key, _before[key])

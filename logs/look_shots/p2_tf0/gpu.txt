@@ -1,0 +1,3 @@
+look_shots p2_tf0  window (1920, 1080)  5 frames per reading  preset OURS
+view 5 floor_murk   gpu 1.25 ms  cpu 0.41 ms  (1 viewport)  draw calls 483
+view 3 reef_close   gpu 1.36 ms  cpu 0.28 ms  (1 viewport)  draw calls 183

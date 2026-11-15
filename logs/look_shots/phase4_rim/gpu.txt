@@ -1,0 +1,2 @@
+look_shots phase4_rim  window (1920, 1080)  90 frames per reading  preset OURS
+view 1 kelp_up      gpu 0.84 ms  cpu 0.25 ms  (1 viewport)  draw calls 137

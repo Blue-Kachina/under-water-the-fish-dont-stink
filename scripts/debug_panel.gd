@@ -40,7 +40,7 @@ const PREVIEW_DIR := "res://assets/ui/previews"
 ## The sections in order: [id, title]. Game, Display and Controls are
 ## UISettings and Controls; the rest are tuning targets.
 const SECTIONS := [["game", "Game"], ["display", "Display"], ["audio", "Audio"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"],
-		["gaits", "Gaits"], ["ball", "Ball"], ["nature", "Nature"], ["unnatural", "Unnatural"], ["powerups", "Powerups"], ["marco_polo", "Marco Polo"], ["what_stinks", "What Stinks?"], ["hunter_size", "Hunter Size"]]
+		["gaits", "Gaits"], ["ball", "Ball"], ["nature", "Nature"], ["unnatural", "Unnatural"], ["powerups", "Powerups"], ["marco_polo", "Marco Polo"], ["what_stinks", "What Stinks?"], ["hunter_size", "Hunter Size"], ["water_look", "Water Look"]]
 ## Who each tuning section is for ("Used by ...").
 const USED_BY := {
 	"camera": "the follow camera, in every mode",
@@ -52,6 +52,7 @@ const USED_BY := {
 	"marco_polo": "Marco Polo",
 	"what_stinks": "What Stinks?",
 	"hunter_size": "What Stinks?'s Hunter",
+	"water_look": "the water in every Ocean mode and the Look Tank",
 	"powerups": "Unnatural's powerups",
 }
 ## The Game, Display and Controls options: key -> [title, group, description, used by].
@@ -65,6 +66,8 @@ const GAME_OPTIONS := {
 	"game/preset_default": ["Default tuning", "Tuning presets", "Puts every tuning section back to its defaults. Not saved until you save a preset.", "the tuning sections"],
 	"game/preset_copy": ["Copy tuning", "Tuning presets", "Copies the tuning as preset text to the clipboard, to paste into a file or a message.", "the tuning sections"],
 	"display/fullscreen": ["Fullscreen", "Window", "Fills the screen. F11 or Alt+Enter switches it any time. The game always starts fullscreen.", "the window"],
+	"display/graphics_quality": ["Graphics quality", "Graphics", "Low, Medium or High. High is the full underwater look. Medium thins the marine snow, light shafts, kelp glints and bloom. Low thins them more, drops the caustics to one tap and renders at 77% with FSR. Never chosen for you.", "the Ocean modes"],
+	"display/adaptive_resolution": ["Adaptive resolution", "Graphics", "Lowers the render scale a notch at a time when the GPU cannot hold the frame rate, and raises it again when there is room. Off by default.", "every mode"],
 	"display/show_stats": ["Stats panel", "Tuning aids", "A readout of the fish's speed, forward speed, drift and more, for tuning.", "the HUD"],
 	"display/show_input_overlay": ["Controller overlay", "Tuning aids", "Shows the controller's sticks, triggers and buttons live on screen.", "the HUD"],
 	"controls/profile": ["Controller profile", "Controller", "Which controller buttons do what. The sticks, triggers and keyboard are the same in every profile.", "your controller"],
@@ -106,6 +109,7 @@ const TABS := {
 	"marco_polo": [["Match", ["Match"]], ["Noise & Sight", ["Noise", "Exposure", "Layers", "Sonar"]], ["Marco! scan", ["Marco! scan"]], ["Roles", ["Seeker", "Hider"]],
 			["Scoring", ["Scoring"]], ["Fake Fish & Portholes", ["Fake Fish", "Portholes"]], ["Bots", ["Bots"]]],
 	"what_stinks": [["Match", ["Match"]], ["Hunter & Bite", ["Hunter", "Bite"]], ["Schools & Arena", ["Schools", "Arena"]], ["Join & Spook", ["Join"]], ["Echo", ["Echo"]], ["Stomach", ["Stomach"]], ["Scoring", ["Scoring"]], ["Camera", ["Camera"]], ["Bots", ["Bots"]]],
+	"water_look": [["Water model", ["Water model", "Water fog", "Depth exposure", "Blood Moon water"]], ["Grading", ["Grading", "Bloom", "Blood Moon grade"]], ["Caustics", ["Caustics"]], ["Surface", ["Surface"]], ["Particles", ["Marine snow", "Kelp glints", "Bubbles"]], ["Light shafts", ["Light shafts"]], ["Materials", ["Materials"]], ["Quality", ["Quality"]], ["Look Tank", ["Look Tank"]]],
 	"powerups": [["General", []], ["Weapons", []], ["Common", []], ["Uncommon", []], ["Rare", []], ["Epic", []], ["Legendary", []], ["Boss", []],
 			["Cursed", []]],
 	"controls": [["Keyboard & Mouse", []], ["Controller", []]],
@@ -119,7 +123,7 @@ const HIDDEN := ["fish/rl_roll_timing", "fish/rl_air_control", "fish/rl_dodge_ti
 ## (SELECT in Settings): the tuning presets, the stats panel and controller
 ## overlay, the sound tools, and every tuning section but the camera, plus the
 ## fish's controller options.
-const EVERYDAY := ["game/player_name", "game/character", "game/species", "game/goal_replays", "display/fullscreen", "audio/profile", "audio/music_profile",
+const EVERYDAY := ["game/player_name", "game/character", "game/species", "game/goal_replays", "display/fullscreen", "display/graphics_quality", "display/adaptive_resolution", "audio/profile", "audio/music_profile",
 		"audio/master_volume", "audio/sfx_volume", "audio/music_volume", "audio/voice_volume"]
 ## A held left/right repeats after this, this often (s).
 const REPEAT_DELAY := 0.38
@@ -213,7 +217,8 @@ func _ready() -> void:
 	layer = 7  # over the pause menu and the home screen
 	_targets = {"fish": fish, "gaits": GaitSettings.shared(), "camera": follow_camera, "ball": ball_settings, "nature": NatureSettings.shared(),
 			"unnatural": UnnaturalSettings.shared(), "powerups": PowerupSettings.shared(), "marco_polo": MarcoPoloSettings.shared(),
-			"what_stinks": WhatStinksSettings.shared(), "hunter_size": HunterSize.shared()}
+			"what_stinks": WhatStinksSettings.shared(), "hunter_size": HunterSize.shared(),
+			"water_look": WaterLook.shared()}
 	for section: String in _targets:
 		_defaults[section] = _snapshot(_targets[section])
 	_build_ui()
@@ -701,6 +706,9 @@ func _build_game_options() -> void:
 				for profile: String in Controls.profile_names():
 					profiles.append([profile, profile])
 				meta["choices"] = profiles
+			"display/graphics_quality":
+				meta["kind"] = "enum"
+				meta["choices"] = [["Low", 0], ["Medium", 1], ["High", 2]]
 			"audio/profile":
 				meta["kind"] = "enum"
 				meta["choices"] = Sfx.profile_choices()
@@ -851,6 +859,10 @@ func _default(key: String) -> Variant:
 			return true
 		"display/show_stats", "display/show_input_overlay":
 			return false
+		"display/adaptive_resolution":
+			return false
+		"display/graphics_quality":
+			return 2
 		"controls/profile":
 			return Controls.DEFAULT_PROFILE
 	if section == "audio":

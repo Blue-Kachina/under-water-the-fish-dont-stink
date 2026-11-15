@@ -1,0 +1,4 @@
+look_shots phase6_volfog_dense  window (1920, 1080)  90 frames per reading  preset OURS
+view 1 kelp_up      gpu 0.67 ms  cpu 0.26 ms  (1 viewport)  draw calls 78
+view 2 ruin_shafts  gpu 1.65 ms  cpu 0.28 ms  (1 viewport)  draw calls 152
+view 6 split        gpu 1.68 ms  cpu 0.70 ms  (2 viewports)  draw calls 709

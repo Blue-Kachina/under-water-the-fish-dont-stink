@@ -77,6 +77,7 @@ func spawn_transform() -> Transform3D:
 
 func configure_environment(env: Environment) -> void:
 	_env = env
+	WaterLook.reset_grade(env)  # the Temple keeps its own look for now (the Ocean's grade is a stretch goal there)
 	for property: String in ["background_mode", "background_color", "sky", "fog_enabled", "fog_light_color", "fog_density",
 			"fog_sky_affect", "ambient_light_source", "ambient_light_color", "ambient_light_energy"]:
 		_saved[property] = env.get(property)

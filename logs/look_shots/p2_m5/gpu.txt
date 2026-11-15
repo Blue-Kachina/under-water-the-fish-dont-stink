@@ -1,0 +1,2 @@
+look_shots p2_m5  window (1920, 1080)  3 frames per reading  preset OURS
+view 3 reef_close   gpu 1.49 ms  cpu 0.29 ms  (1 viewport)  draw calls 183
