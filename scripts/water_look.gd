@@ -108,6 +108,11 @@ static func shared() -> WaterLook:
 @export_group("Surface")
 ## Phase 4: the water's surface seen from below (waves, Snell's window onto the sky and sun, a mirror of the deep past its rim). Off leaves open water with no ceiling (and Unnatural's old red plane).
 @export var surface_enabled := true
+## The surface can't be reached. In open modes (no ceiling) it rises with the highest camera, staying at least this far (m) above it,
+## so swimming up keeps the look instead of breaking through.
+@export_range(1.0, 200.0, 0.5, "or_greater") var surface_recede_gap := 10.0
+## In modes with a fixed surface over a ceiling (Unnatural), cameras are held this far (m) under it (above it the water look has nothing to show).
+@export_range(0.1, 20.0, 0.05, "or_greater") var surface_camera_gap := 1.0
 ## How far the surface plane reaches around each camera (m); past it the sky's water takes over. Kept inside the camera's far plane.
 @export_range(50.0, 20000.0, 10.0, "or_greater") var surface_radius := 900.0
 ## How steep the waves are (1 as built; 0 a flat mirror, higher is choppier).
@@ -135,6 +140,10 @@ static func shared() -> WaterLook:
 @export_range(0.0, 4.0, 0.01, "or_greater") var moon_wcol_g := 0.028
 @export_range(0.0, 4.0, 0.01, "or_greater") var moon_wcol_b := 0.038
 @export_range(0.0, 2.0, 0.01) var moon_kd_scale := 0.35
+## How fast each colour dies through the Blood Moon's water, as a multiple of the normal rate (red, green, blue). Red has to last longest, so far things sink into the red fog instead of staying blue-white against it.
+@export_range(0.0, 4.0, 0.01, "or_greater") var moon_sig_r := 0.3
+@export_range(0.0, 4.0, 0.01, "or_greater") var moon_sig_g := 1.0
+@export_range(0.0, 4.0, 0.01, "or_greater") var moon_sig_b := 1.8
 
 @export_group("Grading")
 ## Phase 1: the colour grade every Ocean mode wears (an Environment adjustment plus a per-camera vignette and S-curve pass). Off gives back the old plain filmic look.
@@ -315,6 +324,8 @@ static func shared() -> WaterLook:
 @export_range(0.0, 2.0, 0.01, "or_greater") var sand_cover := 0.5
 ## How much of the floor is bare, encrusted rock instead of sand (0 none; scales the rocky regions' strength).
 @export_range(0.0, 2.0, 0.01, "or_greater") var rocky_floor := 1.0
+## How strongly the rocky regions' violet, teal and ochre crust fluoresces (0 none: the blue water light turns it navy).
+@export_range(0.0, 8.0, 0.01, "or_greater") var rock_crust_glow := 0.6
 ## The per-run biome tint on sand and rock (Unnatural): a colour cast picked from the run's seed, and how strong it is (0 none).
 @export var biome_enabled := true
 @export_range(0.0, 1.0, 0.01) var biome_strength := 0.4
@@ -381,6 +392,8 @@ static var density_now := 0.012
 static var edge_amount := 0.0
 ## A mode's own surface height (Unnatural's), or NAN for surface_height.
 static var surface_override := NAN
+## The highest camera in an open mode (Ocean keeps it current; -INF none): the receding surface stays surface_recede_gap above it.
+static var top_camera_y := -INF
 ## Where the Blood Moon's disc is (a direction from the camera), or (0,0,0) for none: the surface shows it through the window in place of the sun.
 static var moon_dir := Vector3.ZERO
 ## How much of the density scale the sky gets (UnnaturalSettings.murk_sky: 1 the murk covers the sky fully, 0 the sky stays clear).
@@ -398,11 +411,18 @@ static func fog_sigma(density: float) -> float:
 	if not fog_active:
 		return density
 	var look := shared()
-	return density * look.sig_g / maxf(look.density_ref, 0.0001)
+	return density * look.eff_sig().y / maxf(look.density_ref, 0.0001)
 
 
 func surface_y() -> float:
-	return surface_height if is_nan(surface_override) else surface_override
+	if not is_nan(surface_override):
+		return surface_override
+	return maxf(surface_height, top_camera_y + surface_recede_gap)
+
+
+## The surface is fixed over a ceiling (Unnatural) rather than receding.
+static func surface_fixed() -> bool:
+	return not is_nan(surface_override)
 
 
 func density_scale() -> float:
@@ -523,6 +543,11 @@ func sig() -> Vector3:
 	return Vector3(sig_r, sig_g, sig_b)
 
 
+## The extinction now: the Blood Moon's per-colour rates folded in.
+func eff_sig() -> Vector3:
+	return sig() * Vector3.ONE.lerp(Vector3(moon_sig_r, moon_sig_g, moon_sig_b), moon_share)
+
+
 func kd() -> Vector3:
 	return Vector3(kd_r, kd_g, kd_b)
 
@@ -594,7 +619,7 @@ func push_materials() -> void:
 	g.global_shader_parameter_set("water_mat_kelp2", Vector4(kelp_warm_r, kelp_warm_g, kelp_warm_b, kelp_sparkle_share))
 	g.global_shader_parameter_set("water_mat_coral", Vector4(coral_fluorescence, coral_flu_min, maxf(coral_flu_max, coral_flu_min), coral_tip))
 	g.global_shader_parameter_set("water_mat_rock", Vector4(rock_strata, rock_detail, rock_algae, rock_rim))
-	g.global_shader_parameter_set("water_mat_sand", Vector4(sand_cover, rocky_floor, 0.0, 0.0))
+	g.global_shader_parameter_set("water_mat_sand", Vector4(sand_cover, rocky_floor, rock_crust_glow, 0.0))
 	var c := biome_color()
 	g.global_shader_parameter_set("water_biome", Vector4(c.r, c.g, c.b, biome_strength if biome_enabled else 0.0))
 

@@ -702,6 +702,15 @@ static func shared() -> WhatStinksSettings:
 @export_range(0.0, 20.0, 0.1, "or_greater") var wall_outward := 2.0
 ## The most the wall pushes (m/s^2).
 @export_range(0.0, 200.0, 1.0, "or_greater") var wall_max := 40.0
+## A sea floor under the arena (Unnatural's seabed: sand, rock, reef, kelp, ruins), this far (m) below the middle. The echo shadows
+## (kelp stands, rock arches) then stand on it instead of floating.
+@export var floor_enabled := true
+@export_range(5.0, 500.0, 1.0, "or_greater") var floor_depth := 18.0
+## The floor's push back up (1/s per m under the clearance), and how far above the sand it starts (m).
+@export_range(0.0, 50.0, 0.1, "or_greater") var floor_push := 6.0
+@export_range(0.0, 20.0, 0.1, "or_greater") var floor_clearance := 1.5
+## The seabed's seed (the same on every machine).
+@export var floor_seed := 23
 
 @export_group("Scoring")
 ## The Hunter's points per prey eaten.

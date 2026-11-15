@@ -48,23 +48,26 @@ void fragment() {
 		float rocky = smoothstep(0.46, 0.53, sc_fbm(vec3(p * 0.021, 17.0)) + (sc_noise(vec3(p * 0.4, 4.0)) - 0.5) * 0.1) * water_mat_sand.y;
 		if (rocky > 0.0) {
 			vec4 det = wm_detail(vec3(p.x, 0.0, p.y) * 1.6, vec3(0.0, 1.0, 0.0));
-			vec3 rock = mix(vec3(0.16, 0.14, 0.2), vec3(0.34, 0.3, 0.34), det.z);
-			rock *= 1.0 - det.w * 0.6;  // dark cracks
+			vec3 rock = mix(vec3(0.13, 0.11, 0.16), vec3(0.3, 0.26, 0.3), det.z);
+			rock *= 1.0 - det.w * 0.35;  // dark cracks
 			float lump = sc_fbm(vec3(p * 0.5, 6.0));
-			// Crust: patches of violet / magenta, teal and ochre, thicker on the high parts of the relief.
-			float cv = smoothstep(0.45, 0.7, sc_fbm(vec3(p * 0.16, 11.0)) + det.x * 0.35);
-			float ct = smoothstep(0.55, 0.78, sc_fbm(vec3(p * 0.11, 23.0)) + det.x * 0.2);
+			// Crust: patches of violet / magenta, teal and ochre, thicker on the high parts of the relief. Like the corals it
+			// fluoresces (water_mat_sand.z), or the blue water light swamps its colours and it reads as navy.
+			float cv = smoothstep(0.4, 0.66, sc_fbm(vec3(p * 0.16, 11.0)) + det.x * 0.35);
+			float ct = smoothstep(0.64, 0.84, sc_fbm(vec3(p * 0.11, 23.0)) + det.x * 0.2);
 			float co = smoothstep(0.62, 0.8, sc_fbm(vec3(p * 0.13, 31.0)) + (1.0 - det.z) * 0.15);
-			rock = mix(rock, mix(vec3(0.34, 0.12, 0.44), vec3(0.66, 0.2, 0.52), lump), cv * 0.8);
-			rock = mix(rock, vec3(0.16, 0.46, 0.44), ct * 0.6);
-			rock = mix(rock, vec3(0.62, 0.46, 0.18), co * 0.5);
+			vec3 crust_c = mix(vec3(0.42, 0.1, 0.56), vec3(0.78, 0.16, 0.56), lump);
+			crust_c = mix(crust_c, vec3(0.1, 0.5, 0.46), ct * 0.8);
+			crust_c = mix(crust_c, vec3(0.78, 0.52, 0.14), co);
+			float crust_k = clamp(cv * 0.8 + ct * 0.6 + co * 0.6, 0.0, 1.0) * (1.0 - det.w * 0.5);
+			rock = mix(rock, crust_c, crust_k);
 			// Relief: tilt the normal from the detail's height so the rock reads as lumpy, not flat.
 			vec3 q = vec3(p.x, 0.0, p.y) * 1.6;
 			float hx = wm_detail(q + vec3(0.08, 0.0, 0.0), vec3(0.0, 1.0, 0.0)).x - det.x;
 			float hz = wm_detail(q + vec3(0.0, 0.0, 0.08), vec3(0.0, 1.0, 0.0)).x - det.x;
 			n = normalize(mix(n, normalize(vec3(-hx * 2.5, 1.0, -hz * 2.5)), rocky));
-			color = mix(color, wm_biome(rock, 0.5) * 0.45, rocky);
-			flu_add = mix(flu_add, vec3(0.0), rocky);
+			color = mix(color, wm_biome(rock, 0.5) * 0.5, rocky);
+			flu_add = mix(flu_add, wm_fluor(crust_c, world_pos, water_mat_sand.z) * crust_k, rocky);
 		}
 	}
 	ALBEDO = color;

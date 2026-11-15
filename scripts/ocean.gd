@@ -48,6 +48,38 @@ var _shafts: MultiMeshInstance3D
 func _ready() -> void:
 	_build_specks()
 	_build_shafts()
+	RenderingServer.frame_pre_draw.connect(_hold_cameras_under_surface)
+
+
+## The cameras drawing this water: the window's and every split-screen view's follow cam.
+func _cameras(main_camera: Camera3D) -> Array[Camera3D]:
+	var cameras: Array[Camera3D] = []
+	if main_camera:
+		cameras.append(main_camera)
+	for node in get_tree().get_nodes_in_group(&"follow_cameras"):
+		var cam := node as Camera3D
+		if cam and cam.is_inside_tree() and cam.current and not cameras.has(cam):
+			cameras.append(cam)
+	return cameras
+
+
+## In open modes the surface recedes ahead of the highest camera (WaterLook.surface_y), so it can't be reached.
+func _track_top_camera(main_camera: Camera3D) -> void:
+	var top := -INF
+	for cam in _cameras(main_camera):
+		top = maxf(top, cam.global_position.y)
+	WaterLook.top_camera_y = top
+
+
+## Where the surface is fixed over a ceiling, no camera goes above surface_camera_gap under it (after every camera has moved this frame).
+func _hold_cameras_under_surface() -> void:
+	if not is_inside_tree() or not WaterLook.fog_active or not WaterLook.surface_fixed():
+		return
+	var look := WaterLook.shared()
+	var limit := look.surface_y() - look.surface_camera_gap
+	for cam in _cameras(get_viewport().get_camera_3d()):
+		if cam.global_position.y > limit:
+			cam.global_position.y = limit
 
 
 func _process(delta: float) -> void:
@@ -58,6 +90,7 @@ func _process(delta: float) -> void:
 	WaterLook.shared().push_materials()
 	_update_snow()
 	var camera := get_viewport().get_camera_3d()
+	_track_top_camera(camera)
 	if camera:
 		if boundary_radius > 0.0:
 			var inside := boundary_radius * (1.0 - EDGE_FADE)
@@ -269,7 +302,7 @@ func _update_water(camera: Camera3D) -> void:
 	var k := look.kd_k()
 	var wcol := look.eff_wcol() * look.inscatter_gain
 	var sun := WaterLook.sun_dir
-	var sky_sig := look.sig() * lerpf(1.0, scale, WaterLook.sky_murk)
+	var sky_sig := look.eff_sig() * lerpf(1.0, scale, WaterLook.sky_murk)
 	var phase := Vector2(look.phase_base, look.phase_forward)
 	var m := _water_sky
 	m.set_shader_parameter("ws_sig", sky_sig)
@@ -282,7 +315,7 @@ func _update_water(camera: Camera3D) -> void:
 	m.set_shader_parameter("ws_surface_y", look.surface_y())
 	m.set_shader_parameter("ws_ref_depth", clampf(depth, 1.0, 400.0))
 	var q := WaterFogQuad.material()  # the opaque world's fog pass (every camera's quad shares it)
-	q.set_shader_parameter("wf_sig", look.sig() * scale)
+	q.set_shader_parameter("wf_sig", look.eff_sig() * scale)
 	q.set_shader_parameter("wf_k", k)
 	q.set_shader_parameter("wf_wcol", wcol)
 	q.set_shader_parameter("wf_sun_dir", sun)
@@ -325,7 +358,7 @@ func _update_surface(look: WaterLook, camera: Camera3D, k: Vector3, wcol: Vector
 	var sun_col := Vector3(1.7, 1.6, 1.45).lerp(Vector3(1.0, 0.05, 0.03), share)
 	var sun_dir := WaterLook.sun_dir.lerp(moon.normalized(), share).normalized() if moon_on else WaterLook.sun_dir
 	var far := camera.far * 0.9 if camera else 900.0
-	m.set_shader_parameter("wf_sig", look.sig() * scale)
+	m.set_shader_parameter("wf_sig", look.eff_sig() * scale)
 	m.set_shader_parameter("wf_k", k)
 	m.set_shader_parameter("wf_wcol", wcol)
 	m.set_shader_parameter("wf_sun_dir", WaterLook.sun_dir)
@@ -347,6 +380,7 @@ func _exit_tree() -> void:
 		_sun.light_color = _sun.get_meta("sun_base")  # the depth tint is the Ocean's
 	if boundary_radius > 0.0:
 		_shift_fog(0.0)  # the environment outlives the ocean
+	WaterLook.top_camera_y = -INF
 
 
 ## Puts the graphics quality's render scale on the window and the split-screen views when the tier (or the adaptive factor) changes.

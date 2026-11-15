@@ -16,6 +16,8 @@ const GEMS := ["staghorn", "brain", "table", "fan"]
 
 var radius := 150.0
 var edge_height := 40.0
+## The red wall of light on the edge (Unnatural's; off for a mode whose wall is just murk).
+var edge_glow := true
 var rng := RandomNumberGenerator.new()
 ## The ruin clusters' middles (this node's space, y 0), for shrines to keep clear of.
 var cluster_spots: Array[Vector3] = []
@@ -408,6 +410,8 @@ func _build_edge() -> void:
 			else:
 				_put(band, ReefKit.mesh("kelp", rng.randi() % ReefKit.VARIANTS), at, rng.randf_range(most * 0.45, most), 0.05, 0.0, false)
 		_flush_kelp(band)
+	if not edge_glow:
+		return
 	var wall := MeshInstance3D.new()
 	wall.name = "EdgeGlow"
 	var tube := CylinderMesh.new()

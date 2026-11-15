@@ -1,0 +1,4 @@
+look_shots rock1  window (1920, 1080)  10 frames per reading  preset OURS
+view 2 ruin_shafts  gpu 2.27 ms  cpu 0.35 ms  (1 viewport)  draw calls 130
+view 3 reef_close   gpu 1.80 ms  cpu 0.28 ms  (1 viewport)  draw calls 179
+view 5 floor_murk   gpu 1.46 ms  cpu 0.44 ms  (1 viewport)  draw calls 477

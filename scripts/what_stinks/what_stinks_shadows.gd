@@ -35,6 +35,8 @@ func build(middle: Vector3, rng_seed: int) -> void:
 	for i in settings.shadow_count:
 		var flat := Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * settings.arena_radius * 0.8
 		var at := middle + Vector3(flat.x, rng.randf_range(-5.0, 5.0), flat.y)
+		if settings.floor_enabled:
+			at.y = middle.y - settings.floor_depth + settings.shadow_radius * 0.6  # the pieces' base (0.6 r under the middle) on the sand
 		var kind := "kelp" if i % 2 == 0 else "arch"
 		add_spot(at, settings.shadow_radius, kind, rng.randi() & 0x7fffffff)
 

@@ -73,6 +73,8 @@ var join: WhatStinksJoin
 var echo: WhatStinksEcho
 ## The kelp stands and rock arches the echo can't reach into.
 var shadows: WhatStinksShadows
+## The sea floor (floor_enabled; null without): Unnatural's seabed, floor_depth under the middle.
+var seabed: Seabed
 ## The Hunter's reveal layers on the prey (HiderLooks, bound to this match).
 var looks: WhatStinksLooks
 ## The follow cam and the school lock-on (WhatStinksCam).
@@ -161,6 +163,7 @@ func _ready() -> void:
 	if environment is Ocean:
 		(environment as Ocean).boundary_center = center
 		(environment as Ocean).boundary_radius = settings.arena_radius
+	_build_floor()
 	field = WhatStinksField.new()
 	field.name = "Field"
 	field.authority = authority
@@ -1282,13 +1285,35 @@ func _prey_spawn() -> Transform3D:
 	return Transform3D(Basis(Vector3.UP, _rng.randf() * TAU), at)
 
 
-## Past the wall (arena_radius): a push back in, as Hunt and Marco Polo's ocean.
+## The sea floor under the arena: Unnatural's seabed (its own copy of the Unnatural settings, sized to this arena, no red edge wall).
+func _build_floor() -> void:
+	if not settings.floor_enabled or not (environment is Ocean):
+		return
+	var floor_settings := UnnaturalSettings.shared().duplicate() as UnnaturalSettings
+	floor_settings.arena_radius = settings.arena_radius
+	seabed = Seabed.new()
+	seabed.name = "Seabed"
+	seabed.edge_glow = false
+	add_child(seabed)
+	seabed.global_position = center + Vector3.DOWN * settings.floor_depth
+	seabed.setup(floor_settings, settings.floor_seed, settings.floor_depth + 10.0)
+	seabed.set_murk((environment as Ocean).fog_density())
+
+
+## Past the wall (arena_radius): a push back in, as Hunt and Marco Polo's ocean. Over the floor: a push back up.
 func _keep_in_arena(delta: float) -> void:
 	if not (environment is Ocean):
 		return
+	var floor_y := center.y - settings.floor_depth + settings.floor_clearance
 	for fish in players:
 		if not is_instance_valid(fish) or fish.freeze or fish.puppet or eaten.has(fish):
 			continue
+		if seabed != null and fish.global_position.y < floor_y:
+			var under := floor_y - fish.global_position.y
+			var change := settings.floor_push * (1.0 + under) * delta
+			if fish.linear_velocity.y < 0.0:
+				change -= fish.linear_velocity.y * minf(8.0 * delta, 1.0)
+			fish.apply_push(Vector3.UP * change)
 		var out := fish.global_position - center
 		var past := out.length() - settings.arena_radius
 		if past <= 0.0:
