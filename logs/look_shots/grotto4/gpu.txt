@@ -1,0 +1,3 @@
+look_shots grotto4  window (1920, 1080)  90 frames per reading  preset OURS
+view 3 reef_close   gpu 1.89 ms  cpu 0.34 ms  (1 viewport)  draw calls 179
+view 5 floor_murk   gpu 1.49 ms  cpu 0.42 ms  (1 viewport)  draw calls 477

@@ -74,7 +74,9 @@ static func shared() -> UnnaturalSettings:
 ## Blades per metre of strand height in a kelp column (the base the density multiplies).
 @export_range(0.0, 200.0, 1.0, "or_greater") var flora_blades_per_m := 30.0
 ## Kelp density: multiplies the blades of every forest column.
-@export_range(0.0, 8.0, 0.05, "or_greater") var flora_kelp_density := 1.0
+@export_range(0.0, 8.0, 0.05, "or_greater") var flora_kelp_density := 1.6
+## How tall the kelp columns grow, as a multiple of the 6.5-9.5 m base (towering kelp frames the view).
+@export_range(0.3, 5.0, 0.05, "or_greater") var flora_kelp_height := 1.8
 ## Blade count multiplier for all blade flora (kelp now, cover and grass as they are added).
 @export_range(0.0, 8.0, 0.05, "or_greater") var flora_blade_mult := 1.0
 ## How dense the arena edge's tall kelp band is compared with a forest (it has far more, taller, columns).
@@ -118,10 +120,10 @@ static func shared() -> UnnaturalSettings:
 ## Growth on the ruins (carpet at their edge, tufts on the platform and column feet, fronds under the beams): multiplies those counts.
 @export_range(0.0, 20.0, 0.05, "or_greater") var flora_ruin_cover := 2.0
 ## The most blades the carpets, grass, tufts and fronds may add in all (0: no limit).
-@export_range(0, 2000000, 1000, "or_greater") var flora_cover_budget := 230000
+@export_range(0, 2000000, 1000, "or_greater") var flora_cover_budget := 600000
 ## Sway of the blades in the current (1: as in abyssal-garden), their width, their length and their brightness.
 @export_range(0.0, 10.0, 0.05, "or_greater") var flora_sway := 1.0
-@export_range(0.1, 6.0, 0.05, "or_greater") var flora_width := 1.0
+@export_range(0.1, 6.0, 0.05, "or_greater") var flora_width := 1.4
 @export_range(0.1, 6.0, 0.05, "or_greater") var flora_length := 1.0
 @export_range(0.0, 8.0, 0.05, "or_greater") var flora_brightness := 2.0
 

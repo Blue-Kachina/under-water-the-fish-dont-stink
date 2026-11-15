@@ -313,6 +313,8 @@ static func shared() -> WaterLook:
 @export_range(0.0, 4.0, 0.01, "or_greater") var rock_rim := 0.35
 ## Sand: how much of the floor is covered by magenta encrusting growth (0 none).
 @export_range(0.0, 2.0, 0.01, "or_greater") var sand_cover := 0.5
+## How much of the floor is bare, encrusted rock instead of sand (0 none; scales the rocky regions' strength).
+@export_range(0.0, 2.0, 0.01, "or_greater") var rocky_floor := 1.0
 ## The per-run biome tint on sand and rock (Unnatural): a colour cast picked from the run's seed, and how strong it is (0 none).
 @export var biome_enabled := true
 @export_range(0.0, 1.0, 0.01) var biome_strength := 0.4
@@ -592,7 +594,7 @@ func push_materials() -> void:
 	g.global_shader_parameter_set("water_mat_kelp2", Vector4(kelp_warm_r, kelp_warm_g, kelp_warm_b, kelp_sparkle_share))
 	g.global_shader_parameter_set("water_mat_coral", Vector4(coral_fluorescence, coral_flu_min, maxf(coral_flu_max, coral_flu_min), coral_tip))
 	g.global_shader_parameter_set("water_mat_rock", Vector4(rock_strata, rock_detail, rock_algae, rock_rim))
-	g.global_shader_parameter_set("water_mat_sand", Vector4(sand_cover, 0.0, 0.0, 0.0))
+	g.global_shader_parameter_set("water_mat_sand", Vector4(sand_cover, rocky_floor, 0.0, 0.0))
 	var c := biome_color()
 	g.global_shader_parameter_set("water_biome", Vector4(c.r, c.g, c.b, biome_strength if biome_enabled else 0.0))
 

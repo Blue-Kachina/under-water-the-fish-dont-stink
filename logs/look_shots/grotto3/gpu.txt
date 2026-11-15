@@ -1,0 +1,2 @@
+look_shots grotto3  window (1920, 1080)  90 frames per reading  preset OURS
+view 3 reef_close   gpu 1.87 ms  cpu 0.36 ms  (1 viewport)  draw calls 179

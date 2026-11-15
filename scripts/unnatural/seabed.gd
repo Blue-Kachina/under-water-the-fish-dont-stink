@@ -306,7 +306,7 @@ func _plant_column(spot: Vector2, size: float, density: float) -> void:
 	var roll := dice.randf()
 	var kind := 1 if roll < 0.08 else (2 if roll < 0.2 else 0)
 	var glints := _settings.flora_glints_per_m if WaterLook.shared().glints_per_plant > 0 else 0.0
-	flora.add_kelp_column(Vector3(spot.x, 0.0, spot.y), dice.randf_range(6.5, 9.5) * size, kind,
+	flora.add_kelp_column(Vector3(spot.x, 0.0, spot.y), dice.randf_range(6.5, 9.5) * size * _settings.flora_kelp_height, kind,
 			_settings.flora_blades_per_m * _settings.flora_blade_mult, density * _settings.flora_kelp_density, glints, 1.0, dice)
 
 

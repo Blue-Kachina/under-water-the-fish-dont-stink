@@ -81,8 +81,9 @@ void vertex() {
 	float hsel = fl_hs(s1 * 13.7 + s2 * 71.3);
 	int ti = int(ty);
 	if (ti == 0) { // olive kelp
-		col = mix(vec3(0.11, 0.125, 0.022), vec3(0.04, 0.10, 0.04), s1);
-		col = mix(col, vec3(0.25, 0.17, 0.025), step(0.72, s2));
+		col = mix(vec3(0.10, 0.20, 0.045), vec3(0.04, 0.13, 0.06), s1);
+		col = mix(col, vec3(0.20, 0.07, 0.34), step(0.62, s2));  // violet leaves
+		col = mix(col, vec3(0.42, 0.34, 0.04), step(0.86, fract(s2 * 7.3 + s1)));  // yellow-ochre leaves
 		pr = vec4(0.24, 0.9, 0.0, 0.0);
 		spc = fl_pal(hsel * 0.72);
 		shp = vec2(0.5, 0.32);
