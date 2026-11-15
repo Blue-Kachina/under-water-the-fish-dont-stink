@@ -95,7 +95,7 @@ const TABS := {
 	"nature": [["Schools", ["Schools", "Formation", "Spawning", "Performance"]],
 			["Battering", ["Battered fish", "School Reactions", "Multis & Sprees"]],
 			["Pearls & Targets", ["Pearls", "Targeting"]]],
-	"unnatural": [["Arena", ["Arena", "Seabed", "Murk", "Minimap", "Compass", "Camera"]],
+	"unnatural": [["Arena", ["Arena", "Seabed", "Flora", "Murk", "Minimap", "Compass", "Camera"]],
 			["Feel", ["Feel", "Assist"]],
 			["Horde", ["Director", "Enemies", "Twists"]],
 			["Survivor", ["Player", "Batteries", "Levels", "Weapons and Tomes", "Pearls"]],

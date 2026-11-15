@@ -66,6 +66,65 @@ static func shared() -> UnnaturalSettings:
 ## How far scenery is drawn (m; 0: follow the murk, as the horde does).
 @export_range(0.0, 1000.0, 5.0, "or_greater") var scenery_draw_distance := 0.0
 
+@export_group("Flora")
+## Blade flora (planning_abyssal_look.md): the kelp is built from thousands of curved ribbon blades, each one instance of a
+## small mesh, shaded for arc, twist, ruffle, sway, translucency and sparkle. Off: the old three-stipe kelp meshes.
+## (Layout values apply when the next stage is built; the look values below apply live.)
+@export var flora_blades := true
+## Blades per metre of strand height in a kelp column (the base the density multiplies).
+@export_range(0.0, 200.0, 1.0, "or_greater") var flora_blades_per_m := 30.0
+## Kelp density: multiplies the blades of every forest column.
+@export_range(0.0, 8.0, 0.05, "or_greater") var flora_kelp_density := 1.0
+## Blade count multiplier for all blade flora (kelp now, cover and grass as they are added).
+@export_range(0.0, 8.0, 0.05, "or_greater") var flora_blade_mult := 1.0
+## How dense the arena edge's tall kelp band is compared with a forest (it has far more, taller, columns).
+@export_range(0.0, 4.0, 0.05, "or_greater") var flora_edge_density := 0.25
+## How far blade flora is drawn (m; 0: follow the murk like the rest of the scenery).
+@export_range(0.0, 1000.0, 5.0, "or_greater") var flora_draw_distance := 0.0
+## Where the full blade mesh gives way to the thin far level (m; 0: always full).
+@export_range(0.0, 300.0, 1.0, "or_greater") var flora_lod_distance := 28.0
+## The share of blades the far level keeps (the rest are dropped there, the kept ones drawn wider).
+@export_range(0.05, 1.0, 0.01) var flora_far_keep := 0.6
+## Rows (pairs of vertices) in the near blade mesh, and in the far one.
+@export_range(2, 24, 1, "or_greater") var flora_rows := 7
+@export_range(2, 12, 1, "or_greater") var flora_rows_far := 3
+## Sparkles riding on the kelp per metre of column height (0: none; the global Kelp glints switch also applies).
+@export_range(0.0, 40.0, 0.1, "or_greater") var flora_glints_per_m := 4.0
+## Ground-cover carpets: how many patches of small tufts are laid (they go where the reef is, round rocks and ruins, and in a few
+## open spots). 0: no carpets. Layout values apply when the next stage is built.
+@export_range(0, 3000, 5, "or_greater") var flora_cover_patches := 90
+## Carpet tufts per square metre at a patch's middle (thinning toward its edge; each tuft is 2-4 blades).
+@export_range(0.0, 400.0, 0.5, "or_greater") var flora_cover_per_m2 := 16.0
+## Mean radius of a carpet patch (m).
+@export_range(0.5, 120.0, 0.5, "or_greater") var flora_cover_radius := 4.0
+## Size of the carpet tufts (1: abyssal-garden's 8-26 cm).
+@export_range(0.1, 10.0, 0.05, "or_greater") var flora_cover_size := 1.0
+## Grass clusters (long teal and cyan ribbons, 8-22 at a time) on open ground in the grass zones, on top of the old sea-grass spots.
+@export_range(0, 20000, 10, "or_greater") var flora_grass_clusters := 500
+## Blades in each of those clusters.
+@export_range(1.0, 200.0, 1.0, "or_greater") var flora_grass_blades := 16.0
+## Length of the grass blades (1: 1-3 m for the big clusters, 0.5-1.4 m for the sea-grass spots).
+@export_range(0.1, 10.0, 0.05, "or_greater") var flora_grass_size := 1.0
+## The sea-grass spots grow blade grass in place of the old sea-grass meshes (off: the meshes stay and no blades grow there).
+@export var flora_replace_seagrass := true
+## Blades in the grass clump that stands in for each old sea-grass mesh.
+@export_range(0.0, 100.0, 0.5, "or_greater") var flora_seagrass_blades := 7.0
+## Tufts ringing the foot of every seabed rock (per metre of its width), and tufts on the sides of rocks and outcrops (each).
+@export_range(0.0, 60.0, 0.1, "or_greater") var flora_rock_tufts := 5.0
+@export_range(0.0, 60.0, 0.1, "or_greater") var flora_wall_tufts := 3.0
+## Hanging clumps under outcrop rocks and ruin architraves (per overhang), and the blades in each clump.
+@export_range(0.0, 60.0, 0.1, "or_greater") var flora_frond_clumps := 2.0
+@export_range(1.0, 200.0, 1.0, "or_greater") var flora_frond_blades := 10.0
+## Growth on the ruins (carpet at their edge, tufts on the platform and column feet, fronds under the beams): multiplies those counts.
+@export_range(0.0, 20.0, 0.05, "or_greater") var flora_ruin_cover := 2.0
+## The most blades the carpets, grass, tufts and fronds may add in all (0: no limit).
+@export_range(0, 2000000, 1000, "or_greater") var flora_cover_budget := 230000
+## Sway of the blades in the current (1: as in abyssal-garden), their width, their length and their brightness.
+@export_range(0.0, 10.0, 0.05, "or_greater") var flora_sway := 1.0
+@export_range(0.1, 6.0, 0.05, "or_greater") var flora_width := 1.0
+@export_range(0.1, 6.0, 0.05, "or_greater") var flora_length := 1.0
+@export_range(0.0, 8.0, 0.05, "or_greater") var flora_brightness := 2.0
+
 @export_group("Murk")
 ## Murky water (planning_murk.md): the fog's density in the arena (0: the
 ## ocean's own, with the blood moon's). The edge's thickening goes on top.

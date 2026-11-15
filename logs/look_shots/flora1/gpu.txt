@@ -1,0 +1,2 @@
+look_shots flora1  window (1920, 1080)  20 frames per reading  preset OURS
+view 1 kelp_up      gpu 0.72 ms  cpu 0.21 ms  (1 viewport)  draw calls 62

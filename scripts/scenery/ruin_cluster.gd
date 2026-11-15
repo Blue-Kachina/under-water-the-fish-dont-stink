@@ -10,6 +10,47 @@ extends RefCounted
 const GODS := ["poseidon", "tyche", "hades", "aphrodite"]
 
 
+## Where a seed's ruin has its platform, standing columns and architrave beams (local space), for the flora to grow on and hang from.
+## Replays only the dice of `build` up to the architrave, so keep the two in step. {width, depth, bases: columns standing (base),
+## lintels: beams still in place (underside centre), gap: their length - 0.5}
+static func layout(seed_value: int) -> Dictionary:
+	var dice := RandomNumberGenerator.new()
+	dice.seed = seed_value
+	var width := dice.randf_range(13.0, 18.0)
+	var depth := dice.randf_range(8.0, 11.0)
+	var tilt := Basis(Vector3.RIGHT, dice.randf_range(-0.04, 0.04)) * Basis(Vector3.BACK, dice.randf_range(-0.03, 0.03))
+	var floor_y := 0.55
+	var count := maxi(roundi((width - 1.6) / 2.6), 3)
+	var gap := (width - 1.6) / (count - 1)
+	var standing := PackedByteArray()
+	standing.resize(count)
+	var bases: Array[Vector3] = []
+	for n in count:
+		var x := -width * 0.5 + 0.8 + gap * n
+		dice.randf()  # turn
+		var roll := dice.randf()
+		if roll < 0.5:
+			standing[n] = 1
+			bases.append(tilt * Vector3(x, floor_y, depth * 0.5 - 0.9))
+		elif roll < 0.8:
+			dice.randf()  # the drum's height
+		else:
+			dice.randf()
+			dice.randf()
+			dice.randf()
+	var lintels: Array[Vector3] = []
+	for n in count - 1:
+		if standing[n] and standing[n + 1]:
+			var x := -width * 0.5 + 0.8 + gap * (n + 0.5)
+			if dice.randf() < 0.25:
+				dice.randf()
+				dice.randf()
+				dice.randf()
+			else:
+				lintels.append(tilt * Vector3(x, floor_y + GreekKit.COLUMN_HEIGHT, depth * 0.5 - 0.9))
+	return {"width": width, "depth": depth, "bases": bases, "lintels": lintels, "gap": gap}
+
+
 static func build(seed_value: int) -> MeshKit:
 	var kit := MeshKit.new()
 	var dice := RandomNumberGenerator.new()

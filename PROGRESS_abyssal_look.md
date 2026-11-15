@@ -353,3 +353,54 @@ Other probes on the final run: `look_tank_probe` ALL PASSED (includes quality-ti
 - Headless runs skip shader compile, so shader validity rests on the logged GPU runs.
 - The per-view sun tint (fallback 2) is not built.
 - Marco Temple has no water model (stretch not taken).
+
+## Flora pass, phases 1+2: blade system and blade kelp (2026-11-15)
+
+**Built**
+- `scripts/scenery/flora_field.gd` (`FloraField`): blade flora in 32 m tiles (Scatter conventions: `draw_distance`, `fade`, `clear_around`, `build`, counts). One curved-ribbon mesh (`blade_mesh(rows)`, 2 verts per row, UV = side and row fraction, rows bunched toward the tip) instanced by MultiMesh. The blade's data rides in the instance transform, written as one `buffer` per tile (12 floats, 48 B per blade): origin = root, `basis.x` = length/yaw/tilt, `basis.y` = width/sway height/type+bend, `basis.z.xy` = two seeds. The shader reads `MODEL_MATRIX` and writes `POSITION`; so the field node must only be translated (Seabed is). Layer 2 holds glints on the same tiles.
+- **LOD / culling:** near MultiMesh (7 rows) out to `flora_lod_distance`, then a far MultiMesh with 3 rows, only `flora_far_keep` of the blades (stable subset by seed) drawn wider; both end at the draw distance (follows the murk like Scatter, or `flora_draw_distance`). In the shader the width fades to nothing toward the draw distance and close to the camera (their `farK`), so no popping or blades in the lens.
+- `shaders/flora_blade.gdshader` (MIT header, port of W_LEAF): constant-curvature arc (bend + breathing), twist, travelling ruffle (near only), height-scaled sway (`shaders/flora_sway.gdshaderinc`, a^1.25), 8 types (olive, dark stipe, teal grass, violet, amber, magenta cover, red, cyan) with their palettes, shape, translucency, iridescence, emissive, sparkle colour. Fragment: gradient, veins + midrib, thin film, warm back-light translucency and travelling sparkle band driven by the existing `water_mat_kelp/kelp2` globals, `wm_light`, `wc_caustics`, Godot BACKLIGHT. Types 5-7 (cover) are ready for phase 3.
+- `FloraField.add_kelp_column` = their `column()`: 2-4 strands twisting round each other, a dark stipe leaf every 1.7 m per strand, then `height * blades_per_m * density` ribbons (30/m base, rolled 0.55-1.3 per column), shorter and more upright toward the top, per-blade type/colour, plus `flora_glints_per_m` sparkles.
+- **Glints kept:** `shaders/flora_glint.gdshader` (copy of `kelp_glint` that takes its point from the instance and sways with `flora_sway`); `WaterLook.push_particles` copies the glint look to it, so the Particles tab still drives both. `KelpGlints` (old kelp meshes) is untouched.
+- **Seabed:** `_build_reef` kelp forests and `_build_edge` kelp band place columns with `_plant_column` (own dice from one `rng.randi()`, so the layout after does not depend on blade settings). Old 3-stipe meshes + Scatter remain behind `flora_blades` off. `set_murk` sets the flora draw distance, `clear_around` clears flora too, `_process` pushes the look values live.
+- **Settings** (`UnnaturalSettings`, new "Flora" group in the Arena tab, wide ranges, docs regenerated, 2311 entries): `flora_blades`, `flora_blades_per_m` 30, `flora_kelp_density` 1, `flora_blade_mult` 1, `flora_edge_density` 0.25 (the edge band has 420 tall columns), `flora_draw_distance` 0 (follow murk), `flora_lod_distance` 28, `flora_far_keep` 0.6, `flora_rows` 7, `flora_rows_far` 3, `flora_glints_per_m` 4, and live look values `flora_sway`, `flora_width`, `flora_length`, `flora_brightness` (2.0). Layout values apply when the next stage is built.
+- **Tests/tools:** `tests/flora_probe.gd/.tscn` (blade data round trip through a MultiMesh (GPU run only, the headless renderer keeps no instance data), column, glints, far subset, clear_around, Seabed with the flag on/off, multiplier). `tests/flora_shot.gd/.tscn` renders a close-up of kelp columns and cover on a plain background (`-- --out=logs/flora_shots/a.png --cam=x,y,z --look=x,y,z`).
+
+**Blade counts** (default settings, `flora_probe`, arena radius default, seed 11): **119,018 blades** (71,098 drawn at the far level), 29,105 glints, 198 MultiMesh nodes (blades near+far, glints), 1061 Scatter tiles. Blade multiplier 0.5 gives 65,335. In the Look Tank's stage (bigger arena) 166,224 blades. Build 0.75-0.9 s for the seabed (flora included).
+
+**Measured (RTX 4070 Ti SUPER, 1920x1080, Look Tank GPU ms; phase 5 in brackets):** kelp_up 0.72 (0.60), ruin_shafts 1.82 (1.57), reef_close 1.62 (1.47), open_blue 1.65 (1.53), floor_murk 1.28 (1.18), split 1.73 (1.54): +0.1 to +0.25 ms, inside the +1.5 ms budget; draw calls per view went down (the kelp glint tiles are gone). `split_bench --players=3 --count=2000`: 13.44 ms (74 fps), GPU 3.89, draw calls 3753 (baseline 12.41-13.40 ms, 3700). Shots: `logs/look_shots/flora1/`, `flora2/`; close-up `logs/flora_shots/a.png`.
+
+**Probes:** `flora_probe` ALL PASSED (headless and on the GPU), `look_tank_probe` ALL PASSED, `murk_probe` ALL PASS, `modes_probe` passed, no shader or script errors in the Look Tank GPU runs.
+
+**Open items**
+- Needs your eyes: kelp colour/brightness (`flora_brightness` 2.0, types are abyssal-garden's values doubled), density in the forests (columns are the old `seabed_kelp` count and 6.5-9.5 m, not their 15-40 m), and how the edge band reads at 0.25 density.
+- Look Tank view 1 now looks up at open water (the spot is the highest kelp noise, no longer where a column stands); retarget it to a real column later.
+- Phase 3 (ground cover, hanging fronds, wall tufts) can use `FloraField.add_blade` with types 2, 5, 6, 7.
+- Sway uses TIME (not the pausing water clock). Co-op machines lay out the same blades (seeded), the sway is per machine.
+
+## Flora pass, phase 3: ground cover, grass, tufts, fronds (2026-11-15)
+
+**Built**
+- `FloraField` recipes (share a blade budget `cover_cap` and a count multiplier `count_mult`): `add_tuft` (2-4 short blades), `add_cluster` (abyssal-garden's `cluster`), `add_hanging` (fronds pointing down, tilt PI), `add_wall_tuft` (blades leaning out of a wall). Blade types used: 5 magenta and 7 cyan carpets, 2 teal grass, 6 red and 0 olive fronds, 0/3 wall tufts.
+- `Seabed._build_cover()` (after `_build_edge`, before the tiles are built). It uses a dice of its own, seeded from the stage seed, so no other layout shifts: with every phase 3 setting at 0 the blade count is exactly phase 2's 119,018.
+  - **Structure first:** ruins (carpet band round the platform, tufts on the lower step and column feet, fronds under standing architrave beams), outcrop rocks (side tufts, fronds under stacked rocks, clamped so they never reach below the sand), seabed rocks and rubble (carpet ring round the foot, side tufts).
+  - **Grass:** one clump per old sea-grass spot (teal, some cyan; the old meshes are dropped with `flora_replace_seagrass`), plus bigger 1-3 m clusters where the grass noise is hot.
+  - **Carpets last:** patches (centres weighted to reef zones, near ruins, and a few open spots), tufts thin toward the edge, modulated by a noise, magenta in the reef, cyan/teal on sand, 30% with taller cyan blades. They keep off rocks, ruin platforms, the start area (`_clear_of_start`) and the arena edge. Shrines still clear them via `clear_around`.
+- `RuinCluster.layout(seed)`: replays `build`'s dice up to the architrave to give platform size, standing column bases and beams still in place. Keep it in step with `build`.
+- Seabed records what flora grows on: rocks, ruins, outcrop rocks, sea-grass spots.
+- Settings (Flora group, wide ranges, docs regenerated, 2326 entries): `flora_cover_patches` 60, `flora_cover_per_m2` 10, `flora_cover_radius` 3.5, `flora_cover_size`, `flora_grass_clusters` 500, `flora_grass_blades` 16, `flora_grass_size`, `flora_replace_seagrass`, `flora_seagrass_blades` 7, `flora_rock_tufts` 5, `flora_wall_tufts` 3, `flora_frond_clumps` 2, `flora_frond_blades` 10, `flora_ruin_cover` 1, `flora_cover_budget` 160000 (0: unlimited). `flora_blade_mult` scales all of it. Layout values apply on the next stage build.
+
+**Counts** (defaults, seed 11, `flora_probe`): phase 3 adds 101,761 blades (budget 160,000); total 220,779 blades (132,092 at the far level), 264 MultiMesh nodes, 970 Scatter tiles (was 1061, seagrass meshes gone). Blade multiplier 0.5: 107,283. Stage build ~0.95 s.
+
+**Measured** (Look Tank GPU ms, `flora3` shots, phase 2 in brackets): kelp_up 0.75 (0.72), ruin_shafts 1.86 (1.82), reef_close 1.68 (1.62), open_blue 1.74 (1.65), floor_murk 1.34 (1.28), split 1.87 (1.73). Draw calls unchanged to +3. `split_bench` is CPU-bound and noisy (14.3 and 8.4 ms frames in two runs), GPU total 3.78-4.13 ms (phase 2: 3.89). Probes: `flora_probe` (new checks: cover laid, budget cap, all-zero equals kelp only, ruin layout), `murk_probe`, `modes_probe` pass headless; no shader or script errors in the GPU runs.
+
+**Open items**
+- Needs your eyes: carpet look at close range (tufts read as pink shards, density `flora_cover_per_m2`), wall tufts and fronds on outcrops (placed from an ellipsoid approximation of the rock, not the mesh, so some float or sink a little), colours.
+- Our floor is flat, so "gentle ground" is everywhere; hanging fronds only exist under outcrop rocks and ruin beams (small seabed rocks have none).
+- No glints on the cover (abyssal-garden adds a few).
+
+## Flora verify pass (2026-11-15)
+- Headless: flora_probe, look_tank_probe, murk_probe, modes_probe, stage_probe pass (stage_probe "blood bolts hurt" is the known flake; passes on rerun). No script errors.
+- Bench (tests/split_bench.tscn, new `--set=key=value` flag for any UnnaturalSettings value): GPU total 3P 4.47 ms vs 3.98-4.05 with flora off (+11%); 1P 2.62 ms same as off. Frame times are bimodal on this machine (70 vs 130 fps) with flora on AND off, so GPU ms is the reliable figure; best 3P runs 139 fps (on) vs 130 (off).
+- Fixes: Look Tank view 1 now stands in the densest blade-kelp (Seabed.kelp_spots); carpets were sparse shards, so defaults raised: flora_cover_patches 90, flora_cover_per_m2 16, flora_cover_radius 4, flora_ruin_cover 2, flora_cover_budget 230000 (total ~318k blades). flora_probe tolerates the budget overshoot of one recipe.
+- Shots: logs/look_shots/flora_after/ (views 2 and 5 re-shot after the ruin_cover bump; others before it).

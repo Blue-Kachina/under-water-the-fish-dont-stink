@@ -222,6 +222,17 @@ func _find_spots() -> void:
 						reef = p
 			z += 5.0
 		x += 5.0
+	var crowd := 0  # blade kelp: the column with the most columns within 8 m, so the camera stands in a forest
+	for c in seabed.kelp_spots:
+		if c.length() < 30.0 or c.length() > reach or not seabed._clear_of_ruins(c, 10.0):
+			continue
+		var near := 0
+		for o in seabed.kelp_spots:
+			if c.distance_squared_to(o) < 64.0:
+				near += 1
+		if near > crowd:
+			crowd = near
+			kelp = c
 	spots.kelp = base + Vector3(kelp.x, 0.0, kelp.y)
 	spots.reef = base + Vector3(reef.x, 0.0, reef.y)
 	var ruin := Vector3(40.0, 0.0, 40.0)

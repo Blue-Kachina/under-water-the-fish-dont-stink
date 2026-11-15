@@ -694,6 +694,10 @@ func push_particles() -> void:
 	g.set_shader_parameter("far_a", glint_far_a)
 	g.set_shader_parameter("far_b", maxf(glint_far_b, glint_far_a + 0.01))
 	g.set_shader_parameter("color", Vector3(glint_color_r, glint_color_g, glint_color_b))
+	# The blade flora's glints (FloraField) share the look, with their own sway.
+	var fg := FloraField.glint_material()
+	for param: String in ["size", "min_px", "peak", "speed", "density", "far_a", "far_b", "color"]:
+		fg.set_shader_parameter(param, g.get_shader_parameter(param))
 	push_bubbles()
 
 

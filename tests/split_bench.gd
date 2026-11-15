@@ -33,6 +33,7 @@ var profile := false
 var kind_ids: Array[String] = ["sardine", "clownfish", "boxfish", "swordfish", "ray"]
 var lunge_impact := -1
 var iframes := -1.0
+var sets: Array[String] = []
 
 
 func _ready() -> void:
@@ -63,6 +64,8 @@ func _ready() -> void:
 			lunge_impact = arg.trim_prefix("--lunge_impact=").to_int()
 		elif arg.begins_with("--iframes="):
 			iframes = arg.trim_prefix("--iframes=").to_float()
+		elif arg.begins_with("--set="):  # --set=key=value: any UnnaturalSettings value (numbers, true/false)
+			sets.append(arg.trim_prefix("--set="))
 	get_window().size = Vector2i(1920, 1080)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = 0
@@ -74,6 +77,10 @@ func _ready() -> void:
 func _run(main: Node) -> void:
 	var settings := UnnaturalSettings.shared()
 	settings.spawning = false
+	for kv in sets:
+		var parts := kv.split("=")
+		var cur: Variant = settings.get(parts[0])
+		settings.set(parts[0], (parts[1] == "true") if cur is bool else (parts[1].to_int() if cur is int else parts[1].to_float()))
 	if no_scenery:
 		for key: String in ["seabed_rocks", "seabed_kelp", "seagrass", "corals", "sponges", "anemones", "small_life", "ruin_rubble",
 				"ruin_clusters", "edge_rocks", "edge_kelp", "shrine_count"]:

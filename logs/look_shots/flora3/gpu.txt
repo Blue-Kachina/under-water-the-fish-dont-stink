@@ -1,0 +1,7 @@
+look_shots flora3  window (1920, 1080)  90 frames per reading  preset OURS
+view 1 kelp_up      gpu 0.75 ms  cpu 0.24 ms  (1 viewport)  draw calls 83
+view 2 ruin_shafts  gpu 1.86 ms  cpu 0.32 ms  (1 viewport)  draw calls 131
+view 3 reef_close   gpu 1.68 ms  cpu 0.30 ms  (1 viewport)  draw calls 180
+view 4 open_blue    gpu 1.74 ms  cpu 0.44 ms  (1 viewport)  draw calls 436
+view 5 floor_murk   gpu 1.34 ms  cpu 0.45 ms  (1 viewport)  draw calls 475
+view 6 split        gpu 1.87 ms  cpu 0.71 ms  (2 viewports)  draw calls 649
