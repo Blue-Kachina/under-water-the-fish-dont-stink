@@ -1,0 +1,7 @@
+look_shots terrain_off_p5  window (1920, 1080)  30 frames per reading  preset OURS
+view 1 kelp_up      gpu 1.18 ms  cpu 0.27 ms  (1 viewport)  draw calls 77
+view 2 ruin_shafts  gpu 2.09 ms  cpu 0.36 ms  (1 viewport)  draw calls 130
+view 3 reef_close   gpu 1.81 ms  cpu 0.36 ms  (1 viewport)  draw calls 179
+view 4 open_blue    gpu 1.96 ms  cpu 0.52 ms  (1 viewport)  draw calls 450
+view 5 floor_murk   gpu 1.47 ms  cpu 0.49 ms  (1 viewport)  draw calls 477
+view 6 split        gpu 2.31 ms  cpu 0.76 ms  (2 viewports)  draw calls 667

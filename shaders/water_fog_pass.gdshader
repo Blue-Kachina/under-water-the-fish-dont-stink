@@ -12,6 +12,7 @@ shader_type spatial;
 render_mode unshaded, depth_test_disabled, depth_draw_never, cull_disabled, fog_disabled, shadows_disabled;
 
 #include "res://shaders/water_fog.gdshaderinc"
+#include "res://shaders/water_openness.gdshaderinc"
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_nearest, repeat_disable;
 uniform sampler2D depth_tex : hint_depth_texture, filter_nearest, repeat_disable;
@@ -40,7 +41,7 @@ void fragment() {
 		float te = exp(-wq_env_fog.w * d);
 		vec3 c = max((src - wq_env_fog.rgb * (1.0 - te)) / te, vec3(0.0));
 
-		vec3 scatter = wf_in(ro_y, rd, d, wf_sig);
+		vec3 scatter = wf_in(ro_y, rd, d, wf_sig) * wo_ray_sky(CAMERA_POSITION_WORLD, rd, d);  // dark in covered water
 		float far = smoothstep(wq_fade.x, max(wq_fade.y, wq_fade.x + 0.01), d);
 		ALBEDO = mix(c * exp(-wf_sig * d) + scatter, scatter, far);
 		ALPHA = 1.0;

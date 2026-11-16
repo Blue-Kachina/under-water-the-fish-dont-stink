@@ -38,6 +38,12 @@ project(under-water-the-fish-dont-stinkExt
     LANGUAGES CXX
 )
 
+# The terrain generator does millions of samples per stage: drop the run-time checks (incompatible with /O2) and
+# optimise its source even in a Debug tree.
+if(MSVC)
+    string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+endif()
+
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp" "src/*.h")
 add_library(${LIBNAME} SHARED)
 target_sources(${LIBNAME}
@@ -46,6 +52,12 @@ target_sources(${LIBNAME}
 )
 
 target_link_libraries(${LIBNAME} PRIVATE godot-cpp)
+
+if(MSVC)
+    set_source_files_properties(src/terrain_field.cpp PROPERTIES COMPILE_OPTIONS "/O2;/Ob2;/fp:precise")
+else()
+    set_source_files_properties(src/terrain_field.cpp PROPERTIES COMPILE_OPTIONS "-O2")
+endif()
 
 # Require at least C++17 for this target
 set_property(TARGET ${LIBNAME} PROPERTY CXX_STANDARD 17)

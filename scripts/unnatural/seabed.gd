@@ -11,6 +11,11 @@ extends Node3D
 ## The arena's edge is marked so it reads from far off: a ring of tall rock
 ## outcrops and a thick band of tall kelp on `radius`, and a faint red wall of
 ## light rising from it (round 2).
+##
+## With terrain_enabled (planning_procedural_world.md) a Terrain is built first: rock round the open middle and an edge
+## ring that takes the outcrops' place. The reef, ruins and sand keep to the flat floor between the rock (D9), and
+## _grow_terrain dresses the rock itself (kelp on its flats as tall as the water above allows, fronds under overhangs,
+## tufts on walls, carpets, corals and boulders).
 
 const GEMS := ["staghorn", "brain", "table", "fan"]
 
@@ -27,6 +32,11 @@ var kelp_spots: Array[Vector2] = []
 var scatter: Scatter
 ## The blade flora (kelp columns and their glints; null with `flora_blades` off): tiles of curved-ribbon MultiMeshes.
 var flora: FloraField
+## The procedural rock (null with terrain off).
+var terrain: Terrain
+## The set pieces (phase 7) and the background schools.
+var pieces: Array[Node3D] = []
+var schools: Array[School] = []
 var _settings: UnnaturalSettings
 var _glow := ShaderMaterial.new()
 var _clusters: Array[MeshInstance3D] = []
@@ -41,6 +51,10 @@ var _ruins: Array[Dictionary] = []
 var _outcrops: Array[Dictionary] = []
 var _grass_spots: Array[Vector3] = []
 var _cover_noise := FastNoiseLite.new()
+## A terrain being generated ahead on a worker thread (prefetch()), and what it was made for.
+var _prefetched: Terrain
+var _prefetch_key := ""
+var _prefetch_task := -1
 
 
 ## The seabed `settings.arena_radius` round, its top at this node's height.
@@ -83,6 +97,23 @@ func setup(settings: UnnaturalSettings, rng_seed := 11, edge_tall := 40.0) -> vo
 		flora.cover_cap = settings.flora_cover_budget
 		add_child(flora)
 	_build_sand()
+	terrain = null
+	if settings.terrain_enabled:
+		var key := _terrain_key(settings, rng_seed, edge_height)
+		if _prefetched != null and _prefetch_key == key:
+			WorkerThreadPool.wait_for_task_completion(_prefetch_task)
+			terrain = _prefetched
+			_prefetched = null
+			_prefetch_task = -1
+			add_child(terrain)
+			terrain.apply(settings)
+		else:
+			_drop_prefetch()
+			terrain = Terrain.new()
+			terrain.name = "Terrain"
+			add_child(terrain)
+			terrain.build(settings, rng_seed, radius, edge_height)
+		_build_set_pieces()
 	_build_ruins()
 	_build_reef()
 	_build_edge()
@@ -91,7 +122,42 @@ func setup(settings: UnnaturalSettings, rng_seed := 11, edge_tall := 40.0) -> vo
 	if flora:
 		flora.build()
 	_push_flora_look()
+	_build_life()
 	_murk = -1.0
+
+
+## Starts generating the terrain setup() will want for `rng_seed` on a worker thread (the stage-clear screen calls it
+## for the next stage, so the stage change only builds the nodes). A no-op with terrain off.
+func prefetch(settings: UnnaturalSettings, rng_seed: int, edge_tall: float) -> void:
+	if not settings.terrain_enabled:
+		return
+	var key := _terrain_key(settings, rng_seed, edge_tall)
+	if _prefetched != null and _prefetch_key == key:
+		return
+	_drop_prefetch()
+	_prefetched = Terrain.new()
+	_prefetched.name = "Terrain"
+	_prefetch_key = key
+	_prefetch_task = WorkerThreadPool.add_task(_prefetched.prepare.bind(settings, rng_seed, settings.arena_radius, edge_tall), false,
+			"terrain prefetch")
+
+
+func _terrain_key(settings: UnnaturalSettings, rng_seed: int, edge_tall: float) -> String:
+	return "%d/%.1f/%.1f/%.2f/%d" % [rng_seed, settings.arena_radius, edge_tall, settings.terrain_cell, settings.terrain_quality]
+
+
+func _drop_prefetch() -> void:
+	if _prefetch_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_prefetch_task)
+	if _prefetched != null:
+		_prefetched.free()
+	_prefetched = null
+	_prefetch_task = -1
+	_prefetch_key = ""
+
+
+func _exit_tree() -> void:
+	_drop_prefetch()
 
 
 ## The panel's blade look (live), onto the shared blade materials.
@@ -135,6 +201,8 @@ func set_murk(density: float) -> void:
 		flora.draw_distance = _settings.flora_draw_distance if _settings.flora_draw_distance > 0.0 else reach
 	for cluster in _clusters:
 		cluster.visibility_range_end = reach
+	if is_instance_valid(terrain):
+		terrain.set_draw_distance(reach)
 
 
 # --- Sand ------------------------------------------------------------------
@@ -162,7 +230,7 @@ func _build_ruins() -> void:
 		var found := false
 		for attempt in 40:
 			spot = _point(0.85)
-			found = spot.length() > maxf(_settings.scenery_clearing, 0.0) + 22.0
+			found = spot.length() > maxf(_settings.scenery_clearing, 0.0) + 22.0 and _flat(spot, 14.0)
 			for other in cluster_spots:
 				if Vector2(other.x, other.z).distance_to(spot) < _settings.ruin_spacing:
 					found = false
@@ -202,7 +270,7 @@ func _build_ruins() -> void:
 		if not cluster_spots.is_empty() and n % 2 == 0:
 			var near: Vector3 = cluster_spots[rng.randi() % cluster_spots.size()]
 			spot = Vector2(near.x, near.z) + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(10.0, 28.0)
-		if not _clear_of_start(spot):
+		if not _clear_of_start(spot) or not _flat(spot, 1.0):
 			continue
 		var kind := kinds[rng.randi() % kinds.size()]
 		_rocks.append(Vector4(spot.x, spot.y, 0.7, 0.0))  # a stone of rubble
@@ -268,7 +336,8 @@ func _build_reef() -> void:
 	while planted < _settings.seabed_kelp and tries < _settings.seabed_kelp * 30:
 		tries += 1
 		var centre := _point(1.05)
-		if _kelp_noise.get_noise_2dv(centre) < 0.25 or not _clear_of_ruins(centre, 10.0) or not _clear_of_start(centre):
+		if _kelp_noise.get_noise_2dv(centre) < 0.25 or not _clear_of_ruins(centre, 10.0) or not _clear_of_start(centre) \
+				or not _flat(centre, 4.0):
 			continue
 		for k in rng.randi_range(3, 7):
 			var spot := centre + Vector2(rng.randf_range(-3.0, 3.0), rng.randf_range(-3.0, 3.0))
@@ -341,7 +410,7 @@ func _flush_kelp(sets: Dictionary) -> void:
 func _find(test: Callable, tries := 24) -> Vector2:
 	for attempt in tries:
 		var spot := _point(1.05)
-		if _clear_of_start(spot) and test.call(spot):
+		if _clear_of_start(spot) and _flat(spot, 1.5) and test.call(spot):
 			return spot
 	return Vector2.INF
 
@@ -360,6 +429,52 @@ func _clear_of_start(spot: Vector2) -> bool:
 	return spot.length() > _settings.scenery_clearing
 
 
+## Whether `spot` (x, z) is on the flat sand with `margin` m clear of any rock (always, with no terrain).
+func _flat(spot: Vector2, margin: float) -> bool:
+	if terrain == null:
+		return true
+	for piece in terrain.layout.pieces:
+		if spot.distance_to(piece["at"]) < SetPieces.reach(piece["kind"]) * 0.8 + margin:
+			return false
+	return terrain.field.floor_y(spot.x, spot.y) < 0.15 and terrain.field.sdf(Vector3(spot.x, 0.6, spot.y)) > margin
+
+
+## The layout's set pieces, each standing on the floor of its clearing.
+func _build_set_pieces() -> void:
+	pieces.clear()
+	for i in terrain.layout.pieces.size():
+		var record: Dictionary = terrain.layout.pieces[i]
+		var piece := SetPieces.build(record["kind"], rng.seed * 31 + i * 7 + 1, _settings.terrain_collision)
+		var at: Vector2 = record["at"]
+		piece.position = Vector3(at.x, maxf(terrain.field.floor_y(at.x, at.y), 0.0), at.y)
+		piece.rotation.y = record["yaw"]
+		add_child(piece)
+		pieces.append(piece)
+
+
+## Background life: a few schools roaming high over the outer band, clear of the mesas' tops.
+func _build_life() -> void:
+	schools.clear()
+	if _settings.terrain_schools <= 0 or not _settings.terrain_enabled:
+		return
+	var nature := NatureSettings.new()
+	nature.fish_per_school = _settings.terrain_school_fish
+	nature.roam_radius = 22.0
+	nature.roam_height = 2.0
+	var dice := RandomNumberGenerator.new()
+	dice.seed = rng.seed * 17 + 9
+	var kinds := FishCharacter.pickable_classes()
+	var inner := terrain.layout.open_radius if terrain else radius * 0.5
+	for n in _settings.terrain_schools:
+		var school := School.new()
+		school.name = "School%d" % n
+		add_child(school)
+		var spot := Vector2.from_angle(dice.randf() * TAU) * dice.randf_range(inner, radius * 0.85)
+		var at := to_global(Vector3(spot.x, edge_height * 0.82, spot.y))
+		school.setup(nature, at, Vector3.FORWARD.rotated(Vector3.UP, dice.randf() * TAU), kinds[dice.randi() % kinds.size()], dice.randi())
+		schools.append(school)
+
+
 func _clear_of_ruins(spot: Vector2, margin: float) -> bool:
 	for at in cluster_spots:
 		if Vector2(at.x, at.z).distance_to(spot) < margin:
@@ -371,7 +486,7 @@ func _clear_of_ruins(spot: Vector2, margin: float) -> bool:
 
 ## The edge's outcrops (piles of big rocks), its kelp band, and its wall of light.
 func _build_edge() -> void:
-	if _settings.edge_rocks > 0:
+	if _settings.edge_rocks > 0 and (terrain == null or terrain.layout.ring_height <= 0.0):
 		var piles := {}
 		for i in _settings.edge_rocks:
 			var angle := (float(i) + rng.randf_range(-0.3, 0.3)) / _settings.edge_rocks * TAU
@@ -405,6 +520,10 @@ func _build_edge() -> void:
 		var most := maxf(edge_height * 0.75 / 8.0, 1.0)
 		for i in _settings.edge_kelp:
 			var at := Vector2.from_angle(rng.randf() * TAU) * radius * rng.randf_range(0.95, 1.06)
+			if terrain and not _flat(at, 1.0):
+				at = Vector2.from_angle(rng.randf() * TAU) * radius * rng.randf_range(0.8, 0.92)  # the ring's in the way: just inside it
+				if not _flat(at, 1.0):
+					continue
 			if flora:
 				_plant_column(at, rng.randf_range(most * 0.45, most), _settings.flora_edge_density)
 			else:
@@ -476,6 +595,7 @@ func _build_cover() -> void:
 	_grow_ruins(dice)
 	_grow_outcrops(dice)
 	_grow_rocks(dice)
+	_grow_terrain(dice)
 	_grow_grass(dice, grid)
 	_grow_carpets(dice, grid)
 
@@ -731,3 +851,172 @@ func _grow_carpets(dice: RandomNumberGenerator, grid: Dictionary) -> void:
 				for j in 2:
 					flora.add_cluster(base + Vector3(dice.randf_range(-0.2, 0.2), -0.01, dice.randf_range(-0.2, 0.2)), 1.0, FloraField.Type.CYAN,
 							0.2 * size, 0.55 * size, 0.03, 0.06, 0.6, 0.0, dice)
+
+
+# --- Terrain dressing (planning_procedural_world.md, phase 4) ------------------------------------------------------
+# Every piece samples the rock's surface (area-weighted, from the meshed triangles) and checks its normal and the water
+# above it: kelp on flats with room above (as tall as that room allows), fronds hanging from overhangs, tufts out of
+# walls, carpets on flats, corals and sponges on the lower flats, boulders on slopes. Growth clumps: a slow noise times
+# hot discs (the grottoes and a few rolled ones) decides what survives.
+
+func _grow_terrain(dice: RandomNumberGenerator) -> void:
+	if terrain == null or terrain.field == null:
+		return
+	var f := terrain.field
+	var lay := terrain.layout
+	var hot: Array[Vector3] = []  # x, z, radius
+	for g in lay.grottoes:
+		hot.append(Vector3(g.x, g.y, g.z))
+	for n in 5:
+		var spot := Vector2.from_angle(dice.randf() * TAU) * dice.randf_range(lay.open_radius, radius)
+		hot.append(Vector3(spot.x, spot.y, dice.randf_range(18.0, 40.0)))
+	var heat := func(p: Vector3) -> float:
+		var h := 0.35 + 0.65 * smoothstep(-0.25, 0.35, _cover_noise.get_noise_2d(p.x * 0.4, p.z * 0.4))
+		for d in hot:
+			h = maxf(h, smoothstep(d.z, d.z * 0.4, Vector2(p.x, p.z).distance_to(Vector2(d.x, d.y))))
+		return h
+	var grotto := func(p: Vector3) -> float:
+		var g := 0.0
+		for d in lay.grottoes:
+			g = maxf(g, smoothstep(d.z, d.z * 0.5, Vector2(p.x, p.z).distance_to(Vector2(d.x, d.y))))
+		return g
+	var top := 1e4
+	var reach := radius + 40.0
+	var size := _settings.flora_cover_size
+	var seed_base := rng.seed * 13 + 5
+	var q := TerrainLayout.quality_dressing(_settings)
+	var want_kelp := roundi(_settings.terrain_kelp * q)
+	var want_fronds := roundi(_settings.terrain_fronds * q)
+	var want_tufts := roundi(_settings.terrain_wall_tufts * q)
+	var want_carpets := roundi(_settings.terrain_carpets * q)
+	var want_corals := roundi(_settings.terrain_corals * q)
+	var want_boulders := roundi(_settings.terrain_boulders * q)
+
+	# Kelp: flat rock (ny >= 0.55) with more than 9 m of water above; as tall as that water allows, capped.
+	if flora and want_kelp > 0:
+		var got: Dictionary = f.sample_surface(want_kelp * 6, seed_base + 1, 0.55, 1.01, 0.2, top, radius * 0.98)
+		var used := {}
+		var planted := 0
+		var pts: PackedVector3Array = got["points"]
+		for p in pts:
+			if planted >= want_kelp:
+				break
+			var key := Vector2i(floori(p.x / 2.5), floori(p.z / 2.5))
+			if used.has(key) or dice.randf() > heat.call(p):
+				continue
+			# Kelp needs the sky: none under a roof (grotto cavities, overhangs), where fronds and tufts go instead.
+			var above := f.open_above(p + Vector3.UP * 0.3)
+			var room := minf(above, edge_height + 2.0 - p.y)
+			if room < 9.0 or above < 1e3:
+				continue
+			used[key] = true
+			var tall := minf(room - dice.randf_range(0.8, 5.0), dice.randf_range(15.0, maxf(_settings.terrain_kelp_max, 15.0))) \
+					* _settings.flora_kelp_height
+			var column := RandomNumberGenerator.new()
+			column.seed = dice.randi()
+			var kind := 1 if grotto.call(p) > 0.4 and column.randf() < 0.7 else (2 if column.randf() < 0.12 else 0)
+			var glints := _settings.flora_glints_per_m if WaterLook.shared().glints_per_plant > 0 else 0.0
+			flora.add_kelp_column(p - Vector3.UP * 0.2, tall, kind, _settings.flora_blades_per_m * _settings.flora_blade_mult,
+					_settings.flora_kelp_density, glints, 1.0, column)
+			kelp_spots.append(Vector2(p.x, p.z))
+			planted += 1
+
+	# Fronds hang from overhangs (ny < -0.35).
+	if flora and want_fronds > 0:
+		var got: Dictionary = f.sample_surface(want_fronds * 2, seed_base + 2, -1.01, -0.35, 0.5, top, reach)
+		var pts: PackedVector3Array = got["points"]
+		var made := 0
+		for p in pts:
+			if made >= want_fronds or not flora.has_room():
+				break
+			if dice.randf() > heat.call(p):
+				continue
+			var drop := minf(f.sdf(p + Vector3.DOWN * 0.5) + 0.5, 3.0)
+			if drop < 0.6:
+				continue
+			var red: bool = grotto.call(p) > 0.3 or dice.randf() < 0.5
+			flora.add_hanging(p + Vector3.DOWN * 0.05, _settings.flora_frond_blades, FloraField.Type.RED,
+					FloraField.Type.RED if red else FloraField.Type.OLIVE, clampf(drop / 2.5, 0.4, 1.4), 0.35, dice)
+			made += 1
+
+	# Wall tufts (-0.2 < ny < 0.8), leaning out along the wall's normal.
+	if flora and want_tufts > 0:
+		var got: Dictionary = f.sample_surface(want_tufts * 2, seed_base + 3, -0.2, 0.8, 0.3, top, reach)
+		var pts: PackedVector3Array = got["points"]
+		var nrm: PackedVector3Array = got["normals"]
+		var made := 0
+		for i in pts.size():
+			if made >= want_tufts or not flora.has_room():
+				break
+			var p := pts[i]
+			if dice.randf() > heat.call(p):
+				continue
+			var g: float = grotto.call(p)
+			var type := FloraField.Type.VIOLET if g > 0.3 or dice.randf() < 0.3 else FloraField.Type.OLIVE
+			flora.add_wall_tuft(p, atan2(nrm[i].z, nrm[i].x), 4.0, type, dice.randf_range(0.6, 1.4) * size, dice)
+			made += 1
+
+	# Carpets on the rock's flats: tufts by the magenta map (the grotto zone and the reef noise).
+	if flora and want_carpets > 0:
+		var got: Dictionary = f.sample_surface(want_carpets * 2, seed_base + 4, 0.75, 1.01, 0.2, top, reach)
+		var pts: PackedVector3Array = got["points"]
+		var made := 0
+		for p in pts:
+			if made >= want_carpets or not flora.has_room():
+				break
+			if dice.randf() > heat.call(p):
+				continue
+			var zone := maxf(grotto.call(p), _reef_zone(Vector2(p.x, p.z)))
+			flora.add_tuft(p - Vector3.UP * 0.03, _cover_type(zone, dice), size, dice)
+			made += 1
+
+	# Corals, sponges and anemones on the lower flats, boulders on slopes (Scatter meshes, tilted to the surface).
+	if want_corals > 0:
+		var got: Dictionary = f.sample_surface(want_corals * 3, seed_base + 5, 0.7, 1.01, 0.2, edge_height * 0.5, radius * 0.98)
+		var pts: PackedVector3Array = got["points"]
+		var nrm: PackedVector3Array = got["normals"]
+		var sets := {}
+		var made := 0
+		for i in pts.size():
+			if made >= want_corals:
+				break
+			if dice.randf() > heat.call(pts[i]):
+				continue
+			var roll := dice.randf()
+			var mesh: Mesh
+			var s := dice.randf_range(0.8, 1.6)
+			if roll < 0.6:
+				mesh = ReefKit.mesh(GEMS[dice.randi() % GEMS.size()], dice.randi() % ReefKit.VARIANTS)
+			elif roll < 0.85:
+				mesh = ReefKit.mesh("tube_sponge" if dice.randf() < 0.6 else "barrel", dice.randi() % ReefKit.VARIANTS)
+				s = dice.randf_range(1.1, 2.0)
+			else:
+				mesh = ReefKit.mesh("anemone", dice.randi() % ReefKit.VARIANTS)
+				s = dice.randf_range(1.2, 2.4)
+			_put3(sets, mesh, pts[i], nrm[i], s, -0.06 * s, dice)
+			made += 1
+		_flush(sets)
+	if want_boulders > 0:
+		var got: Dictionary = f.sample_surface(want_boulders * 2, seed_base + 6, 0.3, 0.85, 0.2, top, reach)
+		var pts: PackedVector3Array = got["points"]
+		var nrm: PackedVector3Array = got["normals"]
+		var sets := {}
+		for i in mini(pts.size(), want_boulders):
+			var s := dice.randf_range(0.8, 3.0)
+			_put3(sets, ReefKit.mesh("boulder" if dice.randf() < 0.7 else "slab", dice.randi() % ReefKit.VARIANTS), pts[i], nrm[i], s,
+					-0.25 * s, dice)
+		_flush(sets)
+
+
+## A copy of `mesh` at `at` (this node's space) standing on a surface with normal `n` (half-way between it and up),
+## sunk `sink` m along that.
+func _put3(into: Dictionary, mesh: Mesh, at: Vector3, n: Vector3, size: float, sink: float, dice: RandomNumberGenerator) -> void:
+	var up := (n.normalized() + Vector3.UP).normalized()
+	var basis := Basis(Vector3.UP, dice.randf() * TAU)
+	var axis := Vector3.UP.cross(up)
+	if axis.length() > 0.001:
+		basis = Basis(axis.normalized(), Vector3.UP.angle_to(up)) * basis
+	if not into.has(mesh):
+		into[mesh] = [[] as Array[Transform3D], [] as Array[Color]]
+	(into[mesh][0] as Array[Transform3D]).append(Transform3D(basis.scaled(Vector3.ONE * size), at + up * sink))
+	(into[mesh][1] as Array[Color]).append(Color(dice.randf(), dice.randf(), dice.randf(), 0.0))

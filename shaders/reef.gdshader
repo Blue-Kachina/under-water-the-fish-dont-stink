@@ -92,6 +92,9 @@ void fragment() {
 	// Ocean modes (phase 7): fluorescence (the blue-green light that reaches it, re-emitted) and a tip highlight.
 	vec3 flu_add = wm_fluor(color, world_pos, wm_flu_of(custom.r + custom.g));
 	flu_add += color * water_mat_coral.w * smoothstep(0.7, 1.0, up) * dot(wm_light(world_pos), vec3(0.2, 0.5, 0.3)) * (pattern == 0 || pattern == 3 ? 1.0 : 0.0);
+	float terrain_lit = wo_scene(world_pos);  // under the procedural terrain's rock
+	color *= terrain_lit;
+	lit *= mix(1.0, terrain_lit, 0.5);
 	ALBEDO = color;
 	ROUGHNESS = rough;
 	SPECULAR = 0.4;

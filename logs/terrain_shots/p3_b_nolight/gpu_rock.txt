@@ -1,0 +1,6 @@
+terrain_rock_shots p3_b_nolight  stats { "dims": (349, 61, 349), "ms_columns": 13.5335000157356, "ms_field": 37.4168000221252, "ms_nav": 249.043500006199, "ms_dist": 65.6371999979019, "ms_total": 365.631000041962, "lip_cells": 2389, "speck_cells": 7, "sealed_cells": 13936, "ms_mesh": 106.014, "ms_prepare": 472.009, "triangles": 261486, "chunks": 85, "ms_apply": 159.097, "ms_light": 0.014 }
+view r1 wall      gpu 2.46 ms
+view r2 cavity    gpu 2.11 ms
+view r3 mouth     gpu 2.24 ms
+view r4 overhang  gpu 1.93 ms
+view r5 shafts    gpu 2.39 ms

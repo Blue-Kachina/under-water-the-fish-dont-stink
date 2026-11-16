@@ -20,6 +20,8 @@ signal defeated(boss: Boss, by: FishController)
 
 ## Time to sink away once beaten (s).
 const DEATH_TIME := 2.5
+## How far a boss's middle keeps from the terrain's rock (m).
+const BOSS_ROCK_ROOM := 3.0
 
 var run: UnnaturalRun
 var settings: UnnaturalSettings
@@ -234,8 +236,9 @@ func _keep_in_arena() -> void:
 	var reach := settings.arena_radius - 5.0
 	if flat.length() > reach:
 		flat = flat.normalized() * reach
-	var y := clampf(offset.y, settings.arena_floor + 3.0, settings.arena_ceiling)
+	var y := clampf(offset.y, run.ground_y(global_position.x, global_position.z) - centre.y + 3.0, settings.arena_ceiling)
 	global_position = centre + Vector3(flat.x, y, flat.y)
+	global_position = run.out_of_rock(global_position, BOSS_ROCK_ROOM)  # the terrain's rock (none: no change)
 
 
 ## Beaten (a puppet: the host says so).

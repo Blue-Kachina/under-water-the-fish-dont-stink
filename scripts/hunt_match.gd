@@ -98,6 +98,8 @@ var style := StylePoints.new()
 var last_battery := {}
 ## The arena's centre (the ocean's spawn).
 var center := Vector3.ZERO
+## The sea floor under the arena (NatureSettings.hunt_floor; null without).
+var seabed: Seabed
 
 var _battery_left := 0.0
 var _recorder := GoalRecorder.new()
@@ -135,6 +137,9 @@ func _ready() -> void:
 	_recorder.setup(null, [player, opponent] as Array[FishController])
 	ocean.boundary_center = center
 	ocean.boundary_radius = ARENA_RADIUS
+	var floor_settings := NatureSettings.shared()
+	if floor_settings.hunt_floor:
+		seabed = OceanFloor.seabed(self, center, ARENA_RADIUS, floor_settings.hunt_floor_depth, 29, ocean.fog_density())
 	kickoff()
 
 
@@ -197,6 +202,10 @@ func batter_speed() -> float:
 
 
 func _physics_process(delta: float) -> void:
+	if seabed != null:
+		var floor_settings := NatureSettings.shared()
+		OceanFloor.keep_above([player, opponent], center.y - floor_settings.hunt_floor_depth, floor_settings.floor_clearance,
+				floor_settings.floor_push, delta)
 	match phase:
 		Phase.COUNTDOWN:
 			countdown_left -= delta

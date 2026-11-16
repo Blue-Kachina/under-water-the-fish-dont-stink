@@ -53,7 +53,7 @@ func build(middle: Vector3, rng_seed := -1) -> void:
 	for i in settings.school_count:
 		# Spread by area (sqrt) inside 85% of the wall, so none start against it.
 		var flat := Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * settings.arena_radius * 0.85
-		var at := center + Vector3(flat.x, rng.randf_range(-6.0, 6.0), flat.y)
+		var at := WhatStinksMatch.clear_of_rock(center + Vector3(flat.x, rng.randf_range(-6.0, 6.0), flat.y), 4.0)
 		var heading := Vector3(rng.randf_range(-1.0, 1.0), 0.0, rng.randf_range(-1.0, 1.0)).normalized()
 		var kind: FishCharacter.FishClass = kinds[rng.randi_range(0, kinds.size() - 1)]
 		if i < prey_schools:

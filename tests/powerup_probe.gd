@@ -56,7 +56,7 @@ func _run() -> void:
 	var inside := true
 	for chest in run.chests:
 		var flat := Vector2(chest.global_position.x, chest.global_position.z).length()
-		inside = inside and flat <= settings.arena_radius and absf(chest.global_position.y - settings.arena_floor) < 1.0
+		inside = inside and flat <= settings.arena_radius and absf(chest.global_position.y - run.ground_y(chest.global_position.x, chest.global_position.z)) < 1.0
 		inside = inside and chest.get_parent() == run
 	check(inside, "all in the arena, in the seabed")
 	var chest: TreasureChest = run.chests[0]

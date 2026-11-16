@@ -272,7 +272,7 @@ func _move(delta: float) -> void:
 				if flat.length() > reach:
 					flat = flat.normalized() * reach
 					slot = Vector3(run.centre.x + flat.x, slot.y, run.centre.z + flat.y)
-				slot.y = maxf(slot.y, run.centre.y + settings.arena_floor + 3.0)
+				slot.y = maxf(slot.y, run.ground_y(slot.x, slot.z) + 3.0)
 				var miss := slot - global_position
 				lock_miss = miss.length()
 				wanted = lock_prey.swim_velocity() + miss * 2.4

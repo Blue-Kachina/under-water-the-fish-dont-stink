@@ -66,6 +66,115 @@ static func shared() -> UnnaturalSettings:
 ## How far scenery is drawn (m; 0: follow the murk, as the horde does).
 @export_range(0.0, 1000.0, 5.0, "or_greater") var scenery_draw_distance := 0.0
 
+@export_group("Terrain")
+## Procedural terrain (planning_procedural_world.md): a rock field round the open middle (canyon walls, a grotto, arches,
+## tunnels, plateaus and an edge ring), built natively from the stage's seed, so every machine builds the same world.
+## Applies when the next stage (or match) is built.
+@export var terrain_enabled := true
+## The grid's cell (m): finer is smoother rock and more triangles. 0.75 is the quality option.
+@export_range(0.25, 4.0, 0.05, "or_greater") var terrain_cell := 1.0
+## Cells per chunk side (each chunk is one mesh and one collision shape, culled by the murk).
+@export_range(8, 128, 1, "or_greater") var terrain_chunk_cells := 32
+## Quality tier (phase 8): 0 low (1.5 x the cell, 60% of the dressing), 1 medium (as set), 2 high (0.75 x the cell,
+## 125% of the dressing). Chunks keep about the same size in metres.
+@export_range(0, 2, 1) var terrain_quality := 1
+## Endless terrain in Free Swim (phase 8): tiles of rock and seabed streamed round the fish, built on worker threads.
+## Tile side (m), how far round the fish tiles are kept (m), the tiles' cell (m), and how far below the start the floor lies (m).
+@export var terrain_stream := true
+@export_range(32.0, 512.0, 8.0, "or_greater") var terrain_stream_tile := 96.0
+@export_range(32.0, 1000.0, 8.0, "or_greater") var terrain_stream_reach := 160.0
+@export_range(0.5, 6.0, 0.25, "or_greater") var terrain_stream_cell := 2.0
+@export_range(5.0, 300.0, 1.0, "or_greater") var terrain_stream_depth := 45.0
+## The open middle (m): no walls, mesas or plateaus inside it (D6a). Capped at 0.7 x the arena's radius.
+@export_range(0.0, 500.0, 5.0, "or_greater") var terrain_open_radius := 75.0
+## The floor's relief outside the open middle: big swells (m) and small detail (m).
+@export_range(0.0, 40.0, 0.5, "or_greater") var terrain_floor_swell := 6.0
+@export_range(0.0, 10.0, 0.1, "or_greater") var terrain_floor_detail := 1.4
+## The edge ring: how tall it rises (x the depth band's height, 0: none), how far inside the edge its foot starts (m), and
+## how wide its rise is (m).
+@export_range(0.0, 3.0, 0.05, "or_greater") var terrain_ring_height := 1.05
+@export_range(-50.0, 100.0, 1.0, "or_greater") var terrain_ring_inset := 8.0
+@export_range(1.0, 100.0, 1.0, "or_greater") var terrain_ring_width := 24.0
+## Plateaus in the outer band: how much of it they cover (0..1, 0: none) and their height range (m).
+@export_range(0.0, 1.0, 0.05) var terrain_plateau_cover := 0.3
+@export_range(0.0, 80.0, 1.0, "or_greater") var terrain_plateau_min := 7.0
+@export_range(0.0, 80.0, 1.0, "or_greater") var terrain_plateau_max := 18.0
+## Mesas (extruded rock walls): how many in all (most in 2-3 canyon arcs near the edge), their radius (m) and height
+## (x the depth band's height).
+@export_range(0, 60, 1, "or_greater") var terrain_mesas := 14
+@export_range(1.0, 40.0, 0.5, "or_greater") var terrain_mesa_radius := 8.0
+@export_range(0.05, 2.0, 0.05, "or_greater") var terrain_mesa_height := 0.65
+## Canyon arcs the mesas line up in.
+@export_range(0, 6, 1, "or_greater") var terrain_canyons := 3
+## A grotto per stage: an overhanging mesa with a cavity under its lip (0: none).
+@export_range(0, 4, 1, "or_greater") var terrain_grottoes := 1
+## Rock arches (most stages get 1-3) and tunnels bored through mesas.
+@export_range(0, 8, 1, "or_greater") var terrain_arches := 2
+@export_range(0, 6, 1, "or_greater") var terrain_tunnels := 1
+## The rock's surface: erosion pits (x), strata band depth (m), domain warp (m), how softly pieces blend (m).
+@export_range(0.0, 4.0, 0.05, "or_greater") var terrain_erosion := 1.0
+@export_range(0.0, 3.0, 0.05, "or_greater") var terrain_strata := 0.35
+@export_range(0.0, 60.0, 0.5, "or_greater") var terrain_warp := 14.0
+@export_range(0.0, 20.0, 0.25, "or_greater") var terrain_blend := 4.0
+## Rule N (navigable terrain): the clearance (m) every gap, bore and pocket must leave (the biggest body's radius plus a
+## margin; water a ball this size can't reach from the start is filled in), and the thinnest rock lip kept (m; thinner
+## fins are rounded off). 0 switches either off.
+@export_range(0.0, 30.0, 0.25, "or_greater") var terrain_clearance := 4.0
+@export_range(0.0, 6.0, 0.1, "or_greater") var terrain_lip := 1.0
+## Collision for the rock (fish bump and slide on it).
+@export var terrain_collision := true
+## Ambient occlusion baked into the rock (0: none, 1: full).
+@export_range(0.0, 1.0, 0.05) var terrain_ao := 1.0
+## Set pieces (phase 7), each on a clearing of flat floor in the outer band, per stage: a whale fall skeleton, a sunken
+## hull, a field of bubbling vents, and rock pillars rising to the top of the depth band. 0 switches one off.
+@export_range(0, 4, 1, "or_greater") var terrain_whale_falls := 1
+@export_range(0, 4, 1, "or_greater") var terrain_hulls := 1
+@export_range(0, 4, 1, "or_greater") var terrain_vents := 1
+@export_range(0, 6, 1, "or_greater") var terrain_pillars := 1
+## Background life: schools of fish roaming high over the outer band (how many, and fish in each).
+@export_range(0, 12, 1, "or_greater") var terrain_schools := 3
+@export_range(1, 200, 1, "or_greater") var terrain_school_fish := 24
+## Dressing the rock (phase 4), all placed by the terrain: kelp columns on its flats with more than 9 m of water above
+## (as tall as that allows, up to terrain_kelp_max m), frond clumps under overhangs, tufts on walls, carpet tufts on
+## flats, corals/sponges/anemones on the lower flats and boulders on slopes. Counts across the arena; 0 switches one off.
+@export_range(0, 2000, 10, "or_greater") var terrain_kelp := 160
+@export_range(15.0, 80.0, 1.0, "or_greater") var terrain_kelp_max := 34.0
+@export_range(0, 4000, 10, "or_greater") var terrain_fronds := 420
+@export_range(0, 8000, 10, "or_greater") var terrain_wall_tufts := 1400
+@export_range(0, 20000, 50, "or_greater") var terrain_carpets := 2500
+@export_range(0, 4000, 10, "or_greater") var terrain_corals := 360
+@export_range(0, 2000, 10, "or_greater") var terrain_boulders := 160
+
+@export_group("Terrain Look")
+## The rock's material (phase 3): how much of the rocky floor's violet/teal/ochre crust it wears (0..1) and how much that
+## crust fluoresces, sand settling on its low flats (blending into the sand floor), the grotto zone's violet tint, and
+## an overall brightness. Live.
+@export_range(0.0, 1.0, 0.05) var terrain_crust := 0.65
+@export_range(0.0, 4.0, 0.05, "or_greater") var terrain_crust_glow := 1.0
+@export_range(0.0, 1.0, 0.05) var terrain_sand_blend := 1.0
+@export_range(0.0, 1.0, 0.05) var terrain_zone_tint := 0.8
+@export_range(0.0, 3.0, 0.05, "or_greater") var terrain_rock_bright := 1.0
+## Light that rock blocks (phase 5): a skylight/openness volume and a static sun shadow, baked when the terrain is built.
+## Off: everything lit as in open water.
+@export var terrain_light_enabled := true
+## The volume's cell (m) and the openness it measures out to (m); how much skylight the water itself soaks up per cell
+## (0: only rock blocks it). Applied at the next build.
+@export_range(0.25, 8.0, 0.25, "or_greater") var terrain_light_cell := 1.5
+@export_range(0.5, 40.0, 0.5, "or_greater") var terrain_open_reach := 8.0
+@export_range(0.0, 0.2, 0.002) var terrain_sky_absorb := 0.0
+## How dark the skylight makes covered places (0: not at all, 1: fully) and the darkest a deep grotto gets (0..1). Live.
+@export_range(0.0, 1.0, 0.05) var terrain_skylight := 0.7
+@export_range(0.0, 1.0, 0.02) var terrain_grotto_dark := 0.3
+## The sun's shadow from the rock: strength (0: none), the bake's cell (m, next build) and the edge softness (m, live).
+@export_range(0.0, 1.0, 0.05) var terrain_sun_shadow := 0.7
+@export_range(0.25, 8.0, 0.25, "or_greater") var terrain_shadow_cell := 1.0
+@export_range(0.0, 10.0, 0.1, "or_greater") var terrain_shadow_soft := 1.5
+## Darkening near rock from the openness (contact AO for everything, 0..1), how much the fog's glow darkens inside
+## covered water (0..1), and whether the light shafts stop under rock (0..1). Live.
+@export_range(0.0, 1.0, 0.05) var terrain_open_ao := 0.3
+@export_range(0.0, 1.0, 0.05) var terrain_fog_dark := 0.45
+@export_range(0.0, 1.0, 0.05) var terrain_shaft_cut := 1.0
+
 @export_group("Flora")
 ## Blade flora (planning_abyssal_look.md): the kelp is built from thousands of curved ribbon blades, each one instance of a
 ## small mesh, shaded for arc, twist, ruffle, sway, translucency and sparkle. Off: the old three-stipe kelp meshes.
@@ -126,6 +235,22 @@ static func shared() -> UnnaturalSettings:
 @export_range(0.1, 6.0, 0.05, "or_greater") var flora_width := 1.4
 @export_range(0.1, 6.0, 0.05, "or_greater") var flora_length := 1.0
 @export_range(0.0, 8.0, 0.05, "or_greater") var flora_brightness := 2.0
+
+@export_group("Terrain Play")
+## Gameplay on the terrain (planning_procedural_world.md, phase 6). Room (m) kept round anything placed on the seabed
+## (chests, shrines, the rift) and round spawns, beyond its own size: picks that land on or under the rock move.
+@export_range(0.0, 20.0, 0.25, "or_greater") var terrain_spot_room := 2.0
+## Fish drive on the rock when they touch it (rl_surface_mechanics) instead of swimming off it. Off: the rock is
+## scenery to swim round (rule N).
+@export var terrain_stick_to_rock := false
+## Zombies have no physics: each one inside the rock (or closer than its radius plus terrain_horde_room m) is pushed out
+## along the rock's normal, this share of the way per physics tick (0: off, 1: all the way).
+@export_range(0.0, 1.0, 0.05) var terrain_horde_push := 1.0
+@export_range(0.0, 10.0, 0.1, "or_greater") var terrain_horde_room := 0.5
+## How many physics ticks each zombie waits between rock checks (1: every tick; more spreads the cost over the horde).
+@export_range(1, 30, 1, "or_greater") var terrain_horde_check_every := 2
+## Bots don't head for a spot the rock blocks (a line check, Terrain.line_clear).
+@export var terrain_bot_sight := true
 
 @export_group("Murk")
 ## Murky water (planning_murk.md): the fog's density in the arena (0: the

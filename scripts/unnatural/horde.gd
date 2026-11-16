@@ -822,6 +822,7 @@ func step_once(delta: float) -> void:
 				_velocity[i] = Vector3.ZERO
 	else:
 		_steer(delta)
+		_keep_out_of_rock()
 	# The dying finish, and their slots free up.
 	for i in _high:
 		if _state[i] == State.DYING:
@@ -980,6 +981,44 @@ func _steer(delta: float) -> void:
 				var back := _axis_z[i].lerp(-velocity.normalized(), turn).normalized()
 				_set_back(i, back)
 		_position[i] = at + velocity * delta
+
+
+## Zombies have no physics, so the terrain's rock (planning_procedural_world.md, phase 6) pushes them out: each one
+## checked this tick (terrain_horde_check_every spreads them over ticks) that's inside the rock, or closer to it than its
+## radius plus terrain_horde_room, moves out along the rock's normal and loses the speed it had into it. One batched
+## native call (TerrainField.push_out) per tick. Nothing to do with no terrain.
+func _keep_out_of_rock() -> void:
+	var terrain := Terrain.active
+	if settings.terrain_horde_push <= 0.0 or terrain == null or not is_instance_valid(terrain) or not terrain.is_inside_tree() 			or terrain.field == null:
+		return
+	var every := maxi(settings.terrain_horde_check_every, 1)
+	var origin := terrain.global_position
+	var room := _max_radius + settings.terrain_horde_room
+	var picked := PackedInt32Array()
+	var points := PackedVector3Array()
+	for i in alive:
+		if _proxy[i] == 1 or (i + _steps) % every != 0:
+			continue
+		picked.append(i)
+		points.append(_position[i] - origin)
+	if picked.is_empty():
+		return
+	var pushes := terrain.field.push_out(points, room)
+	var share := settings.terrain_horde_push
+	for n in picked.size():
+		var push := pushes[n]
+		if push == Vector3.ZERO:
+			continue
+		var i := picked[n]
+		# The batch used the biggest zombie's room: a smaller one needs only its own.
+		var need := push.length() - (room - (_radius[i] + settings.terrain_horde_room))
+		if need <= 0.0:
+			continue
+		var out := push.normalized()
+		_position[i] += out * need * share
+		var into := _velocity[i].dot(out)
+		if into < 0.0:
+			_velocity[i] -= out * into
 
 
 ## A lunging zombie's stages, toward its target (`ahead`, unit, `gap` m off),

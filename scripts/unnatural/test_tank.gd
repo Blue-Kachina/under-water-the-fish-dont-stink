@@ -206,7 +206,8 @@ func _spawn_boss() -> void:
 	if flat.length() > reach:
 		flat = flat.normalized() * maxf(reach, 0.0)
 		at = Vector3(run.centre.x + flat.x, at.y, run.centre.z + flat.y)
-	at.y = clampf(at.y, run.centre.y + settings.arena_floor + 4.0, run.centre.y + settings.arena_ceiling - 4.0)
+	at.y = clampf(at.y, run.ground_y(at.x, at.z) + 4.0, run.centre.y + settings.arena_ceiling - 4.0)
+	at = run.out_of_rock(at, 6.0)
 	boss = made
 	run._add_boss(made, at, boss_hp)
 

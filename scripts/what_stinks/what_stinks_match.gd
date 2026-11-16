@@ -155,7 +155,8 @@ func _ready() -> void:
 	_player_base = {"buoyancy": _local.buoyancy, "boost_enabled": _local.boost_enabled, "bow_scale": _local.bow_scale,
 			"speed_scale": _local.speed_scale, "turn_scale": _local.turn_scale, "rl_turn_scale": _local.rl_turn_scale,
 			"drag_scale": _local.drag_scale, "top_speed_scale": _local.top_speed_scale, "boost_scale": _local.boost_scale,
-			"accel_scale": _local.accel_scale, "hitbox_scale": _local.hitbox_scale, "body_scale": _local.body_scale}
+			"accel_scale": _local.accel_scale, "hitbox_scale": _local.hitbox_scale, "body_scale": _local.body_scale,
+			"rl_surface_mechanics": _local.rl_surface_mechanics}
 	if authority:
 		_fill_with_bots()
 	for fish in players:
@@ -457,6 +458,8 @@ func apply_role(fish: FishController, new_role: int, homes: Array[Vector3] = [])
 			if "extra_distance" in camera:
 				camera.set("extra_distance", 0.0)
 				camera.set("extra_height", 0.0)
+	if is_instance_valid(seabed) and seabed.terrain != null:
+		fish.rl_surface_mechanics = UnnaturalSettings.shared().terrain_stick_to_rock  # the floor's rock is scenery (rule N)
 	var home := center
 	if not hunter and not homes.is_empty():
 		home = homes[_rng.randi() % homes.size()]
@@ -1281,8 +1284,18 @@ func _hunter_start() -> Transform3D:
 func _prey_spawn() -> Transform3D:
 	var share := lerpf(settings.prey_spawn_min, settings.prey_spawn_max, _rng.randf())
 	var flat := Vector2.from_angle(_rng.randf() * TAU) * share * settings.arena_radius
-	var at := center + Vector3(flat.x, _rng.randf_range(-6.0, 6.0), flat.y)
+	var at := clear_of_rock(center + Vector3(flat.x, _rng.randf_range(-6.0, 6.0), flat.y), 3.0)
 	return Transform3D(Basis(Vector3.UP, _rng.randf() * TAU), at)
+
+
+## `at` moved out of the floor's rock (planning_procedural_world.md) so it has `room` m round it; unchanged with no terrain.
+static func clear_of_rock(at: Vector3, room: float) -> Vector3:
+	for i in 4:
+		var push := Terrain.push(at, room)
+		if push == Vector3.ZERO:
+			break
+		at += push
+	return at
 
 
 ## The sea floor under the arena: Unnatural's seabed (its own copy of the Unnatural settings, sized to this arena, no red edge wall).
@@ -1304,10 +1317,11 @@ func _build_floor() -> void:
 func _keep_in_arena(delta: float) -> void:
 	if not (environment is Ocean):
 		return
-	var floor_y := center.y - settings.floor_depth + settings.floor_clearance
+	var flat_y := center.y - settings.floor_depth
 	for fish in players:
 		if not is_instance_valid(fish) or fish.freeze or fish.puppet or eaten.has(fish):
 			continue
+		var floor_y := Terrain.floor_y(fish.global_position.x, fish.global_position.z, flat_y) + settings.floor_clearance
 		if seabed != null and fish.global_position.y < floor_y:
 			var under := floor_y - fish.global_position.y
 			var change := settings.floor_push * (1.0 + under) * delta

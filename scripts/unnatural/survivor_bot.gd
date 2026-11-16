@@ -59,6 +59,8 @@ var picked := {}
 
 var _goal := Vector3.ZERO
 var _kite_sign := 1.0
+## How much room (m) a line to a goal must leave round the rock.
+const ROCK_ROOM := 1.5
 var _holding := false
 
 
@@ -124,7 +126,22 @@ func _choose_goal() -> Vector3:
 		var push := clampf(away.length() * 8.0, 0.0, 1.0)
 		var line := (goal - me).normalized()
 		goal = me + (line * (1.0 - push) + away.normalized() * push).normalized() * maxf(me.distance_to(goal), 15.0)
-	return _keep_in(goal)
+	return _around_rock(me, _keep_in(goal))
+
+
+## The terrain's rock in the way of `goal` (planning_procedural_world.md, phase 6): a heading turned 30-120 degrees
+## either side (the kite's way first) that's clear, a little closer; `goal` itself when it's clear or nothing is.
+func _around_rock(me: Vector3, goal: Vector3) -> Vector3:
+	if not run.settings.terrain_bot_sight or Terrain.line_clear(me, goal, ROCK_ROOM):
+		return goal
+	var line := goal - me
+	for turn: float in [0.5, -0.5, 1.0, -1.0, 1.5, -1.5, 2.1, -2.1]:
+		var other := me + line.rotated(Vector3.UP, turn * _kite_sign) * 0.7
+		other = _keep_in(other)
+		if Terrain.line_clear(me, other, ROCK_ROOM):
+			return other
+	_kite_sign = -_kite_sign
+	return goal
 
 
 ## Once the final boss is down and it's lingered a while (LINGER s), swim to the
@@ -251,9 +268,11 @@ func _keep_in(goal: Vector3) -> Vector3:
 	var limit := run.settings.arena_radius * 0.85
 	if flat.length() > limit:
 		flat = flat.normalized() * limit
-	var floor_y := run.centre.y + run.settings.arena_floor + 3.0
+	var x := run.centre.x + flat.x
+	var z := run.centre.z + flat.z
+	var floor_y := run.ground_y(x, z) + 3.0
 	var top_y := run.centre.y + run.settings.arena_ceiling - 3.0
-	return Vector3(run.centre.x + flat.x, clampf(goal.y, floor_y, top_y), run.centre.z + flat.z)
+	return run.out_of_rock(Vector3(x, clampf(goal.y, minf(floor_y, top_y), top_y), z), 3.0)
 
 
 func _on_cards_offered(for_fish: FishController, cards: Array, _heading: String, _line: String) -> void:

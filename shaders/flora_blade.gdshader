@@ -202,6 +202,7 @@ void fragment() {
 	float travel = fract(TIME * 0.12 + fl_hs(v_seed.x * 53.0 + v_seed.y * 17.0));
 	extra += v_spc * v_pr.x * smoothstep(0.09, 0.0, abs(along - travel)) * water_mat_kelp.w * light;
 	extra += color * v_pr.w;
+	color *= wo_scene(v_wp);  // under the procedural terrain's rock
 	ALBEDO = color;
 	ROUGHNESS = 0.55;
 	SPECULAR = 0.35;

@@ -43,7 +43,7 @@ void fragment() {
 	float twig = max(branch, link * step(0.25, r));
 	float edge = smoothstep(0.0, 0.1, up);
 	float pick = custom.r;
-	vec3 color = pick < 0.33 ? color_a : (pick < 0.66 ? color_b : color_c);
+	vec3 color = (pick < 0.33 ? color_a : (pick < 0.66 ? color_b : color_c)) * wo_scene(world_pos);  // under the terrain's rock
 	ALBEDO = color * (0.8 + 0.3 * sc_noise(local * 20.0));
 	ALPHA = max(twig, 1.0 - edge);
 	ALPHA_SCISSOR_THRESHOLD = 0.5;

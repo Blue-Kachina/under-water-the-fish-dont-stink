@@ -8,6 +8,9 @@ extends Node
 ## The arena is a disc arena_radius round the ocean's spawn, between
 ## arena_floor (the Seabed) and arena_ceiling, under the BloodMoon. Its edge
 ## pushes the fish back in (edge_push), and the ocean's fog thickens toward it.
+## With terrain on (planning_procedural_world.md) the Seabed carries rock: every
+## height on the seabed comes from ground_y() (Terrain.floor_y), and everything
+## placed on it picks open, reachable ground (ground_spot()).
 ## The EvilDirector sends packs of zombies from out of view as time goes on,
 ## more when the players have it easy and a breather when they're struggling;
 ## one that strays past the leash from every player is moved back near them.
@@ -319,6 +322,8 @@ const SHRINE_PEARL := 1900000000
 const FREE_CHEST := "free"
 ## The seabed's seed is this plus the stage.
 const SEABED_SEED := 11
+## Tools only (terrain_shots): the seabed's seed instead of SEABED_SEED's (-1: off).
+static var seabed_seed_override := -1
 ## Per player (P4): rerolls, skips and banishes left ({"rerolls", "skips",
 ## "banishes"}), and what they've banished (weapon, tome and item ids).
 var _choices := {}
@@ -780,6 +785,9 @@ func _join(fish: FishController) -> void:
 		_twists[fish] = Traversal.new(self, fish)
 		fish.set_meta("boost_before", fish.boost_enabled)
 		fish.boost_enabled = false  # the boost button is the fish's mobility skill here
+	if settings.terrain_enabled and not fish.has_meta("surface_before"):
+		fish.set_meta("surface_before", fish.rl_surface_mechanics)
+		fish.rl_surface_mechanics = settings.terrain_stick_to_rock  # rock is scenery to swim round (rule N)
 	stats_of(fish)
 	powerups_of(fish)
 	if not _stride_hooks.has(fish):
@@ -805,6 +813,9 @@ func _leave(fish: FishController) -> void:
 			fish.boost_enabled = fish.get_meta("boost_before")
 			fish.remove_meta("boost_before")
 		_twists.erase(fish)
+	if is_instance_valid(fish) and fish.has_meta("surface_before"):
+		fish.rl_surface_mechanics = fish.get_meta("surface_before")
+		fish.remove_meta("surface_before")
 	_health.erase(fish)
 	_offers.erase(fish)
 	_offer_kind.erase(fish)
@@ -1532,7 +1543,7 @@ func _keep_in_arena(fish: FishController, delta: float) -> void:
 		var leaving := velocity.dot(outward)
 		if leaving > 0.0:
 			change -= outward * leaving * minf(4.0 * delta, 1.0)
-	var floor_y := settings.arena_floor + 1.5
+	var floor_y := ground_y(fish.global_position.x, fish.global_position.z) - centre.y + 1.5
 	if offset.y < floor_y:
 		change.y += settings.edge_push * (1.0 + floor_y - offset.y) * delta
 		if velocity.y < 0.0:
@@ -1543,6 +1554,45 @@ func _keep_in_arena(fish: FishController, delta: float) -> void:
 			change.y -= velocity.y * minf(4.0 * delta, 1.0)
 	if change != Vector3.ZERO:
 		fish.apply_push(change)
+
+
+# --- The ground (planning_procedural_world.md, phase 6) --------------------------------
+# With no terrain these all answer for the flat seabed at arena_floor, so the old
+# placements are unchanged.
+
+## The seabed's height under (x, z) (global): the terrain's floor where it rises, else the flat sand.
+func ground_y(x: float, z: float) -> float:
+	return Terrain.floor_y(x, z, centre.y + settings.arena_floor)
+
+
+## Where a chest at `at` (global) comes to rest: half sunk in the ground under it.
+func chest_rest(at: Vector3) -> float:
+	return ground_y(at.x, at.z) - TreasureChest.SIZE.y * 0.3
+
+
+## `at` (global) moved out of any rock so it has `room` m round it (unchanged when it's clear already).
+func out_of_rock(at: Vector3, room: float) -> Vector3:
+	for i in 4:
+		var push := Terrain.push(at, room)
+		if push == Vector3.ZERO:
+			break
+		at += push
+	return at
+
+
+## Whether the ground at `spot` (x, z from the middle) is open: room m of water above the floor there, reachable.
+func ground_open(spot: Vector2, room: float) -> bool:
+	var x := centre.x + spot.x
+	var z := centre.z + spot.y
+	return Terrain.is_open(Vector3(x, ground_y(x, z) + room, z), room * 0.9)
+
+
+## Whether `spot` (x, z from the middle) is the flat sand with `room` m clear of rock round it (always, with no terrain).
+func ground_flat(spot: Vector2, room: float) -> bool:
+	var x := centre.x + spot.x
+	var z := centre.z + spot.y
+	var flat := centre.y + settings.arena_floor
+	return ground_y(x, z) < flat + 0.25 and Terrain.is_open(Vector3(x, flat + room, z), room)
 
 
 ## A point spawn_distance from `around`, inside the arena: out of every
@@ -1559,7 +1609,8 @@ func spawn_point(around: Vector3) -> Vector3:
 		if flat.length() > reach:
 			flat = flat.normalized() * reach
 			point = Vector3(centre.x + flat.x, point.y, centre.z + flat.y)
-		point.y = clampf(point.y, centre.y + settings.arena_floor + 2.0, centre.y + settings.arena_ceiling - 1.0)
+		point.y = clampf(point.y, ground_y(point.x, point.z) + 2.0, centre.y + settings.arena_ceiling - 1.0)
+		point = out_of_rock(point, settings.terrain_spot_room)
 		if anywhere:
 			break  # the murk hides it
 		var hidden := true
@@ -1870,11 +1921,11 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 		return
 	if boss is DrownedShark:
 		# On every machine (each sees the boss beaten), so not sent as a drop.
-		var chest := add_chest(boss.global_position, 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
+		var chest := add_chest(boss.global_position, 0.0, chest_rest(boss.global_position),
 				TreasureChest.Kind.BOSS)  # a legendary pick (the dash is the Shark's own skill now)
 		chest.name = "SharkChest"
 		# And its own drop beside it: Drowned Jaws (planning_bosses_and_survival.md §2).
-		var jaws := add_chest(boss.global_position + Vector3(3.0, 0.0, 0.0), 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
+		var jaws := add_chest(boss.global_position + Vector3(3.0, 0.0, 0.0), 0.0, chest_rest(boss.global_position + Vector3(3.0, 0.0, 0.0)),
 				TreasureChest.Kind.BOSS, Powerup.boss_item_of(boss))
 		jaws.name = "JawsChest"
 		director.quiet(settings.quiet_moment)
@@ -1890,7 +1941,7 @@ func _on_boss_defeated(boss: Boss, by: FishController) -> void:
 		_open_whirlpool(boss.global_position)
 		# And its loot: its own boss item (planning_bosses_and_survival.md §2), in a
 		# chest beside the whirlpool (on every machine, like the shark's).
-		var loot := add_chest(boss.global_position + Vector3(9.0, 0.0, 0.0), 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3,
+		var loot := add_chest(boss.global_position + Vector3(9.0, 0.0, 0.0), 0.0, chest_rest(boss.global_position + Vector3(9.0, 0.0, 0.0)),
 				TreasureChest.Kind.BOSS, Powerup.boss_item_of(boss))
 		loot.name = "LeviathanChest"
 		_deep_chests(boss.global_position)
@@ -1903,7 +1954,7 @@ func _deep_chests(at: Vector3) -> void:
 	var count := deep * settings.shrine_deep_chests
 	for n in count:
 		var spot := at + Vector3(cos(TAU * n / maxf(count, 1)), 0.0, sin(TAU * n / maxf(count, 1))) * 6.0
-		var chest := add_chest(spot, 0.0, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3, TreasureChest.Kind.BOSS)
+		var chest := add_chest(spot, 0.0, chest_rest(spot), TreasureChest.Kind.BOSS)
 		chest.name = "DeepChest"
 
 
@@ -1913,10 +1964,14 @@ func _open_whirlpool(at: Vector3) -> void:
 		return
 	cleared_at = elapsed
 	whirlpool = Whirlpool.new()
-	whirlpool.height = settings.arena_ceiling - settings.arena_floor
-	whirlpool.position = Vector3(at.x, settings.arena_floor, at.z)  # a column, seabed to surface
+	var ground := ground_y(at.x, at.z) - centre.y
+	whirlpool.height = settings.arena_ceiling - ground
+	whirlpool.position = Vector3(at.x, ground, at.z)  # a column, seabed to surface
 	add_child(whirlpool)
 	whirlpool_opened.emit(at)
+	if not is_last_stage() and is_instance_valid(seabed):
+		# The stage is clear: the next stage's terrain generates on a thread while the whirlpool waits (no-op with terrain off).
+		seabed.prefetch(settings, _seabed_seed_for(stage + 1), settings.arena_ceiling - settings.arena_floor + 5.0)
 
 
 ## Whether `fish` is close enough to the whirlpool to enter it.
@@ -2320,9 +2375,13 @@ func _bury_chests() -> void:
 
 func _bury_chest() -> void:
 	var spot := Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf_range(0.02, 1.0)) * settings.arena_radius * 0.9
+	for attempt in 12:  # off the rock (always the first pick with no terrain)
+		if ground_open(spot, TreasureChest.SIZE.length() * 0.5 + settings.terrain_spot_room):
+			break
+		spot = Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf_range(0.02, 1.0)) * settings.arena_radius * 0.9
 	# Now and then a cursed one (luck doesn't help).
 	var kind := TreasureChest.Kind.CURSED if rng.randf() < settings.cursed_chest_chance else TreasureChest.Kind.TREASURE
-	var chest := add_chest(centre + Vector3(spot.x, settings.arena_floor - TreasureChest.SIZE.y * 0.3, spot.y), rng.randf() * TAU,
+	var chest := add_chest(Vector3(centre.x + spot.x, chest_rest(centre + Vector3(spot.x, 0.0, spot.y)), centre.z + spot.y), rng.randf() * TAU,
 			-INF, kind)
 	chest_buried.emit(chest)
 
@@ -2449,7 +2508,8 @@ func lightning_strike(by: FishController) -> int:
 
 ## A chest dropped by a kill at `at`, sinking to the seabed.
 func drop_chest(at: Vector3) -> TreasureChest:
-	var chest := add_chest(at, rng.randf() * TAU, centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3)
+	at = out_of_rock(at, TreasureChest.SIZE.length() * 0.5)
+	var chest := add_chest(at, rng.randf() * TAU, chest_rest(at))
 	if run_log:
 		run_log.chests_dropped += 1
 	chest_buried.emit(chest)
@@ -2812,11 +2872,16 @@ func next_stage() -> void:
 ## The stage's seabed: rocks and kelp laid out from SEABED_SEED and the stage,
 ## so each stage's looks different (and every machine's the same).
 func _build_seabed() -> void:
-	var seed_now := SEABED_SEED + (stage - 1) * 7
+	var seed_now := _seabed_seed_for(stage)
 	if not is_instance_valid(seabed) or seed_now == _seabed_seed:
 		return
 	_seabed_seed = seed_now
 	seabed.setup(settings, seed_now, settings.arena_ceiling - settings.arena_floor + 5.0)
+
+
+## Stage `n`'s seabed seed.
+func _seabed_seed_for(n: int) -> int:
+	return (SEABED_SEED if seabed_seed_override < 0 else seabed_seed_override) + (n - 1) * 7
 
 
 # --- Shrines (P5) ---------------------------------------------------------
@@ -2845,10 +2910,12 @@ func _place_shrines() -> void:
 				if other.distance_to(spot) < settings.shrine_spacing:
 					clear = false
 					break
+			if clear and not ground_flat(spot, Shrine.STEP_RADIUS + settings.terrain_spot_room):
+				clear = false  # on the rock, or under it
 			if clear:
 				break
 		placed.append(spot)
-		add_shrine(n % Shrine.Kind.size(), centre + Vector3(spot.x, settings.arena_floor, spot.y))
+		add_shrine(n % Shrine.Kind.size(), Vector3(centre.x + spot.x, ground_y(centre.x + spot.x, centre.z + spot.y), centre.z + spot.y))
 
 
 ## A shrine of `kind` at `at` (on every machine: the host's own, or one it sent).
@@ -3018,8 +3085,8 @@ func _update_shrines(delta: float) -> void:
 			shrine.tide_active = false
 			shrine.spent = true
 			if authority:
-				var chest := add_chest(shrine.global_position + Vector3(0.0, 4.0, 4.0), rng.randf() * TAU,
-						centre.y + settings.arena_floor - TreasureChest.SIZE.y * 0.3, TreasureChest.Kind.TREASURE, FREE_CHEST)
+				var at := out_of_rock(shrine.global_position + Vector3(0.0, 4.0, 4.0), TreasureChest.SIZE.length() * 0.5)
+				var chest := add_chest(at, rng.randf() * TAU, chest_rest(at), TreasureChest.Kind.TREASURE, FREE_CHEST)
 				chest_buried.emit(chest)
 			for fish in local_players():
 				shrine_used.emit(shrine, fish, "tide_won")
@@ -3062,9 +3129,11 @@ func _place_rift() -> void:
 		for shrine in shrines:
 			if is_instance_valid(shrine) and Vector2(shrine.position.x - centre.x, shrine.position.z - centre.z).distance_to(spot) < settings.rift_shrine_gap:
 				clear = false
+		if clear and not ground_flat(spot, BossRift.MOUTH.x + settings.terrain_spot_room):
+			clear = false  # on the rock, or under it
 		if clear:
 			break
-	add_rift(centre + Vector3(spot.x, settings.arena_floor, spot.y), rng.randf() * TAU)
+	add_rift(Vector3(centre.x + spot.x, ground_y(centre.x + spot.x, centre.z + spot.y), centre.z + spot.y), rng.randf() * TAU)
 
 
 ## The boss rift at `at`, turned `yaw` (on every machine: the host's own, or the one it sent).
@@ -3142,7 +3211,8 @@ func _spit_out(fish: FishController) -> void:
 	if flat.length() > settings.arena_radius - 5.0:
 		away = Vector3(centre.x - from.x, 0.0, centre.z - from.z).normalized()
 		land = from + away * settings.rift_throw_distance
-	land.y = clampf(from.y + settings.rift_throw_height, centre.y + settings.arena_floor + 2.0, centre.y + settings.arena_ceiling - 1.0)
+	land.y = clampf(from.y + settings.rift_throw_height, ground_y(land.x, land.z) + 2.0, centre.y + settings.arena_ceiling - 1.0)
+	land = out_of_rock(land, 3.0)
 	fish.revive(Transform3D(Basis.looking_at(away, Vector3.UP), land))
 	_fling(fish, (away + Vector3.UP * 0.45).normalized() * settings.rift_throw_speed)
 	_announce_teleport([fish])

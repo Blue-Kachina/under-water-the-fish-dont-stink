@@ -1,0 +1,6 @@
+terrain_rock_shots p3_d  stats { "dims": (349, 61, 349), "ms_columns": 16.9298000335693, "ms_field": 37.6884999871254, "ms_nav": 241.803099989891, "ms_dist": 64.1075000166893, "ms_total": 360.528900027275, "lip_cells": 2389, "speck_cells": 7, "sealed_cells": 13936, "ms_mesh": 102.925, "ms_prepare": 464.035, "triangles": 261486, "chunks": 85, "ms_apply": 155.44, "ms_volume": 29.854, "ms_shadow": 5.76, "ms_light": 35.857 }
+view r1 wall      gpu 1.60 ms
+view r2 cavity    gpu 1.97 ms
+view r3 mouth     gpu 2.25 ms
+view r4 overhang  gpu 1.83 ms
+view r5 shafts    gpu 2.29 ms

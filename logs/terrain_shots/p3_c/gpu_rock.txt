@@ -1,0 +1,3 @@
+terrain_rock_shots p3_c  stats { "dims": (349, 61, 349), "ms_columns": 13.6182000041008, "ms_field": 33.3565999865532, "ms_nav": 245.885500013828, "ms_dist": 63.9954000115395, "ms_total": 356.855700016022, "lip_cells": 2389, "speck_cells": 7, "sealed_cells": 13936, "ms_mesh": 108.147, "ms_prepare": 465.344, "triangles": 261486, "chunks": 85, "ms_apply": 163.155, "ms_volume": 29.527, "ms_shadow": 5.618, "ms_light": 35.365 }
+view r1 wall      gpu 1.56 ms
+view r4 overhang  gpu 1.81 ms

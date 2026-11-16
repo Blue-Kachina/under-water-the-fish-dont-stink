@@ -121,3 +121,35 @@ water_rock_detail={
 "type": "sampler2D",
 "value": "res://textures/rock_detail.png"
 }
+terrain_vol={
+"type": "sampler3D",
+"value": ""
+}
+terrain_vol_origin={
+"type": "vec4",
+"value": Color(0, 0, 0, 0)
+}
+terrain_vol_size={
+"type": "vec4",
+"value": Color(1, 1, 1, 0)
+}
+terrain_shadow={
+"type": "sampler2D",
+"value": ""
+}
+terrain_shadow_rect={
+"type": "vec4",
+"value": Color(0, 0, 1, 1)
+}
+terrain_shadow_sun={
+"type": "vec4",
+"value": Color(0, 1, 0, 0)
+}
+terrain_light={
+"type": "vec4",
+"value": Color(0, 0, 0, 0)
+}
+terrain_light2={
+"type": "vec4",
+"value": Color(0, 0, 0, 0)
+}

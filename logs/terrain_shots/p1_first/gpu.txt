@@ -1,0 +1,8 @@
+terrain_shots p1_first  stats { "dims": (349, 61, 349), "ms_columns": 17.0353000164032, "ms_field": 29.8622999787331, "ms_nav": 252.455099999905, "ms_dist": 69.3766000270844, "ms_total": 368.729300022125, "lip_cells": 2367, "speck_cells": 6, "sealed_cells": 14049, "ms_mesh": 110.11, "ms_prepare": 479.397, "triangles": 263558, "chunks": 85, "ms_apply": 145.672 }
+view 1 map      gpu 1.67 ms  draw calls 312
+view 2 grotto   gpu 1.70 ms  draw calls 137
+view 3 inside   gpu 1.67 ms  draw calls 466
+view 4 canyon   gpu 1.59 ms  draw calls 183
+view 5 arch     gpu 1.87 ms  draw calls 266
+view 6 edge     gpu 0.97 ms  draw calls 144
+view 7 fly      gpu 2.34 ms  draw calls 624

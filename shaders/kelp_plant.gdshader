@@ -53,6 +53,7 @@ void fragment() {
 		float travel = fract(TIME * 0.12 + sc_hash(vec3(blade, 7.0, 2.0)));
 		extra += vec3(1.0, 0.95, 0.6) * chosen * smoothstep(0.09, 0.0, abs(up - travel)) * water_mat_kelp.w * wm_light(world_pos);
 	}
+	color *= wo_scene(world_pos);  // under the procedural terrain's rock
 	ALBEDO = color;
 	ROUGHNESS = 0.55;
 	SPECULAR = 0.35;

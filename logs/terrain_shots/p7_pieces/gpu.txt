@@ -1,0 +1,5 @@
+terrain_shots p7_pieces  stats { "dims": (349, 61, 349), "ms_columns": 14.6492999792099, "ms_field": 36.1636000275612, "ms_nav": 262.57080000639, "ms_dist": 67.6484999656677, "ms_total": 381.032199978828, "lip_cells": 2389, "speck_cells": 7, "sealed_cells": 13936, "ms_mesh": 113.287, "ms_prepare": 494.7, "triangles": 261486, "chunks": 85, "ms_apply": 151.512, "ms_volume": 30.329, "ms_shadow": 5.94, "ms_light": 36.508 }
+view 7 fly      gpu 2.44 ms  draw calls 676
+view 8 whale    gpu 1.93 ms  draw calls 194
+view 9 hull     gpu 1.76 ms  draw calls 167
+view 10 vents    gpu 1.47 ms  draw calls 159

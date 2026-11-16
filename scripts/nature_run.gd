@@ -183,6 +183,8 @@ func _ready() -> void:
 		add_child(bot)
 	else:
 		target.make_puppet()  # where the host says (target_state, its snapshots)
+	if settings.nature_floor and ocean is Ocean:
+		OceanFloor.stream(self, (ocean as Ocean).spawn_transform().origin, settings.nature_floor_depth, player, 17)
 	start()
 
 

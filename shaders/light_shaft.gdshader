@@ -97,6 +97,8 @@ void fragment() {
 	float foot_fade = smoothstep(0.0, sh_foot, v_h);
 	float top_fade = 1.0 - smoothstep(0.92, 1.0, v_h);
 
-	ALBEDO = sh_color * sunlight * ext * (phase * dens * rim * near * soft * foot_fade * top_fade);
+	// Under the procedural terrain's rock the shaft is cut (its baked sun shadow), and it dims in covered water.
+	float rock_cut = mix(1.0, wo_sun(wp) * mix(0.35, 1.0, wo_vol(wp).y), terrain_light2.w);
+	ALBEDO = sh_color * sunlight * ext * (phase * dens * rim * near * soft * foot_fade * top_fade * rock_cut);
 	ALPHA = 1.0;
 }

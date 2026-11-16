@@ -70,6 +70,8 @@ void fragment() {
 			flu_add = mix(flu_add, wm_fluor(crust_c, world_pos, water_mat_sand.z) * crust_k, rocky);
 		}
 	}
+	float terrain_lit = wo_scene(world_pos);  // under the procedural terrain's rock
+	color *= terrain_lit;
 	ALBEDO = color;
 	ROUGHNESS = 0.95;
 	SPECULAR = 0.2;

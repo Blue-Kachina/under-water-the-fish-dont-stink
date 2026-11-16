@@ -271,7 +271,7 @@ func _move(delta: float) -> void:
 	var want := Vector3.ZERO
 	if to.length() > 14.0 * k:
 		want = to.normalized() * speed() * 0.28 * (1.0 + settings.hagfish_reach_growth * phase)
-	var floor_y := run.centre.y + settings.arena_floor + (3.6 * k if phase == Phase.FURY else 9.0 * k)
+	var floor_y := run.ground_y(global_position.x, global_position.z) + (3.6 * k if phase == Phase.FURY else 9.0 * k)
 	want.y = clampf((floor_y - global_position.y) * 0.5, -4.0, 4.0)
 	velocity = velocity.lerp(want, 1.0 - exp(-0.7 * delta))
 	global_position += velocity * delta

@@ -34,11 +34,24 @@ func build(middle: Vector3, rng_seed: int) -> void:
 	rng.seed = rng_seed
 	for i in settings.shadow_count:
 		var flat := Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * settings.arena_radius * 0.8
+		if settings.floor_enabled:
+			for attempt in 12:  # on the sand, off the floor's rock (always the first pick with no terrain)
+				if _on_sand(middle, flat):
+					break
+				flat = Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * settings.arena_radius * 0.8
 		var at := middle + Vector3(flat.x, rng.randf_range(-5.0, 5.0), flat.y)
 		if settings.floor_enabled:
 			at.y = middle.y - settings.floor_depth + settings.shadow_radius * 0.6  # the pieces' base (0.6 r under the middle) on the sand
 		var kind := "kelp" if i % 2 == 0 else "arch"
 		add_spot(at, settings.shadow_radius, kind, rng.randi() & 0x7fffffff)
+
+
+## Whether `flat` (x, z from `middle`) is the flat sand with a spot's room clear of the floor's rock (planning_procedural_world.md).
+func _on_sand(middle: Vector3, flat: Vector2) -> bool:
+	var x := middle.x + flat.x
+	var z := middle.z + flat.y
+	var sand := middle.y - settings.floor_depth
+	return Terrain.floor_y(x, z, sand) < sand + 0.25 and Terrain.is_open(Vector3(x, sand + settings.shadow_radius, z), settings.shadow_radius)
 
 
 ## One spot ("kelp" or "arch") at `at`, with its meshes.

@@ -67,6 +67,8 @@ void fragment() {
 		vec3 vw = normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xyz);
 		rim_add = color * pow(1.0 - clamp(dot(n, vw), 0.0, 1.0), 2.5) * water_mat_rock.w * wm_light(world_pos);
 	}
+	color *= wo_scene(world_pos);  // under the procedural terrain's rock
+	rim_add *= wo_scene(world_pos);
 	ALBEDO = color;
 	ROUGHNESS = clamp(roughness_base + pits * 0.3 + growth.a * 0.3 + wear * 0.15, 0.0, 1.0);
 	SPECULAR = 0.4;

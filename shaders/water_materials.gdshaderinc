@@ -16,6 +16,10 @@ global uniform sampler2D water_rock_detail : repeat_enable, filter_linear_mipmap
 // The sunlight (plus a little sky) left at a point's depth, per colour: what the colours can still light.
 vec3 wm_light(vec3 wp) {
 	float depth = max(water_surface_y - wp.y, 0.0);
+	if (terrain_light.w > 0.0) {  // the procedural terrain's rock blocks the sun and the sky (water_openness.gdshaderinc)
+		float sky = mix(terrain_light.z, 1.0, smoothstep(0.0, 0.85, wo_vol(wp).y));
+		return exp(-water_kd * depth) * 0.85 * wo_sun(wp) * mix(1.0, sky, terrain_light.x) + vec3(0.04, 0.09, 0.12) * mix(1.0, sky, terrain_light.x);
+	}
 	return exp(-water_kd * depth) * 0.85 + vec3(0.04, 0.09, 0.12);
 }
 

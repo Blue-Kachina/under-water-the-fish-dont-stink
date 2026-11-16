@@ -52,6 +52,8 @@ Our current floor is one flat plane with a sand shader. We have no walls, no ove
 - D8 (a): region discs plus noise.
 - D9: keep the flat rocky floor regions between terrain features.
 - Build time: if a stage goes over ~1.5 s, build the next stage's terrain on a thread during the stage-clear screen (not a visible load or an automatic quality cut).
+- **Rule N, the terrain is navigable (added 2026-11-15).** Terrain is scenery you swim around and through. It is not a surface to drive on. No layout may trap, snag or wall off a fish (see Phase 2, "Navigability pass"). D5's trimesh stays because rock must be solid, not because walls need to be drivable.
+  - Note: `rl_surface_mechanics` defaults on and nothing in Unnatural or What Stinks turns it off. Only Marco Polo does (`stick_to_surfaces`). It just never comes up today, because those arenas have no solid walls. If sticking to rock feels wrong once walls exist, a per-mode switch like Marco's is a small change.
 
 - **D1. Where does it go first?** (a) Unnatural only (the Test Tank and Look Tank get it free). (b) Unnatural and What Stinks. (c) Every Ocean mode, with Free Swim tiling chunks endlessly. *Recommended: (b) first, (c) later.* Endless terrain needs streaming, which is its own phase.
 - **D2. Where does the generator run?** (a) In the existing C++ GDExtension (`native/`): density, flood fill and surface nets in about 0.3-1 s, threadable. (b) A GDScript generator, cached to disk per seed. (c) A compute shader with a CPU fallback for the host's layout. *Recommended: (a).* (c) breaks determinism, and (b) is minutes per world.
@@ -91,6 +93,12 @@ Every phase lands behind a switch (`terrain_enabled`, off until phase 4 passes),
   - 1-3 arches and 0-2 tunnels where there is room; plateaus in the outer ring;
   - clearings at the start, at shrines and chests, and along a few sightlines from the middle.
 - The playable middle keeps a configurable open radius (D6a).
+- **Navigability pass (rule N)**, run on the coarse SDF grid after the records are rolled and before meshing:
+  - **Clearance:** `terrain_min_clearance` = the radius of the biggest body the mode can field (Titans, adult whales, bosses) plus a margin. Arch and tunnel bores, grotto mouths and the gaps under overhangs are sized to at least 2 × clearance, or they aren't placed.
+  - **One connected water body:** flood-fill the open water (SDF > clearance) from the spawn. Any open pocket the fill doesn't reach is either filled in with rock (if it's small) or opened with a carved passage. No sealed caves, and no dead-end slots a fish can wedge into.
+  - **No snags:** concave creases tighter than a set radius are smoothed with smin on the SDF, so the edges round off. Rock lips and narrow ledges facing open water get rounded too, so a fish slides off them and doesn't catch.
+  - **Reachable things:** every spawn, chest, shrine, rift and pearl sits in the reachable fill, with headroom ≥ clearance.
+  - Every threshold is a panel setting with a wide range, and 0 switches it off ([[flexible-tuning]]).
 - Ruin clusters sit on plateaus or in clearings, with their platforms flush to `floor_y`.
 
 ### Phase 3: terrain material
@@ -116,7 +124,7 @@ Rewrite the placement rules in `Seabed` and `FloraField` to sample the terrain:
 - **Horde:** steering avoids the SDF (a gradient push like `_keep_in_arena`), and cull or LOD behind walls is optional.
 - **Bots:** headroom and line-of-sight queries through the coarse grid. Spawns, chests and shrines go through `is_open`.
 - **Bosses:** ground moves use `floor_y`, and the boss rift sits in a canyon floor.
-- Probes: `stage_probe`, `survivor_cam_probe`, the `what_stinks_*` probes, `boss` probes, plus a new `terrain_probe` (queries, determinism, collision, no spawn inside rock).
+- Probes: `stage_probe`, `survivor_cam_probe`, the `what_stinks_*` probes, `boss` probes, plus a new `terrain_probe` (queries, determinism, collision, no spawn inside rock, and rule N: one connected water body at clearance over many seeds, every placed thing reachable, and a bot fish swept along each tunnel and arch never wedges).
 
 ### Phase 7: set pieces and life
 - Procedural set pieces (each placed by rule): a whale fall skeleton (we have whale meshes), a sunken hull, a pillar to the surface, a bubble vent field.
@@ -134,7 +142,7 @@ Rewrite the placement rules in `Seabed` and `FloraField` to sample the terrain:
 - Tests: `tests/terrain_probe`, `tests/terrain_shots`, plus extending `look_shots` and `split_bench`.
 
 ## 6. Risks
-- **Collision cost.** Trimesh shapes for about 100 chunks with 200-400k triangles total. Godot Physics handles static trimesh well, but the fish's surface sticking near sharp concave edges needs testing early (phase 1 spike).
+- **Collision cost.** Trimesh shapes for about 100 chunks with 200-400k triangles total. Godot Physics handles static trimesh well. Fish getting caught on sharp concave edges is the thing to test early (phase 1 spike), and rule N's snag smoothing is the fix.
 - **Horde through walls.** Zombies don't collide. Without phase 6 they will swim through rock. This is why D6(a) is recommended: keep the walls where the horde rarely goes.
 - **GPU budget.** Terrain triangles in every split-screen view. Cull per chunk, plus the murk. Measure in phase 1.
 - **Build time per stage.** Thread it, or build the next stage's terrain during the stage-clear screen.
@@ -142,6 +150,6 @@ Rewrite the placement rules in `Seabed` and `FloraField` to sample the terrain:
 
 ## 7. Done means
 - A Look Tank shot from inside a generated grotto that holds up next to `purple-grotto.jpg`: framing walls, layered depth, blocked shafts, dense terrain-fitted kelp.
-- Every stage and seed is valid: no spawn in rock, no floating specks, no seams. Host and guest are identical.
+- Every stage and seed is valid: no spawn in rock, no floating specks, no seams, and fully navigable (rule N). Host and guest are identical.
 - `split_bench` 3P and `horde_bench` stay within agreed budgets. Stage build is under 1.5 s.
 - All probes pass, and every value is in the panel.

@@ -5,6 +5,8 @@
 // breaks the pattern's tiling. Returns the light to ADD times the albedo (use it in EMISSION).
 // The globals are set by WaterLook / Ocean every frame; strength 0 (any non-Ocean arena) returns at once.
 
+#include "res://shaders/water_openness.gdshaderinc"
+
 global uniform float water_time;
 global uniform float water_caustic_strength;
 global uniform float water_caustic_scale;
@@ -56,5 +58,5 @@ vec3 wc_caustics(vec3 wp, vec3 n, float dist) {
 	vec3 pat = min(pow(a, vec3(2.3)) * 5.0 * (0.45 + b * 1.3), vec3(4.0));
 	float depth = max(water_surface_y - wp.y, 0.0);
 	vec3 sun = exp(-water_kd * depth);  // the sunlight left at this depth, per colour
-	return pat * sun * k * water_caustic_strength;
+	return pat * sun * k * water_caustic_strength * wo_sun(wp);  // none under rock (procedural terrain's shadow)
 }

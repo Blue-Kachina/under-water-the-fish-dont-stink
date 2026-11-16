@@ -1,0 +1,8 @@
+terrain_shots p3_a  stats { "dims": (349, 61, 349), "ms_columns": 21.084500014782, "ms_field": 40.7735999822617, "ms_nav": 246.141399979591, "ms_dist": 61.9179000258446, "ms_total": 369.91740000248, "lip_cells": 2389, "speck_cells": 7, "sealed_cells": 13936, "ms_mesh": 102.999, "ms_prepare": 473.342, "triangles": 261486, "chunks": 85, "ms_apply": 153.829, "ms_volume": 29.922, "ms_shadow": 5.415, "ms_light": 35.62 }
+view 1 map      gpu 1.83 ms  draw calls 309
+view 2 grotto   gpu 2.44 ms  draw calls 135
+view 3 inside   gpu 2.08 ms  draw calls 534
+view 4 canyon   gpu 2.51 ms  draw calls 175
+view 5 arch     gpu 2.92 ms  draw calls 333
+view 6 edge     gpu 1.83 ms  draw calls 157
+view 7 fly      gpu 3.15 ms  draw calls 673

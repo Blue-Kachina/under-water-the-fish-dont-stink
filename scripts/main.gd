@@ -132,6 +132,8 @@ var match_1v1: Match1v1
 var nature_run: NatureRun
 ## The Hunt match being played, if any.
 var hunt_match: HuntMatch
+## Free Swim's endless terrain (null outside Free Swim or with terrain_stream off).
+var _terrain_stream: TerrainStream
 ## The Unnatural run being played, if any, and its HUD.
 var unnatural_run: UnnaturalRun
 var _unnatural_hud: UnnaturalHud
@@ -860,6 +862,7 @@ func set_mode(mode: String, remember := true) -> void:
 ## Shows a match mode's card (the match starts on Play), or ends the match
 ## (or card) outside one.
 func _apply_mode() -> void:
+	_sync_terrain_stream()
 	if _local:
 		var one_screen: bool = current_mode == MARCO_POLO or current_mode == WHAT_STINKS
 		_local.no_split_screen = one_screen
@@ -891,6 +894,30 @@ func _apply_mode() -> void:
 	if _environment is AquariumArena:
 		(_environment as AquariumArena).reset_kickoff()
 	_fish.set_spawn(_environment.spawn_transform())
+
+
+## Free Swim's endless terrain (planning_procedural_world.md, phase 8): a TerrainStream under the Ocean following the
+## fish, while the mode is Free Swim and terrain_stream is on.
+func _sync_terrain_stream() -> void:
+	var settings := UnnaturalSettings.shared()
+	var want: bool = current_mode == FREE_SWIM and settings.terrain_stream and _environment is Ocean
+	if not want:
+		if is_instance_valid(_terrain_stream):
+			_terrain_stream.queue_free()
+		_terrain_stream = null
+		return
+	if is_instance_valid(_terrain_stream):
+		return
+	_terrain_stream = TerrainStream.new()
+	_terrain_stream.name = "TerrainStream"
+	_terrain_stream.settings = settings
+	_terrain_stream.follow = _fish
+	_terrain_stream.tile_size = settings.terrain_stream_tile
+	_terrain_stream.reach = settings.terrain_stream_reach
+	_terrain_stream.cell = settings.terrain_stream_cell
+	_environment.add_child(_terrain_stream)
+	var spawn: Vector3 = _environment.spawn_transform().origin
+	_terrain_stream.global_position = Vector3(0.0, spawn.y - settings.terrain_stream_depth, 0.0)
 
 
 ## A match, a Nature run or a Hunt is on.
