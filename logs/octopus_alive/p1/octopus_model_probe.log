@@ -1,0 +1,63 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+build 104.1 ms
+ok    118 bones (118)
+ok    8 arms
+ok    arm_bones[arm][segment] = 6 + arm*14 + segment, chained under the head
+ok    4 mantle bones chained from the root
+ok    8 arm tip nodes
+ok    eyes, siphon, siphon mouth
+ok    meta hunter_octopus
+ok    every skinned mesh is bound to the skeleton (skeleton path set, skin set)
+ok    four materials
+ok    the skin shader parses and exposes mantle_pulse
+ok    arm angles and sides
+ok    suckers have hi and lo visibility ranges (3.0 7.0)
+ok    rest extent along Z is length_m (1.004)
+ok    mantle ahead (-Z), arms trailing behind (+Z): z -0.37 .. 0.63
+ok    every arm tip trails well behind the head
+ok    the arms spread in a flat delta: wider than tall (0.78 x 0.19)
+ok    not wider than long (0.78 x 0.19)
+  body: 8501 vertices, 15776 triangles
+  web: 2160 vertices, 3584 triangles
+  suckers: 45696 vertices, 71680 triangles
+  suckers_lo: 17920 vertices, 25088 triangles
+ok    triangle budget (116128)
+ok    mantle_tip_local at rest is the mantle end (-0.375)
+ok    every vertex has 4 valid bones and weights summing to 1 (0 bad)
+ok    positive pitch curls toward the sucker side (0.428)
+ok    other arms untouched
+ok    positive yaw bends toward local -X (0.457)
+ok    clear_arm_pose returns to rest
+ok    tiny bend steps give tiny tip steps (worst 0.0086)
+ok    set_arm_bend moves later joints
+ok    extreme random poses stay finite
+ok    extreme random poses stay bounded (1.56)
+ok    head basis carries the arms
+ok    head basis leaves the mantle alone
+ok    pulse +1 narrows the mantle 0.103 -> 0.078
+ok    pulse -1 swells it (0.118)
+ok    pulse 0 is rest
+ok    mantle yaw swings the tip sideways (-0.074)
+ok    mantle pitch lifts or drops the tip
+ok    bent mantle finite
+ok    arms do not cut through each other past the base (worst gap 0.0203 m, pair 0-7)
+ok    arm_joints at rest equals arm_rest_joints (0.000000)
+ok    arms are about half to one body long (0.61)
+ok    tip node sits at the tip offset
+ok    siphon exhaust points back and slightly down ((0.0, -0.214862, 0.976644))
+ok    siphon aim vectors the jet
+ok    siphon aim 0,0 is rest
+ok    siphon mouth is behind the head
+ok    mouth (beak) is behind the head at the arms' junction
+ok    arm_tip_global
+ok    uniform setters reach every material
+ok    mantle pulse drives the shader uniform
+ok    reset_pose resets drivers
+ok    set_detail(false) hides suckers and webs
+ok    sucker_range_lengths 0 is always on
+ok    idle pose stays near rest (0.013)
+ok    idle pose moves smoothly frame to frame (0.0124)
+ok    a 6 m octopus is about 6 m long (6.02)
+ok    segment lengths scale with size
+55 checks, 0 failures

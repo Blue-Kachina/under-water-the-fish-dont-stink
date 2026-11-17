@@ -1,0 +1,34 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+octopus:
+ok    the first stride swells the mantle (past -0.3 at 0.08 s into it)
+ok    ...a real expansion, not a flicker (mantle -1.00)
+ok    ...the arms spread open (spread 0.44)
+ok    ...and it does not push (jets 0)
+ok    the Battletoads pop swells past the jet and rings thin (-0.39 .. 1.00)
+ok    the second stride squeezes the mantle (mantle 0.83 at the peak)
+ok    ...the delta bundling in the squeeze (spread -0.25)
+ok    ...two strides are one jet (1)
+ok    ...and the squeeze carries the push (peak 1.80)
+ok    four strides in a row make two jets (2)
+ok    with no stride the free-running beat goes on (5 jets in 4 s)
+ok    stride sync off: the beat ignores strides (jets 2)
+ok    octopus_stride_pop 0 turns the pop off (0.000)
+ok    speed pulls the arms into a tighter bundle (spread 1.13 m slow, 0.55 m fast)
+ok    octopus_speed_tuck 0 turns it off (0.87 m)
+angler:
+ok    the angler's rig is on the model
+ok    no stride: the tail is the free sway (weight 0.00)
+ok    Original swimming has no stride to follow
+ok    Extra Swishy swimming hands the rig the fish's stride
+ok    a sweep to one side bends the tail that way (0.78 rad)
+ok    the free sway steps aside while striding (weight 1.00, sway 0.001)
+ok    the tail swells with flow (grow 0.48)
+ok    and the model's tail is bent by it (tail_bend 0.78)
+ok    the next sweep, the other way, bends it the other way (-0.79 rad)
+ok    and it whips past the sweep before it settles (-1.29 past -0.79)
+ok    when the strides stop the tail relaxes back (0.003 rad, grow 0.000)
+ok    a stride's input flicks the tail at once (0.195 rad)
+ok    angler_stride_pop 0 turns the swell off (0.000)
+ok    ...but the tail still follows the sweep (0.77 rad)
+stride_forms_probe: 29 checks, 0 failed

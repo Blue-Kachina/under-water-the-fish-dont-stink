@@ -2,13 +2,15 @@ class_name OctopusRig
 extends Node3D
 ## The Ember Octopus as a Hunter's body (planning_new_hunters.md C2): wraps OctopusModel (C1) and gives it a gait, driven from the
 ## fish's velocity, throttle, stick, roll and the floor under it, never from AI. HYBRID design:
-##   arms     8 chains of 14 bones. Each segment is a unit DIRECTION (model frame) on its own spring, with follow-the-leader lag (a
-##            segment's offset from its target is passed on to the next), converted into the model's (pitch, yaw, twist) bends through the
-##            rest bases (shortest arc from the rest direction: the twist is a pure function of the direction, so it cannot pop).
-##            An FK travelling wave is added to the directions. The state is counter-rotated by the body's own rotation (inertia), so
-##            arms swing wide in a turn and trail in an air roll; flow drag bends the tips back; a slack arm drapes with the water.
-##   swim     the mantle leads (-Z) and the arms trail behind in a flat swept-back delta (the model's rest pose), the web between
-##            their bases the wing (planning_hunter_refine.md: the video's motion, the photo's shape).
+##   arms     8 chains of 14 bones, each a rope of 15 particles in the WATER: the joints are masses that stay where the water is (the
+##            body's velocity and rotation drag them along by the base), held in shape by muscle springs toward the gait's pose (stiff at
+##            the base, floppy at the tips) and slowed by the water's drag (far stronger across an arm than along it). So nothing is
+##            scripted about how they react: they stream behind at speed, get left behind by a jet's kick, swing on past the head in a
+##            stop and sweep the curve of a turn or a roll. The rope's segment directions become the model's (pitch, yaw, twist) bends
+##            through the rest bases (shortest arc from the rest direction: the twist is a pure function of the direction, so it cannot
+##            pop). An FK travelling wave and a slow per-arm wander are added to the pose the muscles hold.
+##   swim     the mantle leads (-Z) and the arms trail behind as a loose cone round the body's axis that the water closes into a bundle
+##            at speed. `octopus_delta` blends the old flat swept-back delta (the model's rest pose) back in.
 ##   jet      a cycle driven by the throttle: POWER (the mantle squeezes, the delta narrows a little, the siphon under the head jets back
 ##            between the arms: an impulse along the siphon's vector with its torque about the centre, and a wave starts down the arms)
 ##            then RECOVERY (the mantle refills past rest, the delta re-spreads slightly and relaxes). Never a crown opening ahead.
@@ -53,6 +55,9 @@ const DEFAULTS := {
 	"octopus_jet_wave": 0.4,
 	"octopus_accel_lag": 1.0,
 	"octopus_bank": 0.45,
+	"octopus_delta": 0.0,
+	"octopus_arm_splay": 0.5,
+	"octopus_arm_wander": 1.0,
 	"octopus_stride_sync": 1.0,
 	"octopus_stride_pop": 1.0,
 	"octopus_stride_squeeze_push": 1.8,
@@ -162,12 +167,27 @@ var _mbend := Vector2.ZERO
 var _mbend_v := Vector2.ZERO
 var _last_basis := Basis.IDENTITY
 var _have_basis := false
-var _flow_dir := Vector3.BACK
 var _up_local := Vector3.UP
 var _omega_local := Vector3.ZERO
 var _turn_flare := Vector2.ZERO
-var _dirs: Array[PackedVector3Array] = []     # spring state, model frame
-var _vels: Array[PackedVector3Array] = []
+var _dirs: Array[PackedVector3Array] = []     # the arms' segment directions now, model frame (read off the particles)
+# the arms in the water: each joint a particle (SEGS + 1 per arm, the first pinned to the crown), as an offset from the model's origin
+# along the world's axes (m), with its velocity through the water (world, m/s), and last frame's muscle targets in the same frame
+var _pq: Array[PackedVector3Array] = []
+var _pv: Array[PackedVector3Array] = []
+var _pt: Array[PackedVector3Array] = []
+var _phys_ok := false
+var _turn_snap := false
+var _speed_ref := 9.6  # the speed (m/s) the drag is sized against: about the fish's top speed
+var _dv := Vector3.ZERO  # the body's change of velocity this frame (world), and the part of it the arms are simply carried with
+var _dv_carried := Vector3.ZERO
+var _nat_ring: Array[Vector3] = []   # per arm: which way it splays from the axis in the relaxed cone (model frame)
+var _nat_tang: Array[Vector3] = []
+var _nat_curl: Array[Vector3] = []   # per arm: which way its tip curls in the relaxed cone
+var _nat_vary := PackedFloat32Array()
+var _body_r := 0.6    # the mantle as a capsule the arms do not pass through: radius and its ends along the model's z (m)
+var _body_z0 := -3.0
+var _body_z1 := -0.5
 var _rest_dirs: Array[PackedVector3Array] = []
 var _bundle_dirs: Array[PackedVector3Array] = []
 var _flare_dirs: Array[PackedVector3Array] = []
@@ -182,9 +202,6 @@ var _front_z := 0.0
 var _crown_local := Vector3.ZERO  # the arm bases' centre, model space (the crawl stands round it)
 var _wave_age := 99.0  # seconds since the last jet started its wave down the arms
 var _prev_vel := Vector3.ZERO
-var _have_accel := false
-var _accel_local := Vector3.ZERO  # the body's smoothed acceleration, model frame (m/s^2)
-var _accel_ref := 12.0  # the acceleration (m/s^2) that bends the tips fully; set from the fish's speed each frame
 
 
 ## A setting's value, or its default here while it is not registered.
@@ -241,7 +258,17 @@ func apply_settings() -> void:
 
 func _init_tables() -> void:
 	_dirs.clear()
-	_vels.clear()
+	_pq.clear()
+	_pv.clear()
+	_pt.clear()
+	_phys_ok = false
+	_nat_ring.clear()
+	_nat_tang.clear()
+	_nat_curl.clear()
+	_nat_vary = PackedFloat32Array()
+	_body_r = 0.105 * model.unit
+	_body_z0 = model.mantle_tip_local().z + _body_r
+	_body_z1 = -0.08 * model.unit
 	_rest_dirs.clear()
 	_bundle_dirs.clear()
 	_flare_dirs.clear()
@@ -290,9 +317,19 @@ func _init_tables() -> void:
 		_rest_pts.append(pts)
 		_seg_len.append(lens)
 		_dirs.append(rest.duplicate())
-		var zeros := PackedVector3Array()
-		zeros.resize(SEGS)
-		_vels.append(zeros)
+		var joints := PackedVector3Array()
+		joints.resize(SEGS + 1)
+		_pq.append(joints)
+		_pv.append(joints.duplicate())
+		_pt.append(joints.duplicate())
+		# the relaxed cone: each arm splays its own way from the axis (a little off its radial, so no two are alike) and its tip
+		# curls round the bundle, alternately one way and the other
+		var vary := sin(float(a) * 2.4 + 0.7)
+		var ring := (radial + tang * (0.22 * vary)).normalized()
+		_nat_vary.append(vary)
+		_nat_ring.append(ring)
+		_nat_tang.append(Vector3(-ring.y, ring.x, 0.0))
+		_nat_curl.append((tang * (0.9 if a % 2 == 0 else -0.9) - radial * 0.45).normalized())
 		_crawl_dirs.append(rest.duplicate())
 		override_dirs.append(PackedVector3Array())
 		_tips_model.append(pts[SEGS])
@@ -729,13 +766,15 @@ func step(delta: float, ctx: Dictionary) -> void:
 		_read_fish_inputs()
 	if not _phys_driven or frozen:
 		tick(delta, _vel, gb)
-	# the body's own rotation since last frame, as a rotation of model-local vectors
-	var counter := Basis.IDENTITY
+	# the body's own rotation since last frame: as a rotation of model-local vectors (for the turn rate) and in the world (`turn`)
+	var turn := Basis.IDENTITY
 	if _have_basis:
-		counter = gb.inverse() * _last_basis
-		var dq := counter.get_rotation_quaternion()
+		var dq := (gb.inverse() * _last_basis).get_rotation_quaternion()
 		var axis := dq.get_axis() if dq.get_angle() > 0.00001 else Vector3.UP
 		_omega_local = -axis * dq.get_angle() / delta
+		turn = gb * _last_basis.inverse()
+		# a respawn or a snap is not a turn: the arms go round with it whole
+		_turn_snap = dq.get_angle() > 0.5 and dq.get_angle() > 25.0 * delta
 	_last_basis = gb
 	_have_basis = true
 	var vel_local := gb.inverse() * _vel
@@ -745,14 +784,13 @@ func step(delta: float, ctx: Dictionary) -> void:
 		speed_ref = maxf(fish.max_speed * 0.8, 1.0)
 	var speed_t := clampf(speed / speed_ref, 0.0, 1.0)
 	_speed_t = lerpf(_speed_t, speed_t, 1.0 - exp(-6.0 * delta))
-	_flow_dir = (-vel_local / speed) if speed > 0.05 else _flow_dir
-	# The body's acceleration in its own frame (smoothed): the arms are masses in the water, so the tips lag a push (trail
-	# opposite it) and swing on past a stop (a jet's kick throws them back, the coast after it swings them forward again).
-	if _have_accel:
-		var accel_w := (_vel - _prev_vel) / delta
-		_accel_local = _accel_local.lerp((gb.inverse() * accel_w).limit_length(speed_ref * 6.0), 1.0 - exp(-6.0 * delta))
+	_speed_ref = speed_ref
+	# the body's change of velocity this frame. A knock or a respawn is capped: the arms whip to the capped part and are carried
+	# with the rest (they do not explode)
+	var dv_raw := _vel - _prev_vel
+	_dv = dv_raw.limit_length(speed_ref * 0.25)
+	_dv_carried = dv_raw - _dv
 	_prev_vel = _vel
-	_have_accel = true
 	_up_local = (gb.inverse() * Vector3.UP).normalized()
 	# jet shape: critically damped chase of the physics side's raw values (no step edges)
 	var w := 38.0
@@ -783,7 +821,7 @@ func step(delta: float, ctx: Dictionary) -> void:
 		siphon_yaw = PI * 0.88 * clampf(-_throttle * 2.0, 0.0, 1.0)  # backing off: the jet points ahead, under the arms
 		siphon_pitch = 0.0
 	_siphon = _siphon.lerp(Vector2(siphon_yaw, siphon_pitch), 1.0 - exp(-9.0 * delta))
-	_solve_arms(delta, counter, vel_local, gb)
+	_solve_arms(delta, turn, gb)
 	_step_pop(delta)
 	model.set_mantle_pop(_pop)
 	model.set_mantle_pulse(clampf(_mantle + breath, -1.0, 1.0))
@@ -861,14 +899,23 @@ func _shader(delta: float, jet_on: bool) -> void:
 
 # ------------------------------------------------------------------- the arm solver
 
-func _solve_arms(delta: float, counter: Basis, vel_local: Vector3, gb: Basis) -> void:
-	var stiffness := opt("octopus_arm_stiffness")
+func _solve_arms(delta: float, turn: Basis, gb: Basis) -> void:
+	var stiffness := opt("octopus_arm_stiffness") * 0.5  # the muscle spring at the base (rad/s)
 	var zeta := opt("octopus_arm_damping")
-	var lag := opt("octopus_arm_lag")
-	var inertia := opt("octopus_inertia")
-	var drag_bend := opt("octopus_drag_bend")
+	var floppy := clampf(opt("octopus_arm_lag"), 0.0, 0.95)
+	var inertia := clampf(opt("octopus_inertia"), 0.0, 1.0)
 	var accel_lag := opt("octopus_accel_lag")
-	_accel_ref = maxf(opt("octopus_jet_accel") * 0.8, 1.0)  # a jet's own push reads as a strong kick
+	var delta_w := clampf(opt("octopus_delta"), 0.0, 1.0)
+	var splay := opt("octopus_arm_splay")
+	var idle := (1.0 - _speed_t) * (1.0 - _crawl_w)
+	var wander := opt("octopus_arm_wander") * idle
+	# the water's drag across an arm, sized so that at full speed a tip held square to the flow is pushed `octopus_drag_bend` arm
+	# lengths off the pose its muscles hold (per s); along the arm it is far weaker, so a trailing arm slips through
+	var omega_tip := stiffness * (1.0 - floppy)
+	# (a big body is slow for its size: the drag is sized against its length too, or its own turning would wind the arms up)
+	var drag_n := minf(opt("octopus_drag_bend") * omega_tip * omega_tip * model.arm_length(0) / maxf(_speed_ref, length * 1.6), 30.0)
+	var drag_t := drag_n * 0.3
+	var body_axis := gb.z
 	var droop := opt("octopus_droop") * (1.0 - clampf(_speed_t * 3.5, 0.0, 1.0)) * (1.0 - _crawl_w)  # the swimming arms stream straight
 	# speed pulls the arms into a tighter, streamlined bundle (and calms their undulation); a crawl is not a swim, so it lets go
 	var tuck := opt("octopus_speed_tuck") * _speed_t * (1.0 - _crawl_w)
@@ -881,7 +928,15 @@ func _solve_arms(delta: float, counter: Basis, vel_local: Vector3, gb: Basis) ->
 	var torque := Vector3.ZERO
 	var down_local := -_up_local
 	# a turn (or a roll) banks the delta like a wing: the arms' targets turn about the body's axis, the outside of the turn rising
-	var bank_angle := (-_turn_flare.x + _roll_flare * 0.5) * opt("octopus_bank") * (0.4 + 0.6 * _speed_t)
+	# (the cone only twists a little with it)
+	var bank_angle := (-_turn_flare.x + _roll_flare * 0.5) * opt("octopus_bank") * (0.4 + 0.6 * _speed_t) * lerpf(0.35, 1.0, delta_w)
+	# how much of the body's turn the arms are carried round with (the rest they keep, as the water does)
+	var carried := Basis.IDENTITY
+	if _turn_snap:
+		carried = turn.orthonormalized()
+		_turn_snap = false
+	elif inertia < 0.999 and turn != Basis.IDENTITY:
+		carried = Basis.IDENTITY.slerp(turn.orthonormalized(), 1.0 - inertia)
 	var bank := Basis(Vector3.BACK, bank_angle)
 	var wave_up := bank * Vector3.UP
 	# the jet's wave: one travelling undulation down the arms after each jet, easing in and dying away
@@ -891,7 +946,6 @@ func _solve_arms(delta: float, counter: Basis, vel_local: Vector3, gb: Basis) ->
 	for a in ARMS:
 		var radial := OctopusModel.arm_radial(a)
 		var dirs: PackedVector3Array = _dirs[a]
-		var vels: PackedVector3Array = _vels[a]
 		var rest: PackedVector3Array = _rest_dirs[a]
 		var bundle: PackedVector3Array = _bundle_dirs[a]
 		var flare: PackedVector3Array = _flare_dirs[a]
@@ -905,25 +959,34 @@ func _solve_arms(delta: float, counter: Basis, vel_local: Vector3, gb: Basis) ->
 			_crawl_solve(a, tip_world_inv, gb)
 		var ov: PackedVector3Array = override_dirs[a]
 		var ow := override_w[a] if ov.size() == SEGS else 0.0
-		var prev_offset := Vector3.ZERO
 		var phase_a := float(a) * 0.83
 		var d_target := PackedVector3Array()
 		d_target.resize(SEGS)
+		# the relaxed cone: how far this arm splays from the axis now. Each arm wanders on its own slow clock while the octopus
+		# idles; a jet's squeeze closes the cone to a bundle and its refill (or a stride's breath in) opens it like an umbrella
+		var w1 := sin(_age * (0.31 + 0.07 * float(a)) + float(a) * 1.7)
+		var w2 := sin(_age * (0.53 - 0.04 * float(a)) + float(a) * 0.9)
+		var open := maxf(splay * (1.0 + 0.2 * _nat_vary[a]) + 0.16 * wander * (0.6 * w1 + 0.4 * w2), 0.0)
+		open = lerpf(open, 0.06, minf(-spread, 1.0)) if spread < 0.0 else lerpf(open, maxf(open, 1.15), minf(spread, 1.0))
+		var ring := (_nat_ring[a] + _nat_tang[a] * (0.25 * wander * w2)).normalized()
+		var wave_dir := (bank * ring).lerp(wave_up, delta_w)
 		for j in SEGS:
 			var s := float(j) / float(SEGS - 1)
-			var t := rest[j]
-			t = t.slerp(bundle[j], -spread) if spread < 0.0 else t.slerp(flare[j], minf(spread, 1.0))
+			# it leaves the crown at the cone's angle and straightens along the axis toward its tip (a bundle wraps a touch)
+			var t := (Vector3.BACK + ring * (open * (1.0 - 0.55 * s)) + _nat_tang[a] * (0.03 * s * maxf(-spread, 0.0))).normalized()
+			var gbc: Basis = (_rest_gb[a] as Array)[j]
+			var curl_dir := _nat_curl[a]
+			if delta_w > 0.001:
+				var flat := rest[j]
+				flat = flat.slerp(bundle[j], -spread) if spread < 0.0 else flat.slerp(flare[j], minf(spread, 1.0))
+				t = t.lerp(flat, delta_w).normalized()
+				curl_dir = curl_dir.lerp(gbc.y, delta_w)
 			t = bank * t
 			var tip_w := pow(s, 1.2) * 0.9 + 0.1
-			# the water bends the tips back along the flow, and a slack arm drapes
-			t += _flow_dir * (drag_bend * pow(_speed_t, 0.7) * tip_w * 0.9)
-			# physics: the tips trail the acceleration (heavier at the tips, quadratically), so a jet's kick whips them back and the
-			# coast swings them on; a hard turn's sideways accel throws them out the other way
-			t += -(_accel_local / _accel_ref).limit_length(1.0) * (accel_lag * tip_w * tip_w)
+			# a slack arm drapes (the flow and the body's motion are the water's doing: see the particles below)
 			t += down_local * (droop * tip_w)
-			# the tips keep a curl toward the sucker side (a flared arm is not a stick); it opens a little in a bundle
-			var gbc: Basis = (_rest_gb[a] as Array)[j]
-			t += gbc.y * (opt("octopus_tip_curl") * pow(s, 1.6) * (1.0 + 0.8 * maxf(spread, 0.0)) * (1.0 - 0.6 * maxf(-spread, 0.0)))
+			# the tips keep a curl (an arm is not a stick); it opens a little in a bundle
+			t += curl_dir * (opt("octopus_tip_curl") * pow(s, 1.6) * (1.0 + 0.8 * maxf(spread, 0.0)) * (1.0 - 0.6 * maxf(-spread, 0.0)))
 			t = t.normalized()
 			if crawl_w > 0.001:
 				t = t.slerp((_crawl_dirs[a] as PackedVector3Array)[j], crawl_w)
@@ -934,40 +997,90 @@ func _solve_arms(delta: float, counter: Basis, vel_local: Vector3, gb: Basis) ->
 			var amp := (0.05 * sway * (1.0 - _scull_w) + 0.12 * scull_amp * _scull_w) * (0.3 + tip_w) * (1.0 - crawl_w * 0.6)
 			var ph := _age * 1.05 * (1.0 - _scull_w) + _scull_phase * _scull_w - float(j) * 0.55 + phase_a * (1.0 - 0.6 * _scull_w)
 			var gbj: Basis = (_rest_gb[a] as Array)[j]
-			var lat := gbj.x * (1.0 - _scull_w * 0.65) + wave_up * (_scull_w * 0.9)
+			var lat := gbj.x * (1.0 - _scull_w * 0.65) + wave_dir * (_scull_w * 0.9)
 			var orl := gbj.y * (1.0 - _scull_w * 0.6)
 			t += lat * (amp * sin(ph)) + orl * (amp * 0.7 * sin(ph + 1.3 + _scull_w))
 			if jet_wave > 0.0005:
-				t += wave_up * (jet_wave * (0.2 + tip_w) * sin(s * TAU * 0.9 - _wave_age * TAU * 1.4 + float(a % 4) * 0.25)) * (1.0 - crawl_w)
+				t += wave_dir * (jet_wave * (0.2 + tip_w) * sin(s * TAU * 0.9 - _wave_age * TAU * 1.4 + float(a % 4) * 0.25)) * (1.0 - crawl_w)
 			t = t.normalized()
 			d_target[j] = t
-		# inertia: the state does not turn with the body (more at the tips)
-		if inertia > 0.0 and counter != Basis.IDENTITY:
-			for j in SEGS:
-				var wgt := clampf(inertia * (0.12 + 0.88 * float(j) / float(SEGS - 1)), 0.0, 1.0)
-				dirs[j] = dirs[j].lerp(counter * dirs[j], wgt).normalized()
-				vels[j] = vels[j].lerp(counter * vels[j], wgt)
+		# ---- the arm in the water. The pose above is only what its muscles pull toward; where it is comes from the particles.
+		var q: PackedVector3Array = _pq[a]
+		var pv: PackedVector3Array = _pv[a]
+		var held: PackedVector3Array = _pt[a]
+		var lens: PackedFloat32Array = _seg_len[a]
+		# the muscle targets as joints, along the world's axes from the model's origin, and how fast each is moving there
+		var tw := PackedVector3Array()
+		tw.resize(SEGS + 1)
+		var tp: Vector3 = (_rest_pts[a] as PackedVector3Array)[0]
+		tw[0] = gb * tp
+		for j in SEGS:
+			tp += d_target[j] * lens[j]
+			tw[j + 1] = gb * tp
+		if not _phys_ok:
+			for i in SEGS + 1:
+				q[i] = tw[i]
+				pv[i] = _vel
+				held[i] = tw[i]
+		# an arm that is walking or lashing is held to its pose: the water lets go of it
+		var hold := clampf(maxf(crawl_w, ow), 0.0, 1.0)
+		var free := 1.0 - hold
+		# the body's push this frame beyond the physics' own (`octopus_accel_lag` 1: none; 0: the arms are carried with it)
+		var kick := _dv_carried - _dv * ((accel_lag - 1.0) * free) if _phys_ok else Vector3.ZERO
+		# the pose's own motion (the body turning, a jet's flare) is something the muscles do, not something they resist; a pose that
+		# jumps (the crawl letting go) is not motion, so it is capped and the springs ease the arm over
+		var pose_v_max := length * 2.0
+		var held_v := PackedVector3Array()
+		held_v.resize(SEGS + 1)
+		for i in range(1, SEGS + 1):
+			if carried != Basis.IDENTITY:
+				q[i] = carried * q[i]
+				pv[i] = carried * pv[i]
+			pv[i] += kick
+			held_v[i] = _vel + ((tw[i] - held[i]) / delta).limit_length(pose_v_max)
+		q[0] = tw[0]
+		var cap := 0.85 + 0.25 * crawl_w
+		var step_max := length * 2.5 * h  # no joint outruns the body by more than 2.5 lengths a second
 		for step_i in substeps:
-			prev_offset = Vector3.ZERO
-			for j in SEGS:
-				var s := float(j) / float(SEGS - 1)
-				var omega := stiffness * (1.0 - 0.55 * s)
-				var target := (d_target[j] + prev_offset * lag).normalized()
-				var d := dirs[j]
-				var v := vels[j]
-				v += (omega * omega * (target - d) - 2.0 * zeta * omega * v) * h
-				d = (d + v * h).normalized()
-				v -= d * v.dot(d)
-				# an arm does not fold back on itself: the bend between neighbours is capped
-				if j > 0:
-					var prev := dirs[j - 1]
-					var ang := prev.angle_to(d)
-					var cap := 0.85 + 0.25 * crawl_w
+			var prev_d := Vector3.ZERO
+			for i in range(1, SEGS + 1):
+				var s := float(i - 1) / float(SEGS - 1)
+				var omega := lerpf(stiffness * (1.0 - floppy * s), 40.0, hold)
+				var x := q[i]
+				var v := pv[i]
+				var along := x - q[i - 1]
+				along = along.normalized() if along.length_squared() > 1.0e-10 else d_target[i - 1]
+				# the muscles: a damped spring to the pose (the damping is against the pose's own motion, not the water)
+				v += (omega * omega * (tw[i] - x) - 2.0 * zeta * omega * (v - held_v[i])) * h
+				# the water: it resists a joint moving through it, across the arm far more than along it
+				var c := drag_n * (0.15 + 0.85 * s) * free
+				var v_along := along * v.dot(along)
+				v = v_along / (1.0 + drag_t / maxf(drag_n, 0.0001) * c * h) + (v - v_along) / (1.0 + c * h)
+				var nx := x + ((v - _vel) * h).limit_length(step_max)
+				# the mantle is solid: an arm thrown forward slides round it
+				var zt := clampf(nx.dot(body_axis), _body_z0, _body_z1)
+				var off := nx - body_axis * zt
+				if off.length_squared() < _body_r * _body_r and off.length_squared() > 1.0e-10:
+					nx = body_axis * zt + off.normalized() * _body_r
+				# the arm does not stretch (each joint follows the one before it) or fold back on itself (the bend between
+				# neighbours is capped)
+				var d := nx - q[i - 1]
+				d = d.normalized() if d.length_squared() > 1.0e-10 else along
+				if i > 1:
+					var ang := prev_d.angle_to(d)
 					if ang > cap:
-						d = prev.slerp(d, cap / ang).normalized()
-				dirs[j] = d
-				vels[j] = v
-				prev_offset = d - d_target[j]
+						d = prev_d.slerp(d, cap / ang).normalized()
+				nx = q[i - 1] + d * lens[i - 1]
+				pv[i] = (nx - x) / h + _vel
+				q[i] = nx
+				prev_d = d
+		for i in SEGS + 1:
+			held[i] = tw[i]
+		for j in SEGS:
+			var seg := q[j + 1] - q[j]
+			if seg.length_squared() > 1.0e-10:
+				dirs[j] = (inv * seg).normalized()
+	_phys_ok = true
 	# commit
 	_torque = torque * 0.18
 	_apply_dirs(_dirs, delta)
@@ -1072,12 +1185,13 @@ func settle() -> void:
 		return
 	var saved_throttle := _throttle
 	var saved_boost := _boost
+	_age = 0.0
+	_prev_vel = Vector3.ZERO
 	for i in 45:
 		step(1.0 / 60.0, {"throttle": 0.0, "boost": false, "vel": Vector3.ZERO, "stick": Vector2.ZERO, "roll": 0.0})
 	_throttle = saved_throttle
 	_boost = saved_boost
 	_have_basis = false
-	_age = 0.0
 
 
 ## The fish's visual is scaled to the hitbox (body_scale); the octopus is built in metres, so this undoes the parent's scale and

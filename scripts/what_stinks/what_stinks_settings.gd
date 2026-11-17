@@ -484,15 +484,15 @@ static func shared() -> WhatStinksSettings:
 @export_range(0.0, 3.0, 0.05, "or_greater") var octopus_jet_torque := 0.5
 ## ...and how much the drag of asymmetrically flared arms turns it.
 @export_range(0.0, 3.0, 0.05, "or_greater") var octopus_flare_torque := 0.5
-## How far each arm trails behind the one before it along its length (follow the leader)...
-@export_range(0.0, 1.5, 0.01, "or_greater") var octopus_arm_lag := 0.55
-## ...the arm spring's stiffness...
+## The arms are ropes of particles in the water, held in shape by their muscles. How much floppier the tips are than the base (0: one stiffness all the way down; 0.95: the tips barely hold a pose)...
+@export_range(0.0, 0.95, 0.01) var octopus_arm_lag := 0.55
+## ...the muscles' stiffness (higher: the arms hold the gait's pose harder and the water moves them less)...
 @export_range(4.0, 80.0, 0.5, "or_greater") var octopus_arm_stiffness := 26.0
-## ...and its damping ratio.
+## ...and their damping ratio (lower: the arms ring and overshoot more after a kick).
 @export_range(0.2, 2.0, 0.01, "or_greater") var octopus_arm_damping := 0.8
-## How much the arms keep their world direction when the body turns or rolls (they swing wide).
-@export_range(0.0, 1.5, 0.01, "or_greater") var octopus_inertia := 0.9
-## How far the flow bends the arm tips back at speed.
+## How much the arms stay where the water is when the body turns or rolls (1: fully, they sweep the curve; 0: they are carried round with it).
+@export_range(0.0, 1.0, 0.01) var octopus_inertia := 0.9
+## The water's drag on the arms: at full speed a tip held square to the flow is pushed this many arm lengths off its pose (0: no drag, the arms neither stream nor trail).
 @export_range(0.0, 2.0, 0.01, "or_greater") var octopus_drag_bend := 0.8
 ## The cruise scull's undulation size and its frequency (Hz).
 @export_range(0.0, 3.0, 0.05, "or_greater") var octopus_scull_amp := 1.0
@@ -509,10 +509,16 @@ static func shared() -> WhatStinksSettings:
 @export_range(0.0, 1.0, 0.01) var octopus_jet_respread := 0.35
 ## ...the size of the wave each jet sends down the arms (0: none)...
 @export_range(0.0, 1.0, 0.01, "or_greater") var octopus_jet_wave := 0.4
-## ...how far the arm tips trail the body's acceleration (a jet's kick whips them back, a stop swings them on; 0: none)...
+## ...how hard the body's acceleration throws the arms (a jet's kick leaves them behind, a stop swings them on past the head; 1: as the physics has it, more: exaggerated, 0: they are carried with the body)...
 @export_range(0.0, 3.0, 0.05, "or_greater") var octopus_accel_lag := 1.0
-## ...and how far a turn or roll banks the delta like a wing (rad at full stick).
+## ...and how far a turn or roll banks the delta like a wing (rad at full stick; the cone only twists a little with it).
 @export_range(0.0, 1.5, 0.01, "or_greater") var octopus_bank := 0.45
+## The shape the trailing arms hold: 0 a loose cone round the body's axis (natural), 1 the flat swept-back delta (the stealth bomber).
+@export_range(0.0, 1.0, 0.01) var octopus_delta := 0.0
+## How wide the relaxed cone is (the tangent of its angle at the crown; speed, the water and a jet's squeeze close it)...
+@export_range(0.0, 1.5, 0.01, "or_greater") var octopus_arm_splay := 0.5
+## ...and how much each arm wanders on its own while the octopus idles (0: none).
+@export_range(0.0, 3.0, 0.05, "or_greater") var octopus_arm_wander := 1.0
 ## The crawl: within this many body lengths of a floor the arms plant and walk (0: no crawl)...
 @export_range(0.0, 2.0, 0.05, "or_greater") var octopus_crawl_range := 0.8
 ## ...seconds per arm step...
