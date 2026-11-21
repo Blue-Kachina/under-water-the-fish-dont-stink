@@ -42,7 +42,7 @@ func zero_gait(on := true) -> Gait:
 
 ## The Gait's layer weights, in layer order (each step adds its own).
 func layer_fields() -> Array[String]:
-	return ["rig_undulation"]
+	return ["rig_undulation", "rig_tail_drive"]
 
 
 ## A state at `speed` m/s straight ahead, effort from the throttle.
@@ -84,6 +84,7 @@ func _ready() -> void:
 func _run() -> void:
 	_zero_change()
 	_undulation()
+	_tail_drive()
 	print("swim_rig_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)
 
@@ -202,3 +203,26 @@ func _swing(model: FishModel) -> float:
 		model.react(DT, state)
 		best = maxf(best, absf(model.tail.rotation.y))
 	return best
+
+
+func _tail_drive() -> void:
+	print("TailDrive:")
+	var gait := only(["rig_tail_drive"])
+	var s := moving(10.0)
+	s.gait = gait
+	var model := shark(gait)
+	run(model, s, 0.5)
+	check(absf(model.tail.rotation.y) < 1e-5 and absf(model.tail.rotation.x) < 1e-5, "no stride, no swing")
+	s.stride_dir = Vector2(1.0, 0.0)
+	s.stride_power = 1.0
+	var p := model.rig.pose
+	model.react(DT * 2.0, s)
+	var early := [p.joint_yaw[0], p.joint_yaw[1], p.joint_yaw[2]]
+	check(model.tail.rotation.y > 0.1 and early[2] > early[1] and early[1] > early[0] and early[0] >= 0.0,
+			"the swing reaches the tail first and the joints in order behind it (tail %.3f, joints %.4f %.4f %.4f)" % [model.tail.rotation.y, early[0], early[1], early[2]])
+	run(model, s, 0.6)
+	check(absf(model.tail.rotation.y - gait.rig_stride_swing) < 0.02, "the tail swings across with the stride (%.3f of %.2f rad)" % [model.tail.rotation.y, gait.rig_stride_swing])
+	check(p.spine_yaw() > 0.2 and p.spine_yaw() < gait.rig_stride_swing, "the body carries the bend (spine %.3f rad)" % p.spine_yaw())
+	s.stride_dir = Vector2(-0.5, 0.8)
+	run(model, s, 0.8)
+	check(model.tail.rotation.y < -0.2 and model.tail.rotation.x > 0.3, "the other way and up/down follow the stride's sweep (yaw %.2f, pitch %.2f)" % [model.tail.rotation.y, model.tail.rotation.x])

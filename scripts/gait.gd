@@ -182,3 +182,14 @@ func is_default() -> bool:
 @export_range(0.0, 3.0, 0.05, "or_greater") var rig_cue_amp := 0.5
 ## Rig: how quickly the layers' own smoothed values (the wave's size and rate) follow their targets (1/s).
 @export_range(0.5, 60.0, 0.5, "or_greater") var rig_ease := 5.0
+
+## Rig, TailDrive layer: its weight (0 off). A stride's swing (SwishySwim.tail_swing) drives the caudal fin at once, and
+## the bend is carried forward up the body behind it, each joint a moment later than the one behind.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_tail_drive := 0.0
+## Rig, TailDrive: how far a full stride swings the tail (rad), across and up/down.
+@export_range(0.0, 3.0, 0.01, "or_greater") var rig_stride_swing := 0.6
+## Rig, TailDrive: how quickly the caudal fin follows the swing (1/s).
+@export_range(1.0, 120.0, 0.5, "or_greater") var rig_tail_snap := 40.0
+## Rig, TailDrive: how quickly each joint follows the one behind it (1/s). Lower: a lazier, more whip-like carry up the
+## body.
+@export_range(1.0, 120.0, 0.5, "or_greater") var rig_stride_follow := 14.0
