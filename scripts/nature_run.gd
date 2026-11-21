@@ -188,6 +188,11 @@ func _ready() -> void:
 	start()
 
 
+## The camera style Nature plays under (its settle cam), or null while that is off.
+func camera_style() -> CameraStyle:
+	return settings.camera_style()
+
+
 ## The players at the ocean's spawn, side by side, the lone fish waiting ahead
 ## of them and the schools around.
 func start() -> void:

@@ -9,7 +9,8 @@ extends Camera3D
 ## with a level horizon. It falls back to the normal view while there's no ball.
 ## On the obstacle course the same toggle is ring cam: it aims at the next hoop.
 ##
-## A mode can steady it (steady_heading, Unnatural's survivor cam): it then
+## A mode can steady it with a CameraStyle (push_style / pop_style, keyed by the
+## mode: Unnatural's survivor cam, Nature's settle cam). Steady (steady_heading), it then
 ## turns by its own smoothed heading (heading_rate) rather than straight with
 ## the fish, so stride sweeps don't swing the view, with its climb damped
 ## (heading_climb), and sits extra_distance further back,
@@ -87,6 +88,9 @@ var input: PlayerInput
 var _ball_cam_held := -1.0
 ## Set by a mode (see the class description); not tuning, so never saved.
 var steady_heading := false
+## Set through the CameraStyle pushed (push_style): whether the ball cam button
+## swaps follow and free cam while steady (the survivor cam).
+var style_swaps_view := true
 var heading_rate := 2.5
 var heading_climb := 0.5
 var extra_distance := 0.0
@@ -106,6 +110,9 @@ const BODY_ZOOM_BASE := 1.35
 const BODY_ZOOM_POWER := 0.75
 ## The survivor cam's modes (see the class description).
 var free_cam := false
+## Pushed styles (see push_style), oldest first; and the view_mode last applied.
+var _styles := {}
+var _style_mode := -1
 const FOLLOW_SETTLE := 0
 const FOLLOW_HOLD := 1
 const FOLLOW_ALWAYS := 2
@@ -346,6 +353,64 @@ func focus_node() -> Node3D:
 	return ball
 
 
+## A mode's camera style (CameraStyle): `key` names the pusher (a mode id), so it
+## can push again every frame, live from the panel, and take it off with the same
+## key. The newest key's style is the one in effect.
+func push_style(key: StringName, style: CameraStyle) -> void:
+	_styles[key] = style
+	_apply_style(style)
+
+
+## Takes `key`'s style off: the one pushed before it comes back, else the plain
+## chase view. Does nothing if `key` has none pushed.
+func pop_style(key: StringName) -> void:
+	if not _styles.erase(key):
+		return
+	_apply_style(_styles.values().back() if not _styles.is_empty() else null)
+
+
+## Whether `key` has a style pushed.
+func has_style(key: StringName) -> bool:
+	return _styles.has(key)
+
+
+## Puts `style`'s numbers on the camera's own fields (null: the plain chase view,
+## nose-following, no extra distance).
+func _apply_style(style: CameraStyle) -> void:
+	if style == null:
+		steady_heading = false
+		style_swaps_view = true
+		extra_distance = 0.0
+		extra_height = 0.0
+		extra_angle = 0.0
+		_style_mode = -1
+		return
+	if style.steady and style.view_mode >= 0 and _style_mode != style.view_mode:
+		free_cam = style.view_mode == 1
+	_style_mode = style.view_mode if style.steady else -1
+	steady_heading = style.steady
+	style_swaps_view = style.button_swaps_view
+	follow_style = style.follow_style
+	swing_rate = style.swing_rate
+	settle_rate = style.settle_rate
+	settle_turning_rate = style.settle_turning_rate
+	settle_turn_full = style.settle_turn_full
+	settle_smoothing = style.settle_smoothing
+	settle_delay = style.settle_delay
+	settle_max_angle = style.settle_max_angle
+	settle_coast_rate = style.settle_coast_rate
+	settle_coast_ease = style.settle_coast_ease
+	free_turn_speed = style.free_turn_speed
+	free_pitch_limit = style.free_pitch_limit
+	free_follow_rate = style.free_follow_rate
+	free_invert_y = style.free_invert_y
+	heading_rate = style.heading_rate
+	heading_climb = style.heading_climb
+	extra_distance = style.extra_distance
+	extra_height = style.extra_height
+	extra_angle = style.extra_angle
+
+
 ## Turns ball cam on or off, swinging over at the transition speed.
 func set_ball_cam(on: bool) -> void:
 	if on == ball_cam:
@@ -362,7 +427,7 @@ func _ball_cam_button(delta: float) -> void:
 	if button_taken:
 		_ball_cam_held = -1.0
 		return
-	if steady_heading and not hold_opens_wheel:
+	if steady_heading and style_swaps_view and not hold_opens_wheel:
 		_ball_cam_held = -1.0  # (a hold the mode ended mid-press must not toggle later)
 		# The survivor cam has no ball: the button swaps its modes instead.
 		if _player_input().just_pressed("ball_cam"):

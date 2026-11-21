@@ -50,6 +50,7 @@ const FREE_PLAY := "Free Play"
 const ONE_V_ONE := "1v1"
 const FREE_SWIM := "Free Swim (Ocean)"
 const NATURE := "Nature"
+const NATURE_CAMERA_KEY := &"nature"
 const HUNT := "Hunt"
 const UNNATURAL := "Unnatural"
 const TEST_TANK := "Test Tank"
@@ -490,6 +491,22 @@ func _process(_delta: float) -> void:
 			UnnaturalRun.steady_camera(slot.camera, true, unnatural_run.settings, unnatural_run.camera_pull_of(slot.fish))  # live from the panel
 	elif _course_cam:
 		UnnaturalRun.steady_camera(_camera, true, UnnaturalSettings.shared())  # live from the panel
+	_nature_camera_style()
+
+
+## Nature's camera style (NatureSettings' Camera group: the settle cam), pushed
+## live from the panel on every view while Nature plays, taken off otherwise.
+func _nature_camera_style() -> void:
+	var style: CameraStyle = nature_run.camera_style() if nature_run else null
+	var views: Array[Node] = [_camera]
+	for slot in _local.slots:
+		if slot.camera != _camera:
+			views.append(slot.camera)
+	for view in views:
+		if style:
+			view.push_style(NATURE_CAMERA_KEY, style)
+		else:
+			view.pop_style(NATURE_CAMERA_KEY)
 
 
 ## R or the pause menu's reset: a 1v1 back to a kickoff, otherwise the fish
