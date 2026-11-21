@@ -17,7 +17,7 @@ D6 file moves done in worktree + committed, git: branch per track, push branches
 | T0a metrics | 0 | M0 swim_metrics_probe + fixture | track/metrics | done |
 | T0b boundary | 0 | mode_boundary_probe (report only) | track/boundary | done |
 | T0c swimstate | 0 | M5 SwimState | track/swimstate | done, merged |
-| T1 swim | 1 | M4, M1, M2 | track/swim | resumed 2026-11-21 (worker) |
+| T1 swim | 1 | M4, M1, M2 | track/swim | done, merged (all behind toggles, defaults off) |
 | T2 rig | 2 | P1-P4 shark rig | track/rig | done, merged (needs user eyes: D:/Dev/GameDev/wt/shots/rig) |
 | T3 hunt | 3 | H0-H7 | track/hunt | done, merged (gates green 2026-11-21) |
 | T4a P5 rollout | 4 | Drowned Shark + 2 classes on rig | track/rollout | running |
