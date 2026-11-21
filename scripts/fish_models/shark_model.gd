@@ -157,7 +157,14 @@ static func build(m: FishModel) -> void:
 	var d_back := _surface(shape, dorsal_at.y, 0.0) - Vector3(0.0, h * 0.05, 0.0)
 	var dorsal: Array = (sp.dorsal as Array).duplicate()
 	dorsal[0] = d_front.distance_to(d_back) / l
-	_fin(m, fins, d_front, d_back - d_front, Vector3.UP, _scaled(dorsal, l), 0.13, FIN_DORSAL, Vector3.RIGHT)
+	var first_dorsal := _fin(m, fins, d_front, d_back - d_front, Vector3.UP, _scaled(dorsal, l), 0.13, FIN_DORSAL, Vector3.RIGHT)
+	# It stands stiff on a rider at its root (FishModel.bend_rider): ahead of the bend it never moves, but with the
+	# procedural rig the head's counter-bend reaches under it and carries it whole, rather than bending the body away
+	# from it. Its mesh is built in the model's space, so it sits at minus the rider's place (exactly where it was).
+	var dorsal_rider := m.bend_rider(d_front)
+	m.remove_child(first_dorsal)
+	dorsal_rider.add_child(first_dorsal)
+	first_dorsal.position = -d_front
 	# The rear fins ride the bend: a small second dorsal, an anal fin, pelvics.
 	var bent: Array = []
 	var d2_front := _surface(shape, 0.8, 0.0) - Vector3(0.0, h * 0.03, 0.0)

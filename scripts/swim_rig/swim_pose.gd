@@ -31,6 +31,17 @@ var fin_pitch := Vector2.ZERO
 ## For the shaders: how deep the wave runs now (0..1) and its phase.
 var wave_amp := 0.0
 var wave_phase := 0.0
+## The fin pivots' own roll (left, right; + lowers the fin, as fin_flap): the flap and reverse flutter
+## (Gait.rig_bell_flap), written to the pivots themselves, where the sea hare's flaps and the ray's wings read it.
+var pivot_roll := Vector2.ZERO
+## A jelly's bell (BellPulse): crown, margin, ripple and the ripple's phase, and the stroke's squeeze and flatten, as its
+## shaders take them (Gait.rig_bell_flap). Plain floats, so they reach the shaders at full precision.
+var bell_crown := 0.0
+var bell_margin := 0.0
+var bell_ripple := 0.0
+var bell_ripple_phase := 0.0
+var bell_squeeze := 1.0
+var bell_flatten := 1.0
 
 
 func clear() -> void:
@@ -48,6 +59,13 @@ func clear() -> void:
 	fin_pitch = Vector2.ZERO
 	wave_amp = 0.0
 	wave_phase = 0.0
+	pivot_roll = Vector2.ZERO
+	bell_crown = 0.0
+	bell_margin = 0.0
+	bell_ripple = 0.0
+	bell_ripple_phase = 0.0
+	bell_squeeze = 1.0
+	bell_flatten = 1.0
 
 
 ## The spine's end turn: the sum of the joints.
@@ -64,7 +82,8 @@ func is_finite_pose() -> bool:
 		if not (is_finite(joint_yaw[j]) and is_finite(joint_pitch[j])):
 			return false
 	for v: float in [head_yaw, head_pitch, surge, bank, tail_yaw, tail_pitch, fin_sweep.x, fin_sweep.y,
-			fin_flap.x, fin_flap.y, fin_pitch.x, fin_pitch.y, wave_amp, wave_phase]:
+			fin_flap.x, fin_flap.y, fin_pitch.x, fin_pitch.y, wave_amp, wave_phase, pivot_roll.x, pivot_roll.y,
+			bell_crown, bell_margin, bell_ripple, bell_ripple_phase, bell_squeeze, bell_flatten]:
 		if not is_finite(v):
 			return false
 	return true

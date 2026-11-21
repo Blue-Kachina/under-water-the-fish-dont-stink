@@ -137,6 +137,7 @@ static func build(m: FishModel) -> void:
 	var pivot := Vector3(0.0, MIDDLE, six_end - 0.012)
 	m._tail_pivot(pivot)
 	m.bend_share = 0.65
+	m.rig_capable = true  # SwimRig, when the Brawler gait turns procedural_rig on
 	_tail_fan(m, sk, seams, pivot)
 
 	# Swimmerets under abdominal plates 1-5, beating, bending with the abdomen.

@@ -145,7 +145,8 @@ signal power_stroke(strength: float, at: Transform3D)
 var titan_motion := false
 ## The procedural rig (SwimRig, scripts/swim_rig): whether this model has one to
 ## give (the shark's builder sets it), made on the first frame its Gait's
-## procedural_rig is on. While it's engaged the body bends along the same chain
+## procedural_rig is on (or rig_bell_flap, which any model's bell and fin pivots
+## take without engaging the rest). While it's engaged the body bends along the same chain
 ## as a Titan's (_rig_chain), the rig setting the joints.
 var rig_capable := false
 var rig: SwimRig
@@ -229,14 +230,22 @@ static func build(character: FishCharacter.FishClass, species := 0, skin := 0) -
 ## (the bottom, when it isn't moving up or down, so it squashes onto the floor).
 func react(delta: float, state: SwimState) -> void:
 	swim = state
-	if rig_capable and swim.gait != null and swim.gait.procedural_rig:
+	var full := rig_capable and swim.gait != null and swim.gait.procedural_rig
+	if full or (swim.gait != null and swim.gait.rig_bell_flap):
 		if rig == null:
 			rig = SwimRig.new()
 			add_child(rig)
 			rig.attach(self)
-		rig.step(delta, swim, swim.gait)
-	elif rig != null and rig.engaged:
-		rig.release()
+		if full:
+			rig.step(delta, swim, swim.gait)
+		else:
+			if rig.engaged:
+				rig.release()
+			rig.step_visual(delta, swim, swim.gait)
+	elif rig != null:
+		if rig.engaged:
+			rig.release()
+		rig.visual = false
 	if titan_motion:
 		_titan_swim(delta)
 	apply_bend()
@@ -372,6 +381,11 @@ func _tint(color: Color) -> void:
 func _pulse_bell(delta: float, effort: float) -> void:
 	if bell == null:
 		return
+	if rig != null and rig.visual:
+		# The bell layer (Gait.rig_bell_flap) stepped it already.
+		var p := rig.pose
+		_set_bell(p.bell_crown, p.bell_margin, p.bell_ripple, p.bell_ripple_phase, p.bell_squeeze, p.bell_flatten)
+		return
 	var squeeze := 1.0
 	var flatten := 1.0
 	if swim.bell_lean >= 0.0 and swim.gait != null:
@@ -380,11 +394,16 @@ func _pulse_bell(delta: float, effort: float) -> void:
 		flatten = swim.gait.bell_flatten
 	else:
 		bell.step_free(delta, lerpf(0.4, 0.9, effort), effort)
+	_set_bell(bell.crown, bell.margin, bell.ripple, bell.ripple_phase, squeeze, flatten)
+
+
+## The bell's shape and its stroke's squeeze and flatten, to its shaders.
+func _set_bell(crown: float, margin: float, ripple: float, ripple_phase: float, squeeze: float, flatten: float) -> void:
 	for material in _bell_pulses:
-		material.set_shader_parameter("bell_crown", bell.crown)
-		material.set_shader_parameter("bell_margin", bell.margin)
-		material.set_shader_parameter("bell_ripple", bell.ripple)
-		material.set_shader_parameter("bell_ripple_phase", bell.ripple_phase)
+		material.set_shader_parameter("bell_crown", crown)
+		material.set_shader_parameter("bell_margin", margin)
+		material.set_shader_parameter("bell_ripple", ripple)
+		material.set_shader_parameter("bell_ripple_phase", ripple_phase)
 		material.set_shader_parameter("bell_squeeze", squeeze)
 		material.set_shader_parameter("bell_flatten", flatten)
 
@@ -419,8 +438,12 @@ func _swim(delta: float) -> void:
 	_whip_basis_set = true
 	var moving := body.inverse() * swim.velocity
 	var yaw_rate := turned.x / delta
-	_bank_ray(delta, yaw_rate, -moving.z)
-	_beat_wings(delta)
+	# With the rig engaged (the Gliders' procedural_rig) its Turn and Wing beat layers bank the body and beat the
+	# wings (the pose's bank, fin_flap and fin_sweep).
+	var rigged := rig != null and rig.engaged
+	if not rigged:
+		_bank_ray(delta, yaw_rate, -moving.z)
+		_beat_wings(delta)
 	# The wings' wave runs nose to tail, quicker and deeper with speed and with a
 	# stride's push, and deeper on the wing that's working harder: the outside
 	# of a turn, or the side a stride beats.
@@ -429,10 +452,17 @@ func _swim(delta: float) -> void:
 	_skin.set_shader_parameter("ripple", lerpf(0.014, 0.045, effort) * (1.0 + 0.5 * swim.stride_power))
 	var bias := clampf(yaw_rate * 0.15, -0.6, 0.6) - 0.4 * swim.stride_dir.x * swim.stride_power
 	_skin.set_shader_parameter("ripple_bias", clampf(bias, -0.7, 0.7))
-	_skin.set_shader_parameter("flap_left", -fin_left.rotation.z + _beat.x)
-	_skin.set_shader_parameter("flap_right", fin_right.rotation.z + _beat.y)
-	_skin.set_shader_parameter("sweep_left", fin_left.rotation.y)
-	_skin.set_shader_parameter("sweep_right", -fin_right.rotation.y)
+	if rigged:
+		var p := rig.pose
+		_skin.set_shader_parameter("flap_left", -fin_left.rotation.z - p.fin_flap.x)
+		_skin.set_shader_parameter("flap_right", fin_right.rotation.z - p.fin_flap.y)
+		_skin.set_shader_parameter("sweep_left", fin_left.rotation.y + p.fin_sweep.x)
+		_skin.set_shader_parameter("sweep_right", -fin_right.rotation.y + p.fin_sweep.y)
+	else:
+		_skin.set_shader_parameter("flap_left", -fin_left.rotation.z + _beat.x)
+		_skin.set_shader_parameter("flap_right", fin_right.rotation.z + _beat.y)
+		_skin.set_shader_parameter("sweep_left", fin_left.rotation.y)
+		_skin.set_shader_parameter("sweep_right", -fin_right.rotation.y)
 	_tail_skin.set_shader_parameter("tail_ripple", lerpf(0.02, 0.05, effort))
 	_bend_whip(delta, moving, turned)
 

@@ -12,6 +12,11 @@ extends Node
 ## reads it as the RigLegacy layer's input (rig_legacy_tail) and then writes the
 ## pivot itself, so it also knows when nothing rewrote the pivot since (a fish
 ## with no controller) and holds the pose it last saw.
+##
+## The bell and flap layers (Gait.rig_bell_flap: RigBellPulse, RigFlap) run on any
+## model, rigged or not (step_visual when procedural_rig is off): they fill the
+## pose's bell and pivot_roll channels, the rig writes the fin pivots' roll and the
+## model hands the bell to its shaders.
 
 var model: FishModel
 var pose := SwimPose.new()
@@ -27,6 +32,11 @@ var bend_share := 0.65
 ## Undulation's clock and its rate (Hz), kept here so a probe and the shaders can read them.
 var wave_phase := 0.0
 var wave_freq := 0.0
+## The model's BellPulse (a jelly's), which RigBellPulse steps; null for any other model.
+var bell: BellPulse
+## Whether this frame's pose has the bell and flap layers' channels (Gait.rig_bell_flap).
+var visual := false
+var visual_layers: Array[RigLayer] = [RigBellPulse.new(), RigFlap.new()]
 
 var _written := Vector3(INF, INF, INF)
 var _wrappers: Array[Node3D] = []
@@ -41,14 +51,16 @@ func _init() -> void:
 
 ## The layers after the legacy pose, in order (later steps add theirs).
 static func _later_layers() -> Array:
-	return [RigUndulation, RigTailDrive, RigTurn, RigAccel, RigDrift, RigFinStabilizer, RigIdle]
+	return [RigUndulation, RigTailDrive, RigTurn, RigAccel, RigDrift, RigFinStabilizer, RigIdle, RigWingBeat]
 
 
 func attach(m: FishModel) -> void:
 	model = m
 	bend_share = m.bend_share
 	length = m._size.z
-	span = maxf(m._bend_span.y - m._bend_span.x, 0.01)
+	# A body that doesn't bend (the ray: its wings and whip carry the motion) curls its turn over half its length.
+	span = maxf(m._bend_span.y - m._bend_span.x, 0.01) if m._bend_span.y > m._bend_span.x else maxf(length * 0.5, 0.01)
+	bell = m.bell
 
 
 ## Poses the model for a frame of `dt` s.
@@ -66,8 +78,53 @@ func step(dt: float, state: SwimState, gait: Gait) -> void:
 			layer.evaluate(self, state, gait, dt, pose)
 		elif dt > 0.0:
 			layer.reset()
+	_step_visual(dt, state, gait)
 	pose.wave_phase = wave_phase
 	_apply(gait)
+	_apply_visual()
+
+
+## The bell and flap layers alone, on a model whose rig isn't engaged (procedural_rig off, or a model with no rig).
+func step_visual(dt: float, state: SwimState, gait: Gait) -> void:
+	if model == null:
+		return
+	pose.clear()
+	_step_visual(dt, state, gait)
+	_apply_visual()
+
+
+func _step_visual(dt: float, state: SwimState, gait: Gait) -> void:
+	visual = gait.rig_bell_flap
+	for layer in visual_layers:
+		if visual:
+			layer.evaluate(self, state, gait, dt, pose)
+		elif dt > 0.0:
+			layer.reset()
+
+
+## The model posed by the Undulation layer alone at wave `phase` (rad), swum at `effort` (0..1) with its springs settled:
+## a still frame of the wave for a school bake (SchoolLook). The rig engages; nothing else moves.
+func sample_wave(gait: Gait, phase: float, effort: float) -> void:
+	if model == null or model.tail == null:
+		return
+	if not engaged:
+		_engage()
+	pose.clear()
+	var amp := gait.rig_amplitude * pow(clampf(effort, 0.0, 1.0), 0.7)
+	RigUndulation.write(gait, gait.rig_undulation, amp, phase, pose)
+	pose.wave_phase = phase
+	_apply(gait)
+	model.apply_bend()
+
+
+## The fin pivots take the flap layer's roll (the controller leaves them to it while rig_bell_flap is on).
+func _apply_visual() -> void:
+	if not visual:
+		return
+	if model.fin_left:
+		model.fin_left.rotation.z = pose.pivot_roll.x
+	if model.fin_right:
+		model.fin_right.rotation.z = -pose.pivot_roll.y
 
 
 ## The layers alone, for a body with no FishModel (TrailAdapter): `body_length` m long, its bend spanning all of it (turn curvature x length).

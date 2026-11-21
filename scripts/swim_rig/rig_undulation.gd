@@ -32,7 +32,12 @@ func evaluate(rig: SwimRig, state: SwimState, gait: Gait, dt: float, pose: SwimP
 	rig.wave_freq = freq
 	if dt > 0.0:
 		rig.wave_phase = fmod(rig.wave_phase + TAU * freq * dt, TAU)
-	var phase := rig.wave_phase
+	write(gait, w, amp, rig.wave_phase, pose)
+
+
+## The wave at `phase` (rad), `amp` deep (rad, its size before the envelope), weighted `w`, into `pose`: the joints,
+## the head's sway, the caudal fin's flex and wave_amp. Also the school bakes' sample (SwimRig.sample_wave).
+static func write(gait: Gait, w: float, amp: float, phase: float, pose: SwimPose) -> void:
 	var axis := clampf(gait.rig_wave_axis, 0.0, 1.0)
 	var total := 0.0
 	for j in SwimPose.JOINTS:
