@@ -1,5 +1,5 @@
 extends Node
-## Online Marco Polo (MarcoPoloNet, CoopSession's mpm) over ENet on this
+## Online Marco Polo (MarcoPoloNet, CoopSession's mgame) over ENet on this
 ## machine: a host and two guests, each its own Godot process, plus the host's
 ## bots (tests/marco_polo_net.sh starts them):
 ##   Godot_console.exe --headless --path . res://tests/marco_polo_net_peer.tscn -- --role=host --port=N
@@ -95,7 +95,7 @@ func _host() -> void:
 	NetSession.host_enet(port)
 	await _ticks(5)
 	var coop: CoopSession = NetSession.coop
-	check(NetSession.is_host() and coop.mpm == game, "hosting: the session has our match")
+	check(NetSession.is_host() and coop.mgame == game, "hosting: the session has our match")
 	if not await _wait(func() -> bool: return _pids.has("a") and _pids.has("b"), 30.0):
 		check(false, "both guests joined")
 		return
@@ -122,13 +122,13 @@ func _host() -> void:
 	game._tally[fb] = 7.0
 	game.set_exposure(fb, 0.5)
 	await _seconds(0.5)
-	var to_a: Array = coop.marco_polo_net.sent_views.get(int(_pids.a) / 100, [])
-	var to_b: Array = coop.marco_polo_net.sent_views.get(int(_pids.b) / 100, [])
+	var to_a: Array = (coop.net_of("marco_polo") as MarcoPoloNet).sent_views.get(int(_pids.a) / 100, [])
+	var to_b: Array = (coop.net_of("marco_polo") as MarcoPoloNet).sent_views.get(int(_pids.b) / 100, [])
 	check(not to_b.is_empty() and (to_b[0] as Dictionary).keys() == [int(_pids.b)] and float(to_b[1]) >= 7.0,
 			"b's view: only its own exposure and its own tally (%s)" % [to_b])
 	var hider_ids := []
 	for h in game.live_hiders():
-		hider_ids.append(coop.marco_polo_net.id_of(h))
+		hider_ids.append((coop.net_of("marco_polo") as MarcoPoloNet).id_of(h))
 	var a_keys: Array = (to_a[0] as Dictionary).keys() if not to_a.is_empty() else [-999]
 	check(not to_a.is_empty() and is_zero_approx(float(to_a[1])) and a_keys.all(func(id: Variant) -> bool: return int(id) in hider_ids),
 			"a's view (the seeker): hiders' exposures, no points (%s)" % [to_a])
@@ -204,7 +204,7 @@ func _host() -> void:
 	check(game.phase == MarcoPoloMatch.Phase.ROUND_OVER, "the round's over")
 	var totals := {}
 	for f: FishController in game.match_totals:
-		totals[coop.marco_polo_net.id_of(f)] = float(game.match_totals[f])
+		totals[(coop.net_of("marco_polo") as MarcoPoloNet).id_of(f)] = float(game.match_totals[f])
 	await _seconds(0.5)
 	await _phase("round_over", {"totals": totals}, true, "all")
 
@@ -321,7 +321,7 @@ func _guest() -> void:
 		return
 	await _seconds(0.5)
 	var game: MarcoPoloMatch = main.marco_polo
-	check(main.current_environment == mp.arena and coop.mpm == game, "welcomed: a guest's match in the host's arena (%s)" % main.current_environment)
+	check(main.current_environment == mp.arena and coop.mgame == game, "welcomed: a guest's match in the host's arena (%s)" % main.current_environment)
 	_hello_rpc.rpc_id(1, role, coop.pid_of(fish))
 	while true:
 		await _wait(func() -> bool: return _phase_name != "", 60.0)
@@ -339,7 +339,7 @@ func _guest() -> void:
 				mp.marco_auto_interval = 1.0
 				mp.hide_time = 4.0
 			"whale_round":
-				var seeker := coop.marco_polo_net.fish_by_id(int(data.seeker))
+				var seeker := (coop.net_of("marco_polo") as MarcoPoloNet).fish_by_id(int(data.seeker))
 				await _wait(func() -> bool: return seeker != null and seeker.character == FishCharacter.FishClass.TITAN, 3.0)
 				check(seeker != null and game.seekers() == [seeker] and seeker.character == FishCharacter.FishClass.TITAN and seeker.hitbox_length > 4.0,
 						"the whale: a Titan here too (%.1f m)" % (seeker.hitbox_length if seeker else 0.0))
@@ -350,7 +350,7 @@ func _guest() -> void:
 				check(game.whale_pick_window_left() >= 0.0, "our pick window is open (%.1f s)" % game.whale_pick_window_left())
 				game.request_whale_pick(3, 1, true)
 			"whale_picked":
-				var seeker := coop.marco_polo_net.fish_by_id(int(data.seeker))
+				var seeker := (coop.net_of("marco_polo") as MarcoPoloNet).fish_by_id(int(data.seeker))
 				await _wait(func() -> bool: return seeker != null and seeker.species == 3 and seeker.skin == 1, 3.0)
 				check(seeker != null and seeker.species == 3 and seeker.skin == 1 and seeker.character == FishCharacter.FishClass.TITAN,
 						"the pick shows here: species %d skin %d" % [seeker.species if seeker else -1, seeker.skin if seeker else -1])
@@ -364,7 +364,7 @@ func _guest() -> void:
 			"auto_done":
 				pass
 			"b_near":
-				var seeker := coop.marco_polo_net.fish_by_id(int(data.seeker))
+				var seeker := (coop.net_of("marco_polo") as MarcoPoloNet).fish_by_id(int(data.seeker))
 				if role == "b" and seeker:
 					fish.controls_locked = true
 					fish.global_position = seeker.global_position - seeker.global_basis.z * (seeker.hitbox_length * 0.5 + 5.0)
@@ -392,7 +392,7 @@ func _guest() -> void:
 			"titans_done":
 				pass
 			"swapped_back":
-				var seeker := coop.marco_polo_net.fish_by_id(int(data.seeker))
+				var seeker := (coop.net_of("marco_polo") as MarcoPoloNet).fish_by_id(int(data.seeker))
 				await _wait(func() -> bool: return seeker != null and seeker.character == FishCharacter.FishClass.TITAN, 3.0)
 				check(seeker != null and seeker.character == FishCharacter.FishClass.TITAN, "the host's the Titan here now")
 				var fa_fish := fish if role == "a" else coop.fish_of(int(data.a))
@@ -407,7 +407,7 @@ func _guest() -> void:
 				check(game.players.size() == int(data.players) and game.bots.is_empty(), "everyone's here (%d of %d), the bots puppets (none run here)" % [game.players.size(), data.players])
 			"round":
 				await _wait(func() -> bool: return game.players.size() == int(data.players), 3.0)
-				var seeker := coop.marco_polo_net.fish_by_id(int(data.seeker))
+				var seeker := (coop.net_of("marco_polo") as MarcoPoloNet).fish_by_id(int(data.seeker))
 				check(seeker != null and game.seekers() == [seeker], "the host's round: a seeks here too")
 				check(game.phase == MarcoPoloMatch.Phase.COUNTDOWN, "counting down")
 				if role == "a":
@@ -419,7 +419,7 @@ func _guest() -> void:
 				if role == "a":
 					check(not fish.controls_locked, "the seeker's let go")
 			"privacy":
-				var fb := coop.marco_polo_net.fish_by_id(int(data.b))
+				var fb := (coop.net_of("marco_polo") as MarcoPoloNet).fish_by_id(int(data.b))
 				if role == "b":
 					check(game._net_exposure.keys() == [fish] and game.max_exposure(fish) > 0.2, "we know our own exposure (%.2f), nobody else's" % game.max_exposure(fish))
 					check(game.own_round_tally(fish) >= 7.0, "and our own round tally (%.1f)" % game.own_round_tally(fish))
@@ -466,10 +466,10 @@ func _guest() -> void:
 				check(not game.is_hidden(fish) and holes_of.porthole_of(fish) == null and p.occupant == host_fish,
 						"porthole %d is the host's: we're not in it" % data.j)
 			"a_plate":
-				var fb := coop.marco_polo_net.fish_by_id(int(data.b))
+				var fb := (coop.net_of("marco_polo") as MarcoPoloNet).fish_by_id(int(data.b))
 				check(game.is_hidden(fb) and not game.shows_plate(fb), "b in a porthole: no name plate for us (exposure %.2f)" % game.local_exposure(fb))
 			"tagged":
-				var fb := coop.marco_polo_net.fish_by_id(int(data.b))
+				var fb := (coop.net_of("marco_polo") as MarcoPoloNet).fish_by_id(int(data.b))
 				await _wait(func() -> bool: return game.eliminated.has(fb), 3.0)
 				check(game.eliminated.has(fb), "b's eliminated here")
 				if role == "b":
@@ -477,7 +477,7 @@ func _guest() -> void:
 			"round_over":
 				var mine := {}
 				for f: FishController in game.match_totals:
-					mine[coop.marco_polo_net.id_of(f)] = float(game.match_totals[f])
+					mine[(coop.net_of("marco_polo") as MarcoPoloNet).id_of(f)] = float(game.match_totals[f])
 				var same := true
 				for id: Variant in data.totals:
 					same = same and absf(float(mine.get(int(id), -1.0)) - float(data.totals[id])) < 0.01

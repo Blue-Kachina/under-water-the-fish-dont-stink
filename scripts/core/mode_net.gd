@@ -6,11 +6,14 @@ extends Node
 ## per such mode when it starts (the same node path on every machine, so its RPCs
 ## meet; subclasses set `name` in _ready), and for the mode being played it:
 ##  - hosts: main.host_mode(id), hook(game), then tick() every physics frame;
-##  - joins (a guest's welcome carries world()["mode"] == net_key): main.guest_mode(id),
-##    hook(game), apply_world(world);
+##  - joins (a guest's welcome carries world()["mode"] == net_key): main.join_mode(id, world)
+##    (the descriptor's "join" reads the world), hook(game), apply_world(world);
 ##  - tells it about puppets (other machines' players' fish) as they come and go;
 ##  - leaves: unhook(), and a guest goes back to main.solo_mode(id).
-## CoopSession still does the session, the roster, players' fish and tuning.
+## CoopSession still does the session, the roster, players' fish and tuning (the host's
+## sections: every net descriptor's settings). In tick() an adapter moves the puppets
+## (CoopSession.follow_puppets) and sends ours (send_own_fish); a mode with fish that
+## jump connects its fish_teleported to CoopSession.note_teleport.
 
 var coop: CoopSession
 

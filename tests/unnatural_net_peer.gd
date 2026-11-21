@@ -1,5 +1,5 @@
 extends Node
-## Online co-op in Unnatural (UnnaturalNet, CoopSession's urun) over ENet on
+## Online co-op in Unnatural (UnnaturalNet, CoopSession's mgame) over ENet on
 ## this machine: run as a host and guests, each its own Godot process
 ## (tests/unnatural_net.sh starts them):
 ##   Godot_console.exe --headless --path . res://tests/unnatural_net_peer.tscn -- --role=host --port=N
@@ -101,7 +101,7 @@ func _host() -> void:
 	var run: UnnaturalRun = main.unnatural_run
 	check(NetSession.is_host() and run != null and run.authority, "hosting: our Unnatural run, the world ours")
 	var coop: CoopSession = NetSession.coop
-	check(coop.urun == run, "the session has our run")
+	check(coop.mgame == run, "the session has our run")
 	if not await _wait(func() -> bool: return coop.roster.size() >= 2, 20.0):
 		check(false, "a guest joined")
 		return
@@ -268,7 +268,7 @@ func _guest() -> void:
 		return
 	await _seconds(1.0)
 	var run: UnnaturalRun = main.unnatural_run
-	check(not run.authority and coop.urun == run and coop.roster.size() >= 2, "welcomed: an Unnatural run of ours in the host's world")
+	check(not run.authority and coop.mgame == run and coop.roster.size() >= 2, "welcomed: an Unnatural run of ours in the host's world")
 	var host_fish := coop.fish_of(100)
 	check(host_fish != null and host_fish.puppet and host_fish in run.players, "the host's fish is a puppet here")
 	check(settings.god_mode and settings.chest_open_time > 100.0, "the host's Unnatural tuning is ours")

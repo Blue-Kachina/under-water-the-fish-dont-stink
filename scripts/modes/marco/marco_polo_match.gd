@@ -236,6 +236,7 @@ static func descriptor() -> Dictionary:
 		"role_pool": MarcoPoloMatch.role_pool, "character_picked_by_mode": MarcoPoloMatch.whale_seeker_role,
 		"apply_pick": MarcoPoloMatch.apply_whale_pick,
 		"settings": MarcoPoloSettings, "settings_key": "marco_polo", "settings_after": "powerups",
+		"net": MarcoPoloNet, "net_key": "marco_polo",
 	}
 
 

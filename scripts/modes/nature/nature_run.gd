@@ -171,7 +171,7 @@ static func descriptor() -> Dictionary:
 		"environment": "Ocean", "match": true, "after": "Free Swim (Ocean)", "tile_before": "Free Play",
 		"tuning_preset": "res://presets/nature.cfg",
 		"card_text": NatureRun.card_text, "reset_label": "Restart", "split_screen": true,
-		"settings": NatureSettings,
+		"settings": NatureSettings, "net": NatureNet, "net_key": "nature",
 		"sfx": [[NatureSounds, &"sfx_hook"]],
 	}
 

@@ -1,9 +1,9 @@
 class_name UnnaturalNet
-extends Node
+extends ModeNet
 ## Online co-op in Unnatural (planning_unnatural.md §9): CoopSession's child
 ## "Unnatural" (the same path everywhere, so its RPCs meet), carrying what's
 ## Unnatural's own. CoopSession still does the session, the roster, the
-## players' fish, the tuning and restarts.
+## players' fish and the tuning.
 ##
 ## The host (UnnaturalRun.authority) runs the world, and sends:
 ## - every zombie that comes, each frame's in one batch ([net id, kind, where,
@@ -25,7 +25,8 @@ extends Node
 ## everyone's sea), their Pearl Chance now and then (for the host's rolls),
 ## the drops they touch (the first claim gets it), and the chests they open. Each
 ## machine says when its own players go down or are revived; contact damage is
-## always judged by the hurt player's own machine.
+## always judged by the hurt player's own machine. A restart is the host's, and
+## every guest's run restarts with it.
 
 const CORRECT_RATE := 10.0
 const BOSS_RATE := 15.0
@@ -34,8 +35,9 @@ const MAX_CORRECT := 400
 ## A guest says its players' Pearl Chance this often (s), when it's changed.
 const GAINS_EVERY := 1.0
 
-var coop: CoopSession
 var run: UnnaturalRun
+## The run last hooked (puppets leave it after unhook()).
+var _last_run: UnnaturalRun
 
 var _out_spawns := []
 var _out_deaths := []
@@ -61,10 +63,25 @@ func is_host() -> bool:
 	return run != null and run.authority
 
 
-## Wires `game_run` up: what it does goes out.
-func hook(game_run: UnnaturalRun) -> void:
+func puppet_added(fish: FishController) -> void:
+	if is_instance_valid(_last_run):
+		_last_run.add_player(fish)
+
+
+func puppet_removed(fish: FishController) -> void:
+	if is_instance_valid(_last_run):
+		_last_run.remove_player(fish)
+
+
+func puppet_parent() -> Node:
+	return _last_run
+
+
+## Wires `mode_game` up: what it does goes out.
+func hook(mode_game: GameMode) -> void:
 	unhook()
-	run = game_run
+	run = mode_game as UnnaturalRun
+	_last_run = run
 	_out_spawns.clear()
 	_out_deaths.clear()
 	_out_removes.clear()
@@ -106,6 +123,8 @@ func hook(game_run: UnnaturalRun) -> void:
 		run.rift_claimed.connect(func(by: FishController) -> void: _send_host("_claim_rift", [_pid(by)], true))
 	run.player_down.connect(_on_down.bind(true))
 	run.player_revived.connect(_on_down.bind(false))
+	run.restarted.connect(_on_restarted)
+	run.fish_teleported.connect(_on_teleported)
 
 
 func unhook() -> void:
@@ -132,10 +151,13 @@ func _pid(fish: Object) -> int:
 	return coop.pid_of(fish) if is_instance_valid(fish) else -1
 
 
-## Each physics tick (CoopSession's): the batches out, and the host's corrections.
+## Each physics tick (CoopSession's): the puppets follow their players, ours go out, then
+## the batches, and the host's corrections.
 func tick(delta: float) -> void:
 	if run == null or not is_instance_valid(run):
 		return
+	coop.follow_puppets(func(_fish: FishController) -> bool: return true)
+	coop.send_own_fish(delta, run.local_players())
 	for n in range(_unresolved.size() - 1, -1, -1):
 		var chest: TreasureChest = _unresolved[n][0] if is_instance_valid(_unresolved[n][0]) else null
 		var fish := coop.fish_of(_unresolved[n][1]) if chest else null
@@ -206,6 +228,15 @@ func _send_corrections() -> void:
 
 
 # --- Host: the run -> the guests ------------------------------------------
+
+func _on_restarted() -> void:
+	if run.authority:
+		_send_all("_restart", [], true)
+
+
+func _on_teleported(fish: FishController) -> void:
+	coop.note_teleport(fish)
+
 
 func _on_spawned(index: int) -> void:
 	if run.horde.is_proxy(index):
@@ -410,6 +441,12 @@ func _spawn_all(entries: Array) -> void:
 
 func _guest_run() -> UnnaturalRun:
 	return run if run and is_instance_valid(run) and not run.authority else null
+
+
+@rpc("authority", "call_remote", "reliable")
+func _restart() -> void:
+	if _guest_run():
+		run.restart()
 
 
 @rpc("authority", "call_remote", "reliable")

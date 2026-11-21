@@ -94,7 +94,7 @@ func _run() -> void:
 	check(panel.option_range("gaits/lancer_stroke_time").get("allow_greater", false), "the panel has a GAITS section (lancer_stroke_time)")
 	check(not panel.option_range("gaits/lancer_visual").has("min"), "single-value enums aren't shown yet")
 	check(panel.tuning_snapshot().get("gaits", {}).get("lancer_coast_drag", 0.0) == 3.0, "presets save the gaits")
-	check("gaits" in CoopSession.TUNING_SECTIONS, "the host's gaits go to guests")
+	check("gaits" in CoopSession.tuning_sections(), "the host's gaits go to guests")
 	check(SettingDocs.DOCS.has("gaits/lancer_coast_drag"), "the options have descriptions")
 	panel.restore_tuning({"gaits": {"lancer_coast_drag": 1.0}})
 	check(settings.for_class(FishCharacter.FishClass.LANCER).is_default(), "restoring puts it back")

@@ -731,7 +731,7 @@ func _show_match_card() -> void:
 
 ## How many local players the one-screen modes dropped on the way in (a card's note).
 func dropped_extra_players() -> int:
-	return _local.dropped_for_marco_polo if _local else 0
+	return _local.dropped_for_one_screen if _local else 0
 
 
 ## A registered mode's card: its descriptor's "card_choices" (Callable(card, host)) and, for a
@@ -740,9 +740,9 @@ func _registered_card(card: MatchCard) -> void:
 	var registered := ModeRegistry.describe(current_mode)
 	if registered.has("card_choices"):
 		(registered["card_choices"] as Callable).call(card, self)
-	if registered.get("one_screen", false) and _local and _local.dropped_for_marco_polo > 0:
+	if registered.get("one_screen", false) and _local and _local.dropped_for_one_screen > 0:
 		card.note = "No split-screen in %s: %d local player%s dropped." \
-				% [registered.get("one_screen_note", registered["title"]), _local.dropped_for_marco_polo, "" if _local.dropped_for_marco_polo == 1 else "s"]
+				% [registered.get("one_screen_note", registered["title"]), _local.dropped_for_one_screen, "" if _local.dropped_for_one_screen == 1 else "s"]
 
 
 ## What a match mode's card says.
@@ -810,9 +810,9 @@ func _apply_mode() -> void:
 		var one_screen: bool = ModeRegistry.describe(current_mode).get("one_screen", false)
 		_local.no_split_screen = one_screen
 		if one_screen and _local.count() > 1:
-			_local.dropped_for_marco_polo = _local.count() - 1
+			_local.dropped_for_one_screen = _local.count() - 1
 		elif not one_screen:
-			_local.dropped_for_marco_polo = 0
+			_local.dropped_for_one_screen = 0
 	if not ModeRegistry.describe(current_mode).get("split_screen", false) and _local:
 		_local.drop_extras()  # split-screen co-op is Unnatural's and the modes' that allow it
 	_use_nature_tuning(current_mode in NATURE_MODES)
@@ -916,7 +916,8 @@ func _start_match() -> void:
 
 
 ## Online co-op's host in registered mode `id`: the mode ours, the world run here
-## (one already running stays: its guests join it).
+## (one already running stays: its guests join it; another mode's node, e.g. the Test
+## Tank's Unnatural run, doesn't count).
 func host_mode(id: String) -> void:
 	if _modes.active_id() == id and _modes.active.get("authority"):
 		return
@@ -988,33 +989,6 @@ func guest_mode(id: String) -> void:
 ## The registered mode playing now (null when none).
 func active_mode() -> GameMode:
 	return _modes.active
-
-
-## Online co-op's host in Unnatural: a run of ours, the world run here.
-func host_unnatural_run() -> void:
-	set_mode(UNNATURAL)
-	if unnatural_run and unnatural_run.authority and not unnatural_run.test_tank:
-		return
-	_end_match()
-	_close_match_card()
-	_start_registered(UNNATURAL, {"authority": true})
-
-
-## Online co-op's guest in Unnatural: a run of our players in the host's world.
-func guest_unnatural_run() -> void:
-	set_mode(UNNATURAL)
-	_end_match()
-	_close_match_card()
-	_start_registered(UNNATURAL, {"authority": false})
-
-
-## Back from being a guest: Unnatural on our own again, the world ours.
-func solo_unnatural_run() -> void:
-	if current_mode != UNNATURAL:
-		return
-	_end_match()
-	_close_match_card()
-	_start_registered(UNNATURAL, {"authority": true})
 
 
 func _end_match() -> void:
