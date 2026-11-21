@@ -23,6 +23,16 @@ D6 file moves done in worktree + committed, git: branch per track, push branches
 | T4a P5 rollout | 4 | Drowned Shark + 2 classes on rig | track/rollout | done, merged |
 | T4b carve | 4 | M3 water carving | track/carve | done, merged (default off) |
 | T4c nature | 4 | Nature migration | track/nature | done, merged |
+| rig-classes | 5 | koi, boxfish, lionfish, whale calf on the rig | track/rig-classes | done, merged |
+| rig-converge | 5 | TrailAdapter for King/Lamprey/Angel/Gulper/Lantern | track/rig-converge | done, merged |
+| mig-1v1 | 5 | 1v1 as a GameMode | track/mig-1v1 | done, merged |
+| mig-unnatural | 5 | Unnatural + Test Tank as GameModes, kits | track/mig-unnatural | done, merged |
+| mig-stinks | 5 | What Stinks? as a GameMode, ModeNet, ModeData | track/mig-stinks | done, merged |
+| mig-marco | 5 | Marco Polo as a GameMode, CameraClaim | track/mig-marco | done, merged (APIs unified with stinks) |
+| course | 5 | Obstacle Course as a GameMode, core boundary leftovers | track/course | running |
+| net | 5 | coop_session mode-agnostic (ModeNet for all) | track/net | running |
+| services | 5 | modes use modifiers/capabilities/play_state | track/services | running |
+| rig-rest | 5 | ray/mantis, jelly + sea hare layers, school bakes | track/rig-rest | running |
 
 ## Track sections
 ### T0a metrics
@@ -298,6 +308,8 @@ Branch track/mig-stinks, worktree D:/Dev/GameDev/wt/mig-stinks. Phase 5: What St
 - 2026-11-20: T3 H1-H4 merged. hunt_probe baseline compare tolerates 0.011 float wobble (overtime_elapsed 1-tick jitter). audio_probe has 2 pre-existing failures.
 - 2026-11-20: T0c merged (phase 0 complete). Names: model.swim.* replaces old model fields (stride_swing->stride_dir, bell_gait->gait). Phases 1-3 launched in parallel.
 - 2026-11-21: T2 merged. setting_docs not regenerated for rig_* (do once at end: tools/gen_setting_docs.gd). P5 launched.
+- 2026-11-21 (second coordinator session): merged rig-classes, rig-converge, mig-1v1, mig-unnatural, mig-stinks, mig-marco into roadmap/core (bd1c3e4). Reconciled parallel APIs: one ModeData (union), host_mode/join_mode/solo_mode (guest_mode = join_mode), descriptor settings_key (Marco's settings_id renamed), Marco's setup hook is "role_rows" (Unnatural keeps "setup_rows", What Stinks "setup"), ModeRegistry ordering (after/tile_before) no longer depends on registration order. main.gd has no per-mode start/end code. Boundary violations 213 -> 24. Gates green: all mode baselines (hunt, nature, 1v1, unnatural, what_stinks, marco), ui, mode_setup, modes, coop_local, audio_hooks 1-2, camera, survivor_cam, swim_rig, trail_rig, gait, swishy, swim_state, marco_watch.
+- 2026-11-21: launched course, net, services, rig-rest tracks (worktrees D:/Dev/GameDev/wt/<name>).
 
 ## HANDOFF (written 2026-11-21, session limit reached)
 Resume as coordinator in a new session. Read this file + planning_core_roadmap.md first.
