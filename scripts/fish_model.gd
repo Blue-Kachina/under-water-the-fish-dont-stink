@@ -20,6 +20,8 @@ const FIN_MEMBRANE := preload("res://shaders/fin_membrane.gdshader")
 const STRIDE_OVERLAY := preload("res://shaders/stride_overlay.gdshader")
 const FISH_EYE := preload("res://shaders/fish_eye.gdshader")
 const TITAN_MODEL := "res://scripts/fish_models/titan_model.gd"
+## The speed (m/s) the swim wave reaches full effort at (the top speed it was tuned on).
+const SWIM_REF_SPEED := 23.0
 
 var fish_class := FishCharacter.FishClass.SKIRMISHER
 ## Which of the class's species it wears (FishCharacter.SPECIES).
@@ -37,12 +39,16 @@ var squash: Node3D
 ## default; 1: the old jelly-sweet boxfish).
 var squash_strength := 0.0
 
-## What the swimmer is doing, set before react(): resting on a surface, and
-## an Extra Swishy stride's tail swing (SwishySwim.tail_swing) and power, 0..1.
-## The ray banks and beats its wings with them.
-var grounded := false
-var stride_swing := Vector2.ZERO
-var stride_power := 0.0
+## What the swimmer is doing (SwimState): the one thing react() reads. The
+## fish's own while it calls react(); this model's, filled from a velocity
+## history, under react_velocity() (schools, previews, model shots).
+## It carries the stride's swing and power (the ray banks and beats its wings
+## with them), whether it rests on a surface, and for a jelly how far its bell
+## leans (-1 when it doesn't: the model lies nose-first as built; else react()
+## tilts the model with it, and strides drive the bell, BellPulse.step_strides,
+## from the state's stride phase, peak, fade and gait; otherwise the bell beats
+## on its own with the swim, step_free).
+var swim := SwimState.new()
 ## Whether its tail beats up and down (a whale's flukes, Gait.Visual.FLUKE)
 ## rather than side to side: what idle animations without a gait (replays,
 ## schools) swing.
@@ -52,8 +58,6 @@ var _size := Vector3.ONE  # the hitbox (m): width, height, length
 var _body_material: StandardMaterial3D
 var _own_body_color: Variant = null  # before set_body_color()
 var _squash_base := Vector3.ONE  # squash's scale at rest
-var _last_velocity := Vector3.ZERO
-var _acceleration := Vector3.ZERO  # smoothed, world space
 var _stretch := Vector2.ZERO  # current (along, up): + longer / taller
 var _stretch_speed := Vector2.ZERO
 ## Face features that ride the squash without squashing: each anchor's spot
@@ -118,17 +122,6 @@ var _flaps: Array[Node3D] = []
 ## Materials whose body wave grows with each stride (sea_hare_skin.gdshader's
 ## `stride`), set by _swim.
 var _body_waves: Array[ShaderMaterial] = []
-## Gait.Visual.BELL_PULSE (the jellies): how far the bell leans from upright
-## toward the nose (rad, FishController.bell_lean), or -1 when it doesn't (the
-## model lies nose-first as built). Set before react(), which tilts the model
-## with it, and strides drive the bell (BellPulse.step_strides, from
-## `stride_phase`, `stride_peak`, `stride_fade` and `bell_gait`, which the fish
-## sets). Otherwise the bell beats on its own with the swim (step_free).
-var bell_lean := -1.0
-var stride_phase := -1.0
-var stride_peak := 0.3
-var stride_fade := 0.5
-var bell_gait: Gait
 ## The jelly's bell (JellyModel), and its shaders, which take its shape.
 var bell: BellPulse
 var _bell_pulses: Array[ShaderMaterial] = []
@@ -219,29 +212,24 @@ static func build(character: FishCharacter.FishClass, species := 0, skin := 0) -
 	return model
 
 
-## Squash and stretch with the fish's acceleration (from `velocity`, world
-## space, given every frame), on a springy wobble. Speeding up stretches it
+## Squash and stretch with the fish's acceleration (`state.accel`), on a springy wobble. Speeding up stretches it
 ## along its length and braking squashes it; falling stretches it tall and
 ## landing squashes it flat. Volume is kept, so it bulges the other way. The
 ## edge it's moving toward stays put and the trailing side does the stretching
 ## (the bottom, when it isn't moving up or down, so it squashes onto the floor).
-func react(delta: float, velocity: Vector3) -> void:
+func react(delta: float, state: SwimState) -> void:
+	swim = state
 	if titan_motion:
 		_titan_swim(delta)
 	apply_bend()
 	if not _bell_pulses.is_empty():
 		# Built bell-first along -Z: upright is a quarter turn nose-up.
-		rotation.x = PI / 2.0 - bell_lean if bell_lean >= 0.0 else 0.0
+		rotation.x = PI / 2.0 - swim.bell_lean if swim.bell_lean >= 0.0 else 0.0
 	if not _waving.is_empty():
-		_swim(delta, velocity)
+		_swim(delta)
 	if squash == null or delta <= 0.0:
 		return
-	var raw := (velocity - _last_velocity) / delta
-	_last_velocity = velocity
-	# Physics ticks and frames don't line up: smooth the per-frame acceleration.
-	_acceleration = _acceleration.lerp(raw, 1.0 - exp(-15.0 * delta))
-	var to_local := global_basis.orthonormalized().inverse()
-	var local := to_local * _acceleration
+	var local := swim.accel
 	var target := Vector2(clampf(-local.z / 35.0, -0.3, 0.35), clampf(-local.y / 45.0, -0.35, 0.2)) * squash_strength
 	_stretch_speed += ((target - _stretch) * 160.0 - _stretch_speed * 11.0) * delta
 	_stretch += _stretch_speed * delta
@@ -250,7 +238,7 @@ func react(delta: float, velocity: Vector3) -> void:
 	var shape := Vector3(1.0 / sqrt(along * up), up, along)
 	# Which end leads, blended over 1 m/s so it never snaps: -1 = the front (-Z)
 	# or the bottom, +1 = the back or the top.
-	var moving := to_local * velocity
+	var moving := global_basis.orthonormalized().inverse() * swim.velocity
 	var lead_z := clampf(moving.z, -1.0, 1.0)
 	var lead_y := lerpf(-1.0, signf(moving.y), clampf(absf(moving.y), 0.0, 1.0))
 	var shift := -Vector3(0.0, lead_y * (up - 1.0), lead_z * (along - 1.0)) * _squash_base / 2.0
@@ -258,6 +246,14 @@ func react(delta: float, velocity: Vector3) -> void:
 	squash.position = shift
 	for i in _face_anchors.size():
 		_face_anchors[i].position = _face_rest[i] * shape + shift
+
+
+## react() for a model with no fish behind it (a school fish, a card's preview,
+## a model shot): its own SwimState follows `velocity` (world, m/s), the
+## model's orientation and the frame time. Its swim speeds are in SWIM_REF_SPEED.
+func react_velocity(delta: float, velocity: Vector3) -> void:
+	swim.advance_from_velocity(velocity, global_basis, delta, SWIM_REF_SPEED)
+	react(delta, swim)
 
 
 ## Extra Swishy's timing cue (SwishySwim): the tail lights up from its root
@@ -360,10 +356,10 @@ func _pulse_bell(delta: float, effort: float) -> void:
 		return
 	var squeeze := 1.0
 	var flatten := 1.0
-	if bell_lean >= 0.0 and bell_gait != null:
-		bell.step_strides(delta, stride_phase, stride_peak, stride_fade, bell_gait)
-		squeeze = bell_gait.bell_squeeze
-		flatten = bell_gait.bell_flatten
+	if swim.bell_lean >= 0.0 and swim.gait != null:
+		bell.step_strides(delta, swim.stride_phase, swim.stride_peak, swim.stride_fade, swim.gait)
+		squeeze = swim.gait.bell_squeeze
+		flatten = swim.gait.bell_flatten
 	else:
 		bell.step_free(delta, lerpf(0.4, 0.9, effort), effort)
 	for material in _bell_pulses:
@@ -379,14 +375,16 @@ func _pulse_bell(delta: float, effort: float) -> void:
 ## ray's wings also follow the fin pivots (their roll lifts the tips, their turn
 ## sweeps them back) and beat with strides, it banks into turns, and its tail
 ## whips.
-func _swim(delta: float, velocity: Vector3) -> void:
-	var effort := clampf(velocity.length() / 23.0, 0.0, 1.0)
+func _swim(delta: float) -> void:
+	# Its own effort, from speed (not SwimState.effort, which a coasting fish
+	# lacks): the pose formulas stay as they were, for the rig to replace.
+	var effort := clampf(swim.speed / SWIM_REF_SPEED, 0.0, 1.0)
 	_swim_phase = fmod(_swim_phase + delta * lerpf(2.5, 9.0, effort), TAU * 100.0)
 	for material in _waving:
 		material.set_shader_parameter("phase", _swim_phase)
 		material.set_shader_parameter("effort", effort)
 	for material in _body_waves:
-		material.set_shader_parameter("stride", stride_power)
+		material.set_shader_parameter("stride", swim.stride_power)
 	_pulse_bell(delta, effort)
 	_follow_flaps()
 	if _skin == null or delta <= 0.0:
@@ -401,17 +399,17 @@ func _swim(delta: float, velocity: Vector3) -> void:
 			turned = Vector2.ZERO  # a respawn or a cut, not a turn
 	_whip_basis = body
 	_whip_basis_set = true
-	var moving := body.inverse() * velocity
+	var moving := body.inverse() * swim.velocity
 	var yaw_rate := turned.x / delta
 	_bank_ray(delta, yaw_rate, -moving.z)
 	_beat_wings(delta)
 	# The wings' wave runs nose to tail, quicker and deeper with speed and with a
 	# stride's push, and deeper on the wing that's working harder: the outside
 	# of a turn, or the side a stride beats.
-	_wing_phase = fmod(_wing_phase + delta * lerpf(3.0, 12.0, effort) * (1.0 + 0.6 * stride_power), TAU * 100.0)
+	_wing_phase = fmod(_wing_phase + delta * lerpf(3.0, 12.0, effort) * (1.0 + 0.6 * swim.stride_power), TAU * 100.0)
 	_skin.set_shader_parameter("phase", _wing_phase)
-	_skin.set_shader_parameter("ripple", lerpf(0.014, 0.045, effort) * (1.0 + 0.5 * stride_power))
-	var bias := clampf(yaw_rate * 0.15, -0.6, 0.6) - 0.4 * stride_swing.x * stride_power
+	_skin.set_shader_parameter("ripple", lerpf(0.014, 0.045, effort) * (1.0 + 0.5 * swim.stride_power))
+	var bias := clampf(yaw_rate * 0.15, -0.6, 0.6) - 0.4 * swim.stride_dir.x * swim.stride_power
 	_skin.set_shader_parameter("ripple_bias", clampf(bias, -0.7, 0.7))
 	_skin.set_shader_parameter("flap_left", -fin_left.rotation.z + _beat.x)
 	_skin.set_shader_parameter("flap_right", fin_right.rotation.z + _beat.y)
@@ -449,9 +447,9 @@ func _body_frame() -> Basis:
 ## wing would dig in.
 func _bank_ray(delta: float, yaw_rate: float, forward: float) -> void:
 	var target := 0.0
-	if not grounded:
+	if not swim.grounded:
 		target = clampf(yaw_rate * maxf(forward, 0.0) * 0.012, -RAY_BANK, RAY_BANK)
-		target = clampf(target - stride_swing.x * stride_power * 0.25, -RAY_BANK, RAY_BANK)
+		target = clampf(target - swim.stride_dir.x * swim.stride_power * 0.25, -RAY_BANK, RAY_BANK)
 	_bank_speed += ((target - _bank) * 64.0 - _bank_speed * 11.0) * delta
 	_bank += _bank_speed * delta
 	rotation.z = _bank
@@ -463,17 +461,17 @@ func _bank_ray(delta: float, yaw_rate: float, forward: float) -> void:
 ## its outside wing); an up or down one beats both alike. On a surface the tips
 ## stay out of the floor.
 func _beat_wings(delta: float) -> void:
-	var lean := clampf(stride_swing.x, -1.0, 1.0) * 0.7
+	var lean := clampf(swim.stride_dir.x, -1.0, 1.0) * 0.7
 	# Fading (power falling over about a third of a second) lifts them.
-	var fading := clampf((_last_stride_power - stride_power) / delta * 0.35, 0.0, 1.0)
-	_last_stride_power = stride_power
-	var target := Vector2(1.0 + lean, 1.0 - lean) * (RAY_LIFT * fading - RAY_BEAT * stride_power)
+	var fading := clampf((_last_stride_power - swim.stride_power) / delta * 0.35, 0.0, 1.0)
+	_last_stride_power = swim.stride_power
+	var target := Vector2(1.0 + lean, 1.0 - lean) * (RAY_LIFT * fading - RAY_BEAT * swim.stride_power)
 	var steps := ceili(delta * 120.0)
 	var h := delta / steps
 	for k in steps:
 		_beat_speed += ((target - _beat) * 196.0 - _beat_speed * 2.0 * 0.35 * 14.0) * h
 		_beat += _beat_speed * h
-	if grounded:
+	if swim.grounded:
 		_beat = _beat.max(Vector2(-0.15, -0.15))
 
 
@@ -812,8 +810,8 @@ func _wave_at(delay: float) -> float:
 ## The Gait a Titan's motion reads: the one the swim gave it, or the class's
 ## defaults (model shots, schools, replays without one).
 func _titan_gait() -> Gait:
-	if bell_gait:
-		return bell_gait
+	if swim.gait:
+		return swim.gait
 	if _titan_default_gait == null:
 		_titan_default_gait = GaitSettings.default_for(fish_class)
 	return _titan_default_gait

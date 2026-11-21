@@ -753,6 +753,11 @@ var _flap := 0.0
 ## Gait.PushAxis.BELL: how far the bell leans from upright toward the nose
 ## (rad): it swims bell-first and hangs upright when it stops (_lean_bell).
 var bell_lean := 0.0
+## What the body is doing now (SwimState), filled at the end of every physics
+## tick and read by the animation (_process, FishModel.react) in place of the
+## inputs. A puppet's is synthesised from the network's velocity (set_net_state).
+var swim_state := SwimState.new()
+var _puppet_state_usec := 0
 
 ## The character's model (built in _apply_character) and the parts the swim
 ## animation moves.
@@ -1110,14 +1115,31 @@ func make_puppet() -> void:
 
 
 ## A puppet where (and how fast) the network says it is now, and how it looks
-## (replay_fx()'s layout). Its telemetry follows, for the HUD and cameras.
-func set_net_state(xform: Transform3D, velocity: Vector3, fx: PackedFloat32Array) -> void:
+## (replay_fx()'s layout). Its telemetry follows, for the HUD and cameras, and
+## its swim_state: the motion from its velocity and facing over `step` seconds
+## since the last call (-1: measured on the clock), the stride from `fx`.
+func set_net_state(xform: Transform3D, velocity: Vector3, fx: PackedFloat32Array, step := -1.0) -> void:
 	global_transform = xform
 	_puppet_velocity = velocity
 	_puppet_fx = fx
 	speed = velocity.length()
 	forward_speed = velocity.dot(-xform.basis.z)
 	bow_amount = fx[ReplayData.FX_BOW] if fx.size() == ReplayData.FX_SIZE else 0.0
+	# Its swim state: the stride looks as sent, the motion from the velocity history.
+	var s := swim_state
+	var sent := fx.size() == ReplayData.FX_SIZE
+	s.striding = sent
+	s.stride_dir = Vector2(fx[ReplayData.FX_SWING_X], fx[ReplayData.FX_SWING_Y]) if sent else Vector2.ZERO
+	s.stride_power = fx[ReplayData.FX_POWER] if sent else 0.0
+	s.stride_flow = fx[ReplayData.FX_FLOW] if sent else 0.0
+	s.stride_cue = Vector3(fx[ReplayData.FX_CUE_FILL], fx[ReplayData.FX_CUE_GLOW], fx[ReplayData.FX_CUE_SWEET]) if sent else Vector3.ZERO
+	s.stride_sweet = s.stride_cue.z
+	var now := Time.get_ticks_usec()
+	var first := _puppet_state_usec == 0
+	var dt := step if step >= 0.0 else (0.0 if first else (now - _puppet_state_usec) * 1e-6)
+	_puppet_state_usec = now
+	if first or dt > 0.0:
+		s.advance_from_velocity(velocity, xform.basis, dt, max_speed * speed_scale)
 
 
 ## The left stick after Rocket League's deadzone and sensitivity settings. Read
@@ -1310,6 +1332,37 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	if bow_wave:
 		bow_target = clampf((speed - bow_start_speed) / maxf(bow_full_speed - bow_start_speed, 0.1), 0.0, 1.0)
 	bow_amount = move_toward(bow_amount, bow_target, BOW_RESPONSE * dt)
+	_fill_swim_state(velocity, body_basis, local_spin, dt)
+
+
+## SwimState for the animation: this tick's motion, then the stride and pose cues
+## the physics holds. The one place a fish's inputs become how it looks.
+func _fill_swim_state(velocity: Vector3, body_basis: Basis, local_spin: Vector3, dt: float) -> void:
+	var s := swim_state
+	s.advance(velocity, body_basis, local_spin, dt, max_speed * speed_scale)
+	var striding := swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY
+	s.striding = striding
+	s.stride_phase = swishy.phase if striding else -1.0
+	s.stride_power = swishy.power if striding else 0.0
+	s.stride_dir = swishy.tail_swing if striding else Vector2.ZERO
+	s.stride_fluke = swishy.fluke_swing if striding else 0.0
+	s.stride_peak = swishy.peak_time()
+	s.stride_fade = swishy.fade_time()
+	s.stride_timing = swishy.last_timing
+	s.stride_flow = swishy.flow / maxf(stride_flow_max, 0.01) if striding else 0.0
+	s.stride_sweet = swishy.sweetness() if striding else 0.0
+	s.stride_cue = swishy.cue() if swim_style == SwimStyle.EXTRA_SWISHY else Vector3.ZERO
+	s.effort = maxf(maxf(input_forward, 1.0 if is_boosting else 0.0), s.stride_power)
+	s.grounded = on_surface
+	s.surface_normal = surface_normal
+	var swimmer := gait
+	s.gait = swimmer
+	s.bell_lean = bell_lean if swimmer.visual == Gait.Visual.BELL_PULSE else -1.0
+	s.boosting = is_boosting
+	s.reverse = input_reverse
+	s.slide = 1.0 if is_powersliding else 0.0
+	s.slide_kick = -input_stick.x * s.slide
+	s.stroke_dir = input_stick if stroke_chain > 0 else Vector2.ZERO
 
 
 ## RL's auto-roll (RocketSim Car::_UpdateAutoRoll), while on the throttle with
@@ -2157,6 +2210,7 @@ func _apply_reset(state: PhysicsDirectBodyState3D) -> void:
 	_queued_stroke = 0.0
 	stroke_chain = 0
 	swishy.reset()
+	swim_state.reset()
 	bow_amount = 0.0
 	is_dodging = false
 	jump_state = JumpState.READY
@@ -2185,9 +2239,10 @@ func _apply_physics_material() -> void:
 ## and eases back to hanging straight behind. Slowly, so the quick back-and-forth
 ## of steering through side-to-side strides doesn't wag it.
 func _trail_tail(delta: float) -> void:
-	var frame := _tail.get_parent_node_3d().global_basis.orthonormalized().inverse()
-	var spin := frame * angular_velocity
-	var drift := frame * linear_velocity
+	# The state's body-frame spin and slip, in the tail's parent's frame.
+	var frame := _tail.get_parent_node_3d().global_basis.orthonormalized().inverse() * global_basis.orthonormalized()
+	var spin := frame * swim_state.spin
+	var drift := frame * swim_state.slip
 	var target := Vector2(clampf(-spin.x * 0.12 + drift.y * 0.04, -0.5, 0.5), clampf(-spin.y * 0.12 - drift.x * 0.04, -0.5, 0.5))
 	_arm_trail = _arm_trail.lerp(target, 1.0 - exp(-2.0 * delta))
 	_tail.rotation = Vector3(_arm_trail.x, _arm_trail.y, 0.0)
@@ -2198,68 +2253,57 @@ func _process(delta: float) -> void:
 	if puppet:
 		_process_puppet(delta)
 		return
-	var effort := maxf(input_forward, 1.0 if is_boosting else 0.0)
+	var s := swim_state
+	var effort := s.effort
 	_swim_phase += delta * lerpf(4.0, 18.0, effort)
 	# Powerslide: tail kicks out toward the turn, fins flare like air brakes.
-	var slide := 1.0 if is_powersliding else 0.0
-	var tail_kick := -input_stick.x * 0.6 * slide
-	if swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY:
+	var slide := s.slide
+	var tail_kick := s.slide_kick * 0.6
+	if s.striding:
 		# Strides drive the tail (Gait.Visual.TAIL_BEND): each sweeps it across,
 		# away from the push, to the far side at the peak (SwishySwim.tail_swing).
 		# The idle wiggle only shows between strides.
-		var growth := stride_tail_growth * swishy.flow / maxf(stride_flow_max, 0.01)
-		_tail.scale = Vector3.ONE * (1.0 + growth) * (1.0 + 0.2 * swishy.power)
-		if gait.visual == Gait.Visual.FLUKE:
+		var growth := stride_tail_growth * s.stride_flow
+		_tail.scale = Vector3.ONE * (1.0 + growth) * (1.0 + 0.2 * s.stride_power)
+		if s.gait.visual == Gait.Visual.FLUKE:
 			# Gait.Visual.FLUKE: the flukes beat up and down whichever way the
 			# stick swept (SwishySwim.fluke_swing), with a slow idle beat between.
-			var idle := sin(_swim_phase * 0.6) * lerpf(0.08, 0.2, effort) * (1.0 - minf(absf(swishy.fluke_swing), 1.0))
-			_tail.rotation.x = swishy.fluke_swing * stride_tail_swing + idle
+			var idle := sin(_swim_phase * 0.6) * lerpf(0.08, 0.2, effort) * (1.0 - minf(absf(s.stride_fluke), 1.0))
+			_tail.rotation.x = s.stride_fluke * stride_tail_swing + idle
 			_tail.rotation.y = tail_kick
 		else:
-			var swing := swishy.tail_swing * stride_tail_swing
-			var idle := sin(_swim_phase) * lerpf(0.1, 0.25, effort) * (1.0 - minf(swishy.tail_swing.length(), 1.0))
+			var swing := s.stride_dir * stride_tail_swing
+			var idle := sin(_swim_phase) * lerpf(0.1, 0.25, effort) * (1.0 - minf(s.stride_dir.length(), 1.0))
 			_tail.rotation.y = swing.x + idle + tail_kick
 			_tail.rotation.x = swing.y
 	else:
 		_tail.scale = Vector3.ONE
 		# Swim strokes: the tail sweeps with the stick (side to side, or up and down like a dolphin).
-		var stroking := 1.0 if stroke_chain > 0 else 0.0
-		if gait.visual == Gait.Visual.FLUKE:
-			_tail.rotation.x = sin(_swim_phase * 0.6) * lerpf(0.15, 0.4, effort) + input_stick.y * 0.5 * stroking
-			_tail.rotation.y = tail_kick - input_stick.x * 0.3 * stroking
+		if s.gait.visual == Gait.Visual.FLUKE:
+			_tail.rotation.x = sin(_swim_phase * 0.6) * lerpf(0.15, 0.4, effort) + s.stroke_dir.y * 0.5
+			_tail.rotation.y = tail_kick - s.stroke_dir.x * 0.3
 		else:
-			_tail.rotation.y = sin(_swim_phase) * lerpf(0.15, 0.45, effort) + tail_kick - input_stick.x * 0.5 * stroking
-			_tail.rotation.x = input_stick.y * 0.5 * stroking
+			_tail.rotation.y = sin(_swim_phase) * lerpf(0.15, 0.45, effort) + tail_kick - s.stroke_dir.x * 0.5
+			_tail.rotation.x = s.stroke_dir.y * 0.5
 	if _visual.trails_tail:
 		_trail_tail(delta)
 	_fin_left.rotation.y = lerpf(_fin_left.rotation.y, 0.9 * slide, 1.0 - exp(-15.0 * delta))
 	_fin_right.rotation.y = -_fin_left.rotation.y
 
 	# Reverse swimming: frantic pectoral flutter.
-	var flutter := sin(Time.get_ticks_msec() * 0.05) * 0.7 * input_reverse
-	if gait.visual == Gait.Visual.FLAP:
+	var flutter := sin(Time.get_ticks_msec() * 0.05) * 0.7 * s.reverse
+	if s.gait.visual == Gait.Visual.FLAP:
 		# Gait.Visual.FLAP: the flaps beat down with each stride's push and lift
 		# back up between, with a slow idle wave.
-		var striding_now := swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY
-		var beat := swishy.power if striding_now else 0.0
+		var beat := s.stride_power
 		var idle_wave := sin(_swim_phase * 0.35) * 0.12
 		_flap = lerpf(_flap, 0.9 * beat + idle_wave, 1.0 - exp(-12.0 * delta))  # + is down on the left pivot
 		flutter += _flap
 	_fin_left.rotation.z = flutter
 	_fin_right.rotation.z = -flutter
-	var striding := swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY
-	_visual.grounded = on_surface
-	_visual.stride_swing = swishy.tail_swing if striding else Vector2.ZERO
-	_visual.stride_power = swishy.power if striding else 0.0
-	_visual.bell_lean = bell_lean if gait.visual == Gait.Visual.BELL_PULSE else -1.0
-	_visual.bell_gait = gait
-	_visual.stride_phase = swishy.phase if striding else -1.0
-	_visual.stride_peak = swishy.peak_time()
-	_visual.stride_fade = swishy.fade_time()
-	_visual.react(delta, linear_velocity)
-	var cue := swishy.cue() if swim_style == SwimStyle.EXTRA_SWISHY else Vector3.ZERO
-	_visual.set_stride_cue(cue.x, cue.y, cue.z)
-	_bubbles.emitting = is_boosting
+	_visual.react(delta, s)
+	_visual.set_stride_cue(s.stride_cue.x, s.stride_cue.y, s.stride_cue.z)
+	_bubbles.emitting = s.boosting
 	_update_bow_view(delta)
 	_pour_bubbles(delta)
 
@@ -2332,11 +2376,8 @@ func _process_puppet(delta: float) -> void:
 		return
 	_tail.rotation = Vector3(fx[ReplayData.FX_TAIL_PITCH], fx[ReplayData.FX_TAIL_YAW], 0.0)
 	_tail.scale = Vector3.ONE * maxf(fx[ReplayData.FX_TAIL_SCALE], 0.01)
-	_visual.grounded = false
-	_visual.stride_swing = Vector2(fx[ReplayData.FX_SWING_X], fx[ReplayData.FX_SWING_Y])
-	_visual.stride_power = fx[ReplayData.FX_POWER]
+	_visual.react(delta, swim_state)
 	_visual.set_stride_cue(fx[ReplayData.FX_CUE_FILL], fx[ReplayData.FX_CUE_GLOW], fx[ReplayData.FX_CUE_SWEET])
-	_visual.react(delta, _puppet_velocity)
 	_bubbles.emitting = false
 	_update_bow_view(delta)
 	_pour_rate = fx[ReplayData.FX_POUR]
@@ -2370,21 +2411,22 @@ func _update_bow_view(delta: float) -> void:
 func _pour_bubbles(delta: float) -> void:
 	var swishing := stride_bubbles and swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY
 	_pour_rate = 0.0
-	if not swishing or swishy.phase < 0.0 or not is_visible_in_tree():
+	var s := swim_state
+	if not swishing or s.stride_phase < 0.0 or not is_visible_in_tree():
 		return
 	var tip := _tail.global_transform * _visual.tail_tip()
 	var body := global_basis.orthonormalized()
-	var swing := swishy.tail_swing
+	var swing := s.stride_dir
 	var side := body.x * swing.x - body.y * swing.y
 	var jet := (body.z + side * 0.4).normalized()  # body.z is backward
-	var push := (1.0 + swishy.flow) / (1.0 + stride_flow_max)
-	var rate := lerpf(60.0, 220.0, push) * lerpf(0.4, 1.0, swishy.power)
-	var color := StrideStream.color_for(swishy.last_timing)
+	var push := (1.0 + s.stride_flow * stride_flow_max) / (1.0 + stride_flow_max)
+	var rate := lerpf(60.0, 220.0, push) * lerpf(0.4, 1.0, s.stride_power)
+	var color := StrideStream.color_for(s.stride_timing)
 	color.a = lerpf(0.4, 1.0, push)
 	_pour_rate = rate
 	_pour_color = color
 	# They keep most of the fish's speed, so the stream stays tight behind the tail.
-	_stream.pour(delta, tip, jet, linear_velocity * 0.75, 0.025 * _tail.scale.x, rate, color)
+	_stream.pour(delta, tip, jet, s.velocity * 0.75, 0.025 * _tail.scale.x, rate, color)
 
 
 ## How the fish looks now beyond where it is and which way it faces (the
@@ -2396,20 +2438,19 @@ func replay_fx() -> PackedFloat32Array:
 		return _puppet_fx.duplicate()
 	var fx := PackedFloat32Array()
 	fx.resize(ReplayData.FX_SIZE)
-	var striding := swim_strokes and swim_style == SwimStyle.EXTRA_SWISHY
+	var s := swim_state
 	if _tail:
 		fx[ReplayData.FX_TAIL_YAW] = _tail.rotation.y
 		fx[ReplayData.FX_TAIL_PITCH] = _tail.rotation.x
 		fx[ReplayData.FX_TAIL_SCALE] = _tail.scale.x
-	var cue := swishy.cue() if swim_style == SwimStyle.EXTRA_SWISHY else Vector3.ZERO
-	fx[ReplayData.FX_CUE_FILL] = cue.x
-	fx[ReplayData.FX_CUE_GLOW] = cue.y
-	fx[ReplayData.FX_CUE_SWEET] = cue.z
-	if striding:
-		fx[ReplayData.FX_SWING_X] = swishy.tail_swing.x
-		fx[ReplayData.FX_SWING_Y] = swishy.tail_swing.y
-		fx[ReplayData.FX_POWER] = swishy.power
-		fx[ReplayData.FX_FLOW] = swishy.flow / maxf(stride_flow_max, 0.01)
+	fx[ReplayData.FX_CUE_FILL] = s.stride_cue.x
+	fx[ReplayData.FX_CUE_GLOW] = s.stride_cue.y
+	fx[ReplayData.FX_CUE_SWEET] = s.stride_cue.z
+	if s.striding:
+		fx[ReplayData.FX_SWING_X] = s.stride_dir.x
+		fx[ReplayData.FX_SWING_Y] = s.stride_dir.y
+		fx[ReplayData.FX_POWER] = s.stride_power
+		fx[ReplayData.FX_FLOW] = s.stride_flow
 	fx[ReplayData.FX_BOW] = bow_amount
 	if bow_amount > 0.0:
 		var size := bow_size()

@@ -33,7 +33,7 @@ func tip_bend() -> Vector2:
 
 func settle(seconds: float, velocity := Vector3(0.0, 0.0, -15.0)) -> void:
 	for i in roundi(seconds / DT):
-		model.react(DT, velocity)
+		model.react_velocity(DT, velocity)
 
 
 func _run() -> void:
@@ -47,7 +47,7 @@ func _run() -> void:
 	var most := 0.0
 	var most_at := 0.0
 	for i in 90:
-		model.react(DT, Vector3(0.0, 0.0, -15.0))
+		model.react_velocity(DT, Vector3(0.0, 0.0, -15.0))
 		if i == 2:
 			early = tip_bend().x
 		if tip_bend().x > most:
@@ -69,18 +69,18 @@ func _run() -> void:
 	var trail := 0.0
 	for i in 30:
 		model.rotate_y(2.5 * DT)
-		model.react(DT, model._body_frame() * Vector3(0.0, 0.0, -15.0))
+		model.react_velocity(DT, model._body_frame() * Vector3(0.0, 0.0, -15.0))
 		trail = minf(trail, tip_bend().x)
 	check(trail < -0.1, "turning left, the tip trails out to the right (%.3f)" % trail)
 	check(model.rotation.z > 0.2, "turning left, it banks left wing down (%.2f rad)" % model.rotation.z)
 	var bias: float = model._skin.get_shader_parameter("ripple_bias")
 	check(bias > 0.1, "turning left, the outside (right) wing's wave runs deeper (bias %.2f)" % bias)
-	model.grounded = true
+	model.swim.grounded = true
 	for i in 60:
 		model.rotate_y(2.5 * DT)
-		model.react(DT, model._body_frame() * Vector3(0.0, 0.0, -15.0))
+		model.react_velocity(DT, model._body_frame() * Vector3(0.0, 0.0, -15.0))
 	check(absf(model.rotation.z) < 0.05, "turning on a surface, it stays level (%.3f rad)" % model.rotation.z)
-	model.grounded = false
+	model.swim.grounded = false
 
 	# Sliding sideways to the right: the whip streams back to the left.
 	model.rotation = Vector3.ZERO
@@ -98,9 +98,9 @@ func _run() -> void:
 	var bank_most := 0.0
 	for i in 90:
 		var t := (i + 1) * DT
-		model.stride_swing = Vector2(-1.0, 0.0)
-		model.stride_power = smoothstep(0.0, 0.35, t) if t < 0.35 else clampf(1.0 - (t - 0.35) / 0.35, 0.0, 1.0)
-		model.react(DT, Vector3(0.0, 0.0, -15.0))
+		model.swim.stride_dir = Vector2(-1.0, 0.0)
+		model.swim.stride_power = smoothstep(0.0, 0.35, t) if t < 0.35 else clampf(1.0 - (t - 0.35) / 0.35, 0.0, 1.0)
+		model.react_velocity(DT, Vector3(0.0, 0.0, -15.0))
 		deepest = deepest.min(model._beat)
 		bank_most = maxf(bank_most, model.rotation.z)
 		if t > 0.5:
@@ -110,18 +110,18 @@ func _run() -> void:
 	check(deepest.y < deepest.x * 2.0, "the right wing (away from the push) beats harder")
 	check(highest > 0.15, "then they lift back up past level (the recovery)")
 	check(bank_most > 0.08, "and it banks toward the push (%.2f rad)" % bank_most)
-	model.stride_power = 0.0
-	model.stride_swing = Vector2.ZERO
+	model.swim.stride_power = 0.0
+	model.swim.stride_dir = Vector2.ZERO
 	settle(1.5)
 	check(model._beat.length() < 0.02 and absf(model.rotation.z) < 0.02, "it settles level after")
-	model.stride_swing = Vector2(-1.0, 0.0)
-	model.stride_power = 1.0
-	model.grounded = true
+	model.swim.stride_dir = Vector2(-1.0, 0.0)
+	model.swim.stride_power = 1.0
+	model.swim.grounded = true
 	settle(1.0)
 	check(model._beat.x > -0.151 and model._beat.y > -0.151,"on a surface the wingtips stay out of the floor (%s)" % model._beat)
-	model.grounded = false
-	model.stride_power = 0.0
-	model.stride_swing = Vector2.ZERO
+	model.swim.grounded = false
+	model.swim.stride_power = 0.0
+	model.swim.stride_dir = Vector2.ZERO
 
 	# A respawn spins the body round in one frame: not a turn.
 	settle(1.0)

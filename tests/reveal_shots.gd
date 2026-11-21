@@ -63,7 +63,7 @@ func _run() -> void:
 			camera.look_at(Vector3.ZERO, Vector3.UP)
 			for n in EXPOSURES.size():
 				reveal.update(1.0 / 60.0, EXPOSURES[n], settings, Color(1.0, 0.55, 0.15))
-				model.react(1.0 / 60.0, Vector3.ZERO)
+				model.react_velocity(1.0 / 60.0, Vector3.ZERO)
 				await _frames(1)
 				reveal.update(1.0 / 60.0, EXPOSURES[n], settings, Color(1.0, 0.55, 0.15))
 				await _frames(3)
@@ -78,7 +78,7 @@ func _run() -> void:
 			for n in 4:
 				model.tail.rotation = Vector3(0.0, sin(n * PI / 2.0 + 0.4) * 0.7, 0.0)
 				for k in 4:
-					model.react(1.0 / 60.0, Vector3(0.0, 0.0, -12.0))
+					model.react_velocity(1.0 / 60.0, Vector3(0.0, 0.0, -12.0))
 					reveal.update(1.0 / 60.0, exposure, settings, Color(1.0, 0.55, 0.15))
 				await _frames(3)
 				strip.blit_rect(_shot(), Rect2i(Vector2i.ZERO, CELL), Vector2i(n * CELL.x, row * CELL.y))

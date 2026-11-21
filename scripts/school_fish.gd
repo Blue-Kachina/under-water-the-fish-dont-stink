@@ -37,7 +37,7 @@ func place(transform: Transform3D, size: float, velocity: Vector3, tail_phase: f
 			model.tail.rotation.x = wag  # a whale's flukes beat up and down
 		else:
 			model.tail.rotation.y = wag
-	model.react(delta, velocity)
+	model.react_velocity(delta, velocity)
 
 
 ## Shadows on or off for its model.

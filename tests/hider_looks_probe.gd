@@ -219,7 +219,7 @@ func _measure(fish: Array[FishController], _reveal: bool) -> float:
 		for i in fish.size():
 			var f := fish[i]
 			f._visual.tail.rotation.y = sin(t * 6.0 + i) * 0.5
-			f._visual.react(1.0 / 60.0, Vector3(0.0, 0.0, -10.0))
+			f._visual.react_velocity(1.0 / 60.0, Vector3(0.0, 0.0, -10.0))
 		await get_tree().process_frame
 		frames += 1
 	return frames / ((Time.get_ticks_usec() - start) / 1000000.0)

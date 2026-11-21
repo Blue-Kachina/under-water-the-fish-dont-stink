@@ -125,7 +125,7 @@ func _run() -> void:
 	var top := -INF
 	var bottom := INF
 	for i in 400:
-		model.react(DT, Vector3(0.0, 0.0, -3.0))
+		model.react_velocity(DT, Vector3(0.0, 0.0, -3.0))
 		top = maxf(top, model.bell.crown)
 		bottom = minf(bottom, model.bell.crown)
 	check(top > 0.3 and bottom < -0.2, "it beats on its own (%.2f..%.2f)" % [bottom, top])
