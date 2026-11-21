@@ -36,13 +36,14 @@ signal what_stinks_ended
 
 ## Environment name -> script. Each script builds its own world and provides
 ## spawn_transform() and configure_environment(env).
-const ENVIRONMENTS := {
+const _CORE_ENVIRONMENTS := {
 	"Obstacle Course": preload("res://scripts/arena.gd"),
 	"Ocean": preload("res://scripts/ocean.gd"),
 	"Aquarium Arena": preload("res://scripts/aquarium_arena.gd"),
-	"Sunken Temple": preload("res://scripts/modes/marco/temple_arena.gd"),  # Marco Polo's
-	"Aquarium": preload("res://scripts/modes/marco/fish_tank_arena.gd"),
 }
+## The environments: main.gd's own plus every registered mode's descriptor "environments"
+## (Marco Polo's Sunken Temple and Aquarium arenas).
+var ENVIRONMENTS: Dictionary = ModeRegistry.merged_environments(_CORE_ENVIRONMENTS)
 const SETTINGS_PATH := "user://playground.cfg"
 const FREE_PLAY := "Free Play"
 const ONE_V_ONE := "1v1"

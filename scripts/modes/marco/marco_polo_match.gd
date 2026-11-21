@@ -228,7 +228,7 @@ static func descriptor() -> Dictionary:
 		"colors": [Color(0.03, 0.14, 0.12), Color(0.4, 1.0, 0.7)],
 		"pitch": "Hide and seek by sound. Score in the seeker's sight, keep quiet, and don't get tagged.",
 		"short": "Hide and seek by sound", "play": ["Solo", "Online"],
-		"environment": MarcoPoloMatch.arena_environment, "match": true, "after": "Obstacle Course", "tile_before": "What Stinks?",
+		"environment": MarcoPoloMatch.arena_environment, "environments": {"Sunken Temple": TempleArena, "Aquarium": FishTankArena}, "match": true, "after": "Obstacle Course", "tile_before": "What Stinks?",
 		"tuning_preset": "res://presets/nature.cfg", "one_screen": true,
 		"card_text": MarcoPoloMatch.card_text, "card_fill": MarcoPoloMatch.fill_card,
 		"reset_label": MarcoPoloMatch.reset_label, "join": MarcoPoloMatch.join_args,

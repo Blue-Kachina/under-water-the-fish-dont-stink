@@ -1,6 +1,6 @@
 {
 	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
-	"total": 181,
+	"total": 179,
 	"violations": {
 		"audio/sfx_hooks/sfx_hooks.gd": {
 			"BatteredSounds": 1,
@@ -42,9 +42,7 @@
 			"UnnaturalRun": 8,
 			"UnnaturalSettings": 3,
 			"WhatStinksMatch": 3,
-			"WhatStinksSettings": 5,
-			"path:modes/marco/fish_tank_arena.gd": 1,
-			"path:modes/marco/temple_arena.gd": 1
+			"WhatStinksSettings": 5
 		},
 		"net/coop_session.gd": {
 			"MarcoPoloMatch": 3,

@@ -75,6 +75,15 @@ static func merged_tiles(core: Dictionary) -> Dictionary:
 	return out
 
 
+## `core` (environment name -> script) plus each registered descriptor's
+## "environments" (the arenas that mode builds).
+static func merged_environments(core: Dictionary) -> Dictionary:
+	var out := core.duplicate()
+	for d in descriptors():
+		out.merge(d.get("environments", {}))
+	return out
+
+
 ## The registered ids whose descriptor tunes with a preset (Nature's tuning).
 static func tuned_ids() -> Array:
 	var out := []
