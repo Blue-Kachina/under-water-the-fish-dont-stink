@@ -16,9 +16,15 @@ var fish: FishController
 var camera: Node
 var failures := 0
 var events: Array[Dictionary] = []
+var snaps: Array[Dictionary] = []
+var record := false
+const BASELINE := "res://tests/fixtures/hunt_baseline.json"
 
 
 func _ready() -> void:
+	# Fixed seed so any random draw (kickoff layouts, bots) repeats; --record rewrites the baseline.
+	seed(20261120)
+	record = "--record" in OS.get_cmdline_args() or "--record" in OS.get_cmdline_user_args()
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	fish = main.get_node("Fish")
@@ -66,9 +72,11 @@ func _run() -> void:
 	check(hunt.phase == HuntMatch.Phase.LIVE and not fish.controls_locked and not opponent.controls_locked, "GO: both free")
 	check(hunt.clock_left > HuntMatch.MATCH_TIME - 0.2, "the clock stood still through the countdown (%.2f)" % hunt.clock_left)
 
+	_snap("go_live")
 	print("slow bump:")
 	await _ram(fish, opponent, 5.0)
 	check(hunt.scores == [0, 0] and not opponent.battered, "a slow bump doesn't score")
+	_snap("slow_bump")
 
 	print("player battery:")
 	hunt.battery_replays = true
@@ -76,6 +84,7 @@ func _run() -> void:
 	await _ram(fish, opponent, hunt.batter_speed() + 6.0)
 	check(hunt.scores == [1, 0] and opponent.battered, "a fast ram scores 1-0 and batters the opponent")
 	check(hunt.phase == HuntMatch.Phase.BATTERED, "a pause for the explosion")
+	_snap("player_battery")
 	check(hunt.style.points[0] >= StylePoints.POINTS[StylePoints.BATTERY], "+%d points for it (%d)" % [StylePoints.POINTS[StylePoints.BATTERY], hunt.style.points[0]])
 	check(events.any(func(e: Dictionary) -> bool: return e.type == StylePoints.BATTERY and e.player == 0 and e.victim == 1), "called out as a battery")
 	check(StylePoints.TITLES[StylePoints.BATTERY] == "BATTERED" and "BATTERED FISH" in load("res://scripts/hud.gd").HUNT_HEADINGS,
@@ -96,6 +105,7 @@ func _run() -> void:
 		check(stats.froze, "a hit-stop at the impact")
 		check(stats.vignette, "the arcade vignette shows")
 	await _ticks(5)
+	_snap("replay_ends")
 	check(hunt.phase == HuntMatch.Phase.COUNTDOWN and hunt.battery_replay == null, "the replay ends at the kickoff")
 	check(not opponent.battered and opponent.visible and fish.visible, "both back")
 	check(fish.swishy.flow == 0.0 and fish.linear_velocity.length() < 0.5, "the player's flow and speed are gone")
@@ -112,11 +122,13 @@ func _run() -> void:
 	await _ram(opponent, fish, hunt.batter_speed() + 6.0)
 	check(hunt.scores == [1, 1] and fish.battered, "the opponent ramming the player scores 1-1")
 	await _ticks(roundi((HuntMatch.BATTERY_PAUSE + 0.2) * 120.0))
+	_snap("opponent_battery")
 	check(hunt.phase == HuntMatch.Phase.COUNTDOWN and not fish.battered, "replays off: straight to the kickoff")
 
 	print("head-on:")
 	await _go_live(hunt)
 	await _joust(hunt, hunt.batter_speed() + 8.0, hunt.batter_speed() + 3.0)
+	_snap("head_on_faster")
 	check(hunt.scores == [2, 1] and opponent.battered and not fish.battered, "the faster fish scores")
 	await _ticks(roundi((HuntMatch.BATTERY_PAUSE + 0.2) * 120.0))
 	await _go_live(hunt)
@@ -124,6 +136,7 @@ func _run() -> void:
 	await _joust(hunt, hunt.batter_speed() + 5.0, hunt.batter_speed() + 5.0)
 	check(hunt.scores == [2, 1] and opponent.battered and fish.battered and hunt.last_battery.fish_fry,
 			"the same speed: a Fish Fry, both battered, nobody scores")
+	_snap("fish_fry")
 	await _ticks(roundi((HuntMatch.BATTERY_PAUSE + 0.2) * 120.0))
 	check(hunt.phase == HuntMatch.Phase.REPLAY and is_instance_valid(hunt.battery_replay) and hunt.battery_replay.fish_fry,
 			"the Fish Fry is replayed")
@@ -139,10 +152,12 @@ func _run() -> void:
 	hunt.style.points = [60, 30]
 	hunt.clock_left = 0.02
 	await _ticks(5)
+	_snap("time_up_points")
 	check(hunt.phase == HuntMatch.Phase.OVER and hunt.winner == 0 and hunt.won_on_points(), "level on goals: the most points wins")
 	check(not fish.controls_locked and fish.visible, "the player swims free at the end")
 	main.reset_play()
 	await _ticks(3)
+	_snap("new_match")
 	check(hunt.phase == HuntMatch.Phase.COUNTDOWN and hunt.scores == [0, 0] and hunt.style.points == [0, 0]
 			and hunt.clock_left == HuntMatch.MATCH_TIME, "R starts a new match")
 	await _go_live(hunt)
@@ -150,12 +165,15 @@ func _run() -> void:
 	hunt.style.points = [40, 40]
 	hunt.clock_left = 0.02
 	await _ticks(5)
+	_snap("overtime_start")
 	check(hunt.overtime and hunt.phase == HuntMatch.Phase.COUNTDOWN, "level on both: overtime from a kickoff")
 	await _go_live(hunt)
 	await _ticks(60)
+	_snap("overtime_live")
 	check(hunt.overtime_elapsed > 0.3 and hunt.clock_left == 0.0, "overtime counts up (%.2f s)" % hunt.overtime_elapsed)
 	await _ram(opponent, fish, hunt.batter_speed() + 6.0)
 	await _ticks(roundi((HuntMatch.BATTERY_PAUSE + 0.2) * 120.0))
+	_snap("overtime_battery")
 	check(hunt.phase == HuntMatch.Phase.OVER and hunt.winner == 1 and not hunt.won_on_points(), "overtime's battery wins it")
 
 	print("arena edge:")
@@ -195,6 +213,7 @@ func _run() -> void:
 	check(main.nature_run == null and main._match_card != null and main._match_card.message == main._match_card_text(main.HUNT),
 			"straight from a Nature run: the run ends and Hunt's card shows")
 
+	_finish_baseline()
 	print("hunt_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)
 
@@ -257,3 +276,56 @@ func _joust(hunt: HuntMatch, player_speed: float, opponent_speed: float) -> void
 func _ticks(n: int) -> void:
 	for i in n:
 		await get_tree().physics_frame
+
+
+## One row of the baseline: the match state at a named moment of the script.
+func _snap(label: String) -> void:
+	var hunt: HuntMatch = main.hunt_match
+	snaps.append({
+		"at": label,
+		"phase": HuntMatch.Phase.keys()[hunt.phase],
+		"scores": hunt.scores.duplicate(),
+		"points": hunt.style.points.duplicate(),
+		"clock": snappedf(hunt.clock_left, 0.01),
+		"overtime": hunt.overtime,
+		"overtime_elapsed": snappedf(hunt.overtime_elapsed, 0.01),
+		"winner": hunt.winner,
+		"fish_fry": bool(hunt.last_battery.get("fish_fry", false)) if not hunt.last_battery.is_empty() else false,
+		"battered": [fish.battered, hunt.opponent.battered],
+		"replay": is_instance_valid(hunt.battery_replay),
+		"events": events.size(),
+	})
+
+
+## --record writes the baseline; otherwise the run is diffed against it.
+func _finish_baseline() -> void:
+	var log: Array[Dictionary] = []
+	for e: Dictionary in events:
+		log.append({"type": e.type, "player": e.player, "victim": e.get("victim", -1)})
+	var now := {"snaps": snaps, "events": log}
+	var path := ProjectSettings.globalize_path(BASELINE)
+	if record:
+		DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+		var out := FileAccess.open(path, FileAccess.WRITE)
+		out.store_string(JSON.stringify(now, "\t", true))
+		out.close()
+		print("  baseline recorded: %s (%d snapshots, %d events)" % [path, snaps.size(), log.size()])
+		return
+	if not FileAccess.file_exists(BASELINE):
+		check(false, "no baseline at %s (run with --record)" % BASELINE)
+		return
+	var want: Variant = JSON.parse_string(FileAccess.get_file_as_string(BASELINE))
+	var got: Variant = JSON.parse_string(JSON.stringify(now))
+	var bad := 0
+	var want_snaps: Array = want.snaps
+	var got_snaps: Array = got.snaps
+	for i in maxi(want_snaps.size(), got_snaps.size()):
+		var a: Variant = want_snaps[i] if i < want_snaps.size() else null
+		var b: Variant = got_snaps[i] if i < got_snaps.size() else null
+		if a != b:
+			bad += 1
+			print("    baseline differs: want %s got %s" % [a, b])
+	if want.events != got.events:
+		bad += 1
+		print("    event log differs: want %s got %s" % [want.events, got.events])
+	check(bad == 0, "matches hunt_baseline.json (%d snapshots, %d events)" % [snaps.size(), log.size()])
