@@ -189,6 +189,7 @@ static func build(m: FishModel) -> void:
 	_fin(m, fins, Vector3(0.0, 0.0, -upper[0] * 0.55), Vector3.BACK, Vector3.UP, upper, 0.12, FIN_CAUDAL, Vector3.RIGHT, m.tail)
 	_fin(m, fins, Vector3(0.0, 0.0, -lower[0] * 0.5), Vector3.BACK, Vector3.DOWN, lower, 0.12, FIN_LOWER, Vector3.RIGHT, m.tail)
 	m.bend_share = 0.65
+	m.rig_capable = true  # SwimRig, when the Hunter gait turns procedural_rig on
 	m._bend_body(at.call(0.56), bent)
 	# Small dark eyes set into the head (a hammerhead's out on its tips), the
 	# skin folding dark round them.

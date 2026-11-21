@@ -141,6 +141,13 @@ signal power_stroke(strength: float, at: Transform3D)
 ## each power stroke, the flippers trim and the body banks in turns. Its values
 ## are the class's Gait's Titan-only ones.
 var titan_motion := false
+## The procedural rig (SwimRig, scripts/swim_rig): whether this model has one to
+## give (the shark's builder sets it), made on the first frame its Gait's
+## procedural_rig is on. While it's engaged the body bends along the same chain
+## as a Titan's (_rig_chain), the rig setting the joints.
+var rig_capable := false
+var rig: SwimRig
+var _rig_chain := false
 ## How far in front of the bend the head's counter-bend reaches (m), and the
 ## flipper trim nodes (left, right) between the fin pivots and the flippers.
 var head_span := 0.0
@@ -219,6 +226,14 @@ static func build(character: FishCharacter.FishClass, species := 0, skin := 0) -
 ## (the bottom, when it isn't moving up or down, so it squashes onto the floor).
 func react(delta: float, state: SwimState) -> void:
 	swim = state
+	if rig_capable and swim.gait != null and swim.gait.procedural_rig:
+		if rig == null:
+			rig = SwimRig.new()
+			add_child(rig)
+			rig.attach(self)
+		rig.step(delta, swim, swim.gait)
+	elif rig != null and rig.engaged:
+		rig.release()
 	if titan_motion:
 		_titan_swim(delta)
 	apply_bend()
@@ -589,10 +604,10 @@ func bend_rider(at: Vector3) -> Node3D:
 func apply_bend() -> void:
 	if _bend_span.y <= _bend_span.x or tail == null:
 		return
-	if titan_motion:
-		# _titan_swim set each joint's turn, the head's and the surge; if the
+	if titan_motion or _rig_chain:
+		# _titan_swim (or the rig) set each joint's turn, the head's and the surge; if the
 		# tail was turned by hand since, the body takes that pose as it stands.
-		if not tail.rotation.is_equal_approx(_titan_tail_seen):
+		if titan_motion and not tail.rotation.is_equal_approx(_titan_tail_seen):
 			_titan_pose(tail.rotation.x, tail.rotation.y)
 		_bend_turn = _bend_turns[0]
 		for part in _bent:
@@ -621,7 +636,7 @@ func bend_point(at: Vector3) -> Vector3:
 ## The bend's turn and move at `at` (model space, at rest): the slice there
 ## turns with the spine; in front of the bend, nothing moves.
 func bend_transform(at: Vector3) -> Transform3D:
-	if titan_motion:
+	if titan_motion or _rig_chain:
 		return _chain_transform(at)
 	var span := _bend_span.y - _bend_span.x
 	var angle := _bend_turn.length()

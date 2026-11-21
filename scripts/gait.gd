@@ -132,3 +132,20 @@ func is_default() -> bool:
 	return stroke_axis == StrokeAxis.LATERAL and push_axis == PushAxis.NOSE and stroke_time == 1.0 \
 			and stroke_power == 1.0 and coast_drag == 1.0 and coast_buoyancy == 0.0 \
 			and surface_mode == SurfaceMode.NONE and visual == Visual.TAIL_BEND
+
+
+# --- The procedural rig (SwimRig, planning_core_roadmap.md 2.2/2.3) ---------------
+# Only the Hunter class's shark has one so far. Every number is a field here so the
+# GAITS panel tunes it live. A layer with weight 0 adds nothing.
+
+## Shark only: animate the body with the procedural SwimRig (layers that read how
+## the fish is moving) instead of the controller's tail pose. Off: the pose as it
+## always was. With every layer weight at 0 and rig_legacy_tail at 1 the rig
+## poses exactly as the old pose does.
+@export var procedural_rig := false
+## Rig: how much of the controller's own tail pose (its swim stroke and stride swing) is kept. 1: all of it (the old
+## pose). 0: none, the layers move the tail.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_legacy_tail := 1.0
+## Rig: how far in front of the bend the head bends the other way, as a fraction of the body's length. 0: the head
+## is rigid.
+@export_range(0.0, 0.6, 0.01, "or_greater") var rig_head_span := 0.3
