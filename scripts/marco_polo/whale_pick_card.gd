@@ -149,7 +149,7 @@ func _process(delta: float) -> void:
 	_pivot.rotation.y = _spin
 	_pivot.position.y = sin(_time * 1.3) * 0.04 * _reach * 0.1
 	if _model:
-		_model.react(delta, _model.global_basis * Vector3(0.0, 0.0, -3.0))
+		_model.react_velocity(delta, _model.global_basis * Vector3(0.0, 0.0, -3.0))
 	var view := get_viewport().get_visible_rect().size
 	_layout(view)
 	_card.queue_redraw()

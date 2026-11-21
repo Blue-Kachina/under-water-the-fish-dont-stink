@@ -52,12 +52,12 @@ func _run(model: FishModel) -> void:
 	var centre := Vector3(0.0, -model._size.z * 0.15, 0.0)
 	camera.position = centre + Vector3(0.0, -0.1, 1.0).normalized() * reach
 	camera.look_at(centre, Vector3.UP)
-	model.bell_lean = 0.0  # upright, the apex up
-	model.bell_gait = Gait.new()
+	model.swim.bell_lean = 0.0  # upright, the apex up
+	model.swim.gait = Gait.new()
 	var peak := 0.28
 	var fade := 0.48
-	model.stride_peak = peak
-	model.stride_fade = fade
+	model.swim.stride_peak = peak
+	model.swim.stride_fade = fade
 	# [stride time (-1: none), seconds]: rest, power, recovery (chained at the
 	# peak, left to fade), a glide, then a power stroke left to relax alone.
 	var plan := [[-1.0, 0.5], [0.0, peak], [0.0, peak + fade], [-1.0, 0.8], [0.0, peak + fade], [-1.0, 1.0]]
@@ -67,8 +67,8 @@ func _run(model: FishModel) -> void:
 		var start: float = step[0]
 		var time := 0.0
 		while time < float(step[1]) - 1e-4:
-			model.stride_phase = start + time if start >= 0.0 else -1.0
-			model.react(DT, Vector3.ZERO)
+			model.swim.stride_phase = start + time if start >= 0.0 else -1.0
+			model.react_velocity(DT, Vector3.ZERO)
 			time += DT
 			if frame % every == 0:
 				await RenderingServer.frame_post_draw

@@ -928,7 +928,7 @@ class FishShowcase extends SubViewportContainer:
 		else:
 			_pivot.position.y = sin(_time * 1.3) * 0.04
 		if _model:
-			_model.react(delta, _model.global_basis * Vector3(0.0, 0.0, -3.0))
+			_model.react_velocity(delta, _model.global_basis * Vector3(0.0, 0.0, -3.0))
 
 	## One frame of the right stick (x right, y down, as the pads read): orbits
 	## the camera, or lets the fish turn once it's been left alone a moment.

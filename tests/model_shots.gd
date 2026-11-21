@@ -135,7 +135,7 @@ func _qa(model: FishModel) -> void:
 	for beat: Array in [["fluke_down", 0.6], ["fluke_up", -0.6]]:
 		for i in 45:
 			model.tail.rotation = Vector3(float(beat[1]), 0.0, 0.0)
-			model.react(1.0 / 60.0, Vector3(0.0, 0.0, -10.0))
+			model.react_velocity(1.0 / 60.0, Vector3(0.0, 0.0, -10.0))
 		camera.position = Vector3(views["side"]).normalized() * reach
 		camera.look_at(Vector3.ZERO, Vector3.UP)
 		await _save("%s_qa_%s.png" % [_name, beat[0]])
@@ -174,7 +174,7 @@ func _swim_loop(model: FishModel) -> void:
 			model.tail.rotation = Vector3(0.5 * sin(TAU * clock[0] / beat), 0.0, 0.0)
 			if view[2]:
 				holder.rotate_y(0.5 * dt)  # a steady left turn
-			model.react(dt, holder.global_basis * Vector3(0.0, 0.0, -8.0))
+			model.react_velocity(dt, holder.global_basis * Vector3(0.0, 0.0, -8.0))
 			reach[0] = minf(reach[0], model.tail.rotation.x)
 			reach[1] = maxf(reach[1], model.tail.rotation.x)
 			reach[2] = maxf(reach[2], absf(model._bend_head.x))
@@ -277,7 +277,7 @@ func _run(model: FishModel) -> void:
 	model.fin_right.rotation = Vector3(0.0, -0.5, 0.5)
 	model.tail.rotation.y = 0.3
 	for i in 20:
-		model.react(1.0 / 60.0, Vector3(0.0, 0.0, -23.0))
+		model.react_velocity(1.0 / 60.0, Vector3(0.0, 0.0, -23.0))
 	for view: String in ["front", "back"]:
 		camera.position = Vector3(views[view]).normalized() * reach
 		camera.look_at(Vector3.ZERO, Vector3.UP)
@@ -291,7 +291,7 @@ func _run(model: FishModel) -> void:
 	for wag: Array in [["wag_left", Vector3(0.0, -0.9, 0.0), "top"], ["wag_right", Vector3(0.0, 0.9, 0.0), "top"],
 			["wag_up", Vector3(-0.6, 0.0, 0.0), "side"], ["wag_three", Vector3(0.0, 0.7, 0.0), "back"]]:
 		model.tail.rotation = wag[1]
-		model.react(1.0 / 60.0, Vector3(0.0, 0.0, -10.0))
+		model.react_velocity(1.0 / 60.0, Vector3(0.0, 0.0, -10.0))
 		camera.position = Vector3(views[wag[2]]).normalized() * reach
 		camera.look_at(Vector3.ZERO, Vector3.FORWARD if wag[2] == "top" else Vector3.UP)
 		for i in 3:
@@ -302,7 +302,7 @@ func _run(model: FishModel) -> void:
 		# from the side and from behind.
 		for wag: Array in [["fluke_down", "side"], ["fluke_down_back", "back"]]:
 			model.tail.rotation = Vector3(0.7, 0.0, 0.0)
-			model.react(1.0 / 60.0, Vector3(0.0, 0.0, -10.0))
+			model.react_velocity(1.0 / 60.0, Vector3(0.0, 0.0, -10.0))
 			camera.position = Vector3(views[wag[1]]).normalized() * reach
 			camera.look_at(Vector3.ZERO, Vector3.UP)
 			for i in 3:
@@ -314,12 +314,12 @@ func _run(model: FishModel) -> void:
 	model.fin_left.rotation = Vector3.ZERO
 	model.fin_right.rotation = Vector3.ZERO
 	model.tail.rotation.y = -0.6
-	model.stride_swing = Vector2(-1.0, 0.0)
+	model.swim.stride_dir = Vector2(-1.0, 0.0)
 	for shot: Array in [["stride", 18, 0.0], ["recover", 12, -1.0]]:
 		for i in shot[1]:
-			model.stride_power = clampf(model.stride_power + (1.0 / 18.0 if shot[2] >= 0.0 else -1.0 / 12.0), 0.0, 1.0)
+			model.swim.stride_power = clampf(model.swim.stride_power + (1.0 / 18.0 if shot[2] >= 0.0 else -1.0 / 12.0), 0.0, 1.0)
 			model.rotate_y(1.5 / 60.0)
-			model.react(1.0 / 60.0, model._body_frame() * Vector3(0.0, 0.0, -18.0))
+			model.react_velocity(1.0 / 60.0, model._body_frame() * Vector3(0.0, 0.0, -18.0))
 		camera.position = model.global_basis * Vector3(views["back"]).normalized() * reach
 		camera.look_at(Vector3.ZERO, Vector3.UP)
 		for i in 3:

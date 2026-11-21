@@ -53,7 +53,7 @@ func _check_model(fish_class: FishCharacter.FishClass, species: int) -> void:
 	# Swim a moment with the tail swung, as the controller drives it.
 	for i in 30:
 		model.tail.rotation = Vector3(0.0, 0.8 * sin(i * 0.3), 0.0)
-		model.react(1.0 / 60.0, Vector3(0.0, 0.0, -15.0))
+		model.react_velocity(1.0 / 60.0, Vector3(0.0, 0.0, -15.0))
 	if not fish_class in NO_BEND:
 		check(model._bend_span.y > model._bend_span.x, "bends into its tail")
 	if model._bend_span.y > model._bend_span.x:

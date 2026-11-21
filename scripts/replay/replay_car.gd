@@ -65,6 +65,8 @@ var _hitbox_view := MeshInstance3D.new()
 var _label := Label3D.new()
 var _burst := CPUParticles3D.new()
 var _swim_phase := 0.0
+## How it swims now, synthesised from the replay's velocity and facing (SwimState).
+var _swim := SwimState.new()
 var _bow_view := MeshInstance3D.new()
 var _bow_material := ShaderMaterial.new()
 var _bow_flow := 0.0
@@ -202,12 +204,14 @@ func _process(real_delta: float) -> void:
 	var flutter := sin(Time.get_ticks_msec() * 0.05) * 0.7 * input_reverse
 	_fin_left.rotation.z = flutter
 	_fin_right.rotation.z = -flutter
-	_visual.grounded = on_surface
+	_swim.grounded = on_surface
+	_swim.striding = recorded
+	_swim.stride_dir = Vector2(fx[ReplayData.FX_SWING_X], fx[ReplayData.FX_SWING_Y]) if recorded else Vector2.ZERO
+	_swim.stride_power = fx[ReplayData.FX_POWER] if recorded else 0.0
+	_swim.advance_from_velocity(linear_velocity, global_basis, delta, FishModel.SWIM_REF_SPEED)
+	_visual.react(delta, _swim)
 	if recorded:
-		_visual.stride_swing = Vector2(fx[ReplayData.FX_SWING_X], fx[ReplayData.FX_SWING_Y])
-		_visual.stride_power = fx[ReplayData.FX_POWER]
 		_visual.set_stride_cue(fx[ReplayData.FX_CUE_FILL], fx[ReplayData.FX_CUE_GLOW], fx[ReplayData.FX_CUE_SWEET])
-	_visual.react(delta, linear_velocity)
 	_show_bow(delta, recorded)
 	if recorded and fx[ReplayData.FX_POUR] > 0.0:
 		_pour(delta)
