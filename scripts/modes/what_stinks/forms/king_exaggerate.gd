@@ -14,7 +14,7 @@ extends Node
 ## The tail stride (the swim wave) is untouched. Everything here is re-posed by the rig next frame, so an idle or hidden driver
 ## leaves nothing behind. Not a class_name: the King form preloads it.
 
-const KingRig := preload("res://scripts/what_stinks/forms/king_rig.gd")
+const KingRig := preload("res://scripts/modes/what_stinks/forms/king_rig.gd")
 
 var rig: Node3D  # king_rig.gd
 var jaw: Object  # king_jaw.gd

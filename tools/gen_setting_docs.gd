@@ -19,8 +19,8 @@ const SECTIONS := {
 	"powerups": ["res://scripts/modes/unnatural/powerups/powerup_settings.gd"],
 	"gaits": ["res://scripts/gait_settings.gd"],
 	"marco_polo": ["res://scripts/marco_polo/marco_polo_settings.gd"],
-	"what_stinks": ["res://scripts/what_stinks/what_stinks_settings.gd"],
-	"hunter_size": ["res://scripts/what_stinks/hunter_size.gd"],
+	"what_stinks": ["res://scripts/modes/what_stinks/what_stinks_settings.gd"],
+	"hunter_size": ["res://scripts/modes/what_stinks/hunter_size.gd"],
 	"water_look": ["res://scripts/water_look.gd"],
 }
 ## The Gait exports, which the GAITS section shows once per class.

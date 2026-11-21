@@ -11,7 +11,7 @@ extends Node
 ##   Godot_console.exe --headless --path . res://tests/angler_match_probe.tscn
 
 const KEY := "lantern_angler"
-const LanternRig := preload("res://scripts/what_stinks/forms/lantern_rig.gd")
+const LanternRig := preload("res://scripts/modes/what_stinks/forms/lantern_rig.gd")
 
 var main: Node
 var game: WhatStinksMatch
@@ -184,7 +184,7 @@ func _player_match() -> void:
 		return
 	victim.freeze = false
 	victim.controls = FishInput.new()
-	victim.set_meta("ws_dashing", false)
+	ModeData.set_value(victim, "what_stinks", "dashing", false)
 	var fwd := -fish.global_basis.z
 	victim.global_position = bite.mouth_point() + fwd * 22.0
 	victim.linear_velocity = Vector3.ZERO

@@ -5,8 +5,8 @@ extends Node3D
 ## (yaw and pitch of the fish, each segment lagging the one before). The bite's `open`
 ## (GulperJaw) gapes the pouch and draws the suction streaks in.
 
-const MODEL := preload("res://scripts/what_stinks/forms/gulper_model.gd")
-const JAW := preload("res://scripts/what_stinks/forms/gulper_jaw.gd")
+const MODEL := preload("res://scripts/modes/what_stinks/forms/gulper_model.gd")
+const JAW := preload("res://scripts/modes/what_stinks/forms/gulper_jaw.gd")
 const N := SpineRig.SPINE_N
 ## The belly's fullness at rest (the boss skin's own default).
 const REST_FULLNESS := 0.3

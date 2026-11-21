@@ -27,15 +27,15 @@ extends RefCounted
 
 ## Style key -> script, for make(). Loaded on use so a style file can extend this one.
 const STYLES := {
-	"chomp": "res://scripts/what_stinks/attacks/chomp_attack.gd",
-	"engulf": "res://scripts/what_stinks/attacks/engulf_attack.gd",
-	"coil": "res://scripts/what_stinks/attacks/coil_attack.gd",
-	"drill": "res://scripts/what_stinks/attacks/drill_attack.gd",
-	"lock": "res://scripts/what_stinks/attacks/lock_attack.gd",
-	"suction": "res://scripts/what_stinks/attacks/suction_attack.gd",
-	"whip": "res://scripts/what_stinks/attacks/whip_attack.gd",
-	"lure": "res://scripts/what_stinks/attacks/lure_attack.gd",
-	"grapple": "res://scripts/what_stinks/attacks/grapple_attack.gd",
+	"chomp": "res://scripts/modes/what_stinks/attacks/chomp_attack.gd",
+	"engulf": "res://scripts/modes/what_stinks/attacks/engulf_attack.gd",
+	"coil": "res://scripts/modes/what_stinks/attacks/coil_attack.gd",
+	"drill": "res://scripts/modes/what_stinks/attacks/drill_attack.gd",
+	"lock": "res://scripts/modes/what_stinks/attacks/lock_attack.gd",
+	"suction": "res://scripts/modes/what_stinks/attacks/suction_attack.gd",
+	"whip": "res://scripts/modes/what_stinks/attacks/whip_attack.gd",
+	"lure": "res://scripts/modes/what_stinks/attacks/lure_attack.gd",
+	"grapple": "res://scripts/modes/what_stinks/attacks/grapple_attack.gd",
 }
 
 var key := "chomp"

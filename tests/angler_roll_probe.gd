@@ -8,7 +8,7 @@
 ## Run headless: Godot_console.exe --headless --path . res://tests/angler_roll_probe.tscn
 extends Node
 
-const FORM := preload("res://scripts/what_stinks/forms/lantern_angler.gd")
+const FORM := preload("res://scripts/modes/what_stinks/forms/lantern_angler.gd")
 
 var main: Node
 var fish: FishController

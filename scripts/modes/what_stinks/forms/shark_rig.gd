@@ -6,7 +6,7 @@ extends Node
 ##            teeth grow, the eyes burn hotter: all of it climbing with the charge
 ##   release  the head THRUSTS forward, the teeth balloon for the snap and the jaw slams past shut, eyes flare, then
 ##            everything rings out (damped springs, overshoot) and settles; the landing adds hit-stop and a camera punch
-## Every size comes from AttackExaggerate (scripts/what_stinks/attack_exaggerate.gd); nothing here touches the world's
+## Every size comes from AttackExaggerate (scripts/modes/what_stinks/attack_exaggerate.gd); nothing here touches the world's
 ## clock. The bite's own pose runs first (process_priority), this layers on top and puts everything back exactly at rest.
 ## Nodes it touches: the model (position z / stretch), HunterJaw's upper jaw and lower jaw (the teeth rows are split into one
 ## mesh per tooth so each grows about its own root and stays rooted in the gum), the Eye* meshes (scale + ember glow).
@@ -113,8 +113,8 @@ func camera_margin(radius: float) -> float:
 
 func _exit_tree() -> void:
 	_unhook()
-	if is_instance_valid(fish) and fish.has_meta("ws_exaggerate_peak"):
-		fish.remove_meta("ws_exaggerate_peak")
+	if is_instance_valid(fish) and ModeData.has_value(fish, "what_stinks", "exaggerate_peak"):
+		ModeData.erase(fish, "what_stinks", "exaggerate_peak")
 
 
 # ------------------------------------------------------------------ beats
@@ -170,8 +170,8 @@ func _unhook() -> void:
 
 func _poll_bite() -> void:
 	var now: Variant = null
-	if is_instance_valid(fish) and fish.has_meta("ws_bite"):
-		now = fish.get_meta("ws_bite")
+	if is_instance_valid(fish) and ModeData.has_value(fish, "what_stinks", "bite"):
+		now = ModeData.get_value(fish, "what_stinks", "bite")
 	if now == bite:
 		return
 	_unhook()
@@ -210,7 +210,7 @@ func _apply(rest: bool) -> void:
 	if not is_equal_approx(peak, _shown_peak):
 		_shown_peak = peak
 		if is_instance_valid(fish):
-			fish.set_meta("ws_exaggerate_peak", peak)
+			ModeData.set_value(fish, "what_stinks", "exaggerate_peak", peak)
 
 
 func _apply_body(rest: bool) -> void:

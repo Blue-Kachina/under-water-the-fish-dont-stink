@@ -1,27 +1,19 @@
 {
 	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
-	"total": 94,
+	"total": 58,
 	"violations": {
 		"debug_panel.gd": {
-			"HunterSize": 1,
 			"MarcoPoloSettings": 1,
 			"Powerup": 4,
-			"Rarity": 1,
-			"WhatStinksSettings": 1
-		},
-		"fish_model.gd": {
-			"HunterFormModel": 1
+			"Rarity": 1
 		},
 		"follow_camera.gd": {
 			"MarcoArena": 4
 		},
 		"main.gd": {
 			"CourseSkill": 2,
-			"HunterForms": 3,
 			"MarcoPoloMatch": 3,
 			"MarcoPoloSettings": 11,
-			"WhatStinksMatch": 3,
-			"WhatStinksSettings": 5,
 			"path:marco_polo/fish_tank_arena.gd": 1,
 			"path:marco_polo/temple_arena.gd": 1
 		},
@@ -30,9 +22,7 @@
 			"MarcoPoloNet": 1,
 			"NatureRun": 3,
 			"UnnaturalNet": 1,
-			"UnnaturalRun": 3,
-			"WhatStinksMatch": 3,
-			"WhatStinksNet": 1
+			"UnnaturalRun": 3
 		},
 		"ui/hex_badge.gd": {
 			"Powerup": 1
@@ -43,11 +33,8 @@
 			"StatBlock": 2
 		},
 		"ui/mode_setups.gd": {
-			"HunterForms": 4,
 			"MarcoPoloMatch": 1,
-			"MarcoPoloSettings": 12,
-			"WhatStinksMatch": 1,
-			"WhatStinksSettings": 13
+			"MarcoPoloSettings": 12
 		}
 	}
 }

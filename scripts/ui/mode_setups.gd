@@ -44,16 +44,10 @@ static func build(main: Node, mode: String) -> ModeSetup:
 			var arenas: Array = MarcoPoloSettings.ARENAS.filter(func(arena_name: String) -> bool: return main.ENVIRONMENTS.has(arena_name))
 			setup.rows.append(_row("Arena", arenas, maxi(arenas.find(mp.arena), 0), func(i: int) -> void: mp.arena = arenas[i]))
 			role = "hider" if mp.start_as == MarcoPoloSettings.StartAs.HIDER else "seeker"
-		WHAT_STINKS:
-			var ws := WhatStinksSettings.shared()
-			setup.rows.append(_row("Variant", WhatStinksSettings.VARIANT_NAMES, int(ws.variant),
-					func(i: int) -> void: ws.variant = i as WhatStinksSettings.Variant))
-			setup.rows.append(_row("Start as", [["Hunter", "Eat the crowd first."], ["Prey", "Stay in the swim while a bot hunts."]], int(ws.start_as),
-					func(i: int) -> void:
-						ws.start_as = i as WhatStinksSettings.StartAs
-						ModeSetups._use_role(setup, "hunter" if i == WhatStinksSettings.StartAs.HUNTER else "prey"),
-					func(i: int) -> void: ws.start_as = i as WhatStinksSettings.StartAs))
-			role = "hunter" if ws.start_as == WhatStinksSettings.StartAs.HUNTER else "prey"
+		_:
+			var registered := ModeRegistry.describe(mode)  # a registered mode's own rows (descriptor "setup")
+			if registered.has("setup"):
+				role = (registered["setup"] as GDScript).call("rows", setup, main)
 	_use_role(setup, role)
 	return setup
 
@@ -92,10 +86,9 @@ static func current_role(main: Node) -> String:
 		if main.marco_polo and is_instance_valid(main.marco_polo):
 			return "seeker" if main.marco_polo.local_view_role() == MarcoPoloMatch.Role.SEEKER else "hider"
 		return "hider" if MarcoPoloSettings.shared().start_as == MarcoPoloSettings.StartAs.HIDER else "seeker"
-	if main.current_mode == WHAT_STINKS:
-		if main.what_stinks and is_instance_valid(main.what_stinks):
-			return "hunter" if main.what_stinks.local_view_role() == WhatStinksMatch.Role.HUNTER else "prey"
-		return "hunter" if WhatStinksSettings.shared().start_as == WhatStinksSettings.StartAs.HUNTER else "prey"
+	var registered := ModeRegistry.describe(main.current_mode)
+	if registered.has("setup"):
+		return (registered["setup"] as GDScript).call("current_role", main)
 	return RoleCharacters.DEFAULT
 
 
@@ -117,11 +110,8 @@ static func apply(main: Node, setup: ModeSetup) -> String:
 		var hider := RoleCharacters.character("hider")
 		main.apply_look(hider, RoleCharacters.species("hider", hider))
 	elif entry.has("form"):
-		# A What Stinks? hunter: the form, and the fish worn as prey is the prey's last.
-		WhatStinksSettings.shared().form = entry.form
-		RoleCharacters.store_form(role, entry.form)
-		var prey := RoleCharacters.character("prey")
-		main.apply_look(prey, RoleCharacters.species("prey", prey))
+		# A hunter form (a registered mode's "setup"): the form, and the fish worn as prey is the prey's last.
+		(ModeRegistry.describe(mode)["setup"] as GDScript).call("apply_form", main, role, entry)
 	else:
 		var species := ModeSetup.species_of(entry, setup.species_index)
 		RoleCharacters.store(role, entry.character, species)
@@ -135,7 +125,7 @@ static func settle(setup: ModeSetup) -> void:
 	setup.reapply()
 	var entry: Dictionary = setup.pool[setup.pool_index]
 	if entry.has("form"):
-		WhatStinksSettings.shared().form = entry.form
+		(ModeRegistry.describe(str(setup.get_meta("mode")))["setup"] as GDScript).call("settle_form", entry)
 
 
 ## Applies a confirmed Change Character screen: a hunter's form or a fish plays as
@@ -147,10 +137,7 @@ static func apply_character(main: Node, setup: ModeSetup) -> void:
 	if entry.has("whale"):
 		return  # the whale card's to pick
 	if entry.has("form"):
-		WhatStinksSettings.shared().form = entry.form
-		RoleCharacters.store_form(role, entry.form)
-		if main.what_stinks and is_instance_valid(main.what_stinks):
-			main.what_stinks.refresh_form(main.get_node("Fish"))  # a Hunter wears it now
+		(ModeRegistry.describe(main.current_mode)["setup"] as GDScript).call("change_form", main, role, entry)
 		return
 	var species := ModeSetup.species_of(entry, setup.species_index)
 	RoleCharacters.store(role, entry.character, species)
@@ -168,17 +155,9 @@ static func wear(setup: ModeSetup, fish: FishController) -> void:
 ## or a hunter's forms.
 static func _use_role(setup: ModeSetup, role: String, current := false) -> void:
 	setup.set_meta("role", role)
-	if role == "hunter":
-		setup.pool = _form_pool()
-		setup.pool_label = "Hunter"
-		setup.species_label = "Form"
-		var last := RoleCharacters.form("hunter")
-		if current or last == "":
-			last = WhatStinksSettings.shared().form  # the form in play (mid-match), not the one last remembered
-		var ready: Array[String] = HunterForms.ready_keys()
-		var at := ready.find(HunterForms.playable(last))
-		setup.pool_index = maxi(at, 0)
-		setup.species_index = 0
+	var registered := ModeRegistry.describe(str(setup.get_meta("mode", "")))
+	if registered.has("setup") and (registered["setup"] as GDScript).call("use_role", setup, role, current):
+		pass  # the mode's own pool (What Stinks?'s Hunter forms)
 	elif role == "seeker" and MarcoPoloSettings.shared().whale_seeker:
 		setup.pool = [_whale_entry()]
 		setup.pool_label = "Whale"
@@ -198,16 +177,6 @@ static func _use_role(setup: ModeSetup, role: String, current := false) -> void:
 static func _whale_entry() -> Dictionary:
 	return {"name": "Your whale", "character": FishCharacter.FishClass.TITAN, "whale": true, "slot": 0, "species": [],
 			"preview_species": 0, "line": "As the round starts a card shows your whale: left / right the species, up / down the skin, A locks it in."}
-
-
-static func _form_pool() -> Array:
-	var forms := []
-	for key: String in HunterForms.ready_keys():
-		var sheet: Dictionary = HunterForms.sheet(key)
-		var fish_class: FishCharacter.FishClass = sheet["class"]
-		forms.append({"name": str(sheet["name"]), "line": "", "character": fish_class, "form": key, "slot": 0,
-				"species": [], "preview_species": int(sheet["species"])})  # one look each: no species tier
-	return forms
 
 
 ## `setter`: just the setting (for re-applying it after Nature's tuning restore has had its

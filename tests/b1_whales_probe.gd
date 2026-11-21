@@ -133,7 +133,7 @@ func _species(species: int) -> void:
 	var settings := WhatStinksSettings.shared()
 	settings.whale_gape_deg = 80.0
 	var key: String = KEYS[species]
-	var sheet: Dictionary = (load("res://scripts/what_stinks/forms/%s.gd" % key) as GDScript).call("sheet")
+	var sheet: Dictionary = (load("res://scripts/modes/what_stinks/forms/%s.gd" % key) as GDScript).call("sheet")
 	var rig := Rig.new(species, self, sheet)
 	var jaw := rig.jaw
 	var base_scale := rig.model.scale
@@ -221,7 +221,7 @@ func _off_switch() -> void:
 	var settings := WhatStinksSettings.shared()
 	settings.whale_gape_deg = 80.0
 	var saved: Variant = settings.get("hunter_exaggeration")
-	var rig := Rig.new(0, self, (load("res://scripts/what_stinks/forms/humpback.gd") as GDScript).call("sheet"))
+	var rig := Rig.new(0, self, (load("res://scripts/modes/what_stinks/forms/humpback.gd") as GDScript).call("sheet"))
 	rig.sheet = {}
 	rig.jaw.set_exaggeration({"exaggeration": 0.0})
 	var base := rig.model.scale
@@ -339,7 +339,7 @@ func _shots_run() -> void:
 	var marks := ["rest", "press", "hold_early", "hold_peak", "release", "contact", "rebound", "settle"]
 	for species: int in species_list:
 		var key: String = KEYS[species]
-		var sheet: Dictionary = (load("res://scripts/what_stinks/forms/%s.gd" % key) as GDScript).call("sheet")
+		var sheet: Dictionary = (load("res://scripts/modes/what_stinks/forms/%s.gd" % key) as GDScript).call("sheet")
 		var rig := Rig.new(species, self, sheet)
 		var length := rig.model._size.z
 		var head := Vector3(0.0, 0.0, -length * 0.38)

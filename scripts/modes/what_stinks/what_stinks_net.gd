@@ -1,5 +1,5 @@
 class_name WhatStinksNet
-extends Node
+extends ModeNet
 ## Online What Stinks? (what_stinks.md Phase 6): CoopSession's child "WhatStinks"
 ## (the same path everywhere, so its RPCs meet), carrying what's the mode's own.
 ## CoopSession still does the session, the roster, the players' fish (each
@@ -34,8 +34,9 @@ const SCHOOL_RATE := 10.0
 const MASK_RATE := 2.0
 const STATUS_RATE := 4.0
 
-var coop: CoopSession
 var game: WhatStinksMatch
+## The match as it was hooked, kept past unhook() so a leaving puppet can still be taken out of it.
+var _last_game: WhatStinksMatch
 
 ## Host: bot fish -> its id (negative). Guest: id -> NetFish of the host's bot.
 var _bot_ids := {}
@@ -65,10 +66,25 @@ func is_host() -> bool:
 	return game != null and game.authority
 
 
+func puppet_added(fish: FishController) -> void:
+	if is_instance_valid(_last_game):
+		_last_game.add_player(fish)
+
+
+func puppet_removed(fish: FishController) -> void:
+	if is_instance_valid(_last_game):
+		_last_game.remove_player(fish)
+
+
+func puppet_parent() -> Node:
+	return _last_game
+
+
 ## Wires `match_node` up: what it does goes out (the host), what we do goes to the host (a guest).
-func hook(match_node: WhatStinksMatch) -> void:
+func hook(mode_game: GameMode) -> void:
 	unhook()
-	game = match_node
+	game = mode_game as WhatStinksMatch
+	_last_game = game
 	sent_views.clear()
 	sent_counts.clear()
 	if game.authority:
@@ -327,6 +343,30 @@ func _apply_bots(list: Array) -> void:
 func tick(delta: float) -> void:
 	if game == null or not is_instance_valid(game):
 		return
+	_puppets_tick(delta)
+	_net_tick(delta)
+
+
+## The puppets follow their players (a school's joined fish is moved by the school, not the net; the
+## eaten are hidden), and ours goes out.
+func _puppets_tick(delta: float) -> void:
+	for net: NetFish in coop._remote.values():
+		if net.has_state() and is_instance_valid(net.fish):
+			net.fish.visible = not game.eaten.has(net.fish)
+			if not game.join.is_joined(net.fish):
+				net.apply()
+	coop._send_left -= delta
+	if coop._send_left <= 0.0:
+		coop._send_left += 1.0 / CoopSession.SEND_RATE
+		var now := CoopSession._now()
+		var fish: FishController = game.local_fish()
+		var pid := coop.pid_of(fish)
+		if pid >= 0:
+			coop._send_all("_fish_state", [pid, now, fish.global_position, fish.global_basis.get_rotation_quaternion(),
+					fish.linear_velocity, fish.replay_fx(), coop._teleports.get(fish, 0)], false)
+
+
+func _net_tick(delta: float) -> void:
 	for net: NetFish in _bot_nets.values():
 		if net.has_state() and is_instance_valid(net.fish):
 			net.fish.visible = not game.eaten.has(net.fish)
@@ -664,7 +704,7 @@ func _ws_grapple_up(pid: int, state: PackedInt32Array) -> void:
 func _ws_buttons(pid: int, mask: int) -> void:
 	var fish := _sender_fish(pid)
 	if fish:
-		fish.set_meta("ws_buttons", mask)
+		ModeData.set_value(fish, "what_stinks", "buttons", mask)
 
 
 @rpc("any_peer", "call_remote", "reliable")

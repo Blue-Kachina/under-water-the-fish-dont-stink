@@ -1,5 +1,5 @@
 class_name WhatStinksMatch
-extends Node
+extends GameMode
 ## What Stinks? (what_stinks.md): one Hunter against many prey in an open ocean
 ## full of NPC schools. The Hunter is a monster (a HunterForm: the Drowned Shark
 ## or a Titan, scaled by HunterSize) whose Bite (HunterBite) eats the fish
@@ -60,8 +60,8 @@ enum Phase { COUNTDOWN, LIVE, ROUND_OVER, OVER }
 
 const FISH_SCENE := preload("res://scenes/fish.tscn")
 const BOT_NAMES := ["Guppy", "Minnow", "Tetra", "Danio", "Molly", "Platy", "Rasbora", "Barb", "Loach", "Pleco", "Gourami", "Cory"]
-const BOT_PATH := "res://scripts/what_stinks/what_stinks_bot.gd"
-const HUD_PATH := "res://scripts/what_stinks/what_stinks_hud.gd"
+const BOT_PATH := "res://scripts/modes/what_stinks/what_stinks_bot.gd"
+const HUD_PATH := "res://scripts/modes/what_stinks/what_stinks_hud.gd"
 
 var settings := WhatStinksSettings.shared()
 var size := HunterSize.shared()
@@ -126,6 +126,7 @@ var last_seed := 0
 var round_places := {}
 
 var _local: FishController
+var _world: ModeWorld
 ## Spat-out prey -> {left: seconds of daze left, boost: their boost_enabled before}.
 var _daze := {}
 ## Hunter (a guest's) -> msec of the last bite the host judged for it.
@@ -138,6 +139,77 @@ var _player_base := {}
 var _rng := RandomNumberGenerator.new()
 var _hud: Node
 var _local_role := -1
+
+
+## The mode's picker tile, environment, tuning, card, settings, model and net
+## (read through ModeRegistry; planning_core_roadmap.md 3.2).
+static func descriptor() -> Dictionary:
+	return {
+		"id": "What Stinks?", "title": "What Stinks?", "icon": "mode_what_stinks",
+		"colors": [Color(0.05, 0.13, 0.1), Color(0.75, 0.9, 0.3)],
+		"pitch": "One huge Hunter, a school of prey. Eat every fish in the crowd before the clock runs out, or stay in the swim and get away.",
+		"short": "One Hunter, a crowd of prey", "play": ["Solo"],
+		"environment": "Ocean", "match": true, "after": "Marco Polo",
+		"tuning_preset": "res://presets/nature.cfg",
+		"card_text": WhatStinksMatch.card_text, "reset_label": "Restart match",
+		"card_choices": WhatStinksMatch.card_choices,
+		"one_screen": true, "one_screen_note": "What Stinks? (play together online)",
+		"settings": WhatStinksSettings, "settings_key": "what_stinks", "settings_after": "marco_polo",
+		"extra_settings": [["hunter_size", "Hunter Size", HunterSize]],
+		"models": {FishCharacter.FishClass.MONSTER: HunterFormModel.build},
+		"net": WhatStinksNet, "net_key": "what_stinks", "setup": WhatStinksSetup,
+	}
+
+
+static func card_text() -> String:
+	return "What Stinks?: one huge Hunter and a crowd of prey in an open ocean full of fish schools. The Hunter swims at the fish and bites (jump) to eat the ones nearest its mouth, school fish and players alike, and wins by eating every prey player before the clock runs out. Prey swim among the schools and have to be the fish it doesn't bite. An eaten prey watches the others (left / right)."
+
+
+## The match card's choices: the variant, whether you hunt or are prey first (Start as) and the Hunter's form.
+static func card_choices(card: MatchCard, _host: Node) -> void:
+	var ws := WhatStinksSettings.shared()
+	card.choices.append({"title": "Variant", "options": WhatStinksSettings.VARIANT_NAMES, "index": int(ws.variant),
+			"changed": func(i: int) -> void: ws.variant = i as WhatStinksSettings.Variant})
+	card.choices.append({"title": "Start as", "options": WhatStinksSettings.START_AS_NAMES, "index": int(ws.start_as),
+			"changed": func(i: int) -> void: ws.start_as = i as WhatStinksSettings.StartAs})
+	var ready: Array[String] = HunterForms.ready_keys()
+	var forms: Array = ready.map(func(key: String) -> String: return HunterForms.name_of(key))
+	card.choices.append({"title": "Hunter", "options": forms, "index": maxi(ready.find(HunterForms.playable(ws.form)), 0),
+			"changed": func(i: int) -> void: ws.form = ready[i]})
+
+
+## The environment is ready and the player known (before the node joins the tree): the
+## world's local fish and camera (no ball cam: the follow cam), and whether this machine runs the world.
+func enter(world: ModeWorld) -> void:
+	_world = world
+	authority = world.options.get("authority", true)
+	setup(world.environment, world.fish, world.camera)
+	world.camera.claim(null, false)
+
+
+## In the tree: the HUD's name-plate rule, and the camera snapped to the round's start.
+func start() -> void:
+	_world.hud.set_mode_hud(WhatStinksModeHud.new(self))  # the Hunter sees no prey's name plate
+	_world.camera.snap()
+
+
+## After end(): the HUD and camera are the core's again.
+func release() -> void:
+	if is_instance_valid(_world.hud):
+		_world.hud.set_mode_hud(null)
+	if is_instance_valid(_world.camera):
+		_world.camera.release()
+		_world.camera.set("target", null)
+
+
+## R: the host restarts the match (a guest can't).
+func reset() -> void:
+	if authority:
+		start_match()
+
+
+func can_reset() -> bool:
+	return authority
 
 
 func setup(env: Node3D, player_fish: FishController, follow_camera: Node = null) -> void:
@@ -480,9 +552,9 @@ func _bait_home(homes: Array[Vector3]) -> Vector3:
 func _become_hunter(fish: FishController) -> void:
 	_drop_bite(fish)  # first: it hands back the speed and turn a held bite cost, before the size is applied
 	var form := settings.form_sheet()
-	if not bool(fish.get_meta("ws_swapped", false)):
-		fish.set_meta("ws_base_look", [int(fish.character), fish.species, fish.skin])
-		fish.set_meta("ws_swapped", true)
+	if not bool(ModeData.get_value(fish, "what_stinks", "swapped", false)):
+		ModeData.set_value(fish, "what_stinks", "base_look", [int(fish.character), fish.species, fish.skin])
+		ModeData.set_value(fish, "what_stinks", "swapped", true)
 	if fish.character != form["class"] or fish.species != int(form["species"]):
 		fish.set_look(form["class"], int(form["species"]), 0)
 	size.apply(fish, form)
@@ -533,10 +605,10 @@ func _drop_bite(fish: FishController) -> void:
 
 ## The fish's own class and species again (a Hunter swapped them).
 func _restore_look(fish: FishController) -> void:
-	if not is_instance_valid(fish) or not bool(fish.get_meta("ws_swapped", false)):
+	if not is_instance_valid(fish) or not bool(ModeData.get_value(fish, "what_stinks", "swapped", false)):
 		return
-	var base: Array = fish.get_meta("ws_base_look", [int(fish.character), fish.species, fish.skin])
-	fish.set_meta("ws_swapped", false)
+	var base: Array = ModeData.get_value(fish, "what_stinks", "base_look", [int(fish.character), fish.species, fish.skin])
+	ModeData.set_value(fish, "what_stinks", "swapped", false)
 	fish.set_look(int(base[0]) as FishCharacter.FishClass, int(base[1]), int(base[2]))
 
 

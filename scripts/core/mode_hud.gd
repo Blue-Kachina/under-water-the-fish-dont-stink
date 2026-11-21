@@ -18,6 +18,8 @@ var shows_scorebug := false
 var joined_hint := ""
 ## Added to the usual hint line's end ("Back/View ...: join").
 var join_hint := ""
+## The mode hides some players' name plates (shows_plate() decides, per fish).
+var filters_plates := false
 
 
 ## Hooks onto the HUD (connect the mode's signals here).
@@ -47,6 +49,11 @@ func countdown_text() -> String:
 ## Per frame while the board slot is wanted: fill hud.board.
 func update_board(_hud: Node) -> void:
 	pass
+
+
+## Whether the local player sees `fish`'s name plate (when filters_plates).
+func shows_plate(_fish: FishController) -> bool:
+	return true
 
 
 ## A replay of the mode's own is playing (the HUD hides its live readouts).

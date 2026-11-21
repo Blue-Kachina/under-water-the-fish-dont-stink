@@ -1029,7 +1029,7 @@ static func _fin(parent: Node3D, material: ShaderMaterial, root0: Vector3, root1
 # --- A Hunter's hinged jaw (What Stinks?, two-stage-attack.md 4b) --------------
 
 ## Marco Polo's whales never build this: their mouth stays the painted line, shut. WhaleJaw
-## (scripts/what_stinks/whale_jaw.gd) calls hunter_jaw() on the model of a Hunter wearing a Titan, and
+## (scripts/modes/what_stinks/whale_jaw.gd) calls hunter_jaw() on the model of a Hunter wearing a Titan, and
 ## poses what it makes. The rows and columns the lower jaw's skin is lofted on, per LOD.
 const JAW_ROWS := [36, 18, 9]
 const JAW_COLS := [40, 20, 10]

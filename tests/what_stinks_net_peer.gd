@@ -131,8 +131,8 @@ func _host() -> void:
 	NetSession.host_enet(port)
 	await _ticks(5)
 	var coop: CoopSession = NetSession.coop
-	var net: WhatStinksNet = coop.what_stinks_net
-	check(NetSession.is_host() and coop.wsm == game, "hosting: the session has our match")
+	var net: WhatStinksNet = coop.net_of("what_stinks")
+	check(NetSession.is_host() and coop.mgame == game, "hosting: the session has our match")
 	if not await _wait(func() -> bool: return _pids.has("a") and _pids.has("b"), 30.0):
 		check(false, "both guests joined")
 		return
@@ -278,7 +278,7 @@ func _guest() -> void:
 		return
 	await _seconds(0.5)
 	var game: WhatStinksMatch = main.what_stinks
-	check(coop.wsm == game and game.bots.is_empty(), "welcomed: a guest's match (no bots of its own)")
+	check(coop.mgame == game and game.bots.is_empty(), "welcomed: a guest's match (no bots of its own)")
 	_hello_rpc.rpc_id(1, role, coop.pid_of(fish))
 	while true:
 		await _wait(func() -> bool: return _phase_name != "", 90.0)
@@ -298,7 +298,7 @@ func _guest() -> void:
 				check(host_fish != null and host_fish.puppet and host_fish in game.players, "the host's fish is a puppet here")
 			"round":
 				await _wait(func() -> bool: return game.players.size() == int(data.players) and game.round_index >= 0 and not game.hunters.is_empty(), 3.0)
-				var hunter := coop.what_stinks_net.fish_by_id(int(data.hunter))
+				var hunter := (coop.net_of("what_stinks") as WhatStinksNet).fish_by_id(int(data.hunter))
 				check(hunter != null and game.hunters == [hunter], "the host's round: a hunts here too")
 				check(game.phase == WhatStinksMatch.Phase.COUNTDOWN and game.last_seed == int(data.seed), "counting down, the host's ocean seed")
 				check(_counts_match(data.schools, _alive_of(game)), "the same schools (%d)" % game.field.schools.size())
@@ -374,7 +374,7 @@ func _guest() -> void:
 				await _wait(func() -> bool: return game.phase == WhatStinksMatch.Phase.ROUND_OVER, 3.0)
 				var mine := {}
 				for f: FishController in game.match_totals:
-					mine[coop.what_stinks_net.id_of(f)] = float(game.match_totals[f])
+					mine[(coop.net_of("what_stinks") as WhatStinksNet).id_of(f)] = float(game.match_totals[f])
 				var same := true
 				for id: Variant in data.totals:
 					same = same and absf(float(mine.get(int(id), -1.0)) - float(data.totals[id])) < 0.01
@@ -384,7 +384,7 @@ func _guest() -> void:
 				ws.variant = WhatStinksSettings.Variant.STOMACH
 			"stomach_round":
 				await _wait(func() -> bool: return game.stomach() == bool(data.stomach) and game.phase == WhatStinksMatch.Phase.COUNTDOWN and not game.hunters.is_empty(), 4.0)
-				var hunter := coop.what_stinks_net.fish_by_id(int(data.hunter))
+				var hunter := (coop.net_of("what_stinks") as WhatStinksNet).fish_by_id(int(data.hunter))
 				check(game.stomach() and game.hunters == [hunter], "Upset Stomach here too, a hunting")
 				fish.freeze = false
 			"stomach_live":

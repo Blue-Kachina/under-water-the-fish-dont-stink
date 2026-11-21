@@ -19,19 +19,19 @@ const KEYS: Array[String] = [
 ]
 
 const FORMS := {
-	"drowned_shark": preload("res://scripts/what_stinks/forms/drowned_shark.gd"),
-	"humpback": preload("res://scripts/what_stinks/forms/humpback.gd"),
-	"orca": preload("res://scripts/what_stinks/forms/orca.gd"),
-	"beluga": preload("res://scripts/what_stinks/forms/beluga.gd"),
-	"sperm": preload("res://scripts/what_stinks/forms/sperm.gd"),
-	"blue": preload("res://scripts/what_stinks/forms/blue.gd"),
-	"king_of_herrings": preload("res://scripts/what_stinks/forms/king_of_herrings.gd"),
-	"gulper_mother": preload("res://scripts/what_stinks/forms/gulper_mother.gd"),
-	"whale_fall": preload("res://scripts/what_stinks/forms/whale_fall.gd"),
-	"lamprey_queen": preload("res://scripts/what_stinks/forms/lamprey_queen.gd"),
-	"fallen_angel": preload("res://scripts/what_stinks/forms/fallen_angel.gd"),
-	"ember_octopus": preload("res://scripts/what_stinks/forms/ember_octopus.gd"),
-	"lantern_angler": preload("res://scripts/what_stinks/forms/lantern_angler.gd"),
+	"drowned_shark": preload("res://scripts/modes/what_stinks/forms/drowned_shark.gd"),
+	"humpback": preload("res://scripts/modes/what_stinks/forms/humpback.gd"),
+	"orca": preload("res://scripts/modes/what_stinks/forms/orca.gd"),
+	"beluga": preload("res://scripts/modes/what_stinks/forms/beluga.gd"),
+	"sperm": preload("res://scripts/modes/what_stinks/forms/sperm.gd"),
+	"blue": preload("res://scripts/modes/what_stinks/forms/blue.gd"),
+	"king_of_herrings": preload("res://scripts/modes/what_stinks/forms/king_of_herrings.gd"),
+	"gulper_mother": preload("res://scripts/modes/what_stinks/forms/gulper_mother.gd"),
+	"whale_fall": preload("res://scripts/modes/what_stinks/forms/whale_fall.gd"),
+	"lamprey_queen": preload("res://scripts/modes/what_stinks/forms/lamprey_queen.gd"),
+	"fallen_angel": preload("res://scripts/modes/what_stinks/forms/fallen_angel.gd"),
+	"ember_octopus": preload("res://scripts/modes/what_stinks/forms/ember_octopus.gd"),
+	"lantern_angler": preload("res://scripts/modes/what_stinks/forms/lantern_angler.gd"),
 }
 
 ## What a sheet takes when its form file leaves a key out (the Drowned Shark's numbers).

@@ -5,7 +5,7 @@ extends RefCounted
 ## The Lure attack is D3's (attacks/lure_attack.gd); until it lands the sheet's attack is the plain chomp.
 ## This file is the form's own: its sheet, its ready flag and its dress hook (see HunterForms).
 
-const LanternRig := preload("res://scripts/what_stinks/forms/lantern_rig.gd")
+const LanternRig := preload("res://scripts/modes/what_stinks/forms/lantern_rig.gd")
 
 ## The attack style the sheet names. D3 sets this to "lure" when `HunterAttack.STYLES` knows it.
 const ATTACK := "lure"

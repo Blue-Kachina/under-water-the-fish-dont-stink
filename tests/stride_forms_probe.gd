@@ -7,7 +7,7 @@
 ## Run headless: Godot_console.exe --headless --path . res://tests/stride_forms_probe.tscn
 extends Node
 
-const ANGLER := preload("res://scripts/what_stinks/forms/lantern_angler.gd")
+const ANGLER := preload("res://scripts/modes/what_stinks/forms/lantern_angler.gd")
 const DT := 1.0 / 60.0
 
 var main: Node

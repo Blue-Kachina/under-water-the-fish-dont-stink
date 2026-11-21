@@ -7,7 +7,7 @@ extends RefCounted
 ## more fish, release eats them all.
 ## This file is the form's own: its sheet, its ready flag and its dress hook (see HunterForms).
 
-const OctopusRigScript := preload("res://scripts/what_stinks/forms/octopus_rig.gd")
+const OctopusRigScript := preload("res://scripts/modes/what_stinks/forms/octopus_rig.gd")
 
 ## The attack style the sheet names (registered in `HunterAttack.STYLES`).
 const ATTACK := "grapple"

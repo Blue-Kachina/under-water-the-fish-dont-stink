@@ -7,8 +7,8 @@ extends Node3D
 ## In the lock style (LockAttack) the ring sits on the target instead, a thin line runs from the crown to it, the count
 ## a release would take ("x5") shows beside it and the fish that would go are ringed; a refused press flickers the crown.
 
-const MODEL := preload("res://scripts/what_stinks/forms/angel_model.gd")
-const JAW := preload("res://scripts/what_stinks/forms/angel_jaw.gd")
+const MODEL := preload("res://scripts/modes/what_stinks/forms/angel_model.gd")
+const JAW := preload("res://scripts/modes/what_stinks/forms/angel_jaw.gd")
 const N := SpineRig.SPINE_N
 ## How long a refused press flickers the crown (s).
 const DENIED_TIME := 0.4

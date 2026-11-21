@@ -13,7 +13,7 @@ extends Node3D
 ## A child of the fish's visual (so it frees, hides and follows the bite's lift and saw with it). The body is top_level (the shader
 ## writes world positions), exactly like KingRig. Not a class_name: the form preloads it.
 
-const AnglerModelScript := preload("res://scripts/what_stinks/forms/angler_model.gd")
+const AnglerModelScript := preload("res://scripts/modes/what_stinks/forms/angler_model.gd")
 
 ## Settings read tolerantly (they may not be registered yet): id, default.
 const DEFAULTS := {

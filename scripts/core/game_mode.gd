@@ -13,6 +13,11 @@ extends Node
 ## (String), after (the id of the mode listed before it in the picker order),
 ## split_screen (true: local players can join, see attach_player()), sfx (the
 ## sound scripts attached to the mode's node), settings (its tuning script).
+## More keys, all optional: card_choices (Callable(card, host) adding the match card's
+## choices), one_screen (true: no split-screen; one_screen_note names it on the card),
+## settings_key / settings_after / extra_settings (the tuning panel's section id, where
+## it goes, and more [key, title, script] sections), models ({FishClass: Callable(FishModel)}
+## a mode-built body, see ModeRegistry.model_provider), net (a ModeNet subclass) with net_key.
 
 ## A teleport moved `fish` (the host snaps cameras following it).
 signal teleported(fish: FishController)
@@ -49,6 +54,11 @@ func release() -> void:
 ## R: restart.
 func reset() -> void:
 	pass
+
+
+## Whether R restarts it here (an online guest's can't).
+func can_reset() -> bool:
+	return true
 
 
 ## A local player (a PlayerSlot) is in the mode: claim their own camera and HUD
