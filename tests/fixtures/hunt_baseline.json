@@ -1,0 +1,302 @@
+{
+	"events": [
+		{
+			"player": 0,
+			"type": "battery",
+			"victim": 1
+		},
+		{
+			"player": 1,
+			"type": "battery",
+			"victim": 0
+		},
+		{
+			"player": 0,
+			"type": "battery",
+			"victim": 1
+		},
+		{
+			"player": 1,
+			"type": "battery",
+			"victim": 0
+		}
+	],
+	"snaps": [
+		{
+			"at": "go_live",
+			"battered": [
+				false,
+				false
+			],
+			"clock": 299.87,
+			"events": 0,
+			"fish_fry": false,
+			"overtime": false,
+			"overtime_elapsed": 0.0,
+			"phase": "LIVE",
+			"points": [
+				0,
+				0
+			],
+			"replay": false,
+			"scores": [
+				0,
+				0
+			],
+			"winner": -1
+		},
+		{
+			"at": "slow_bump",
+			"battered": [
+				false,
+				false
+			],
+			"clock": 299.62,
+			"events": 0,
+			"fish_fry": false,
+			"overtime": false,
+			"overtime_elapsed": 0.0,
+			"phase": "LIVE",
+			"points": [
+				0,
+				0
+			],
+			"replay": false,
+			"scores": [
+				0,
+				0
+			],
+			"winner": -1
+		},
+		{
+			"at": "player_battery",
+			"battered": [
+				false,
+				true
+			],
+			"clock": 299.54,
+			"events": 1,
+			"fish_fry": false,
+			"overtime": false,
+			"overtime_elapsed": 0.0,
+			"phase": "BATTERED",
+			"points": [
+				100,
+				0
+			],
+			"replay": false,
+			"scores": [
+				1,
+				0
+			],
+			"winner": -1
+		},
+		{
+			"at": "replay_ends",
+			"battered": [
+				false,
+				false
+			],
+			"clock": 299.54,
+			"events": 1,
+			"fish_fry": false,
+			"overtime": false,
+			"overtime_elapsed": 0.0,
+			"phase": "COUNTDOWN",
+			"points": [
+				100,
+				0
+			],
+			"replay": false,
+			"scores": [
+				1,
+				0
+			],
+			"winner": -1
+		},
+		{
+			"at": "opponent_battery",
+			"battered": [
+				false,
+				false
+			],
+			"clock": 299.47,
+			"events": 2,
+			"fish_fry": false,
+			"overtime": false,
+			"overtime_elapsed": 0.0,
+			"phase": "COUNTDOWN",
+			"points": [
+				100,
+				100
+			],
+			"replay": false,
+			"scores": [
+				1,
+				1
+			],
+			"winner": -1
+		},
+		{
+			"at": "head_on_faster",
+			"battered": [
+				false,
+				true
+			],
+			"clock": 299.4,
+			"events": 3,
+			"fish_fry": false,
+			"overtime": false,
+			"overtime_elapsed": 0.0,
+			"phase": "BATTERED",
+			"points": [
+				200,
+				100
+			],
+			"replay": false,
+			"scores": [
+				2,
+				1
+			],
+			"winner": -1
+		},
+		{
+			"at": "fish_fry",
+			"battered": [
+				true,
+				true
+			],
+			"clock": 299.33,
+			"events": 3,
+			"fish_fry": true,
+			"overtime": false,
+			"overtime_elapsed": 0.0,
+			"phase": "BATTERED",
+			"points": [
+				200,
+				100
+			],
+			"replay": false,
+			"scores": [
+				2,
+				1
+			],
+			"winner": -1
+		},
+		{
+			"at": "time_up_points",
+			"battered": [
+				false,
+				false
+			],
+			"clock": 0.0,
+			"events": 3,
+			"fish_fry": true,
+			"overtime": false,
+			"overtime_elapsed": 0.0,
+			"phase": "OVER",
+			"points": [
+				60,
+				30
+			],
+			"replay": false,
+			"scores": [
+				1,
+				1
+			],
+			"winner": 0
+		},
+		{
+			"at": "new_match",
+			"battered": [
+				false,
+				false
+			],
+			"clock": 300.0,
+			"events": 3,
+			"fish_fry": false,
+			"overtime": false,
+			"overtime_elapsed": 0.0,
+			"phase": "COUNTDOWN",
+			"points": [
+				0,
+				0
+			],
+			"replay": false,
+			"scores": [
+				0,
+				0
+			],
+			"winner": -1
+		},
+		{
+			"at": "overtime_start",
+			"battered": [
+				false,
+				false
+			],
+			"clock": 0.0,
+			"events": 3,
+			"fish_fry": false,
+			"overtime": true,
+			"overtime_elapsed": 0.0,
+			"phase": "COUNTDOWN",
+			"points": [
+				40,
+				40
+			],
+			"replay": false,
+			"scores": [
+				1,
+				1
+			],
+			"winner": -1
+		},
+		{
+			"at": "overtime_live",
+			"battered": [
+				false,
+				false
+			],
+			"clock": 0.0,
+			"events": 3,
+			"fish_fry": false,
+			"overtime": true,
+			"overtime_elapsed": 0.5,
+			"phase": "LIVE",
+			"points": [
+				40,
+				40
+			],
+			"replay": false,
+			"scores": [
+				1,
+				1
+			],
+			"winner": -1
+		},
+		{
+			"at": "overtime_battery",
+			"battered": [
+				false,
+				false
+			],
+			"clock": 0.0,
+			"events": 4,
+			"fish_fry": false,
+			"overtime": true,
+			"overtime_elapsed": 0.58,
+			"phase": "OVER",
+			"points": [
+				40,
+				140
+			],
+			"replay": false,
+			"scores": [
+				1,
+				2
+			],
+			"winner": 1
+		}
+	]
+}
