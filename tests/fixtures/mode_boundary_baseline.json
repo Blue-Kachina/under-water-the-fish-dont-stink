@@ -1,6 +1,6 @@
 {
 	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
-	"total": 219,
+	"total": 213,
 	"violations": {
 		"audio/sfx_hooks/sfx_hooks.gd": {
 			"BatteredSounds": 1,
@@ -14,7 +14,6 @@
 		"debug_panel.gd": {
 			"HunterSize": 1,
 			"MarcoPoloSettings": 1,
-			"NatureSettings": 1,
 			"Powerup": 4,
 			"PowerupSettings": 1,
 			"Rarity": 1,
@@ -28,10 +27,7 @@
 			"MarcoArena": 4
 		},
 		"hud.gd": {
-			"Match1v1": 8,
-			"NatureRun": 2,
-			"NatureScore": 2,
-			"Pearl": 1
+			"Match1v1": 8
 		},
 		"kits/school_look.gd": {
 			"ZombieLooks": 1
