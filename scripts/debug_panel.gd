@@ -40,7 +40,7 @@ const PREVIEW_DIR := "res://assets/ui/previews"
 ## The sections in order: [id, title]. Game, Display and Controls are
 ## UISettings and Controls; the rest are tuning targets.
 const SECTIONS := [["game", "Game"], ["display", "Display"], ["audio", "Audio"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"], ["battery", "Battery"],
-		["gaits", "Gaits"], ["ball", "Ball"], ["nature", "Nature"], ["unnatural", "Unnatural"], ["powerups", "Powerups"], ["marco_polo", "Marco Polo"], ["what_stinks", "What Stinks?"], ["hunter_size", "Hunter Size"], ["water_look", "Water Look"]]
+		["gaits", "Gaits"], ["ball", "Ball"], ["unnatural", "Unnatural"], ["powerups", "Powerups"], ["marco_polo", "Marco Polo"], ["what_stinks", "What Stinks?"], ["hunter_size", "Hunter Size"], ["water_look", "Water Look"]]
 ## Who each tuning section is for ("Used by ...").
 const USED_BY := {
 	"camera": "the follow camera, in every mode",
@@ -233,7 +233,7 @@ func _ready() -> void:
 	for entry: Array in _sections:
 		if _mode_settings.has(entry[0]):
 			_targets[entry[0]] = _mode_settings[entry[0]]
-	_targets.merge({"fish": fish, "gaits": GaitSettings.shared(), "camera": follow_camera, "ball": ball_settings, "nature": NatureSettings.shared(),
+	_targets.merge({"fish": fish, "gaits": GaitSettings.shared(), "camera": follow_camera, "ball": ball_settings,
 			"unnatural": UnnaturalSettings.shared(), "powerups": PowerupSettings.shared(), "marco_polo": MarcoPoloSettings.shared(),
 			"what_stinks": WhatStinksSettings.shared(), "hunter_size": HunterSize.shared(),
 			"water_look": WaterLook.shared()})
@@ -253,7 +253,7 @@ func _ready() -> void:
 
 
 ## SECTIONS plus a section for each registered mode whose descriptor has "settings"
-## (a script with a static shared()), after Nature, titled like the mode and
+## (a script with a static shared()), after Ball, titled like the mode and
 ## keyed by its lower-cased id.
 func _build_section_list() -> void:
 	_sections = SECTIONS.duplicate()
@@ -261,7 +261,7 @@ func _build_section_list() -> void:
 	_mode_used_by.clear()
 	var at := -1
 	for i in _sections.size():
-		if _sections[i][0] == "nature":
+		if _sections[i][0] == "ball":
 			at = i
 	for d: Dictionary in ModeRegistry.descriptors():
 		var script: GDScript = d.get("settings", null)

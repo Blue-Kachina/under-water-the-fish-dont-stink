@@ -39,22 +39,21 @@ const CORE := [
 ## ChompKit still sit inside the unnatural folder: listing them by file takes
 ## them out of that mode's own files.
 const KITS := [
-	"school.gd", "school_fish.gd", "school_look.gd", "unnatural/seabed.gd", "terrain/",
+	"unnatural/seabed.gd", "terrain/",
 	"unnatural/traversal.gd", "battery.gd", "style_points.gd", "match_stats.gd",
-	"goal_recorder.gd", "goal_replay.gd", "replay/", "fish_bot.gd", "kits/", "wander_bot.gd",
+	"goal_recorder.gd", "goal_replay.gd", "replay/", "fish_bot.gd", "kits/",
 	"fx_kit.gd", "unnatural/chomp_kit.gd", "scenery/", "water_look.gd", "fx/", "xray_outline.gd",
 	"rl/",
 ]
 ## Mode folders (every .gd below is that mode's) and single mode files.
 const MODE_DIRS := {
-	"unnatural/": "unnatural", "modes/hunt/": "hunt", "marco_polo/": "marco", "what_stinks/": "what_stinks",
+	"unnatural/": "unnatural", "modes/hunt/": "hunt", "modes/nature/": "nature", "marco_polo/": "marco", "what_stinks/": "what_stinks",
 }
 const MODE_FILES := {
 	"net/unnatural_net.gd": "unnatural", "net/marco_polo_net.gd": "marco",
 	"net/what_stinks_net.gd": "what_stinks",
-	"nature_run.gd": "nature", "nature_score.gd": "nature", "nature_settings.gd": "nature",
-	"pearl.gd": "nature", "match_1v1.gd": "1v1", "course_skill.gd": "course",
-	"audio/sfx_hooks/nature_sounds.gd": "nature", "audio/sfx_hooks/unnatural_sounds.gd": "unnatural",
+	"match_1v1.gd": "1v1", "course_skill.gd": "course",
+	"audio/sfx_hooks/unnatural_sounds.gd": "unnatural",
 	"audio/sfx_hooks/boss_sounds.gd": "unnatural", "audio/sfx_hooks/battered_sounds.gd": "unnatural",
 }
 

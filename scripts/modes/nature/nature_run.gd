@@ -1,5 +1,5 @@
 class_name NatureRun
-extends Node
+extends GameMode
 ## Nature mode in the Ocean: the players swim Extra Swishy (no boost) among
 ## schools of harmless fish (School) and after a calm lone fish (a WanderBot).
 ## Ramming the lone fish nose first at a player's nature_batter_speed or
@@ -154,12 +154,122 @@ var _collected := {}
 ## ([school, index]).
 var _hitboxes: Array[Area3D] = []
 var _hitbox_fish := {}
+var _world: ModeWorld
+## Each local player's slot, by their fish (attach_player()).
+var _slots := {}
+var _slot_signals_wired := false
+
+
+## The mode's picker tile, environment, tuning and card text (read by main.gd
+## through ModeRegistry).
+static func descriptor() -> Dictionary:
+	return {
+		"id": "Nature", "title": "Nature", "icon": "mode_nature",
+		"colors": [Color(0.03, 0.2, 0.17), Color(0.3, 0.88, 0.62)],
+		"pitch": "Swim like a real fish: sweep, stride and build speed, then batter the schools for points.",
+		"short": "Stride, sweep and batter schools", "play": ["Solo", "Split-screen", "Online"],
+		"environment": "Ocean", "match": true, "after": "Free Swim (Ocean)", "tile_before": "Free Play",
+		"tuning_preset": "res://presets/nature.cfg",
+		"card_text": NatureRun.card_text, "reset_label": "Restart", "split_screen": true,
+		"settings": NatureSettings,
+		"sfx": [[NatureSounds, &"sfx_hook"]],
+	}
+
+
+static func card_text() -> String:
+	return "Swim like a fish: no boost here. Hold throttle and sweep the stick from side to side (any direction, as long as each sweep goes back the other way). Each stride builds to a peak, when its glow flashes; sweep back right then and the next stride pushes harder. Keep it up and the push builds. Ram the fish your camera's locked on fast enough to batter it."
 
 
 func setup(nature_ocean: Node3D, player_fish: FishController) -> void:
 	ocean = nature_ocean
 	player = player_fish
 	players = [player_fish]
+
+
+## The environment is ready: the world's local players (split-screen ones past
+## the first) and whether this machine runs the world (an online guest's doesn't).
+func enter(world: ModeWorld) -> void:
+	_world = world
+	authority = world.options.get("authority", true)
+	setup(world.environment, world.fish)
+	for slot: PlayerSlot in world.slots:
+		slot.fish.set_meta("coop_index", slot.index)
+		if slot.index > 0:
+			players.append(slot.fish)
+
+
+## Play: each local player's ball cam, school wheel and HUD.
+func start() -> void:
+	_world.host.attach_local_players(self)
+
+
+func release() -> void:
+	pass
+
+
+## A local player's own camera, school wheel and HUD counts (LocalCoop calls it
+## for each slot, and for anyone joining later): ball cam on their own focus, a
+## tap looks at the nearest thing ahead and holding opens their wheel.
+func attach_player(slot: PlayerSlot) -> void:
+	_slots[slot.fish] = slot
+	if not _slot_signals_wired:
+		_slot_signals_wired = true
+		focus_changed.connect(func(focus: Node3D, fish: FishController) -> void:
+			var their: PlayerSlot = _slots.get(fish)
+			if their:
+				their.camera.ball = focus)
+		awarded.connect(func(event: Dictionary) -> void:
+			# Big multis and sprees punch the player's view in, harder each step.
+			var their: PlayerSlot = _slots.get(event.get("by"))
+			var chain: int = event.get("chain", 0)
+			if their and is_instance_valid(their.arcade) and (event.type == NatureScore.SPREE or chain >= 3):
+				their.arcade.punch(1.0 if event.type == NatureScore.SPREE else minf(0.4 + 0.15 * chain, 1.2)))
+	var camera: Node = slot.camera
+	camera.claim(focus_of(slot.fish), true, true)
+	var fish := slot.fish
+	var toggled := func(on: bool) -> void:
+		if on:
+			pick_focus(fish)
+	camera.set_meta("coop_toggled", toggled)
+	camera.ball_cam_toggled.connect(toggled)
+	slot.wheel = TargetWheel.new()
+	slot.wheel.name = "TargetWheel" if slot.index == 0 else "TargetWheel%d" % (slot.index + 1)
+	slot.wheel.camera = camera
+	slot.wheel.run = self
+	slot.wheel.fish = fish
+	camera.get_parent().add_child(slot.wheel)
+	camera.wheel_opened.connect(slot.wheel.open)
+	camera.wheel_closed.connect(slot.wheel.close)
+	slot.hud.set_mode_hud(NatureHud.new(self))
+
+
+func detach_player(slot: PlayerSlot) -> void:
+	_slots.erase(slot.fish)
+	var camera: Node = slot.camera
+	if not is_instance_valid(camera):
+		return
+	camera.release()
+	if camera.has_meta("coop_toggled"):
+		var toggled: Callable = camera.get_meta("coop_toggled")
+		if camera.ball_cam_toggled.is_connected(toggled):
+			camera.ball_cam_toggled.disconnect(toggled)
+		camera.remove_meta("coop_toggled")
+	if is_instance_valid(slot.wheel):
+		if camera.wheel_opened.is_connected(slot.wheel.open):
+			camera.wheel_opened.disconnect(slot.wheel.open)
+			camera.wheel_closed.disconnect(slot.wheel.close)
+		slot.wheel.queue_free()
+	slot.wheel = null
+	if is_instance_valid(slot.hud):
+		slot.hud.set_mode_hud(null)
+
+
+## R: the world's restart (online, the host's is everyone's), or just a guest's own fish back.
+func reset() -> void:
+	if authority:
+		restart()
+	else:
+		respawn_local()
 
 
 func _ready() -> void:
@@ -185,7 +295,7 @@ func _ready() -> void:
 		target.make_puppet()  # where the host says (target_state, its snapshots)
 	if settings.nature_floor and ocean is Ocean:
 		OceanFloor.stream(self, (ocean as Ocean).spawn_transform().origin, settings.nature_floor_depth, player, 17)
-	start()
+	restart()
 
 
 ## The camera style Nature plays under (its settle cam), or null while that is off.
@@ -195,7 +305,7 @@ func camera_style() -> CameraStyle:
 
 ## The players at the ocean's spawn, side by side, the lone fish waiting ahead
 ## of them and the schools around.
-func start() -> void:
+func restart() -> void:
 	if authority:
 		restarted.emit()
 	last_battery_speed = 0.0
@@ -264,6 +374,8 @@ func spawn_for(fish: FishController, spawn: Transform3D) -> Transform3D:
 
 ## Hands the players' fish back. Call before freeing the run.
 func end() -> void:
+	if _world and is_instance_valid(_world.host):
+		_world.host.detach_local_players()
 	for fish in players.duplicate():
 		_leave(fish)
 		if is_instance_valid(fish) and not fish.puppet and fish.battered:

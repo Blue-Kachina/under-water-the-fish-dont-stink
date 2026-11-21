@@ -457,7 +457,7 @@ func _build_life() -> void:
 	schools.clear()
 	if _settings.terrain_schools <= 0 or not _settings.terrain_enabled:
 		return
-	var nature := NatureSettings.new()
+	var nature := SchoolSettings.new()
 	nature.fish_per_school = _settings.terrain_school_fish
 	nature.roam_radius = 22.0
 	nature.roam_height = 2.0

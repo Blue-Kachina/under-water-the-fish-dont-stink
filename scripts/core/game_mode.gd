@@ -10,7 +10,9 @@ extends Node
 ## "Solo", "Split", "Online"), environment (String), match (true: played from a
 ## card), tuning_preset (res:// path of the tuning preset, "" for none),
 ## card_text (Callable returning the match card's message), reset_label
-## (String), after (the id of the mode listed before it in the picker order).
+## (String), after (the id of the mode listed before it in the picker order),
+## split_screen (true: local players can join, see attach_player()), sfx (the
+## sound scripts attached to the mode's node), settings (its tuning script).
 
 ## A teleport moved `fish` (the host snaps cameras following it).
 signal teleported(fish: FishController)
@@ -46,6 +48,18 @@ func release() -> void:
 
 ## R: restart.
 func reset() -> void:
+	pass
+
+
+## A local player (a PlayerSlot) is in the mode: claim their own camera and HUD
+## (a split-screen player's views are theirs). Called for every slot when the mode
+## starts, and for each player joining later (descriptor "split_screen").
+func attach_player(_slot: PlayerSlot) -> void:
+	pass
+
+
+## Undoes attach_player() (the mode ending, or the player leaving).
+func detach_player(_slot: PlayerSlot) -> void:
 	pass
 
 

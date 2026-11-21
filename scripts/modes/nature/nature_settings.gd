@@ -1,6 +1,6 @@
 class_name NatureSettings
-extends Resource
-## Nature's own tuning (schools of fish, and later multis and pearls), shown in
+extends SchoolSettings
+## Nature's own tuning (spawning, battered fish, multis, pearls and the sea floor; the schools' own values are SchoolSettings', which this extends), shown in
 ## the tuning panel's NATURE section and saved with presets ([nature] in
 ## presets/nature.cfg). One shared copy (shared()) is what the panel edits and
 ## what NatureRun and its schools read, live: most values take effect at once,
@@ -10,7 +10,7 @@ extends Resource
 ## value, so both a light touch and exaggerated play can be tried. Sliders
 ## marked or_greater take bigger values typed into a preset too.
 
-static var _shared: NatureSettings
+static var _natures: NatureSettings
 
 
 ## Nature's camera as a CameraStyle (the settle style, camera_settle), or null while it is off.
@@ -32,56 +32,11 @@ func camera_style() -> CameraStyle:
 
 ## The copy the panel edits and Nature reads.
 static func shared() -> NatureSettings:
-	if _shared == null:
-		_shared = NatureSettings.new()
-	return _shared
+	if _natures == null:
+		_natures = NatureSettings.new()
+		SchoolSettings.provider = NatureSettings.shared
+	return _natures
 
-
-@export_group("Schools")
-## How many schools swim around the player at once.
-@export_range(0, 40, 1, "or_greater") var school_count := 3
-## Fish in each school when it turns up.
-@export_range(1, 300, 1, "or_greater") var fish_per_school := 50
-## A school fish's size against a playable fish of its kind.
-@export_range(0.1, 3.0, 0.05, "or_greater") var fish_scale := 1.0
-## How fast a school cruises (m/s).
-@export_range(0.0, 40.0, 0.5, "or_greater") var school_speed := 5.5
-## How quickly a school turns (degrees per second).
-@export_range(0.0, 360.0, 5.0, "or_greater") var school_turn_rate := 30.0
-## How far from where it turned up (m) a school roams, across and up/down.
-@export_range(0.0, 200.0, 1.0, "or_greater") var roam_radius := 25.0
-@export_range(0.0, 60.0, 0.5, "or_greater") var roam_height := 8.0
-## Never more nose up or down than this while roaming (degrees).
-@export_range(0.0, 89.0, 1.0) var max_climb := 30.0
-## The lone target fish from before schools (a calm full-size fish to batter)
-## swims too. On until battered fish come to the schools.
-@export var lone_target := true
-
-@export_group("Formation")
-## The school's half-width and half-height (m): how tightly it packs. Each
-## fish has a place in an ellipsoid this size around the school's leader.
-@export_range(0.2, 20.0, 0.1, "or_greater") var spread := 2.5
-## How much longer the school is (nose to tail) than it is wide.
-@export_range(0.2, 5.0, 0.05, "or_greater") var spread_length := 1.5
-## How hard each fish steers back to its place (1/s).
-@export_range(0.0, 30.0, 0.1, "or_greater") var slot_pull := 3.0
-## How much faster than the school a fish may swim to catch up to its place.
-@export_range(1.0, 5.0, 0.05, "or_greater") var catch_up := 1.6
-## How quickly a fish changes speed and direction (m/s²).
-@export_range(0.0, 200.0, 1.0, "or_greater") var fish_accel := 30.0
-## Fish closer than this (m) push apart.
-@export_range(0.0, 5.0, 0.05, "or_greater") var separation := 0.8
-## How hard they push apart (m/s² at contact).
-@export_range(0.0, 100.0, 0.5, "or_greater") var separation_strength := 12.0
-## How far each fish drifts around its place (m), so the school looks alive.
-@export_range(0.0, 5.0, 0.05, "or_greater") var wander := 0.3
-## How quickly it drifts (cycles per second).
-@export_range(0.0, 5.0, 0.05, "or_greater") var wander_rate := 0.4
-## How long (s) a turn takes to reach the back of the school from the front,
-## so turns ripple through it.
-@export_range(0.0, 3.0, 0.05, "or_greater") var ripple_delay := 0.35
-## How much a fish rolls into its turns (0 stays level).
-@export_range(0.0, 3.0, 0.05, "or_greater") var bank := 0.6
 
 @export_group("Spawning")
 ## The first school turns up this far from the player (m), off to one side ahead.
@@ -93,18 +48,6 @@ static func shared() -> NatureSettings:
 @export_range(20.0, 1000.0, 5.0, "or_greater") var leash := 150.0
 ## Seconds before a wiped-out school is replaced.
 @export_range(0.0, 30.0, 0.1, "or_greater") var respawn_time := 2.0
-
-@export_group("Performance")
-## How often schools steer (steps per second). Each frame draws between the
-## last two steps, so lower is cheaper and still smooth, just less responsive.
-@export_range(5.0, 120.0, 1.0) var sim_rate := 30.0
-## How many fish in each school get a full model when near the camera (smooth
-## tail and rippling skin); the rest are drawn as one baked mesh per tail pose.
-@export_range(0, 60, 1, "or_greater") var detail_fish := 8
-## How near the camera (m) a fish must be to get a full model.
-@export_range(0.0, 100.0, 1.0, "or_greater") var detail_distance := 14.0
-## School fish cast shadows (they cost about as much as the fish themselves).
-@export var fish_shadows := false
 
 @export_group("Battered fish")
 ## School fish can be battered (rammed nose first at nature_batter_speed or faster).
@@ -120,22 +63,6 @@ static func shared() -> NatureSettings:
 ## pop: sparks and a flash, without the shockwave shell and bubble cloud; 1 is
 ## a full explosion.
 @export_range(0.0, 1.0, 0.01) var fish_explosion_particles := 0.3
-
-@export_group("School Reactions")
-## A school tightens into a bait ball when the player comes at it within this range (m)...
-@export_range(0.0, 100.0, 1.0, "or_greater") var bait_range := 15.0
-## ...closing on it at least this fast (m/s).
-@export_range(0.0, 60.0, 0.5, "or_greater") var bait_speed := 8.0
-## The bait ball's spread, against the school's usual (0.1: packed tight, 1: no change).
-@export_range(0.05, 1.0, 0.01) var bait_tighten := 0.6
-## How hard a scared school swerves away (degrees per second, on top of its turn rate).
-@export_range(0.0, 360.0, 5.0, "or_greater") var bait_swerve := 40.0
-## How quickly it tightens and relaxes again (1/s).
-@export_range(0.1, 20.0, 0.1, "or_greater") var bait_rate := 3.0
-## When a fish is battered, survivors this near it (m)...
-@export_range(0.0, 30.0, 0.1, "or_greater") var burst_radius := 4.0
-## ...burst away from it this fast (m/s, less further off), then regroup.
-@export_range(0.0, 60.0, 0.5, "or_greater") var burst_strength := 6.0
 
 @export_group("Multis & Sprees")
 ## Battered fish this close together (s) chain into a multi: Double Dip, Triple Fry...
@@ -168,12 +95,6 @@ static func shared() -> NatureSettings:
 @export_range(1.0, 120.0, 1.0, "or_greater") var pearl_lifetime := 20.0
 ## A pearl's radius (m).
 @export_range(0.05, 3.0, 0.01, "or_greater") var pearl_size := 0.22
-
-@export_group("Targeting")
-## Holding ball cam this long (s) opens the school wheel instead of toggling ball cam.
-@export_range(0.1, 2.0, 0.05) var wheel_hold_time := 0.3
-## Arrows at the screen's edge point to schools off screen (the target's always shows).
-@export var school_arrows := true
 
 @export_group("Camera")
 ## Nature's chase camera in the settle style (CameraStyle, the survivor cam's): it turns by its own

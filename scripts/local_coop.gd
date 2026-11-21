@@ -252,16 +252,6 @@ func attach_run(game_run: Node) -> void:
 			_wire(slot)
 		_refresh_views()
 		return
-	run.focus_changed.connect(func(focus: Node3D, fish: FishController) -> void:
-		var slot := slot_of(fish)
-		if slot:
-			slot.camera.ball = focus)
-	run.awarded.connect(func(event: Dictionary) -> void:
-		# Big multis and sprees punch the player's view in, harder each step.
-		var slot := slot_of(event.get("by"))
-		var chain: int = event.get("chain", 0)
-		if slot and is_instance_valid(slot.arcade) and (event.type == NatureScore.SPREE or chain >= 3):
-			slot.arcade.punch(1.0 if event.type == NatureScore.SPREE else minf(0.4 + 0.15 * chain, 1.2)))
 	for slot in slots:
 		_wire(slot)
 
@@ -277,27 +267,7 @@ func _wire(slot: PlayerSlot) -> void:
 	if run is UnnaturalRun:
 		_wire_unnatural(slot)
 		return
-	var nature := run as NatureRun
-	var camera := slot.camera
-	camera.ball = nature.focus_of(slot.fish)
-	camera.ball_cam = true
-	# Ball cam: a tap looks at the nearest thing ahead, holding opens the school wheel.
-	camera.hold_opens_wheel = true
-	var fish := slot.fish
-	var toggled := func(on: bool) -> void:
-		if on and is_instance_valid(nature):
-			nature.pick_focus(fish)
-	camera.set_meta("coop_toggled", toggled)
-	camera.ball_cam_toggled.connect(toggled)
-	slot.wheel = TargetWheel.new()
-	slot.wheel.name = "TargetWheel" if slot.index == 0 else "TargetWheel%d" % (slot.index + 1)
-	slot.wheel.camera = camera
-	slot.wheel.run = nature
-	slot.wheel.fish = fish
-	camera.get_parent().add_child(slot.wheel)
-	camera.wheel_opened.connect(slot.wheel.open)
-	camera.wheel_closed.connect(slot.wheel.close)
-	slot.hud.set_nature(nature)
+	(run as GameMode).attach_player(slot)
 
 
 ## Unnatural: the survivor cam, and (past the first player) their own HUD in their view.
@@ -333,21 +303,7 @@ func _unwire(slot: PlayerSlot) -> void:
 		if slot.index > 0 and is_instance_valid(slot.hud):
 			slot.hud.survivor_cam = false
 		return
-	camera.ball = null
-	camera.hold_opens_wheel = false
-	if camera.has_meta("coop_toggled"):
-		var toggled: Callable = camera.get_meta("coop_toggled")
-		if camera.ball_cam_toggled.is_connected(toggled):
-			camera.ball_cam_toggled.disconnect(toggled)
-		camera.remove_meta("coop_toggled")
-	if is_instance_valid(slot.wheel):
-		if camera.wheel_opened.is_connected(slot.wheel.open):
-			camera.wheel_opened.disconnect(slot.wheel.open)
-			camera.wheel_closed.disconnect(slot.wheel.close)
-		slot.wheel.queue_free()
-	slot.wheel = null
-	if is_instance_valid(slot.hud):
-		slot.hud.set_nature(null)
+	(run as GameMode).detach_player(slot)
 
 
 ## The window splits once there's a second player: the first player's camera,

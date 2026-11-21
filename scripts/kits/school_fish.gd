@@ -2,7 +2,7 @@ class_name SchoolFish
 extends Node3D
 ## A school fish up close: the full model (FishModel) of one of a School's
 ## fish, which the school puts on whichever of its fish are nearest the camera
-## (NatureSettings.detail_fish, within detail_distance). It wags its tail and
+## (SchoolSettings.detail_fish, within detail_distance). It wags its tail and
 ## ripples its skin as it swims; everything further off is drawn by the
 ## school's MultiMesh instead (SchoolLook).
 ##

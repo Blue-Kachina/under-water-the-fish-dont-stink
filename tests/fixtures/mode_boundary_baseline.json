@@ -1,6 +1,6 @@
 {
 	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
-	"total": 230,
+	"total": 213,
 	"violations": {
 		"audio/sfx_hooks/sfx_hooks.gd": {
 			"BatteredSounds": 1,
@@ -8,15 +8,12 @@
 			"BossSounds": 1,
 			"FishAttack": 3,
 			"Match1v1": 1,
-			"NatureRun": 1,
-			"NatureSounds": 1,
 			"UnnaturalRun": 1,
 			"UnnaturalSounds": 1
 		},
 		"debug_panel.gd": {
 			"HunterSize": 1,
 			"MarcoPoloSettings": 1,
-			"NatureSettings": 1,
 			"Powerup": 4,
 			"PowerupSettings": 1,
 			"Rarity": 1,
@@ -30,15 +27,13 @@
 			"MarcoArena": 4
 		},
 		"hud.gd": {
-			"Match1v1": 8,
-			"NatureRun": 2,
-			"NatureScore": 2,
-			"Pearl": 1
+			"Match1v1": 8
+		},
+		"kits/school_look.gd": {
+			"ZombieLooks": 1
 		},
 		"local_coop.gd": {
 			"Match1v1": 1,
-			"NatureRun": 1,
-			"NatureScore": 2,
 			"TreasureChest": 1,
 			"UnnaturalHud": 3,
 			"UnnaturalRun": 7
@@ -49,7 +44,6 @@
 			"MarcoPoloMatch": 3,
 			"MarcoPoloSettings": 11,
 			"Match1v1": 3,
-			"NatureRun": 3,
 			"UnnaturalHud": 2,
 			"UnnaturalRun": 8,
 			"UnnaturalSettings": 3,
@@ -66,12 +60,6 @@
 			"UnnaturalRun": 3,
 			"WhatStinksMatch": 3,
 			"WhatStinksNet": 1
-		},
-		"school.gd": {
-			"NatureSettings": 2
-		},
-		"school_look.gd": {
-			"ZombieLooks": 1
 		},
 		"terrain/ocean_floor.gd": {
 			"UnnaturalSettings": 3
@@ -111,7 +99,6 @@
 			"UnnaturalSettings": 2
 		},
 		"unnatural/seabed.gd": {
-			"NatureSettings": 1,
 			"UnnaturalSettings": 5
 		},
 		"unnatural/traversal.gd": {

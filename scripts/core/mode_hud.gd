@@ -14,6 +14,10 @@ var camera_word := "fish"
 var has_board := false
 ## The scorebug shows while the mode is live.
 var shows_scorebug := false
+## The hint line for a split-screen player who joined ("" for the usual one).
+var joined_hint := ""
+## Added to the usual hint line's end ("Back/View ...: join").
+var join_hint := ""
 
 
 ## Hooks onto the HUD (connect the mode's signals here).

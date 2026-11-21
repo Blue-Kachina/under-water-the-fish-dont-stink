@@ -338,14 +338,16 @@ func _player_input() -> PlayerInput:
 ## (what `ball` is for the environment's ball) with ball cam `ball_cam_on`, set
 ## at once (no swing, no ball_cam_toggled). Additive: the old `ball` /
 ## `ball_cam` fields still work for the modes not migrated yet.
-func claim(focus: Node3D, ball_cam_on := true) -> void:
+func claim(focus: Node3D, ball_cam_on := true, wheel := false) -> void:
 	ball = focus
 	ball_cam = ball_cam_on
+	hold_opens_wheel = wheel  # Nature: a tap looks, holding opens the target wheel
 
 
 ## Drops a claim: no focus (the normal view). Ball cam stays as it was set.
 func release() -> void:
 	ball = null
+	hold_opens_wheel = false
 
 
 ## What the camera is focused on through `ball` (the claim's read-out).

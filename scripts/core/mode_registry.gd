@@ -12,7 +12,7 @@ var _world: ModeWorld
 
 ## THE registry: one line per migrated mode.
 static func scripts() -> Array[GDScript]:
-	return [HuntMatch]
+	return [NatureRun, HuntMatch]
 
 
 static func descriptors() -> Array[Dictionary]:
@@ -60,23 +60,18 @@ static func merged(core: Array, only: String = "") -> Array:
 ## `core` (main.gd's own tiles) with each registered mode's descriptor as a
 ## tile, inserted before the tile its "tile_before" names (at the end without).
 static func merged_tiles(core: Dictionary) -> Dictionary:
-	var before := {}  # tile id -> descriptors to put in front of it
-	var tail: Array[Dictionary] = []
-	for d in descriptors():
-		var key: String = d.get("tile_before", "")
-		if key != "" and core.has(key):
-			var list: Array = before.get(key, [])
-			list.append(d)
-			before[key] = list
+	var order: Array = core.keys()
+	var tiles := core.duplicate()
+	for d in descriptors():  # in registration order: a "tile_before" may name an earlier registered mode
+		var at: int = order.find(d.get("tile_before", ""))
+		if at < 0:
+			order.append(d["id"])
 		else:
-			tail.append(d)
+			order.insert(at, d["id"])
+		tiles[d["id"]] = d
 	var out := {}
-	for key: String in core:
-		for d: Dictionary in before.get(key, []):
-			out[d["id"]] = d
-		out[key] = core[key]
-	for d in tail:
-		out[d["id"]] = d
+	for key: String in order:
+		out[key] = tiles[key]
 	return out
 
 

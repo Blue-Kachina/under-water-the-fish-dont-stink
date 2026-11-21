@@ -24,7 +24,7 @@ extends Node3D
 ## fish battered (batter()) makes the survivors near it burst away from it
 ## (burst_strength), and they regroup as their slots pull them back.
 ##
-## Every value is read live from `settings` (NatureSettings). Changing the
+## Every value is read live from `settings` (SchoolSettings). Changing the
 ## school size adds or takes away fish; a school that has lost fish otherwise
 ## stays as it is.
 ##
@@ -77,7 +77,7 @@ var rng := RandomNumberGenerator.new()
 ## follow the host's (set_net_state()) instead of roaming and taking fright
 ## here. Its fish still swim to their places here, from that leader.
 var follower := false
-var settings: NatureSettings
+var settings: SchoolSettings
 var character := FishCharacter.FishClass.SKIRMISHER
 var display_name := ""
 ## The middle of where it roams.
@@ -130,7 +130,7 @@ var _pulls := {}
 var _time := 0.0
 var _since_step := 0.0
 var _steps := 0
-## The school size last asked for (NatureSettings.fish_per_school).
+## The school size last asked for (SchoolSettings.fish_per_school).
 var _planned := 0
 var _looks: Array[MultiMeshInstance3D] = []
 var _buffers: Array[PackedFloat32Array] = []
@@ -159,7 +159,7 @@ func _ready() -> void:
 ## Puts the school at `at` heading along `heading`, with its fish in their places.
 ## Call once it's in the tree. `rng_seed` makes it the same school wherever it's
 ## built (negative: a random one).
-func setup(school_settings: NatureSettings, at: Vector3, heading: Vector3, kind: FishCharacter.FishClass, rng_seed := -1) -> void:
+func setup(school_settings: SchoolSettings, at: Vector3, heading: Vector3, kind: FishCharacter.FishClass, rng_seed := -1) -> void:
 	settings = school_settings
 	character = kind
 	if rng_seed >= 0:

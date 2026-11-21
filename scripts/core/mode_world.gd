@@ -14,6 +14,10 @@ var camera: Node
 var hud: Node
 ## The host, for the few services with no API yet (snapping a camera, settings).
 var host: Node
+## Every local player's slot (slot 0 first: `fish` is theirs), for modes with split-screen.
+var slots: Array[PlayerSlot] = []
+## What the caller asks of this start ({"authority": false}: an online guest).
+var options := {}
 
 
 func _init(host_node: Node, world_environment: Node3D, local_fish: FishController, follow_camera: Node, hud_node: Node) -> void:

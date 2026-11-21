@@ -109,8 +109,8 @@ func _ready() -> void:
 ## The game registers itself (main.gd's _ready).
 func attach_main(game: Node) -> void:
 	main = game
-	main.nature_started.connect(_on_nature_started)
-	main.nature_ended.connect(_on_nature_ended)
+	main.mode_started.connect(_on_mode_started)
+	main.mode_ended.connect(_on_mode_ended)
 	main.unnatural_started.connect(_on_unnatural_started)
 	main.unnatural_ended.connect(_on_unnatural_ended)
 	main.marco_polo_started.connect(_on_marco_polo_started)
@@ -298,12 +298,14 @@ func _unhook_marco_polo() -> void:
 	mpm = null
 
 
-func _on_nature_started(nature_run: NatureRun) -> void:
-	if is_active() and (_welcomed or _is_host()):
-		_hook(nature_run)
+func _on_mode_started(mode: GameMode) -> void:
+	if mode is NatureRun and is_active() and (_welcomed or _is_host()):
+		_hook(mode)
 
 
-func _on_nature_ended() -> void:
+func _on_mode_ended(id: String) -> void:
+	if id != main.NATURE:
+		return
 	_unhook()
 	if is_active() and not _switching:
 		NetSession.leave("Left Nature, so the session ended" if _is_host() else "Left the session")
@@ -989,7 +991,7 @@ func _apply_tuning(sections: Dictionary) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _restart() -> void:
 	if run and not run.authority:
-		run.start()
+		run.restart()
 	elif urun and is_instance_valid(urun) and not urun.authority:
 		urun.start()
 
