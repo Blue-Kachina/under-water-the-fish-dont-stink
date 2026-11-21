@@ -828,6 +828,7 @@ func _apply_character() -> void:
 	_tail = _visual.tail
 	_fin_left = _visual.fin_left
 	_fin_right = _visual.fin_right
+	swim_state.gait = gait  # for frames before the first tick
 	_apply_team_color()
 	_apply_size()
 
