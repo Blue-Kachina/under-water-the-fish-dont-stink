@@ -42,7 +42,7 @@ func zero_gait(on := true) -> Gait:
 
 ## The Gait's layer weights, in layer order (each step adds its own).
 func layer_fields() -> Array[String]:
-	return ["rig_undulation", "rig_tail_drive"]
+	return ["rig_undulation", "rig_tail_drive", "rig_turn"]
 
 
 ## A state at `speed` m/s straight ahead, effort from the throttle.
@@ -85,6 +85,7 @@ func _run() -> void:
 	_zero_change()
 	_undulation()
 	_tail_drive()
+	_turn()
 	print("swim_rig_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)
 
@@ -226,3 +227,32 @@ func _tail_drive() -> void:
 	s.stride_dir = Vector2(-0.5, 0.8)
 	run(model, s, 0.8)
 	check(model.tail.rotation.y < -0.2 and model.tail.rotation.x > 0.3, "the other way and up/down follow the stride's sweep (yaw %.2f, pitch %.2f)" % [model.tail.rotation.y, model.tail.rotation.x])
+
+
+func _turn() -> void:
+	print("Turn:")
+	var gait := only(["rig_turn"])
+	var straight := settle(gait, moving(15.0), 1.0)
+	check(absf(straight.rotation.z) < 1e-5 and straight.rig.pose.spine_yaw() == 0.0, "straight ahead: no bank, no bend")
+	for side: float in [1.0, -1.0]:
+		var s := moving(15.0)
+		s.spin = Vector3(0.0, 1.5 * side, 0.0)
+		var model := settle(gait, s, 1.5)
+		var p := model.rig.pose
+		var name := "left (+yaw)" if side > 0.0 else "right"
+		check(model.rotation.z * side > 0.2, "a %s turn banks into it (%.3f rad)" % [name, model.rotation.z])
+		check(p.spine_yaw() * side < -0.1, "and the spine curls toward its inside (%.3f rad)" % p.spine_yaw())
+		check(p.fin_flap.x * side > 0.1 and p.fin_sweep.x * side < -0.1 and p.fin_sweep.y * side > 0.1, "the inside pectoral tucks, the outside reaches out")
+	# The pectorals bank before the body.
+	var s := moving(15.0)
+	s.spin = Vector3(0.0, 1.5, 0.0)
+	var model := shark(gait)
+	s.gait = gait
+	run(model, s, 0.1)
+	var fin_share := model.rig.pose.fin_flap.x / (gait.rig_fin_bank)
+	var body_share := model.rotation.z / gait.rig_bank
+	check(fin_share > body_share * 1.3, "the pectorals lead the body into a turn (%.2f vs %.2f of full)" % [fin_share, body_share])
+	var slow := moving(0.0, 0.0)
+	slow.spin = Vector3(0.0, 1.5, 0.0)
+	var spot := settle(gait, slow, 1.5)
+	check(absf(spot.rotation.z) < 0.01 and absf(spot.rig.pose.spine_yaw()) < gait.rig_turn_max, "turning on the spot doesn't bank or curl without limit")

@@ -41,7 +41,7 @@ func _init() -> void:
 
 ## The layers after the legacy pose, in order (later steps add theirs).
 static func _later_layers() -> Array:
-	return [RigUndulation, RigTailDrive]
+	return [RigUndulation, RigTailDrive, RigTurn]
 
 
 func attach(m: FishModel) -> void:

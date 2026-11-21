@@ -193,3 +193,27 @@ func is_default() -> bool:
 ## Rig, TailDrive: how quickly each joint follows the one behind it (1/s). Lower: a lazier, more whip-like carry up the
 ## body.
 @export_range(1.0, 120.0, 0.5, "or_greater") var rig_stride_follow := 14.0
+
+## Rig, Turn layer: its weight (0 off). The spine bends into a turn by the turn's curvature (yaw rate over speed), the
+## body banks into it, the pectorals bank first and the inside one tucks while the outside one reaches out.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_turn := 0.0
+## Rig, Turn: how much the spine bends into a turn, times the turn's own curvature over its length. 1: as much as the
+## path curves; more: a more dramatic curl.
+@export_range(0.0, 10.0, 0.1, "or_greater") var rig_turn_bend := 6.0
+## Rig, Turn: the most the spine curls into a turn (rad, all joints together).
+@export_range(0.0, 3.0, 0.01, "or_greater") var rig_turn_max := 0.9
+## Rig, Turn: the yaw rate (rad/s) that counts as a full turn for the bank and the pectorals.
+@export_range(0.1, 10.0, 0.05, "or_greater") var rig_turn_ref := 1.5
+## Rig, Turn: the speed (m/s) below which a turn's curvature is worked out as if the fish were going this fast, so a
+## fish turning on the spot doesn't curl without limit; the bank also fades in over twice this.
+@export_range(0.1, 20.0, 0.1, "or_greater") var rig_turn_min_speed := 3.0
+## Rig, Turn: how far the body rolls into a full turn (rad).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_bank := 0.35
+## Rig, Turn: how quickly the spine's curl and the bank follow the turn (1/s).
+@export_range(0.5, 60.0, 0.5, "or_greater") var rig_turn_rate := 6.0
+## Rig, Turn: how far the pectorals roll into a full turn (rad), ahead of the body.
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_fin_bank := 0.5
+## Rig, Turn: how quickly the pectorals follow the turn (1/s); more than rig_turn_rate and they bank first.
+@export_range(0.5, 120.0, 0.5, "or_greater") var rig_fin_rate := 18.0
+## Rig, Turn: how far the inside pectoral tucks in and the outside one reaches out in a full turn (rad).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_fin_tuck := 0.4
