@@ -12,7 +12,7 @@ var _world: ModeWorld
 
 ## THE registry: one line per migrated mode.
 static func scripts() -> Array[GDScript]:
-	return [Match1v1, NatureRun, HuntMatch, UnnaturalRun, TestTankRun, WhatStinksMatch]
+	return [Match1v1, NatureRun, HuntMatch, UnnaturalRun, TestTankRun, MarcoPoloMatch, WhatStinksMatch]
 
 
 static func descriptors() -> Array[Dictionary]:
@@ -46,14 +46,11 @@ static func script_of(id: String) -> GDScript:
 ## `only` limits it to descriptors with that key set true (e.g. "match").
 static func merged(core: Array, only: String = "") -> Array:
 	var out := core.duplicate()
+	var placing: Array[Dictionary] = []
 	for d in descriptors():
-		if only != "" and not d.get(only, false):
-			continue
-		var at: int = out.find(d.get("after", ""))
-		if at < 0:
-			out.append(d["id"])
-		else:
-			out.insert(at + 1, d["id"])
+		if only == "" or d.get(only, false):
+			placing.append(d)
+	_place(out, placing, "after", 1)
 	return out
 
 
@@ -62,17 +59,38 @@ static func merged(core: Array, only: String = "") -> Array:
 static func merged_tiles(core: Dictionary) -> Dictionary:
 	var order: Array = core.keys()
 	var tiles := core.duplicate()
-	for d in descriptors():  # in registration order: a "tile_before" may name an earlier registered mode
-		var at: int = order.find(d.get("tile_before", ""))
-		if at < 0:
-			order.append(d["id"])
-		else:
-			order.insert(at, d["id"])
+	var placing := descriptors()
+	for d in placing:
 		tiles[d["id"]] = d
+	_place(order, placing, "tile_before", 0)
 	var out := {}
 	for key: String in order:
 		out[key] = tiles[key]
 	return out
+
+
+## Inserts each of `descs`' ids into `order` next to the id its `key` names (`offset` 1: after
+## it, 0: before it), in registration order; one whose anchor is a registered mode not placed
+## yet waits for it, so registration order doesn't matter. Without an anchor: at the end.
+static func _place(order: Array, descs: Array[Dictionary], key: String, offset: int) -> void:
+	var waiting := descs.duplicate()
+	while not waiting.is_empty():
+		var pending_ids := waiting.map(func(d: Dictionary) -> String: return d["id"])
+		var left: Array[Dictionary] = []
+		for d: Dictionary in waiting:
+			var anchor: String = d.get(key, "")
+			var at := order.find(anchor)
+			if at >= 0:
+				order.insert(at + offset, d["id"])
+			elif anchor in pending_ids and anchor != d["id"]:
+				left.append(d)
+			else:
+				order.append(d["id"])
+		if left.size() == waiting.size():  # a loop of anchors: give up on them
+			for d: Dictionary in left:
+				order.append(d["id"])
+			return
+		waiting = left
 
 
 ## The body a registered mode builds for class `fish_class` (descriptor "models": a Callable(FishModel)),
@@ -91,6 +109,15 @@ static func net_descriptors() -> Array[Dictionary]:
 	for d in descriptors():
 		if d.has("net"):
 			out.append(d)
+	return out
+
+
+## `core` (environment name -> script) plus each registered descriptor's
+## "environments" (the arenas that mode builds).
+static func merged_environments(core: Dictionary) -> Dictionary:
+	var out := core.duplicate()
+	for d in descriptors():
+		out.merge(d.get("environments", {}))
 	return out
 
 

@@ -112,7 +112,11 @@ const BODY_ZOOM_POWER := 0.75
 var free_cam := false
 ## Pushed styles (see push_style), oldest first; and the view_mode last applied.
 var _styles := {}
+## Mode claims on the view (push_claim): key -> CameraClaim, the newest last.
+var _claims := {}
 var _style_mode := -1
+## The group of an arena with a cutaway shell (it has cut_away(eye, on) and shell_rids()).
+const CUTAWAY_GROUP := &"camera_cutaway"
 const FOLLOW_SETTLE := 0
 const FOLLOW_HOLD := 1
 const FOLLOW_ALWAYS := 2
@@ -355,6 +359,49 @@ func focus_node() -> Node3D:
 	return ball
 
 
+## A mode's CameraClaim (pose_override, button_taken, body_follow, spectating):
+## `key` names the pusher (a mode id). The newest key's claim is the one in effect;
+## changes to it after the push come through apply_claims().
+func push_claim(key: StringName, claim: CameraClaim) -> void:
+	if _claims.has(key) and _claims[key] != claim:
+		(_claims[key] as CameraClaim).detach()
+	_claims.erase(key)  # re-pushing makes it the newest
+	_claims[key] = claim
+	claim.attach(self)
+
+
+## Takes `key`'s claim off: the one pushed before it comes back, else the plain
+## view (no pose override, the ball cam button its own, the body zoom in full).
+func pop_claim(key: StringName) -> void:
+	if not _claims.has(key):
+		return
+	(_claims[key] as CameraClaim).detach()
+	_claims.erase(key)
+	if _claims.is_empty():
+		pose_override = Callable()
+		button_taken = false
+		body_follow = 1.0
+		hold_opens_wheel = false
+	else:
+		apply_claims()
+
+
+func has_claim(key: StringName) -> bool:
+	return _claims.has(key)
+
+
+## Writes the newest claim's fields onto the camera's own (what the view reads).
+func apply_claims() -> void:
+	if _claims.is_empty():
+		return
+	var top: CameraClaim = _claims.values().back()
+	pose_override = top.pose_override
+	button_taken = top.button_taken
+	body_follow = top.body_follow
+	ball_cam = top.ball_cam
+	hold_opens_wheel = top.wheel
+
+
 ## A mode's camera style (CameraStyle): `key` names the pusher (a mode id), so it
 ## can push again every frame, live from the panel, and take it off with the same
 ## key. The newest key's style is the one in effect.
@@ -472,9 +519,9 @@ func _process(delta: float) -> void:
 		if pose is Transform3D:
 			global_transform = pose
 			_cutaway = 0.0
-			var cut := get_tree().get_first_node_in_group(MarcoArena.CUTAWAY_GROUP) as MarcoArena
+			var cut := get_tree().get_first_node_in_group(CUTAWAY_GROUP)  # an arena with a cutaway shell (cut_away, shell_rids)
 			if cut != null:
-				cut.cut_away(pose.origin, false)  # looking out of a porthole: all the walls back
+				cut.call("cut_away", pose.origin, false)  # looking out of a porthole: all the walls back
 			return
 
 	_ball_cam_button(delta)
@@ -804,21 +851,21 @@ static func _quaternion_from(rotation_vector: Vector3) -> Quaternion:
 ## when the arena's walls or ceiling alone pulled it in to under wall_cutaway_ratio
 ## of the way, eased out to where it would have been past them with those walls hidden.
 func _cut_away(anchor: Vector3, wanted: Vector3, pulled: Vector3, delta: float) -> Vector3:
-	var arena := get_tree().get_first_node_in_group(MarcoArena.CUTAWAY_GROUP) as MarcoArena
+	var arena := get_tree().get_first_node_in_group(CUTAWAY_GROUP)
 	var out := 0.0
 	if wall_cutaway and arena != null:
 		var length := anchor.distance_to(wanted)
-		var beyond := _sweep(anchor, wanted, collision_margin, arena.shell_rids())
+		var beyond := _sweep(anchor, wanted, collision_margin, arena.call("shell_rids"))
 		var walled := beyond.distance_to(anchor) - pulled.distance_to(anchor) > 0.01
 		if walled and length > 0.01 and pulled.distance_to(anchor) < length * wall_cutaway_ratio:
 			out = 1.0
 		_cutaway = move_toward(_cutaway, out, delta * wall_cutaway_speed)
 		var eye := pulled.lerp(beyond, smoothstep(0.0, 1.0, _cutaway))
-		arena.cut_away(eye, _cutaway > 0.0)
+		arena.call("cut_away", eye, _cutaway > 0.0)
 		return eye
 	_cutaway = 0.0
 	if arena != null:
-		arena.cut_away(wanted, false)
+		arena.call("cut_away", wanted, false)
 	return pulled
 
 

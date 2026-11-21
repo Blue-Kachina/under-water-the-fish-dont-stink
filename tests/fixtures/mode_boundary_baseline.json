@@ -1,21 +1,13 @@
 {
 	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
-	"total": 58,
+	"total": 24,
 	"violations": {
 		"debug_panel.gd": {
-			"MarcoPoloSettings": 1,
 			"Powerup": 4,
 			"Rarity": 1
 		},
-		"follow_camera.gd": {
-			"MarcoArena": 4
-		},
 		"main.gd": {
-			"CourseSkill": 2,
-			"MarcoPoloMatch": 3,
-			"MarcoPoloSettings": 11,
-			"path:marco_polo/fish_tank_arena.gd": 1,
-			"path:marco_polo/temple_arena.gd": 1
+			"CourseSkill": 2
 		},
 		"net/coop_session.gd": {
 			"MarcoPoloMatch": 3,
@@ -31,10 +23,6 @@
 			"FishDetails": 1,
 			"HunterPreview": 2,
 			"StatBlock": 2
-		},
-		"ui/mode_setups.gd": {
-			"MarcoPoloMatch": 1,
-			"MarcoPoloSettings": 12
 		}
 	}
 }

@@ -419,7 +419,7 @@ func _part_two() -> void:
 	echo.forced[loner] = 0.04
 	await _settle()
 	for node: Node in loner._visual.find_children("*", "GeometryInstance3D", true, false):
-		if not node.has_meta("marco_reveal") and (node as GeometryInstance3D).layers != 0:
+		if not node.has_meta(FishModel.OVERLAY_META) and (node as GeometryInstance3D).layers != 0:
 			print("   still drawn: ", loner._visual.get_path_to(node), " ", node.get_class(), " ", node.visible)
 	check(seen[0.04] == Vector4.ZERO and not _real_shown(loner, true), "below the skeleton band nothing shows (the real model is off)")
 	check((seen[0.16] as Vector4).x > 0.0 and (seen[0.16] as Vector4).y == 0.0, "the skeleton band shows bones (%.2f)" % (seen[0.16] as Vector4).x)
@@ -477,7 +477,7 @@ func _real_shown(who: FishController, any: bool) -> bool:
 	var shown := 0
 	var total := 0
 	for node: Node in who._visual.find_children("*", "GeometryInstance3D", true, false):
-		if node.has_meta("marco_reveal"):
+		if node.has_meta(FishModel.OVERLAY_META):
 			continue
 		total += 1
 		if (node as GeometryInstance3D).layers != 0:

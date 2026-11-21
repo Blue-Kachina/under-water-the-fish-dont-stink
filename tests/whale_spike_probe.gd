@@ -153,7 +153,7 @@ func _arena(arena_name: String) -> void:
 
 	print("%s: the swap back:" % arena_name)
 	var hider: FishController = game.live_hiders()[0] if not game.live_hiders().is_empty() else null
-	var base_class := fish.get_meta("mp_base_look", [fish.character, fish.species]) as Array
+	var base_class := ModeData.get_value(fish, MarcoPoloMatch.MODE_ID, "base_look", [fish.character, fish.species]) as Array
 	mp.bot_seeker_rounds = 1
 	mp.rounds = 2
 	game.start_round(1)

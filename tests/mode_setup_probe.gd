@@ -81,7 +81,7 @@ func _restore() -> void:
 
 func _check_builds() -> void:
 	print("every mode has a screen:")
-	var expected_rows := {ModeSetups.UNNATURAL: 1, ModeSetups.FISH_STICKS: 1, ModeSetups.MARCO_POLO: 3, ModeSetups.WHAT_STINKS: 2}
+	var expected_rows := {ModeSetups.UNNATURAL: 1, ModeSetups.FISH_STICKS: 1, MarcoPoloMatch.MODE_ID: 3, ModeSetups.WHAT_STINKS: 2}
 	for mode: String in ModePicker.PRIMARY + ModePicker.MORE:
 		var setup := ModeSetups.build(main, mode)
 		var rows: int = expected_rows.get(mode, 0)
@@ -185,10 +185,10 @@ func _check_roles() -> void:
 	check(RoleCharacters.character("seeker") == seeker and RoleCharacters.character("hider") == hider, "each role keeps its own character")
 	var mp := MarcoPoloSettings.shared()
 	mp.start_as = MarcoPoloSettings.StartAs.SEEKER
-	var setup := ModeSetups.build(main, ModeSetups.MARCO_POLO)
+	var setup := ModeSetups.build(main, MarcoPoloMatch.MODE_ID)
 	main.add_child(setup)
 	await _frames(3)
-	check(setup.pool.size() == 1 and setup.pool[0].has("whale") and setup.pool_label == "Whale",
+	check(setup.pool.size() == 1 and setup.pool[0].has("mode_pick") and setup.pool_label == "Whale",
 			"Marco Polo as Seeker: no fish to pick, the whale card does it")
 	var seeker_before := RoleCharacters.character("seeker")
 	setup._focus = 2  # Start as (fish, Variant, Start as, Arena)
@@ -198,18 +198,18 @@ func _check_roles() -> void:
 	var hider2: FishCharacter.FishClass = FishCharacter.pickable_classes()[3]
 	setup.pool_index = ModeSetup.pool_index_of(setup.pool, hider2)
 	var to_start := ModeSetups.apply(main, setup)
-	check(to_start == ModeSetups.MARCO_POLO and RoleCharacters.character("hider") == hider2 and RoleCharacters.character("seeker") == seeker_before,
+	check(to_start == MarcoPoloMatch.MODE_ID and RoleCharacters.character("hider") == hider2 and RoleCharacters.character("seeker") == seeker_before,
 			"applying remembers the hider only")
 	# A whale seeker applying wears the hider's last fish and remembers no seeker fish.
 	mp.start_as = MarcoPoloSettings.StartAs.SEEKER
-	var whale := ModeSetups.build(main, ModeSetups.MARCO_POLO)
+	var whale := ModeSetups.build(main, MarcoPoloMatch.MODE_ID)
 	ModeSetups.apply(main, whale)
 	var fish: FishController = main.get_node("Fish")
 	check(fish.character == hider2 and RoleCharacters.character("seeker") == seeker_before, "a whale seeker wears the hider's fish under its whale")
 	whale.free()
 	mp.whale_seeker = false
-	var plain := ModeSetups.build(main, ModeSetups.MARCO_POLO)
-	check(plain.pool.size() > 1 and not plain.pool[0].has("whale"), "with whales off a seeker picks a fish again")
+	var plain := ModeSetups.build(main, MarcoPoloMatch.MODE_ID)
+	check(plain.pool.size() > 1 and not plain.pool[0].has("mode_pick"), "with whales off a seeker picks a fish again")
 	plain.free()
 	mp.whale_seeker = true
 	setup.free()

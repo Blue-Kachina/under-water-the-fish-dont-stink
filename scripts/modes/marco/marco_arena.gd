@@ -23,7 +23,7 @@ const PORTHOLE_GROUP := &"mp_porthole"
 const SIGHT_LEFT := 0.05
 ## The arena is in this group while it lets the follow cam sit outside its walls
 ## (FollowCamera.wall_cutaway): see shell_rids() and cut_away().
-const CUTAWAY_GROUP := &"camera_cutaway"
+const CUTAWAY_GROUP := &"camera_cutaway"  # the group follow_camera.gd looks for (its CUTAWAY_GROUP)
 ## How far past a wall's inner face the camera has to be before that wall is hidden (m).
 const CUTAWAY_PAST := 0.05
 

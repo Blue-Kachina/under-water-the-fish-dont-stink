@@ -18,7 +18,7 @@ const SECTIONS := {
 	"unnatural": ["res://scripts/modes/unnatural/unnatural_settings.gd", "res://scripts/kits/terrain_settings.gd", "res://scripts/kits/survivor_cam_settings.gd", "res://scripts/kits/traversal_settings.gd", "res://scripts/kits/chomp_settings.gd"],
 	"powerups": ["res://scripts/modes/unnatural/powerups/powerup_settings.gd"],
 	"gaits": ["res://scripts/gait_settings.gd"],
-	"marco_polo": ["res://scripts/marco_polo/marco_polo_settings.gd"],
+	"marco_polo": ["res://scripts/modes/marco/marco_polo_settings.gd"],
 	"what_stinks": ["res://scripts/modes/what_stinks/what_stinks_settings.gd"],
 	"hunter_size": ["res://scripts/modes/what_stinks/hunter_size.gd"],
 	"water_look": ["res://scripts/water_look.gd"],

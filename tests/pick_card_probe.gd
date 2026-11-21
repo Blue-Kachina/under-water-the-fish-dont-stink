@@ -69,10 +69,10 @@ func _run(shots: bool) -> void:
 	stub.settings.whale_seeker = true
 	stub.settings.whale_last_pick = 2
 	stub.settings.whale_last_skin = 1
-	card = load("res://scripts/marco_polo/whale_pick_card.gd").new()
+	card = load("res://scripts/modes/marco/whale_pick_card.gd").new()
 	stub.add_child(card)
 	card.call("bind", stub)
-	view = load("res://scripts/marco_polo/titan_view.gd").new()
+	view = load("res://scripts/modes/marco/titan_view.gd").new()
 	stub.add_child(view)
 	view.call("bind", stub)
 

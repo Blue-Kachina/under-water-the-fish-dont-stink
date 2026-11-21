@@ -40,7 +40,7 @@ const PREVIEW_DIR := "res://assets/ui/previews"
 ## The sections in order: [id, title]. Game, Display and Controls are
 ## UISettings and Controls; the rest are tuning targets.
 const SECTIONS := [["game", "Game"], ["display", "Display"], ["audio", "Audio"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"], ["battery", "Battery"],
-		["gaits", "Gaits"], ["ball", "Ball"], ["marco_polo", "Marco Polo"], ["water_look", "Water Look"]]
+		["gaits", "Gaits"], ["ball", "Ball"], ["water_look", "Water Look"]]
 ## Who each tuning section is for ("Used by ...").
 const USED_BY := {
 	"camera": "the follow camera, in every mode",
@@ -234,7 +234,6 @@ func _ready() -> void:
 		if _mode_settings.has(entry[0]):
 			_targets[entry[0]] = _mode_settings[entry[0]]
 	_targets.merge({"fish": fish, "gaits": GaitSettings.shared(), "camera": follow_camera, "ball": ball_settings,
-			"marco_polo": MarcoPoloSettings.shared(),
 			"water_look": WaterLook.shared()})
 	for section: String in _targets:
 		_defaults[section] = _snapshot(_targets[section])

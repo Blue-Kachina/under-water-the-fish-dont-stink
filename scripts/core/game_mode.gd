@@ -17,7 +17,18 @@ extends Node
 ## choices), one_screen (true: no split-screen; one_screen_note names it on the card),
 ## settings_key / settings_after / extra_settings (the tuning panel's section id, where
 ## it goes, and more [key, title, script] sections), models ({FishClass: Callable(FishModel)}
-## a mode-built body, see ModeRegistry.model_provider), net (a ModeNet subclass) with net_key.
+## a mode-built body, see ModeRegistry.model_provider), net (a ModeNet subclass) with net_key,
+## environments ({name: script}: arenas the mode builds, merged into the host's list).
+## "environment" may be a Callable of the host returning the name (a card's arena pick);
+## "reset_label" a Callable of the mode's node; "card_fill" (Callable(host, MatchCard): the
+## card's pickers and note); "join" (Callable(host, args): an online guest's prep, see
+## Main.join_mode).
+## Setup screen (ModeSetups), one of: "setup_rows" (Callable(ModeSetup, row maker): plain
+## option rows), "setup" (a script with static rows/current_role/use_role/apply_form/...,
+## see WhatStinksSetup) or "role_rows" (Callable(host, ModeSetup) -> the role it starts on)
+## with "current_role" (Callable(host) -> role), "role_pool" (Callable(role) -> {"entry",
+## "label"} or {}: a role's own character pick), "character_picked_by_mode" (Callable(role)
+## -> bool) and "apply_pick" (Callable(host)).
 
 ## A teleport moved `fish` (the host snaps cameras following it).
 signal teleported(fish: FishController)
