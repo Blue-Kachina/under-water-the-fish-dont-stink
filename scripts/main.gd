@@ -497,7 +497,7 @@ func _process(_delta: float) -> void:
 ## Nature's camera style (NatureSettings' Camera group: the settle cam), pushed
 ## live from the panel on every view while Nature plays, taken off otherwise.
 func _nature_camera_style() -> void:
-	var style: CameraStyle = NatureSettings.shared().camera_style() if nature_run else null
+	var style: CameraStyle = nature_run.camera_style() if nature_run else null
 	var views: Array[Node] = [_camera]
 	for slot in _local.slots:
 		if slot.camera != _camera:
