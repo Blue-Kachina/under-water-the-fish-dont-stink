@@ -20,6 +20,8 @@ extends Node
 ## scanned (the probe prints how many, so the lists can be kept complete).
 
 const SCRIPTS := "res://scripts"
+## The registry is the one core file that names modes: one line each.
+const REGISTRY := "core/mode_registry.gd"
 const BASELINE := "res://tests/fixtures/mode_boundary_baseline.json"
 
 ## Core: relative to scripts/; an entry ending in "/" is a whole folder.
@@ -29,7 +31,7 @@ const CORE := [
 	"split_screen.gd", "controls.gd", "swishy_swim.gd", "gait.gd", "gait_settings.gd",
 	"stride_stream.gd", "pause_menu.gd", "debug_panel.gd", "role_characters.gd", "ui_settings.gd",
 	"broadcast_ui.gd", "match_card.gd", "ocean.gd",
-	"ui/", "fish_models/",
+	"ui/", "fish_models/", "core/",
 	"audio/sfx.gd", "audio/sound_catalog.gd", "audio/sound_profile.gd", "audio/sfx_hooks/sfx_hooks.gd",
 	"net/net_session.gd", "net/coop_session.gd", "net/net_fish.gd",
 ]
@@ -98,7 +100,7 @@ func _run() -> void:
 	var rx_cache := {}
 	for rel in files:
 		var k: String = kind[rel]
-		if k != "core" and k != "kit":
+		if (k != "core" and k != "kit") or rel == REGISTRY:
 			continue
 		var src_lines := FileAccess.get_file_as_string(SCRIPTS + "/" + rel).split("\n")
 		for i in src_lines.size():

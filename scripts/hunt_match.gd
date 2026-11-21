@@ -1,5 +1,5 @@
 class_name HuntMatch
-extends Node
+extends GameMode
 ## Hunt: a 1v1 in the Ocean against a hostile fish (a HunterBot) with the
 ## player's own tuning (Nature's: Extra Swishy strides, no boost, bow wave).
 ## A battery (Battery) is a goal: ramming
@@ -21,8 +21,8 @@ extends Node
 ## The arena is a sphere ARENA_RADIUS round the ocean's spawn: past its edge a
 ## fish is pushed back in, and the Ocean's fog shifts as the camera nears it.
 ##
-## Lives under the Ocean (setup() before adding it). end() hands the player's
-## fish back.
+## Lives under the Ocean (enter() before adding it). end() hands the player's
+## fish back. Registered in ModeRegistry; main.gd starts it through the registry.
 
 ## A kickoff has moved `fish` (cameras following it can snap).
 signal fish_teleported(fish: FishController)
@@ -101,15 +101,58 @@ var center := Vector3.ZERO
 ## The sea floor under the arena (NatureSettings.hunt_floor; null without).
 var seabed: Seabed
 
+var _world: ModeWorld
 var _battery_left := 0.0
 var _recorder := GoalRecorder.new()
 ## The recorder's time at the last battery.
 var _battery_record_time := 0.0
 
 
+## The mode's picker tile, environment, tuning and card text (read by main.gd
+## through ModeRegistry).
+static func descriptor() -> Dictionary:
+	return {
+		"id": "Hunt", "title": "Hunt", "icon": "mode_hunt",
+		"colors": [Color(0.27, 0.1, 0.06), Color(1.0, 0.54, 0.36)],
+		"pitch": "One on one in open water: batter the other fish before it batters you.",
+		"short": "Batter it before it batters you", "play": ["Solo"],
+		"environment": "Ocean", "match": true, "after": "Nature", "tile_before": "Nature",
+		"tuning_preset": "res://presets/nature.cfg",
+		"card_text": HuntMatch.card_text, "reset_label": "Restart match",
+	}
+
+
+static func card_text() -> String:
+	return "Hunt: 1v1 in open water, %d minutes on the clock. Batter your opponent (ram it nose first, fast) to score, and watch out: it's out to batter you too. Batter each other at once and it's a Fish Fry. Close calls, dodges and runs of perfect strides earn points, and level on goals, points decide it." % int(MATCH_TIME / 60.0)
+
+
 func setup(hunt_ocean: Ocean, player_fish: FishController) -> void:
 	ocean = hunt_ocean
 	player = player_fish
+
+
+func enter(world: ModeWorld) -> void:
+	_world = world
+	setup(world.environment as Ocean, world.fish)
+	battery_replays = UISettings.goal_replays
+	fish_teleported.connect(func(fish: FishController) -> void:
+		if fish == world.fish:
+			world.camera.snap())
+
+
+func start() -> void:
+	_world.camera.ball = opponent  # ball cam follows the opponent
+	_world.camera.ball_cam = true
+	_world.hud.set_hunt(self)
+
+
+func release() -> void:
+	_world.camera.ball = null
+	_world.hud.set_hunt(null)
+
+
+func reset() -> void:
+	restart()
 
 
 func _ready() -> void:
