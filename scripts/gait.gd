@@ -149,3 +149,36 @@ func is_default() -> bool:
 ## Rig: how far in front of the bend the head bends the other way, as a fraction of the body's length. 0: the head
 ## is rigid.
 @export_range(0.0, 0.6, 0.01, "or_greater") var rig_head_span := 0.3
+
+## Rig, Undulation layer: its weight (0 off). A travelling wave runs down the spine, deeper with effort, quicker with
+## speed, growing toward the tail.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_undulation := 0.0
+## Rig, Undulation: the wave's biggest total turn of the spine (rad) at full effort.
+@export_range(0.0, 3.0, 0.01, "or_greater") var rig_amplitude := 0.6
+## Rig, Undulation: how far behind each joint's beat is the one in front (rad of wave phase). More: a longer, lazier
+## wave. 0: the whole spine swings as one.
+@export_range(0.0, 3.2, 0.05, "or_greater") var rig_wave_lag := 1.0
+## Rig, Undulation: the Strouhal number: wave rate = this x speed / the tail's reach. More: a faster wave at any speed.
+@export_range(0.01, 2.0, 0.01, "or_greater") var rig_strouhal := 0.04
+## Rig, Undulation: the slowest the wave beats (Hz), at rest or crawling.
+@export_range(0.0, 10.0, 0.05, "or_greater") var rig_freq_min := 0.5
+## Rig, Undulation: the fastest the wave beats (Hz).
+@export_range(0.1, 20.0, 0.1, "or_greater") var rig_freq_max := 3.5
+## Rig, Undulation: how much of its top speed's wave a coasting fish keeps (0: it stops waving when the throttle is
+## off, 1: it waves as hard as its speed says).
+@export_range(0.0, 1.0, 0.05, "or_greater") var rig_coast_wave := 0.5
+## Rig, Undulation: how much of the wave's size sits at the tail. 1: the joints beat 1 : 4 : 9 (the tail most). 0: the
+## three alike.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_envelope := 1.0
+## Rig, Undulation: how far the head swings against the body's wave, of the wave's size.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_head_sway := 0.25
+## Rig, Undulation: how far the caudal fin flexes past the end of the spine, of the wave's size.
+@export_range(0.0, 3.0, 0.05, "or_greater") var rig_caudal_flex := 0.5
+## Rig, Undulation: how many degrees the caudal fin's flex runs ahead of the spine's own wave (the fin bends before the
+## stalk does).
+@export_range(0.0, 90.0, 1.0, "or_greater") var rig_caudal_lead := 8.0
+## Rig, Undulation: how much a stride's power deepens the wave (0: not at all), so a stride's timing shows on the
+## whole body.
+@export_range(0.0, 3.0, 0.05, "or_greater") var rig_cue_amp := 0.5
+## Rig: how quickly the layers' own smoothed values (the wave's size and rate) follow their targets (1/s).
+@export_range(0.5, 60.0, 0.5, "or_greater") var rig_ease := 5.0

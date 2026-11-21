@@ -42,7 +42,7 @@ func zero_gait(on := true) -> Gait:
 
 ## The Gait's layer weights, in layer order (each step adds its own).
 func layer_fields() -> Array[String]:
-	return []
+	return ["rig_undulation"]
 
 
 ## A state at `speed` m/s straight ahead, effort from the throttle.
@@ -83,6 +83,7 @@ func _ready() -> void:
 
 func _run() -> void:
 	_zero_change()
+	_undulation()
 	print("swim_rig_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)
 
@@ -121,3 +122,83 @@ func _zero_change() -> void:
 	on.react(DT, s_on)
 	off.react(DT, s_off)
 	check(not on.rig.engaged and worst_gap(bend_signature(off), bend_signature(on)) < 1e-5, "switching it off gives the old bend back")
+
+
+## A gait with only the named layer weights on (1), the old pose off.
+func only(fields: Array[String], legacy := 0.0) -> Gait:
+	var gait := zero_gait(true)
+	gait.rig_legacy_tail = legacy
+	for field in fields:
+		gait.set(field, 1.0)
+	return gait
+
+
+## The pose after `seconds` of `s` on a fresh shark with `gait`.
+func settle(gait: Gait, s: SwimState, seconds: float) -> FishModel:
+	var model := shark(gait)
+	s.gait = gait
+	run(model, s, seconds)
+	return model
+
+
+func _undulation() -> void:
+	print("Undulation:")
+	var gait := only(["rig_undulation"])
+	var rest := settle(gait, moving(0.0, 0.0), 1.0)
+	var p := rest.rig.pose
+	var worst := 0.0
+	for v: float in [p.joint_yaw[0], p.joint_yaw[1], p.joint_yaw[2], p.tail_yaw, p.head_yaw, p.bank, p.surge]:
+		worst = maxf(worst, absf(v))
+	check(worst < 1e-5 and rest.tail.rotation.length() < 1e-5, "the pose is zero at rest (%.7f)" % worst)
+	var rates: Array[float] = []
+	for speed: float in [2.0, 5.0, 8.0, 12.0, 16.0, 20.0, 23.0]:
+		var model := settle(gait, moving(speed), 3.0)
+		rates.append(model.rig.wave_freq)
+	var rising := true
+	for i in range(1, rates.size()):
+		rising = rising and rates[i] >= rates[i - 1] - 1e-6
+	check(rising and rates[5] > rates[1] * 1.5, "the wave's rate rises with speed (Hz at 2..23 m/s: %s)" % [rates.map(func(r: float) -> String: return "%.2f" % r)])
+	# The phase really advances at that rate.
+	var model := shark(gait)
+	var s := moving(15.0)
+	s.gait = gait
+	run(model, s, 2.0)
+	var before: float = model.rig.wave_phase
+	var turned := 0.0
+	var last := before
+	for i in 60:
+		model.react(DT, s)
+		turned += fposmod(model.rig.wave_phase - last, TAU)
+		last = model.rig.wave_phase
+	check(absf(turned - TAU * model.rig.wave_freq) < 0.1 * TAU * model.rig.wave_freq + 0.05, "the phase advances at 2 pi f (%.2f rad in 1 s, f %.2f Hz)" % [turned, model.rig.wave_freq])
+	# The envelope grows toward the tail, and the tail flexes past it.
+	var peak := [0.0, 0.0, 0.0]
+	var tail_peak := 0.0
+	for i in 240:
+		model.react(DT, s)
+		for j in 3:
+			peak[j] = maxf(peak[j], absf(model.rig.pose.joint_yaw[j]))
+		tail_peak = maxf(tail_peak, absf(model.rig.pose.tail_yaw))
+	check(peak[0] < peak[1] and peak[1] < peak[2] and peak[2] > 0.05, "the wave grows toward the tail (joint peaks %.3f %.3f %.3f)" % [peak[0], peak[1], peak[2]])
+	check(tail_peak > 0.02, "the caudal fin flexes (%.3f rad)" % tail_peak)
+	# A harder effort is a deeper wave.
+	var soft := settle(gait, moving(15.0, 0.2), 3.0)
+	var hard := settle(gait, moving(15.0, 1.0), 3.0)
+	check(_swing(hard) > _swing(soft) * 1.3, "full effort waves deeper than a light one (%.3f vs %.3f rad)" % [_swing(hard), _swing(soft)])
+	# The caudal fin leads: the flex peaks before it would on the spine's own lag.
+	check(model.tail.position.x != 0.0 or model.tail.position.z != 0.0, "the tail pivot rides the bend")
+
+
+## The tail pivot's biggest yaw over a second more of the same state.
+func _swing(model: FishModel) -> float:
+	var s := model.swim
+	var best := 0.0
+	var state := SwimState.new()
+	state.speed = 15.0
+	state.speed_frac = 15.0 / 23.0
+	state.effort = s.effort
+	state.gait = s.gait
+	for i in 120:
+		model.react(DT, state)
+		best = maxf(best, absf(model.tail.rotation.y))
+	return best
