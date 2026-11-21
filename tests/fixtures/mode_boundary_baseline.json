@@ -1,6 +1,6 @@
 {
 	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
-	"total": 227,
+	"total": 219,
 	"violations": {
 		"audio/sfx_hooks/sfx_hooks.gd": {
 			"BatteredSounds": 1,
@@ -8,8 +8,6 @@
 			"BossSounds": 1,
 			"FishAttack": 3,
 			"Match1v1": 1,
-			"NatureRun": 1,
-			"NatureSounds": 1,
 			"UnnaturalRun": 1,
 			"UnnaturalSounds": 1
 		},
@@ -40,8 +38,6 @@
 		},
 		"local_coop.gd": {
 			"Match1v1": 1,
-			"NatureRun": 1,
-			"NatureScore": 2,
 			"TreasureChest": 1,
 			"UnnaturalHud": 3,
 			"UnnaturalRun": 7
@@ -52,7 +48,6 @@
 			"MarcoPoloMatch": 3,
 			"MarcoPoloSettings": 11,
 			"Match1v1": 3,
-			"NatureRun": 3,
 			"UnnaturalHud": 2,
 			"UnnaturalRun": 8,
 			"UnnaturalSettings": 3,

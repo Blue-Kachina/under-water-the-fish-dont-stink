@@ -27,8 +27,8 @@ extends Node3D
 ## the window.
 
 ## A Nature run started (Play, a restart doesn't count), or ended.
-signal nature_started(run: NatureRun)
-signal nature_ended
+signal mode_started(mode: GameMode)
+signal mode_ended(id: String)
 signal unnatural_started(run: UnnaturalRun)
 signal unnatural_ended
 signal marco_polo_started(game: MarcoPoloMatch)
@@ -57,11 +57,11 @@ const OBSTACLE_COURSE := "Obstacle Course"
 const REPLAYS := "Replays"
 const MARCO_POLO := "Marco Polo"
 const WHAT_STINKS := "What Stinks?"
-const _CORE_MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, NATURE, UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS, REPLAYS]
+const _CORE_MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS, REPLAYS]
 ## Modes played as a match, which wait on a card for Play.
-const _CORE_MATCH_MODES := [ONE_V_ONE, NATURE, UNNATURAL, TEST_TANK, MARCO_POLO, WHAT_STINKS]
+const _CORE_MATCH_MODES := [ONE_V_ONE, UNNATURAL, TEST_TANK, MARCO_POLO, WHAT_STINKS]
 ## Modes played on Nature's tuning.
-const _CORE_NATURE_MODES := [NATURE, UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS]
+const _CORE_NATURE_MODES := [UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS]
 ## Nature's tuning: Extra Swishy strides, no boost.
 const NATURE_PRESET := "res://presets/nature.cfg"
 ## Mode -> the environment it's played in.
@@ -69,7 +69,6 @@ const MODE_ENVIRONMENTS := {
 	FREE_PLAY: "Aquarium Arena",
 	ONE_V_ONE: "Aquarium Arena",
 	FREE_SWIM: "Ocean",
-	NATURE: "Ocean",
 	UNNATURAL: "Ocean",
 	TEST_TANK: "Ocean",
 	OBSTACLE_COURSE: "Obstacle Course",
@@ -90,9 +89,6 @@ const _CORE_TILES := {
 	ONE_V_ONE: {"title": "Fish Sticks: 1v1", "icon": "mode_1v1", "colors": [Color(0.04, 0.17, 0.3), Color(0.35, 0.65, 1.0)],
 		"pitch": "Fish-ball in the aquarium against a bot: five minutes on the clock, overtime on a tie.",
 		"short": "Fish-ball against a bot", "play": ["Solo"]},
-	NATURE: {"title": "Nature", "icon": "mode_nature", "colors": [Color(0.03, 0.2, 0.17), Color(0.3, 0.88, 0.62)],
-		"pitch": "Swim like a real fish: sweep, stride and build speed, then batter the schools for points.",
-		"short": "Stride, sweep and batter schools", "play": ["Solo", "Split-screen", "Online"]},
 	FREE_PLAY: {"title": "Fish Sticks: Free Play", "icon": "mode_free_play", "colors": [Color(0.05, 0.14, 0.24), Color(0.22, 0.89, 0.84)],
 		"pitch": "The aquarium arena and a ball, no clock: practise touches, aerials and shots.",
 		"short": "The arena and a ball, no clock", "play": ["Solo"]},
@@ -124,8 +120,10 @@ var current_mode := ""
 var replay: ReplayPlayer
 ## The 1v1 being played, if any.
 var match_1v1: Match1v1
-## The Nature run being played, if any.
-var nature_run: NatureRun
+## The Nature run being played, if any (a registered mode's node).
+var nature_run: Object:
+	get:
+		return _modes.active if _modes.active_id() == NATURE else null
 ## The Hunt match being played, if any (a registered mode's node).
 var hunt_match: Object:
 	get:
@@ -219,8 +217,8 @@ func _ready() -> void:
 	_local.name = "LocalCoop"
 	_local.setup(self, first, _panel)
 	add_child(_local)
-	if nature_run:  # a Nature run already on (started before the split-screen players were set up)
-		_local.attach_run(nature_run)
+	if _modes.active and ModeRegistry.describe(_modes.active_id()).get("split_screen", false):  # a run already on (started before the split-screen players were set up)
+		_local.attach_run(_modes.active)
 	_pause_menu = PauseMenu.new()
 	_pause_menu.name = "PauseMenu"
 	_pause_menu.settings_panel = _panel
@@ -425,7 +423,7 @@ func set_character(character: FishCharacter.FishClass) -> void:
 		_fish.set_look(character, species)
 	if unnatural_run:
 		unnatural_run.start()  # its loadout comes from the class (Change Character is off there for now)
-	elif not (match_1v1 or nature_run or _modes.active or marco_polo or what_stinks):
+	elif not (match_1v1 or _modes.active or marco_polo or what_stinks):
 		_fish.set_spawn(_environment.spawn_transform())
 	# Otherwise it's worn now, mid-match: 1v1, Nature and Hunt keep nothing of the class (no
 	# restart), and Marco Polo / What Stinks keep it for when this role's body comes off.
@@ -501,12 +499,6 @@ func reset_play() -> void:
 	if match_1v1:
 		match_1v1.kickoff()
 		return
-	if nature_run:
-		if nature_run.authority:
-			nature_run.start()  # online, the host's restart is everyone's
-		else:
-			nature_run.respawn_local()  # a guest: just their own fish back to the start
-		return
 	if _modes.active:
 		_modes.active.reset()
 		return
@@ -544,7 +536,7 @@ func _reset_label() -> String:
 		return "Restart match" if what_stinks.authority else ""
 	if unnatural_run:
 		return "Reset the tank" if unnatural_run.test_tank else "Restart run"
-	return "Restart" if nature_run else "Reset"
+	return "Reset"
 
 
 ## Loads (converting a .replay first) and plays a replay. Runs in the
@@ -806,8 +798,6 @@ static func _match_card_text(mode: String) -> String:
 	match mode:
 		ONE_V_ONE:
 			return "1v1 against a bot: %d minutes on the clock, overtime on a tie." % int(Match1v1.MATCH_TIME / 60.0)
-		NATURE:
-			return "Swim like a fish: no boost here. Hold throttle and sweep the stick from side to side (any direction, as long as each sweep goes back the other way). Each stride builds to a peak, when its glow flashes; sweep back right then and the next stride pushes harder. Keep it up and the push builds. Ram the fish your camera's locked on fast enough to batter it."
 		TEST_TANK:
 			return "Test Tank: Unnatural's shooting range. Immortal dummies wait ahead (a cluster, and lines at 10, 20 and 40 m) and the DPS readout shows each damage source. Set your level, every stat, the dummies and a chasing horde in the tuning panel's UNNATURAL > Test Tank. R resets."
 		UNNATURAL:
@@ -879,8 +869,8 @@ func _apply_mode() -> void:
 			_local.dropped_for_marco_polo = _local.count() - 1
 		elif not one_screen:
 			_local.dropped_for_marco_polo = 0
-	if current_mode not in [NATURE, UNNATURAL] and _local:
-		_local.drop_extras()  # split-screen co-op is Nature's and Unnatural's
+	if current_mode != UNNATURAL and not ModeRegistry.describe(current_mode).get("split_screen", false) and _local:
+		_local.drop_extras()  # split-screen co-op is Unnatural's and the modes' that allow it
 	_use_nature_tuning(current_mode in NATURE_MODES)
 	_use_course_cam(current_mode == OBSTACLE_COURSE)
 	var wanted: bool = current_mode in MATCH_MODES and current_environment == mode_environment(current_mode)
@@ -931,15 +921,13 @@ func _sync_terrain_stream() -> void:
 
 ## A match, a Nature run or a Hunt is on.
 func _playing() -> bool:
-	return match_1v1 != null or nature_run != null or _modes.active != null or unnatural_run != null or marco_polo != null or what_stinks != null
+	return match_1v1 != null or _modes.active != null or unnatural_run != null or marco_polo != null or what_stinks != null
 
 
 ## The mode of the match being played ("" when none).
 func _playing_mode() -> String:
 	if match_1v1:
 		return ONE_V_ONE
-	if nature_run:
-		return NATURE
 	if unnatural_run:
 		return TEST_TANK if unnatural_run.test_tank else UNNATURAL
 	if marco_polo:
@@ -986,11 +974,8 @@ func _use_course_cam(on: bool) -> void:
 
 
 func _start_match() -> void:
-	if current_mode == NATURE:
-		_start_nature()
-		return
 	if ModeRegistry.has_mode(current_mode):
-		_modes.start(current_mode, ModeWorld.new(self, _environment, _fish, _camera, _hud))
+		_start_registered(current_mode)
 		return
 	if current_mode == MARCO_POLO:
 		_start_marco_polo()
@@ -1020,7 +1005,7 @@ func host_nature_run() -> void:
 		return
 	_end_match()
 	_close_match_card()
-	_start_nature(true)
+	_start_registered(NATURE, {"authority": true})
 
 
 ## Online co-op's guest: a Nature run of our players in the host's world.
@@ -1028,7 +1013,7 @@ func guest_nature_run() -> void:
 	set_mode(NATURE)
 	_end_match()
 	_close_match_card()
-	_start_nature(false)
+	_start_registered(NATURE, {"authority": false})
 
 
 ## Back from being a guest: Nature on our own again, the world ours.
@@ -1037,7 +1022,7 @@ func solo_nature_run() -> void:
 		return
 	_end_match()
 	_close_match_card()
-	_start_nature(true)
+	_start_registered(NATURE, {"authority": true})
 
 
 ## Holds the local players' fish still (online, while the pause menu's open:
@@ -1047,20 +1032,25 @@ func _hold_local_players(hold: bool) -> void:
 		slot.fish.controls_locked = hold
 
 
-## A Nature run with every local player (LocalCoop), the world run here
-## (`authority`) unless this is an online session's guest (CoopSession).
-func _start_nature(authority := true) -> void:
-	nature_run = NatureRun.new()
-	nature_run.name = "Nature"
-	nature_run.authority = authority
-	nature_run.setup(_environment, _fish)
-	for slot in _local.slots:
-		slot.fish.set_meta("coop_index", slot.index)
-		if slot.index > 0:
-			nature_run.players.append(slot.fish)
-	_environment.add_child(nature_run)
-	_local.attach_run(nature_run)  # each player's ball cam, school wheel and HUD
-	nature_started.emit(nature_run)
+## Starts registered mode `id` with every local player (LocalCoop) in its world.
+## `options` ride on the ModeWorld ({"authority": false}: an online session's guest).
+func _start_registered(id: String, options := {}) -> void:
+	var world := ModeWorld.new(self, _environment, _fish, _camera, _hud)
+	world.slots.assign(_local.slots)
+	world.options = options
+	mode_started.emit(_modes.start(id, world))
+
+
+## A registered mode with split-screen wires every local player in (their own
+## camera, wheel and HUD); `run` is its node.
+func attach_local_players(run: GameMode) -> void:
+	if _local:
+		_local.attach_run(run)
+
+
+func detach_local_players() -> void:
+	if _local and is_instance_valid(_local.run):
+		_local.detach_run()
 
 
 ## Marco Polo in the arena picked on its card: the player and bots (no
@@ -1244,13 +1234,9 @@ func _end_match() -> void:
 		_camera.target = null
 		what_stinks_ended.emit()
 	if _modes.active:
+		var ended := _modes.active_id()
 		_modes.end()
-	if nature_run:
-		_local.detach_run()
-		nature_run.end()
-		nature_run.queue_free()
-		nature_run = null
-		nature_ended.emit()
+		mode_ended.emit(ended)
 	if match_1v1 == null:
 		return
 	match_1v1.end()

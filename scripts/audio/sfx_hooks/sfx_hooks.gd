@@ -110,8 +110,6 @@ func _on_node_added(node: Node) -> void:
 	elif node is Match1v1:
 		_attach.call_deferred(node, MatchSounds.new(), &"sfx_hook")
 		_attach.call_deferred(node, BatteredSounds.new(), &"sfx_battered")
-	elif node is NatureRun:
-		_attach.call_deferred(node, NatureSounds.new())
 	elif node is UnnaturalRun:
 		_attach.call_deferred(node, UnnaturalSounds.new())
 	elif node is Boss:
