@@ -18,6 +18,8 @@ extends Node3D
 const SPAWN_AHEAD := 0.6
 ## How long the bubble puff stays before it's freed (s).
 const PUFF_TIME := 2.5
+## Its name on the decoy's modifiers and capabilities.
+const MODS := "marco.fake"
 
 var game: MarcoPoloMatch
 ## The hider who threw it.
@@ -51,9 +53,8 @@ func _ready() -> void:
 	fish.team = thrower.team
 	fish.team_color = thrower.team_color
 	fish.buoyancy = settings.hider_buoyancy
-	fish.speed_scale = thrower.speed_scale
-	fish.boost_enabled = false
-	fish.bow_scale = 1.0
+	fish.modifiers.push(MODS, {"speed": thrower.speed_scale, "bow": 1.0})
+	fish.capabilities.push(MODS, {"boost": false})
 	fish.add_collision_exception_with(thrower)
 	thrower.add_collision_exception_with(fish)
 	var facing := -thrower.global_basis.z.normalized()
