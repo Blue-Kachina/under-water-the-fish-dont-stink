@@ -21,7 +21,7 @@ D6 file moves done in worktree + committed, git: branch per track, push branches
 | T2 rig | 2 | P1-P4 shark rig | track/rig | done, merged (needs user eyes: D:/Dev/GameDev/wt/shots/rig) |
 | T3 hunt | 3 | H0-H7 | track/hunt | done, merged (gates green 2026-11-21) |
 | T4a P5 rollout | 4 | Drowned Shark + 2 classes on rig | track/rollout | done, merged |
-| T4b carve | 4 | M3 water carving | track/carve | waits on T1 + T3 H5 |
+| T4b carve | 4 | M3 water carving | track/carve | done, merged (default off) |
 | T4c nature | 4 | Nature migration | track/nature | waits on T3 H7 |
 
 ## Track sections
