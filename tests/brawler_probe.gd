@@ -166,7 +166,7 @@ func _run() -> void:
 	settings.fish_attack = FishAttack.Kind.LASH
 	await _be()
 	twist = run.twist_of(fish)
-	var spare := twist.punch_for_recoil()
+	var spare = twist.punch_for_recoil()
 	check(spare != null and run.attack_of(fish) is ShockLash, "another attack from the panel: the skill still punches (a spare)")
 	settings.fish_attack = FishAttack.Kind.OWN
 

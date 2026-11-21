@@ -156,7 +156,7 @@ signal rift_claimed(by: FishController)
 signal choices_changed(fish: FishController)
 
 ## The key its survivor cam is pushed on the FollowCamera under (push_style).
-const CAMERA_STYLE_KEY := &"unnatural"
+const CAMERA_STYLE_KEY := SurvivorCam.KEY
 
 ## Players spawn side by side, this far apart (m).
 const SPAWN_SPACING := 3.0
@@ -622,44 +622,14 @@ func remove_player(fish: FishController) -> void:
 	players.erase(fish)
 
 
-## Puts the survivor cam (UnnaturalSettings' Camera group) on `camera` (a
-## FollowCamera), or takes it off (`on` false: the usual chase view). Called
-## every frame, live from the panel: camera_mode only sets the follow or free
-## cam when it's put on, or when the setting changes, so the camera's own swap
-## button sticks in between. `pull`: m further back on top (camera_pull_of()).
+## Puts the survivor cam on `camera` (see SurvivorCam; kept for the modes that still call it here).
 static func steady_camera(camera: Node, on: bool, from: UnnaturalSettings, pull := 0.0) -> void:
-	if not is_instance_valid(camera):
-		return
-	if on and from.steady_camera:
-		camera.push_style(CAMERA_STYLE_KEY, survivor_style(from, pull))
-	else:
-		camera.pop_style(CAMERA_STYLE_KEY)
+	SurvivorCam.apply(camera, on, from, pull)
 
 
-## The survivor cam as a CameraStyle (UnnaturalSettings' Camera group).
+## The survivor cam as a CameraStyle (see SurvivorCam).
 static func survivor_style(from: UnnaturalSettings, pull := 0.0) -> CameraStyle:
-	var style := CameraStyle.new()
-	style.view_mode = from.camera_mode
-	style.follow_style = from.camera_follow
-	style.swing_rate = from.camera_swing_rate
-	style.settle_rate = from.camera_settle_rate
-	style.settle_turning_rate = from.camera_settle_turning_rate
-	style.settle_turn_full = deg_to_rad(from.camera_settle_turn)
-	style.settle_smoothing = from.camera_settle_smoothing
-	style.settle_delay = from.camera_settle_delay
-	style.settle_max_angle = deg_to_rad(from.camera_settle_max_angle)
-	style.settle_coast_rate = from.camera_settle_coast_rate
-	style.settle_coast_ease = from.camera_settle_coast_ease
-	style.free_turn_speed = deg_to_rad(from.free_cam_speed)
-	style.free_pitch_limit = deg_to_rad(from.free_cam_pitch)
-	style.free_follow_rate = from.free_cam_follow
-	style.free_invert_y = from.free_cam_invert_y
-	style.heading_rate = from.camera_turn_rate
-	style.heading_climb = from.camera_climb
-	style.extra_distance = from.camera_distance + pull
-	style.extra_height = from.camera_height + pull * 0.3
-	style.extra_angle = from.camera_tilt
-	return style
+	return SurvivorCam.style(from, pull)
 
 
 ## A player's health.
@@ -686,6 +656,51 @@ func is_quiet(fish: FishController) -> bool:
 ## `fish's traversal twist and mobility skill.
 func twist_of(fish: FishController) -> Traversal:
 	return _twists.get(fish)
+
+
+## The punch a Recoil Dash throws (Traversal asks): the fish's own Cavitation Punch,
+## else a second one it holds, else a spare at its stats (the panel gave it another attack).
+func recoil_punch(twist: Traversal) -> CavitationPunch:
+	var fish := twist.fish
+	var own := attack_of(fish) as CavitationPunch
+	if own:
+		return own
+	var held := powerups_of(fish)
+	var weapon: CavitationPunch = held.weapon("attack_punch") as CavitationPunch if held else null
+	if weapon:
+		return weapon
+	if not is_instance_valid(twist.spare_punch):
+		twist.spare_punch = _spare_attack(twist, FishAttack.Kind.PUNCH)
+	(twist.spare_punch as CavitationPunch).configure(block_of(fish), {}, 1)
+	return twist.spare_punch as CavitationPunch
+
+
+## The Purple Haze Flutter drops its cloud with (Traversal asks): likewise.
+func flutter_haze(twist: Traversal) -> PurpleHaze:
+	var fish := twist.fish
+	var own := attack_of(fish) as PurpleHaze
+	if own:
+		return own
+	var held := powerups_of(fish)
+	var weapon: PurpleHaze = held.weapon("attack_purple_haze") as PurpleHaze if held else null
+	if weapon:
+		return weapon
+	if not is_instance_valid(twist.spare_haze):
+		twist.spare_haze = _spare_attack(twist, FishAttack.Kind.HAZE)
+	(twist.spare_haze as PurpleHaze).configure(block_of(fish), {}, 1)
+	return twist.spare_haze as PurpleHaze
+
+
+func _spare_attack(twist: Traversal, kind: FishAttack.Kind) -> FishAttack:
+	var spare := FishAttack.make(kind)
+	spare.fish = twist.fish
+	spare.horde = horde
+	spare.settings = settings
+	spare.run = self
+	spare.powers = powerup_settings
+	spare.on_hit = hit
+	add_child(spare)
+	return spare
 
 
 ## A player's run so far: kills, damage (and by source: "bite", "battery"),

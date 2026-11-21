@@ -1,6 +1,6 @@
 {
 	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
-	"total": 213,
+	"total": 133,
 	"violations": {
 		"audio/sfx_hooks/sfx_hooks.gd": {
 			"BatteredSounds": 1,
@@ -36,7 +36,7 @@
 			"Match1v1": 1,
 			"TreasureChest": 1,
 			"UnnaturalHud": 3,
-			"UnnaturalRun": 7
+			"UnnaturalRun": 5
 		},
 		"main.gd": {
 			"CourseSkill": 2,
@@ -45,8 +45,7 @@
 			"MarcoPoloSettings": 11,
 			"Match1v1": 3,
 			"UnnaturalHud": 2,
-			"UnnaturalRun": 8,
-			"UnnaturalSettings": 3,
+			"UnnaturalRun": 3,
 			"WhatStinksMatch": 3,
 			"WhatStinksSettings": 5,
 			"path:marco_polo/fish_tank_arena.gd": 1,
@@ -60,21 +59,6 @@
 			"UnnaturalRun": 3,
 			"WhatStinksMatch": 3,
 			"WhatStinksNet": 1
-		},
-		"terrain/ocean_floor.gd": {
-			"UnnaturalSettings": 3
-		},
-		"terrain/terrain.gd": {
-			"UnnaturalSettings": 4
-		},
-		"terrain/terrain_layout.gd": {
-			"UnnaturalSettings": 4
-		},
-		"terrain/terrain_light.gd": {
-			"UnnaturalSettings": 2
-		},
-		"terrain/terrain_stream.gd": {
-			"UnnaturalSettings": 1
 		},
 		"ui/hex_badge.gd": {
 			"Powerup": 1
@@ -91,23 +75,6 @@
 			"UnnaturalSettings": 1,
 			"WhatStinksMatch": 1,
 			"WhatStinksSettings": 13
-		},
-		"unnatural/chomp_kit.gd": {
-			"Boss": 2,
-			"UnnaturalHud": 6,
-			"UnnaturalRun": 9,
-			"UnnaturalSettings": 2
-		},
-		"unnatural/seabed.gd": {
-			"UnnaturalSettings": 5
-		},
-		"unnatural/traversal.gd": {
-			"CavitationPunch": 7,
-			"FishAttack": 4,
-			"PowerupFx": 9,
-			"PurpleHaze": 7,
-			"UnnaturalRun": 3,
-			"UnnaturalSettings": 2
 		}
 	}
 }

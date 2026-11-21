@@ -9,7 +9,7 @@ extends RefCounted
 
 ## A Seabed `depth` m under `center`, `radius` round, laid out from `seed_value`, added to `parent`.
 static func seabed(parent: Node, center: Vector3, radius: float, depth: float, seed_value: int, fog_density: float) -> Seabed:
-	var floor_settings := UnnaturalSettings.shared().duplicate() as UnnaturalSettings
+	var floor_settings := TerrainSettings.shared().duplicate() as TerrainSettings
 	floor_settings.arena_radius = radius
 	var bed := Seabed.new()
 	bed.name = "Seabed"
@@ -23,7 +23,7 @@ static func seabed(parent: Node, center: Vector3, radius: float, depth: float, s
 
 ## An endless TerrainStream `depth` m under `center` following `fish`, added to `parent`.
 static func stream(parent: Node, center: Vector3, depth: float, fish: Node3D, seed_value: int) -> TerrainStream:
-	var settings := UnnaturalSettings.shared()
+	var settings := TerrainSettings.shared()
 	var terrain := TerrainStream.new()
 	terrain.name = "TerrainStream"
 	terrain.settings = settings

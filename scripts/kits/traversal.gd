@@ -34,7 +34,7 @@ extends RefCounted
 ## - Breachers (baby whales), Gulp: sucks the zombies ahead of it in.
 ## - Sea Hare, Flutter: three big flaps carry it up and forward over the pack,
 ##   dropping a Purple Haze cloud where it took off.
-## UnnaturalRun owns one per local player and calls update() every tick.
+## A mode's run (Unnatural's) owns one per local player and calls update() every tick.
 ## Away from a run (`run` null: the Obstacle Course's CourseSkill) the skills
 ## still move the fish and show their effects, but there's nothing to hit,
 ## shield or heal.
@@ -71,11 +71,13 @@ const SKILLS := {
 const LEAP_TOP := 0.35
 const LEAP_MAX := 1.2
 const FIN_COLOR := Color(0.55, 0.75, 0.85)
+## How close a zombie must be to the fish to count as touching it (m).
+const PLAYER_RADIUS := 0.75
 
 ## Null away from a run.
-var run: UnnaturalRun
+var run  # the mode's run (a duck: horde, hit(), health_of(), attack_of()...), else null
 var fish: FishController
-var settings: UnnaturalSettings
+var settings: TraversalSettings
 ## Where the skills' effects go: the run, else the node given.
 var host: Node
 ## The Shark's frenzy now (a share of swim speed), and how long it's held still.
@@ -120,21 +122,21 @@ var _recoil_heading := Vector3.BACK
 var _flings: Array[Dictionary] = []
 ## The Recoil Dash's punch when the fish has no Cavitation Punch of its own
 ## (the panel's fish_attack gave it another).
-var _spare_punch: CavitationPunch
+var spare_punch: Node
 ## Flutter's flaps still to come, and seconds to the next.
 var _flaps_left := 0
 var _flap_wait := 0.0
 ## Flutter's cloud when the fish has no Purple Haze of its own (likewise).
-var _spare_haze: PurpleHaze
+var spare_haze: Node
 ## Unpalatable: coated zombies (index -> when the coat wears off, on _clock).
 var _coated := {}
 var _clock := 0.0
 
 
-func _init(owner: UnnaturalRun, of: FishController, effects_in: Node = null) -> void:
+func _init(owner, of: FishController, effects_in: Node = null) -> void:
 	run = owner
 	fish = of
-	settings = owner.settings if owner else UnnaturalSettings.shared()
+	settings = owner.settings if owner else TraversalSettings.shared()
 	host = owner if owner else effects_in
 
 
@@ -144,12 +146,12 @@ func clear() -> void:
 		fish.turn_scale = 1.0
 		fish.drag_scale = 1.0
 	reset()
-	if is_instance_valid(_spare_punch):
-		_spare_punch.queue_free()
-	_spare_punch = null
-	if is_instance_valid(_spare_haze):
-		_spare_haze.queue_free()
-	_spare_haze = null
+	if is_instance_valid(spare_punch):
+		spare_punch.queue_free()
+	spare_punch = null
+	if is_instance_valid(spare_haze):
+		spare_haze.queue_free()
+	spare_haze = null
 
 
 func reset() -> void:
@@ -224,7 +226,7 @@ func update(delta: float) -> void:
 	_brace_left = maxf(_brace_left - delta, 0.0)
 	fish.drag_scale = 0.0 if _surge_left > 0.0 or _recoil_left > 0.0 else (settings.glide_drag if is_on(FishCharacter.FishClass.GLIDER) else 1.0)
 	if run and is_on(FishCharacter.FishClass.BREACHER) and settings.escort_regen > 0.0 and fish.speed <= settings.chest_still_speed:
-		var health := run.health_of(fish)
+		var health = run.health_of(fish)
 		if health and not health.down:
 			health.heal(settings.escort_regen * delta)
 	if frenzy > 0.0:
@@ -371,7 +373,7 @@ func _cool_for(seconds: float) -> void:
 func _shield(seconds: float) -> void:
 	if run == null:
 		return
-	var health := run.health_of(fish)
+	var health = run.health_of(fish)
 	if health and seconds > 0.0:
 		health.shield(seconds)
 
@@ -426,7 +428,7 @@ func _splash() -> void:
 	if run == null:
 		return
 	for i in run.horde.query_sphere(at, settings.leap_radius):
-		var away := run.horde.enemy_position(i) - at
+		var away = run.horde.enemy_position(i) - at
 		run.hit(i, settings.leap_damage, fish, "splash", away.normalized() if away.length_squared() > 0.0001 else Vector3.UP)
 
 
@@ -437,13 +439,13 @@ func _recoil() -> void:
 	_recoil_heading = recoil_heading()
 	_recoil_left = settings.recoil_time
 	_shield(settings.recoil_iframes)
-	var punch := punch_for_recoil()
+	var punch = punch_for_recoil()
 	if punch:
 		punch.punch(-_recoil_heading)
 	var short := settings.recoil_speed - fish.linear_velocity.dot(_recoil_heading)
 	if short > 0.0:
 		fish.apply_push(_recoil_heading * short)
-	PowerupFx.ring(host, fish.global_position, 1.4, CavitationPunch.BUBBLE_COLOR, _recoil_heading, 0.25)
+	PowerupFx.ring(host, fish.global_position, 1.4, Color(0.75, 0.95, 1.0), _recoil_heading, 0.25)
 
 
 ## The way the Recoil Dash throws the fish (unit): the way the stick leans
@@ -457,29 +459,10 @@ func recoil_heading() -> Vector3:
 	return (fish.global_basis.x * lean.x + fish.global_basis.y * lean.y).normalized()
 
 
-## The punch the Recoil Dash throws: the fish's own Cavitation Punch, else a
-## second one it holds, else a spare at its stats (the panel gave it another attack).
-func punch_for_recoil() -> CavitationPunch:
-	if run == null:
-		return null
-	var own := run.attack_of(fish) as CavitationPunch
-	if own:
-		return own
-	var powerups := run.powerups_of(fish)
-	var held: CavitationPunch = powerups.weapon("attack_punch") as CavitationPunch if powerups else null
-	if held:
-		return held
-	if not is_instance_valid(_spare_punch):
-		_spare_punch = FishAttack.make(FishAttack.Kind.PUNCH) as CavitationPunch
-		_spare_punch.fish = fish
-		_spare_punch.horde = run.horde
-		_spare_punch.settings = settings
-		_spare_punch.run = run
-		_spare_punch.powers = run.powerup_settings
-		_spare_punch.on_hit = run.hit
-		run.add_child(_spare_punch)
-	_spare_punch.configure(run.block_of(fish), {}, 1)
-	return _spare_punch
+## The punch the Recoil Dash throws (a Cavitation Punch): the run's to find (the fish's
+## own, one it holds, else a spare it keeps in `spare_punch`); none away from a run.
+func punch_for_recoil():
+	return run.recoil_punch(self) if run != null and run.has_method("recoil_punch") else null
 
 
 ## Heavy Hitter: zombie `index`, just punched for `amount`, flies as a missile
@@ -509,7 +492,7 @@ func is_flung(index: int) -> bool:
 
 
 func _fling_step(delta: float) -> void:
-	var horde := run.horde
+	var horde = run.horde
 	var n := 0
 	while n < _flings.size():
 		var f := _flings[n]
@@ -519,10 +502,10 @@ func _fling_step(delta: float) -> void:
 			_flings.remove_at(n)
 			continue
 		n += 1
-		var flying := horde.enemy_velocity(index)
+		var flying = horde.enemy_velocity(index)
 		if flying.length_squared() < 1.0:
 			continue
-		var at := horde.enemy_position(index)
+		var at = horde.enemy_position(index)
 		for j in horde.query_sphere(at, horde.enemy_radius(index)):
 			if f.hit.has(j):
 				continue
@@ -543,10 +526,10 @@ func _gulp(nose: Vector3) -> void:
 	if run == null:
 		return
 	for i in run.horde.query_sphere(fish.global_position, settings.gulp_range):
-		var offset := run.horde.enemy_position(i) - fish.global_position
+		var offset = run.horde.enemy_position(i) - fish.global_position
 		if offset.length_squared() < 0.0001 or offset.normalized().dot(nose) < 0.5:
 			continue
-		var pull := (mouth - run.horde.enemy_position(i)).normalized() * settings.gulp_pull
+		var pull = (mouth - run.horde.enemy_position(i)).normalized() * settings.gulp_pull
 		run.hit(i, settings.gulp_damage, fish, "gulp", pull, 0.5)
 
 
@@ -555,7 +538,7 @@ func _gulp(nose: Vector3) -> void:
 func _coat_touching() -> void:
 	if settings.coat_time <= 0.0:
 		return
-	for i in run.horde.query_sphere(fish.global_position, UnnaturalRun.PLAYER_RADIUS):
+	for i in run.horde.query_sphere(fish.global_position, PLAYER_RADIUS):
 		if not _coated.has(i) or _coated[i] < _clock:
 			coats += 1
 		_coated[i] = _clock + settings.coat_time
@@ -578,7 +561,7 @@ func _flutter() -> void:
 	_cool_for(settings.flutter_cooldown)
 	_flaps_left = maxi(settings.flutter_flaps, 1)
 	_flap()
-	var haze := haze_for_flutter()
+	var haze = haze_for_flutter()
 	if haze:
 		haze.open_cloud(fish.global_position, haze.radius(), haze.life())
 
@@ -593,38 +576,18 @@ func _flap() -> void:
 	var ahead := flat.normalized() if flat.length_squared() > 0.0001 else Vector3.FORWARD
 	var heading := (ahead * (1.0 - settings.flutter_lift) + Vector3.UP * settings.flutter_lift).normalized()
 	fish.apply_push(heading * settings.flutter_speed)
-	PowerupFx.ring(host, fish.global_position, 1.3, PurpleHaze.COLOR, Vector3.UP, 0.25)
+	PowerupFx.ring(host, fish.global_position, 1.3, Color(0.62, 0.3, 0.85), Vector3.UP, 0.25)
 
 
-## The Purple Haze Flutter drops its cloud with: the fish's own, else one it
-## holds, else a spare at its stats (the panel gave it another attack).
-func haze_for_flutter() -> PurpleHaze:
-	if run == null:
-		return null
-	var own := run.attack_of(fish) as PurpleHaze
-	if own:
-		return own
-	var powerups := run.powerups_of(fish)
-	var held: PurpleHaze = powerups.weapon("attack_purple_haze") as PurpleHaze if powerups else null
-	if held:
-		return held
-	if not is_instance_valid(_spare_haze):
-		_spare_haze = FishAttack.make(FishAttack.Kind.HAZE) as PurpleHaze
-		_spare_haze.fish = fish
-		_spare_haze.horde = run.horde
-		_spare_haze.settings = settings
-		_spare_haze.run = run
-		_spare_haze.powers = run.powerup_settings
-		_spare_haze.on_hit = run.hit
-		run.add_child(_spare_haze)
-	_spare_haze.configure(run.block_of(fish), {}, 1)
-	return _spare_haze
+## The Purple Haze Flutter drops its cloud with: the run's to find (likewise).
+func haze_for_flutter():
+	return run.flutter_haze(self) if run != null and run.has_method("flutter_haze") else null
 
 
 ## Ticks the spare haze's clouds (it isn't the fish's attack, so nothing else does).
 func _tick_spare(delta: float) -> void:
-	if is_instance_valid(_spare_haze) and not _spare_haze.clouds.is_empty():
-		_spare_haze._tick_clouds(delta)
+	if is_instance_valid(spare_haze) and not spare_haze.clouds.is_empty():
+		spare_haze._tick_clouds(delta)
 
 
 ## More i-frames after a hit (s): the Koi's grace.

@@ -69,7 +69,7 @@ class Bite:
 	## A held-open bite (open_now) reached full charge.
 	signal charged
 
-	var settings: UnnaturalSettings
+	var settings: ChompSettings
 	var phase := Phase.IDLE
 	## Seconds into the phase.
 	var t := 0.0
@@ -103,7 +103,7 @@ class Bite:
 	var _offset := 0.0
 	var _net_phase := -1
 
-	func _init(from: UnnaturalSettings) -> void:
+	func _init(from: ChompSettings) -> void:
 		settings = from
 
 	## Starts a chomp, its wind-up `wind_s` s, biting `bite_reach` m round the mouth.
@@ -294,7 +294,7 @@ class Bite:
 
 ## A bite of `damage` (already scaled) on player `fish` from a mouth at `mouth`:
 ## hurt, then the impact if it did (power: 1 a boss's chomp). Returns whether it hurt.
-static func bite_player(run: UnnaturalRun, fish: FishController, mouth: Vector3, damage: float, cause: String, boss: Boss = null,
+static func bite_player(run, fish: FishController, mouth: Vector3, damage: float, cause: String, boss = null,
 		power := 1.0) -> bool:
 	if not run.hurt(fish, damage, -1, cause):
 		return false
@@ -304,10 +304,10 @@ static func bite_player(run: UnnaturalRun, fish: FishController, mouth: Vector3,
 
 ## A chomp's impact on player `fish` from `from` (the mouth), `power` times a
 ## boss's chomp; `boss` freezes with them; `amount`: its damage (0: none shown).
-static func impact(run: UnnaturalRun, fish: FishController, from: Vector3, power := 1.0, boss: Boss = null, amount := 0.0) -> void:
+static func impact(run, fish: FishController, from: Vector3, power := 1.0, boss = null, amount := 0.0) -> void:
 	if not is_instance_valid(fish) or fish.puppet:
 		return
-	var settings := run.settings
+	var settings = run.settings
 	var scale := power * clampf(amount / maxf(settings.chomp_damage_ref, 1.0), 0.6, 2.0) if amount > 0.0 else power
 	var toward := from - fish.global_position
 	var camera := _camera_of(fish)
@@ -321,7 +321,7 @@ static func impact(run: UnnaturalRun, fish: FishController, from: Vector3, power
 	if settings.chomp_knockback > 0.0 and run.holder_of(fish) == null:
 		var away := -toward.normalized() if toward.length_squared() > 0.01 else fish.global_basis.z
 		fish.apply_push(away * settings.chomp_knockback * power)
-	var hud := _hud_of(fish)
+	var hud = _hud_of(fish)
 	if hud:
 		hud.hurt_level = maxf(hud.hurt_level, settings.chomp_vignette * power)
 		if amount > 0.0:
@@ -337,18 +337,18 @@ static func impact(run: UnnaturalRun, fish: FishController, from: Vector3, power
 
 ## Jaws (`reach` m) clacking shut on nothing at `mouth`: a smaller shake for
 ## local players within chomp_miss_range times the reach, a bubble puff and boss/chomp_miss.
-static func miss(run: UnnaturalRun, mouth: Vector3, reach: float, power := 1.0) -> void:
-	var settings := run.settings
-	var near := reach * settings.chomp_miss_range
+static func miss(run, mouth: Vector3, reach: float, power := 1.0) -> void:
+	var settings = run.settings
+	var near = reach * settings.chomp_miss_range
 	for fish in run.local_players():
 		if not run.is_up(fish):
 			continue
-		var gap := fish.global_position.distance_to(mouth)
+		var gap = fish.global_position.distance_to(mouth)
 		if gap > near:
 			continue
 		var camera := _camera_of(fish)
 		if camera:
-			var fall := 1.0 - 0.5 * gap / maxf(near, 0.01)
+			var fall = 1.0 - 0.5 * gap / maxf(near, 0.01)
 			camera.call("punch", settings.chomp_cam_shake * settings.chomp_miss_shake * power * fall, Vector3.ZERO)
 		_rumble(fish, settings.chomp_rumble * settings.chomp_miss_shake * power, settings.chomp_rumble_time * 0.6)
 	var fx := _fx(run)
@@ -358,24 +358,24 @@ static func miss(run: UnnaturalRun, mouth: Vector3, reach: float, power := 1.0) 
 
 ## A rumble of `strength` for `seconds` on every local player within `reach` m of `at`
 ## (fading with distance): a chomp's beats, as opposed to its landing (impact).
-static func rumble_near(run: UnnaturalRun, at: Vector3, reach: float, strength: float, seconds: float) -> void:
+static func rumble_near(run, at: Vector3, reach: float, strength: float, seconds: float) -> void:
 	if strength <= 0.0 or seconds <= 0.0:
 		return
 	for fish in run.local_players():
 		if not run.is_up(fish):
 			continue
-		var gap := fish.global_position.distance_to(at)
+		var gap = fish.global_position.distance_to(at)
 		if gap <= reach:
 			_rumble(fish, strength * (1.0 - 0.6 * gap / maxf(reach, 0.01)), seconds)
 
 
 ## A zombie's lunge landing on player `fish` from `from` (lunge_impact): a
 ## light, throttled impact. Returns whether it played (false: off, merged or remote).
-static func light_impact(run: UnnaturalRun, fish: FishController, from: Vector3) -> bool:
-	var settings := run.settings
+static func light_impact(run, fish: FishController, from: Vector3) -> bool:
+	var settings = run.settings
 	if not settings.lunge_impact or not is_instance_valid(fish) or fish.puppet:
 		return false
-	var shake := settings.chomp_cam_shake * settings.lunge_impact_shake
+	var shake = settings.chomp_cam_shake * settings.lunge_impact_shake
 	var camera := _camera_of(fish)
 	var now := float(Engine.get_physics_frames()) / maxf(Engine.physics_ticks_per_second, 1.0)  # game time, not the wall clock
 	var last: float = _light_at.get(fish, -INF)
@@ -391,7 +391,7 @@ static func light_impact(run: UnnaturalRun, fish: FishController, from: Vector3)
 		camera.call("punch", shake, toward.normalized() * settings.chomp_cam_kick * settings.lunge_impact_shake if toward.length_squared() > 0.01 else Vector3.ZERO)
 	if settings.lunge_impact_knock > 0.0 and toward.length_squared() > 0.01 and run.holder_of(fish) == null:
 		fish.apply_push(-toward.normalized() * settings.lunge_impact_knock)
-	var hud := _hud_of(fish)
+	var hud = _hud_of(fish)
 	if hud:
 		hud.hurt_level = maxf(hud.hurt_level, settings.lunge_impact_flash)
 	_rumble(fish, settings.lunge_impact_rumble, 0.1)
@@ -404,17 +404,17 @@ static func light_impact(run: UnnaturalRun, fish: FishController, from: Vector3)
 ## through UnnaturalRun.hit (the boss takes it as any hit), its number in the
 ## big style, a boss hit freezing a moment, blood and teeth there, and `by`'s
 ## camera punching (power: 1 a boss chomp's shake on them).
-static func chomp_zombie(run: UnnaturalRun, index: int, damage: float, by: FishController, source: String, power := 0.5) -> void:
+static func chomp_zombie(run, index: int, damage: float, by: FishController, source: String, power := 0.5) -> void:
 	if not run.horde.is_alive(index):
 		return
-	var at := run.horde.enemy_position(index)
+	var at = run.horde.enemy_position(index)
 	var push := Vector3.ZERO
 	if is_instance_valid(by):
 		push = (at - by.global_position).normalized() * 2.0
 	big_hit = true
 	run.hit(index, damage, by, source, push)
 	big_hit = false
-	var boss := run.boss_at(index)
+	var boss = run.boss_at(index)
 	if boss and run.settings.chomp_hit_stop > 0.0:
 		boss.hit_stop = maxf(boss.hit_stop, run.settings.chomp_hit_stop)
 	if is_instance_valid(by) and not by.puppet:
@@ -453,30 +453,30 @@ static func _camera_of(fish: FishController) -> Camera3D:
 
 
 ## `fish`'s own UnnaturalHud (null: none).
-static func _hud_of(fish: FishController) -> UnnaturalHud:
+static func _hud_of(fish: FishController) -> Node:
 	var views: Array = _views.get(fish, [])
 	if views.is_empty() or not is_instance_valid(views[1]):
 		_find_views(fish)
 		views = _views.get(fish, [null, null])
-	return views[1] as UnnaturalHud if is_instance_valid(views[1]) else null
+	return views[1] as Node if is_instance_valid(views[1]) else null
 
 
 static func _find_views(fish: FishController) -> void:
 	var camera: Camera3D = null
-	var hud: UnnaturalHud = null
+	var hud: Node = null
 	if fish.is_inside_tree():
 		var tree := fish.get_tree()
 		for node in tree.get_nodes_in_group(CAMERAS):
 			if node.get("fish") == fish and node.has_method("punch"):
 				camera = node as Camera3D
 		for node in tree.get_nodes_in_group(HUDS):
-			if node is UnnaturalHud and (node as UnnaturalHud).fish == fish:
-				hud = node as UnnaturalHud
+			if node.get("fish") == fish and node.get("numbers") != null:
+				hud = node
 	_views[fish] = [camera, hud]
 
 
 ## The victim's moment of hit-stop: its controls don't answer for `seconds`.
-static func _freeze(run: UnnaturalRun, fish: FishController, seconds: float) -> void:
+static func _freeze(run, fish: FishController, seconds: float) -> void:
 	if fish.controls_locked:
 		return
 	fish.controls_locked = true
@@ -486,14 +486,14 @@ static func _freeze(run: UnnaturalRun, fish: FishController, seconds: float) -> 
 
 
 ## The victim's model squashed by `amount` (0.3: 30% flatter), springing back.
-static func _squash(run: UnnaturalRun, fish: FishController, amount: float) -> void:
+static func _squash(run, fish: FishController, amount: float) -> void:
 	var model: Node3D = fish.get("_visual")
 	if amount <= 0.0 or not is_instance_valid(model) or model.has_meta("chomp_squash"):
 		return
 	var rest := model.scale
 	model.set_meta("chomp_squash", true)
 	model.scale = rest * Vector3(1.0 + amount * 0.7, 1.0 - amount, 1.0 + amount * 0.4)
-	var tween := run.create_tween()
+	var tween = run.create_tween()
 	tween.tween_property(model, "scale", rest, 0.22).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	tween.tween_callback(func() -> void:
 		if is_instance_valid(model):
@@ -517,7 +517,7 @@ static func _rumble(fish: FishController, strength: float, seconds: float) -> vo
 # --- The FX -------------------------------------------------------------------
 
 ## The run's pooled chomp FX (made the first time).
-static func _fx(run: UnnaturalRun) -> Fx:
+static func _fx(run) -> Fx:
 	var fx := run.get_node_or_null("ChompFx") as Fx
 	if fx == null:
 		fx = Fx.new()

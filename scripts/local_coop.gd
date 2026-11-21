@@ -276,7 +276,7 @@ func _wire_unnatural(slot: PlayerSlot) -> void:
 	slot.camera.ball = null
 	slot.camera.ball_cam = false
 	slot.camera.cull_mask = TreasureChest.view_mask(slot.index)  # their chests, not the others'
-	UnnaturalRun.steady_camera(slot.camera, true, unnatural.settings)
+	SurvivorCam.apply(slot.camera, true, unnatural.settings)
 	if slot.index > 0 and not is_instance_valid(slot.mode_hud):
 		var hud := UnnaturalHud.new()
 		hud.name = "UnnaturalHud%d" % (slot.index + 1)
@@ -295,7 +295,7 @@ func _unwire(slot: PlayerSlot) -> void:
 	if not is_instance_valid(camera):
 		return
 	if run is UnnaturalRun:
-		UnnaturalRun.steady_camera(camera, false, (run as UnnaturalRun).settings)
+		SurvivorCam.apply(camera, false, (run as UnnaturalRun).settings)
 		camera.cull_mask = 0xFFFFF
 		if slot.index > 0 and is_instance_valid(slot.mode_hud):
 			slot.mode_hud.queue_free()

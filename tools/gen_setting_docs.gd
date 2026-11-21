@@ -15,7 +15,7 @@ const SECTIONS := {
 	"nature": ["res://scripts/modes/nature/nature_settings.gd", "res://scripts/kits/school_settings.gd"],
 	"hunt": ["res://scripts/modes/hunt/hunt_settings.gd"],
 	"battery": ["res://scripts/battery_settings.gd"],
-	"unnatural": ["res://scripts/unnatural/unnatural_settings.gd"],
+	"unnatural": ["res://scripts/unnatural/unnatural_settings.gd", "res://scripts/kits/terrain_settings.gd", "res://scripts/kits/survivor_cam_settings.gd", "res://scripts/kits/traversal_settings.gd", "res://scripts/kits/chomp_settings.gd"],
 	"powerups": ["res://scripts/unnatural/powerups/powerup_settings.gd"],
 	"gaits": ["res://scripts/gait_settings.gd"],
 	"marco_polo": ["res://scripts/marco_polo/marco_polo_settings.gd"],

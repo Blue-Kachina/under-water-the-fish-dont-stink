@@ -486,9 +486,9 @@ func _process(_delta: float) -> void:
 		reset_play()
 	if unnatural_run:
 		for slot in _local.slots:
-			UnnaturalRun.steady_camera(slot.camera, true, unnatural_run.settings, unnatural_run.camera_pull_of(slot.fish))  # live from the panel
+			SurvivorCam.apply(slot.camera, true, unnatural_run.settings, unnatural_run.camera_pull_of(slot.fish))  # live from the panel
 	elif _course_cam:
-		UnnaturalRun.steady_camera(_camera, true, UnnaturalSettings.shared())  # live from the panel
+		SurvivorCam.apply(_camera, true, SurvivorCamSettings.shared())  # live from the panel
 	_nature_camera_style()
 
 
@@ -915,7 +915,7 @@ func _apply_mode() -> void:
 ## Free Swim's endless terrain (planning_procedural_world.md, phase 8): a TerrainStream under the Ocean following the
 ## fish, while the mode is Free Swim and terrain_stream is on.
 func _sync_terrain_stream() -> void:
-	var settings := UnnaturalSettings.shared()
+	var settings := TerrainSettings.shared()
 	var want: bool = current_mode == FREE_SWIM and settings.terrain_stream and _environment is Ocean
 	if not want:
 		if is_instance_valid(_terrain_stream):
@@ -985,7 +985,7 @@ func _use_course_cam(on: bool) -> void:
 		remove_child(_course_skill)  # now: it gives the fish its own swimming back on leaving
 		_course_skill.queue_free()
 		_course_skill = null
-	UnnaturalRun.steady_camera(_camera, on, UnnaturalSettings.shared())
+	SurvivorCam.apply(_camera, on, SurvivorCamSettings.shared())
 	_hud.survivor_cam = on
 	_camera.snap()
 
@@ -1210,7 +1210,7 @@ func _start_unnatural(test_tank := false, authority := true) -> void:
 	_environment.add_child(unnatural_run)
 	_camera.ball = null
 	_camera.ball_cam = false
-	UnnaturalRun.steady_camera(_camera, true, unnatural_run.settings)
+	SurvivorCam.apply(_camera, true, unnatural_run.settings)
 	_camera.snap()
 	_hud.survivor_cam = true
 	_unnatural_hud = UnnaturalHud.new()
@@ -1227,7 +1227,7 @@ func _end_match() -> void:
 	if unnatural_run:
 		_local.detach_run()
 		_local.slots[0].mode_hud = null
-		UnnaturalRun.steady_camera(_camera, false, unnatural_run.settings)
+		SurvivorCam.apply(_camera, false, unnatural_run.settings)
 		_hud.survivor_cam = false
 		unnatural_run.end()
 		unnatural_run.queue_free()
