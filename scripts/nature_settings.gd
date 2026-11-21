@@ -160,11 +160,9 @@ static func shared() -> NatureSettings:
 
 @export_group("Sea Floor")
 ## A sea floor (planning_procedural_world.md, phase 8): Nature gets endless terrain far below, streamed round the player;
-## Hunt gets a seabed under its arena (with rock when Unnatural's terrain_enabled is on). Off: open water, as before.
+## Off: open water, as before. (Hunt's own floor switch and depth are in HuntSettings.)
 @export var nature_floor := false
 @export_range(10.0, 400.0, 1.0, "or_greater") var nature_floor_depth := 60.0
-@export var hunt_floor := false
-@export_range(5.0, 200.0, 1.0, "or_greater") var hunt_floor_depth := 22.0
 ## Hunt's floor: how far above it fish are kept (m), and how hard (m/s² per metre under).
 @export_range(0.0, 20.0, 0.1, "or_greater") var floor_clearance := 1.5
 @export_range(0.0, 50.0, 0.1, "or_greater") var floor_push := 6.0

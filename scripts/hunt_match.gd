@@ -3,7 +3,7 @@ extends GameMode
 ## Hunt: a 1v1 in the Ocean against a hostile fish (a HunterBot) with the
 ## player's own tuning (Nature's: Extra Swishy strides, no boost, bow wave).
 ## A battery (Battery) is a goal: ramming
-## the other fish nose first at nature_batter_speed or faster scores for the
+## the other fish nose first at the battery speed or faster scores for the
 ## rammer. Both fish ramming each other at once: the faster one scores; at the
 ## same speed both are battered (a "Fish Fry") and nobody scores.
 ##
@@ -98,7 +98,7 @@ var style := StylePoints.new()
 var last_battery := {}
 ## The arena's centre (the ocean's spawn).
 var center := Vector3.ZERO
-## The sea floor under the arena (NatureSettings.hunt_floor; null without).
+## The sea floor under the arena (HuntSettings.floor_enabled; null without).
 var seabed: Seabed
 
 var _world: ModeWorld
@@ -119,6 +119,7 @@ static func descriptor() -> Dictionary:
 		"environment": "Ocean", "match": true, "after": "Nature", "tile_before": "Nature",
 		"tuning_preset": "res://presets/nature.cfg",
 		"card_text": HuntMatch.card_text, "reset_label": "Restart match",
+		"settings": HuntSettings,
 		"sfx": [[MatchSounds, &"sfx_hook"], [BatteredSounds, &"sfx_battered"], [HuntSounds, &"sfx_hunt"]],
 	}
 
@@ -177,9 +178,8 @@ func _ready() -> void:
 	opponent.team = 1
 	_pick_opponent()
 	add_child(opponent)
-	opponent.team_color = AquariumArena.TEAM_COLORS[1]
-	player.team = 0
-	player.team_color = AquariumArena.TEAM_COLORS[0]
+	opponent.join_team(1, AquariumArena.TEAM_COLORS[1])
+	player.join_team(0, AquariumArena.TEAM_COLORS[0])
 
 	bot = HunterBot.new()
 	bot.name = "HunterBot"
@@ -195,9 +195,9 @@ func _ready() -> void:
 	_recorder.setup(null, [player, opponent] as Array[FishController])
 	ocean.boundary_center = center
 	ocean.boundary_radius = ARENA_RADIUS
-	var floor_settings := NatureSettings.shared()
-	if floor_settings.hunt_floor:
-		seabed = OceanFloor.seabed(self, center, ARENA_RADIUS, floor_settings.hunt_floor_depth, 29, ocean.fog_density())
+	var hunt_settings := HuntSettings.shared()
+	if hunt_settings.floor_enabled:
+		seabed = OceanFloor.seabed(self, center, ARENA_RADIUS, hunt_settings.floor_depth, 29, ocean.fog_density())
 	kickoff()
 
 
@@ -209,9 +209,8 @@ func end() -> void:
 		ocean.boundary_radius = 0.0
 	if not is_instance_valid(player):
 		return
-	player.team_color = Color.TRANSPARENT
-	player.team = -1
-	player.controls_locked = false
+	player.leave_team()
+	player.play_state = FishController.PlayState.LIVE
 	player.visible = not player.battered  # a replay hides it
 	player.freeze = player.battered
 	if player.battered:
@@ -238,7 +237,7 @@ func kickoff() -> void:
 	var layout: Vector2 = KICKOFF_LAYOUTS.pick_random()
 	for team in 2:
 		var fish := _fish_of(team)
-		fish.controls_locked = true
+		fish.play_state = FishController.PlayState.HELD
 		fish.revive(kickoff_transform(layout, team))
 	bot.reset()
 	style.live = false
@@ -256,13 +255,13 @@ func kickoff_transform(layout: Vector2, team: int) -> Transform3D:
 
 ## The slowest ram that batters (m/s): the player's tuning, which the opponent shares.
 func batter_speed() -> float:
-	return player.nature_batter_speed
+	return BatterySettings.shared().batter_speed
 
 
 func _physics_process(delta: float) -> void:
 	if seabed != null:
 		var floor_settings := NatureSettings.shared()
-		OceanFloor.keep_above([player, opponent], center.y - floor_settings.hunt_floor_depth, floor_settings.floor_clearance,
+		OceanFloor.keep_above([player, opponent], center.y - HuntSettings.shared().floor_depth, floor_settings.floor_clearance,
 				floor_settings.floor_push, delta)
 	match phase:
 		Phase.COUNTDOWN:
@@ -270,8 +269,8 @@ func _physics_process(delta: float) -> void:
 			if countdown_left <= 0.0:
 				phase = Phase.LIVE
 				go_time_left = GO_TIME
-				player.controls_locked = false
-				opponent.controls_locked = false
+				player.play_state = FishController.PlayState.LIVE
+				opponent.play_state = FishController.PlayState.LIVE
 		Phase.LIVE:
 			if overtime:
 				overtime_elapsed += delta
@@ -377,8 +376,8 @@ func _finish_match() -> void:
 	for team in 2:
 		var fish := _fish_of(team)
 		fish.revive(kickoff_transform(layout, team))
-	player.controls_locked = false
-	opponent.controls_locked = true
+	player.play_state = FishController.PlayState.LIVE
+	opponent.play_state = FishController.PlayState.HELD
 	_announce_teleport([player, opponent])
 	match_over.emit(winner)
 
@@ -436,7 +435,7 @@ func _start_replay() -> bool:
 	phase = Phase.REPLAY
 	# The live fish wait out of sight; the next kickoff (revive) brings them back.
 	for f: FishController in fish:
-		f.controls_locked = true
+		f.play_state = FishController.PlayState.HELD
 		f.visible = false
 		f.freeze = true
 	add_child(battery_replay)
