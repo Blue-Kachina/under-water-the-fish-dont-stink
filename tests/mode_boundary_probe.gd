@@ -41,7 +41,7 @@ const CORE := [
 const KITS := [
 	"school.gd", "school_fish.gd", "school_look.gd", "unnatural/seabed.gd", "terrain/",
 	"unnatural/traversal.gd", "battery.gd", "style_points.gd", "match_stats.gd",
-	"goal_recorder.gd", "goal_replay.gd", "replay/", "fish_bot.gd", "hunter_bot.gd", "wander_bot.gd",
+	"goal_recorder.gd", "goal_replay.gd", "replay/", "fish_bot.gd", "kits/", "wander_bot.gd",
 	"fx_kit.gd", "unnatural/chomp_kit.gd", "scenery/", "water_look.gd", "fx/", "xray_outline.gd",
 	"rl/",
 ]
@@ -51,7 +51,7 @@ const MODE_DIRS := {
 }
 const MODE_FILES := {
 	"net/unnatural_net.gd": "unnatural", "net/marco_polo_net.gd": "marco",
-	"net/what_stinks_net.gd": "what_stinks", "hunt_match.gd": "hunt",
+	"net/what_stinks_net.gd": "what_stinks",
 	"nature_run.gd": "nature", "nature_score.gd": "nature", "nature_settings.gd": "nature",
 	"pearl.gd": "nature", "match_1v1.gd": "1v1", "course_skill.gd": "course",
 	"audio/sfx_hooks/nature_sounds.gd": "nature", "audio/sfx_hooks/unnatural_sounds.gd": "unnatural",
