@@ -42,7 +42,7 @@ func zero_gait(on := true) -> Gait:
 
 ## The Gait's layer weights, in layer order (each step adds its own).
 func layer_fields() -> Array[String]:
-	return ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel", "rig_drift"]
+	return ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel", "rig_drift", "rig_fin_stabilizer"]
 
 
 ## A state at `speed` m/s straight ahead, effort from the throttle.
@@ -88,6 +88,7 @@ func _run() -> void:
 	_turn()
 	_accel()
 	_drift()
+	_fin_stabilizer()
 	print("swim_rig_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)
 
@@ -307,3 +308,33 @@ func _drift() -> void:
 	var climbing := moving(15.0)
 	climbing.slip = Vector3(0.0, 8.0, 0.0)
 	check(settle(gait, climbing, 1.5).rig.pose.spine_pitch() < -0.1, "drifting upward lifts the tail end toward the velocity")
+
+
+func _fin_stabilizer() -> void:
+	print("FinStabilizer:")
+	var gait := only(["rig_fin_stabilizer"])
+	var still := settle(gait, moving(0.0, 0.0), 1.0)
+	check(absf(still.rig.pose.fin_flap.x) < 1e-5 and absf(still.rig.pose.fin_pitch.x) < 1e-5, "at rest the fins hold still")
+	var rolling := moving(15.0)
+	rolling.spin = Vector3(0.0, 0.0, 1.0)  # rolling to its left
+	var p := settle(gait, rolling, 1.0).rig.pose
+	check(p.fin_flap.x < 0.0 or p.fin_flap.y > 0.0, "rolling left, the ailerons answer against it (flaps %.3f / %.3f)" % [p.fin_flap.x, p.fin_flap.y])
+	var counter := (p.fin_flap.y - p.fin_flap.x) * 0.5
+	check(counter > 0.05, "left fin up, right fin down (%.3f)" % counter)
+	var pitching := moving(15.0)
+	pitching.spin = Vector3(1.0, 0.0, 0.0)  # the nose rising
+	check(settle(gait, pitching, 1.0).rig.pose.fin_pitch.x < -0.05, "a nose-up rate drops the leading edges")
+	var climbing := moving(15.0)
+	climbing.slip = Vector3(0.0, 6.0, 0.0)
+	check(settle(gait, climbing, 1.0).rig.pose.fin_pitch.x > 0.05, "a climb trims the fins")
+	# Flutter: amplitude follows speed, and the layer's own clock keeps it moving.
+	var amps: Array[float] = []
+	for speed: float in [3.0, 23.0]:
+		var model := settle(gait, moving(speed), 0.3)
+		var s := model.swim
+		var best := 0.0
+		for i in 60:
+			model.react(DT, s)
+			best = maxf(best, absf(model.rig.pose.fin_flap.x))
+		amps.append(best)
+	check(amps[1] > amps[0] * 3.0 and amps[1] > 0.03, "the pectorals flutter more at speed (%.3f vs %.3f rad)" % [amps[1], amps[0]])

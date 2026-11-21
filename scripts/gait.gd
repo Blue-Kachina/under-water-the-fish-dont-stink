@@ -244,3 +244,17 @@ func is_default() -> bool:
 @export_range(0.0, 1.5, 0.01, "or_greater") var rig_drift_fins := 0.6
 ## Rig, Drift: how quickly the body follows the slip (1/s).
 @export_range(0.5, 60.0, 0.5, "or_greater") var rig_drift_rate := 6.0
+
+## Rig, FinStabilizer layer: its weight (0 off). The pectorals work as ailerons against the body's roll and pitch rates,
+## trim with the climb, and flutter with speed; the tail's own fin flutters with effort.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_fin_stabilizer := 0.0
+## Rig, FinStabilizer: how far the pectorals counter a roll or pitch (rad per rad/s of rate).
+@export_range(0.0, 1.0, 0.01, "or_greater") var rig_fin_stab := 0.15
+## Rig, FinStabilizer: how far the pectorals trim to a climb or dive (rad at a full one).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_fin_trim := 0.5
+## Rig, FinStabilizer: how far the pectorals flutter at full speed (rad).
+@export_range(0.0, 0.5, 0.005, "or_greater") var rig_fin_flutter := 0.08
+## Rig, FinStabilizer: how fast they flutter (Hz).
+@export_range(0.5, 30.0, 0.5, "or_greater") var rig_fin_flutter_hz := 6.0
+## Rig, FinStabilizer: how quickly the pectorals follow all of that (1/s).
+@export_range(0.5, 120.0, 0.5, "or_greater") var rig_fin_stab_rate := 15.0
