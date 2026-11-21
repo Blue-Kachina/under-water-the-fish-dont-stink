@@ -16,7 +16,8 @@ const AT_POINTS := [Vector3(0.0, 0.0, 0.6), Vector3(0.0, 0.1, 1.2), Vector3(0.2,
 
 ## The classes with a rig (P5): the shark first, then the rest.
 const CLASSES := [FishCharacter.FishClass.HUNTER, FishCharacter.FishClass.MONSTER, FishCharacter.FishClass.SKIRMISHER, FishCharacter.FishClass.LANCER,
-		FishCharacter.FishClass.CHARMER, FishCharacter.FishClass.BULWARK, FishCharacter.FishClass.SCORCHER, FishCharacter.FishClass.BREACHER]
+		FishCharacter.FishClass.CHARMER, FishCharacter.FishClass.BULWARK, FishCharacter.FishClass.SCORCHER, FishCharacter.FishClass.BREACHER,
+		FishCharacter.FishClass.GLIDER, FishCharacter.FishClass.BRAWLER]
 
 var failures := 0
 ## The class the blocks below build (set by _run, one pass each).
@@ -49,7 +50,8 @@ func zero_gait(on := true) -> Gait:
 
 ## The Gait's layer weights, in layer order (each step adds its own).
 func layer_fields() -> Array[String]:
-	var fields: Array[String] = ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel", "rig_drift", "rig_fin_stabilizer", "rig_idle"]
+	var fields: Array[String] = ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel", "rig_drift", "rig_fin_stabilizer", "rig_idle",
+			"rig_wing_beat"]
 	return fields
 
 
@@ -111,6 +113,7 @@ func _blocks() -> void:
 	_drift()
 	_fin_stabilizer()
 	_idle()
+	_wing_beat()
 	_stride_cue()
 	_soak()
 
@@ -267,7 +270,8 @@ func _turn() -> void:
 		var name := "left (+yaw)" if side > 0.0 else "right"
 		check(model.rotation.z * side > 0.5 * gait.rig_bank, "a %s turn banks into it (%.3f rad)" % [name, model.rotation.z])
 		check(p.spine_yaw() * side < -0.01, "and the spine curls toward its inside (%.3f rad)" % p.spine_yaw())
-		check(p.fin_flap.x * side > 0.1 and p.fin_sweep.x * side < -0.1 and p.fin_sweep.y * side > 0.1, "the inside pectoral tucks, the outside reaches out")
+		check(p.fin_flap.x * side > 0.5 * gait.rig_fin_bank and p.fin_sweep.x * side < -0.5 * gait.rig_fin_tuck and p.fin_sweep.y * side > 0.5 * gait.rig_fin_tuck,
+				"the inside pectoral tucks, the outside reaches out (flap %.3f, sweep %.3f)" % [p.fin_flap.x, p.fin_sweep.x])
 	# The pectorals bank before the body.
 	var s := moving(15.0)
 	s.spin = Vector3(0.0, 1.5, 0.0)
@@ -365,7 +369,10 @@ func _fin_stabilizer() -> void:
 			model.react(DT, s)
 			best = maxf(best, absf(model.rig.pose.fin_flap.x))
 		amps.append(best)
-	check(amps[1] > amps[0] * 3.0 and amps[1] > 0.03, "the pectorals flutter more at speed (%.3f vs %.3f rad)" % [amps[1], amps[0]])
+	if gait.rig_fin_flutter > 0.0:
+		check(amps[1] > amps[0] * 3.0 and amps[1] > 0.03, "the pectorals flutter more at speed (%.3f vs %.3f rad)" % [amps[1], amps[0]])
+	else:
+		check(amps[1] < 1e-6, "a class with no flutter (the mantis's claws) keeps its fins still at speed (%.4f rad)" % amps[1])
 
 
 func _defaults() -> void:
@@ -382,7 +389,7 @@ func _defaults() -> void:
 			capable = capable and has
 		else:
 			others_not = others_not and not has
-	check(capable and others_not, "only the rolled-out classes (shark, Drowned Shark form, clownfish, swordfish, koi, boxfish, lionfish, whale calf) can have a rig")
+	check(capable and others_not, "only the rolled-out classes (shark, Drowned Shark form, clownfish, swordfish, koi, boxfish, lionfish, whale calf, ray, mantis) can have a rig")
 	check(GaitSettings.shared().for_class(FishCharacter.FishClass.MONSTER).rig_undulation == 1.0, "the Drowned Shark form's gait has the layers on (the toggle waits)")
 
 
@@ -419,6 +426,62 @@ func _idle() -> void:
 		coasting.react(DT, coasting.swim)
 		mid = maxf(mid, absf(coasting.rig.pose.fin_flap.x))
 	check(mid > 0.0 and mid < fins, "and fades out between (%.3f at 1.5 m/s, %.3f at rest)" % [mid, fins])
+
+
+## The ray's wings (RigWingBeat, only for a class whose gait has it): a beat on the wave, a stride's downstroke and
+## recovery, the far wing harder and the body rolling away from a sideways push, level on a surface; the skin takes it.
+func _wing_beat() -> void:
+	if GaitSettings.default_for(fish_class).rig_wing_beat <= 0.0:
+		return
+	print("Wing beat:")
+	var gait := only(["rig_undulation", "rig_wing_beat"])
+	var rest := settle(gait, moving(0.0, 0.0), 1.0)
+	check(absf(rest.rig.pose.fin_flap.x) < 1e-5 and absf(rest.rig.pose.fin_flap.y) < 1e-5, "at rest, no stride: the wings hold still")
+	var cruise := settle(gait, moving(12.0), 1.0)
+	var high := -INF
+	var low := INF
+	var even := true
+	for i in 180:
+		cruise.react(DT, cruise.swim)
+		var p := cruise.rig.pose
+		high = maxf(high, p.fin_flap.x)
+		low = minf(low, p.fin_flap.x)
+		even = even and is_equal_approx(p.fin_flap.x, p.fin_flap.y)
+	check(high > 0.05 and low < -0.05 and even, "cruising, both wings beat together on the wave (%.3f..%.3f rad)" % [low, high])
+	var only_beat := only(["rig_wing_beat"])
+	var model := shark(only_beat)
+	var s := moving(12.0)
+	s.gait = only_beat
+	run(model, s, 0.5)
+	s.stride_dir = Vector2(0.0, 0.0)
+	var down := 0.0
+	for i in 20:
+		s.stride_power = minf(1.0, i / 10.0)
+		model.react(DT, s)
+		down = maxf(down, model.rig.pose.fin_flap.x)
+	var up := 0.0
+	for i in 40:
+		s.stride_power = maxf(0.0, 1.0 - i / 12.0)
+		model.react(DT, s)
+		up = minf(up, model.rig.pose.fin_flap.x)
+	check(down > 0.6 * only_beat.rig_wing_stride and up < -0.05, "a stride beats them down and they spring back up past level as it fades (%.3f / %.3f rad)" % [down, up])
+	s.stride_dir = Vector2(1.0, 0.0)
+	s.stride_power = 1.0
+	run(model, s, 0.4)
+	var p := model.rig.pose
+	check(p.fin_flap.x > p.fin_flap.y + 0.1 and p.bank < -0.5 * only_beat.rig_wing_roll,
+			"a sideways stride beats one wing harder and rolls the body (wings %.3f / %.3f, bank %.3f)" % [p.fin_flap.x, p.fin_flap.y, p.bank])
+	s.grounded = true
+	s.spin = Vector3(0.0, 1.5, 0.0)
+	var grounded_gait := only(["rig_turn", "rig_wing_beat"])
+	s.gait = grounded_gait
+	var lying := shark(grounded_gait)
+	run(lying, s, 1.5)
+	check(absf(lying.rotation.z) < 0.02 and lying.rig.pose.fin_flap.x <= grounded_gait.rig_wing_ground + 1e-6,
+			"on a surface it lies level, the tips out of the floor (bank %.3f, flap %.3f)" % [lying.rotation.z, lying.rig.pose.fin_flap.x])
+	if model._skin != null:
+		var flap := float(model._skin.get_shader_parameter("flap_left"))
+		check(is_equal_approx(flap, -model.fin_left.rotation.z - model.rig.pose.fin_flap.x), "the skin's wings take the pose (flap_left %.3f)" % flap)
 
 
 func _stride_cue() -> void:

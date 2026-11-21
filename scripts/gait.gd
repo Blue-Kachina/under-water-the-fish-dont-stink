@@ -280,3 +280,53 @@ func is_default() -> bool:
 @export_range(0.1, 5.0, 0.05, "or_greater") var rig_idle_hz := 0.7
 ## Rig, Idle: the speed (m/s) at which the hover has faded out completely.
 @export_range(0.1, 30.0, 0.1, "or_greater") var rig_idle_speed := 3.0
+
+## Rig, Wing beat layer: its weight (0 off). For a ray's wings (the pectoral pivots' flap, which its skin bends): they
+## beat up and down on the body's wave, deeper with effort, and each stride is a downstroke that springs back up past
+## level; a sideways stride beats the far wing harder and rolls the body away from the push.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_wing_beat := 0.0
+## Rig, Wing beat: how far the wings beat on the wave at full effort (rad each way).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_wing_amp := 0.2
+## Rig, Wing beat: how far the wings' beat runs behind the body's wave (rad of its phase).
+@export_range(0.0, 6.3, 0.05, "or_greater") var rig_wing_lag := 0.6
+## Rig, Wing beat: how far a full stride beats the wings down (rad).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_wing_stride := 0.5
+## Rig, Wing beat: how far the wings lift past level as a stride fades (rad), the recovery stroke.
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_wing_lift := 0.35
+## Rig, Wing beat: how much harder a sideways stride beats the wing away from the push (of the beat).
+@export_range(0.0, 1.0, 0.05, "or_greater") var rig_wing_lean := 0.7
+## Rig, Wing beat: how stiff the wings' spring is (rad/s); with rig_wing_damping under 1 they overshoot.
+@export_range(1.0, 60.0, 0.5, "or_greater") var rig_wing_spring := 14.0
+## Rig, Wing beat: the wings' spring damping (1: no overshoot; less: they swing past and back).
+@export_range(0.05, 2.0, 0.05, "or_greater") var rig_wing_damping := 0.35
+## Rig, Wing beat: how far a full sideways stride rolls the body away from the push (rad).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_wing_roll := 0.25
+## Rig, Wing beat: on a surface the body levels and the wing tips stay this far (rad) from dipping below level.
+@export_range(0.0, 1.0, 0.01, "or_greater") var rig_wing_ground := 0.15
+
+## Rig, Bell and flap layers: the jelly's bell pulse and the fins' flap and reverse flutter (the sea hare's parapodia
+## beating with strides, every fish's pectorals fluttering when it swims backwards) come from SwimRig layers on the
+## rig's own clocks instead of the model and the controller. Works with or without procedural_rig. Off: as always.
+@export var rig_bell_flap := false
+## Rig, Flap (Gait.Visual.FLAP): how far a full stride beats the flaps down (rad on the fin pivots).
+@export_range(0.0, 3.0, 0.01, "or_greater") var rig_flap_beat := 0.9
+## Rig, Flap: the slow idle wave between strides (rad).
+@export_range(0.0, 1.0, 0.01, "or_greater") var rig_flap_idle := 0.12
+## Rig, Flap: the idle wave's pace, of the swim's own rhythm (4 rad/s at rest to 18 at full effort).
+@export_range(0.0, 3.0, 0.01, "or_greater") var rig_flap_idle_pace := 0.35
+## Rig, Flap: how quickly the flaps follow the beat (1/s).
+@export_range(0.5, 60.0, 0.5, "or_greater") var rig_flap_rate := 12.0
+## Rig, Flap: how far the pectorals flutter when swimming backwards (rad).
+@export_range(0.0, 2.0, 0.01, "or_greater") var rig_reverse_flutter := 0.7
+## Rig, Flap: how fast they flutter backwards (Hz).
+@export_range(0.5, 30.0, 0.05, "or_greater") var rig_reverse_hz := 7.9577
+
+## School bakes: bake this class's school look from the rig's wave (rig_school_poses poses round one beat of the
+## Undulation layer, at rig_school_effort) instead of three tail swings, so a school wags with the wave the fish swims
+## with. Only for a class whose model has a rig (and not the Horde, which keeps three poses). Applies to schools made
+## after it changes.
+@export var rig_school_bake := false
+## School bakes: how many poses round the beat.
+@export_range(3, 12, 1) var rig_school_poses := 5
+## School bakes: the effort the baked wave is swum at (its size).
+@export_range(0.0, 1.0, 0.05) var rig_school_effort := 0.6

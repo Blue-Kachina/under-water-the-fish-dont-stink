@@ -182,6 +182,7 @@ static func build(m: FishModel) -> void:
 	# flap and sweep to it (FishModel._swim).
 	m._fin_pivots(Vector3(maxf(hinge, w * 0.18), 0.0, shape.tip_z()))
 	_tail(m, shape, p)
+	m.rig_capable = true  # SwimRig, when the Glider gait turns procedural_rig on (wings and whip; the body doesn't bend)
 
 
 ## The shader's colours and markings for skin `p` (both the body's and the tail's).

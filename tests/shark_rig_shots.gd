@@ -6,7 +6,7 @@ extends Node3D
 ## on the top row and ON (layers at the Hunter gait's defaults) on the bottom. The camera rides with the holder.
 ## Needs a window (not --headless); it quits when done.
 ##   Godot_console.exe --path . res://tests/shark_rig_shots.tscn -- --out=DIR [--set=straight,turn,brake,stride,drift]
-##     [--views=side,three_quarter,top] [--class=hunter|monster|skirmisher|lancer]
+##     [--views=side,three_quarter,top] [--class=hunter|monster|skirmisher|lancer|charmer|bulwark|scorcher|breacher|glider|brawler]
 ## Writes shark_rig_<scenario>_<view>.png in DIR (<class>_rig_... for a class other than hunter: P5 rolled the rig out to the
 ## Drowned Shark form (monster), the clownfish (skirmisher) and the swordfish (lancer)). Scenarios: straight_0/5/15/30 (steady speeds, tiles across one wave),
 ## turn_15 and turn_30 (a full-lock turn from straight, tiles 0.25 s apart from its start), brake_30 (30 m/s to a stop),

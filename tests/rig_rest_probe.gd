@@ -158,8 +158,8 @@ func _ray(on: bool, gait_in: Gait = null) -> Array:
 
 # --- The shark's fins -------------------------------------------------------------------------------------------------
 
-## 4 s of a shark (rig off) under a random tail swing: every 8th frame, every fin mesh's bounds centre in the model's
-## space (sorted, so moving a fin to another parent doesn't reorder them) and the tail pivot's place.
+## 4 s of a shark (rig off) under a random tail swing: every 8th frame, every mesh part's bounds centre in the model's
+## space (sorted, so moving a part to another parent doesn't reorder them) and the tail pivot's place.
 func _shark() -> Array:
 	var model := FishModel.build(FishCharacter.FishClass.HUNTER, 0)
 	add_child(model)
@@ -174,7 +174,7 @@ func _shark() -> Array:
 		model.react(DT, s)
 		if f % 8 == 0:
 			var centres: Array = []
-			for node in model.find_children("Fin*", "MeshInstance3D", true, false):
+			for node in model.find_children("*", "MeshInstance3D", true, false):
 				var part := node as MeshInstance3D
 				var c := (_in_model(part, model) * part.get_aabb()).get_center()
 				centres.append([c.x, c.y, c.z])
@@ -270,5 +270,179 @@ func _sea_hare(on: bool) -> Array:
 
 # --- Rig on -----------------------------------------------------------------------------------------------------------
 
-func _rig_on(_off: Dictionary) -> void:
-	pass
+func _rig_on(off: Dictionary) -> void:
+	print("the bell layer (rig_bell_flap on):")
+	var defaults := true
+	for fc: FishCharacter.FishClass in FishCharacter.FishClass.values():
+		var g := GaitSettings.default_for(fc)
+		defaults = defaults and not g.rig_bell_flap and not g.rig_school_bake and not g.procedural_rig
+	check(defaults, "rig_bell_flap, rig_school_bake and procedural_rig are off for every class by default")
+	var gap := _gap(_jelly(true), off["jelly"])
+	check(gap[0] <= 1e-6, "the bell's uniforms are the very same as the model's own step (worst gap %.7f; switching to no gait and back included)" % gap[0])
+	_flap_layer()
+	print("the flap layer in a game:")
+	var rows: Array = await _sea_hare(true)
+	var most := 0.0
+	var mirrored := true
+	var hinged := true
+	for row: Array in rows:
+		most = maxf(most, row[0])
+		mirrored = mirrored and is_equal_approx(row[1], -row[0])
+		hinged = hinged and absf(row[2] - clampf(row[0], -0.12, 1.2)) < 1e-5
+	check(most > 0.5 and mirrored and hinged, "the sea hare's flaps beat with its strides from the layer (most %.3f rad), mirrored, the hinges following" % most)
+	var near := _gap(rows, off["sea_hare"])
+	check(near[0] < 0.3, "and look like the controller's beat (worst gap %.3f rad: the idle wave's own clock)" % near[0])
+	_ray_rig()
+	_mantis_rig()
+	_dorsal_rider()
+	_school_bakes()
+
+
+## The shark's first dorsal on its rider: with the rig on, the head's counter-bend carries it whole, its root on the body.
+func _dorsal_rider() -> void:
+	print("the shark's dorsal rider:")
+	var model := FishModel.build(FishCharacter.FishClass.HUNTER, 0)
+	add_child(model)
+	var rider: Node3D = model._riders[0] if not model._riders.is_empty() else null
+	check(rider != null and rider.get_child_count() == 1 and not model.is_bent(rider.get_child(0) as GeometryInstance3D),
+			"the first dorsal rides a rider and is not itself bent (stiff)")
+	if rider == null:
+		return
+	var gait := GaitSettings.default_for(FishCharacter.FishClass.HUNTER)
+	gait.procedural_rig = true
+	var s := SwimState.new()
+	s.gait = gait
+	s.speed = 15.0
+	s.speed_frac = 15.0 / 23.0
+	s.effort = 1.0
+	s.spin = Vector3(0.0, 1.5, 0.0)
+	var turned := 0.0
+	var on_body := 0.0
+	for f in 120:
+		model.react(DT, s)
+		turned = maxf(turned, rider.transform.basis.get_euler().length())
+		on_body = maxf(on_body, rider.position.distance_to(model.bend_point(model._rider_rest[0].origin)))
+	check(turned > 0.01 and on_body < 1e-5, "the head's counter-bend turns it whole (%.3f rad), its root staying on the body" % turned)
+	model.queue_free()
+
+
+## School bakes from the rig's wave: rig_school_poses meshes for a rigged class, still three for others and the Horde.
+func _school_bakes() -> void:
+	print("school bakes at the rig's phases:")
+	var gait := GaitSettings.shared().for_class(FishCharacter.FishClass.HUNTER)
+	var classic := SchoolLook.meshes(FishCharacter.FishClass.HUNTER)
+	check(classic.size() == SchoolLook.POSES.size() and not SchoolLook.is_wave_bake(FishCharacter.FishClass.HUNTER), "off: the three tail poses")
+	gait.rig_school_bake = true
+	var waved := SchoolLook.meshes(FishCharacter.FishClass.HUNTER)
+	var tips: Array[float] = []
+	for mesh: Mesh in waved:
+		var mean: Array = _mesh_print(mesh)
+		tips.append(float(mean[1]) / maxf(float(mean[0]), 1.0))
+	var spread: float = tips.max() - tips.min()
+	check(waved.size() == gait.rig_school_poses and SchoolLook.is_wave_bake(FishCharacter.FishClass.HUNTER),
+			"on: one mesh per phase of the wave (%d)" % waved.size())
+	check(spread > 0.005, "the phases differ: the body swings across the beat (vertices' mean x moves %.4f m)" % spread)
+	check(SchoolLook.detail_meshes(FishCharacter.FishClass.HUNTER, 0.0) == classic, "the Horde's detail meshes keep the three tail poses")
+	check(SchoolLook.wave_pose(0.0, 5) == 0 and SchoolLook.wave_pose(TAU * 0.41, 5) == 2 and SchoolLook.wave_pose(TAU * 0.95, 5) == 0,
+			"a tail phase picks the nearest baked phase")
+	var jelly := GaitSettings.shared().for_class(FishCharacter.FishClass.DRIFTER)
+	jelly.rig_school_bake = true
+	check(SchoolLook.meshes(FishCharacter.FishClass.DRIFTER).size() == SchoolLook.POSES.size() and not SchoolLook.is_wave_bake(FishCharacter.FishClass.DRIFTER),
+			"a class with no rig keeps the three poses")
+	jelly.rig_school_bake = false
+	gait.rig_school_bake = false
+	check(SchoolLook.meshes(FishCharacter.FishClass.HUNTER) == classic, "switching it off gives the old bakes back")
+
+
+## The flap layer on a bare sea hare against the controller's formulas with the clock in place of Time: the stride
+## beat, the idle wave, the reverse flutter; the pivots take it and the flaps' hinges follow; no wall clock.
+func _flap_layer() -> void:
+	print("the flap layer on a model:")
+	var a := _flap_run(false)
+	var b := _flap_run(true)
+	check(_gap(a[0], a[1])[0] < 2e-3, "it is the controller's beat and flutter on the rig's clocks (worst gap %.5f rad)" % _gap(a[0], a[1])[0])
+	check(_gap(a[0], b[0])[0] == 0.0, "the same with the wall clock held up between frames: no Time in it")
+	var span := 0.0
+	for v: float in a[0]:
+		span = maxf(span, absf(v))
+	check(span > 0.6, "it beats and flutters (%.3f rad at most)" % span)
+
+
+## [the left pivot's roll each frame, the controller formula's] over 6 s: strides, then idle, then swimming backwards.
+func _flap_run(stall: bool) -> Array:
+	var model := FishModel.build(FishCharacter.FishClass.ALCHEMIST, 0)
+	add_child(model)
+	var gait := GaitSettings.default_for(FishCharacter.FishClass.ALCHEMIST)
+	gait.rig_bell_flap = true
+	var s := SwimState.new()
+	s.gait = gait
+	var got: Array = []
+	var want: Array = []
+	var phase := 0.0
+	var flap := 0.0
+	var hinge_ok := true
+	for f in 360:
+		var t := (f + 1) * DT
+		s.effort = 0.5 + 0.5 * sin(t)
+		s.stride_power = clampf(sin(fmod(t, 0.8) / 0.8 * PI), 0.0, 1.0) if f < 160 else 0.0
+		s.reverse = 1.0 if f >= 260 else 0.0
+		model.react(DT, s)
+		if stall:
+			OS.delay_msec(1)
+		# FishController._process's formulas, with t for Time.get_ticks_msec() / 1000.
+		phase += DT * lerpf(4.0, 18.0, s.effort)
+		var flutter := sin(t * 50.0) * 0.7 * s.reverse
+		flap = lerpf(flap, 0.9 * s.stride_power + sin(phase * 0.35) * 0.12, 1.0 - exp(-12.0 * DT))
+		got.append(model.fin_left.rotation.z)
+		want.append(flutter + flap)
+		var hinge: Node3D = model._flaps[0]
+		var side := signf(hinge.position.x)
+		hinge_ok = hinge_ok and is_equal_approx(hinge.rotation.z, clampf(-side * (model.fin_left if side < 0.0 else model.fin_right).rotation.z, -FishModel.FLAP_CLOSE, 1.2) * -side)
+	model.queue_free()
+	check(hinge_ok and is_equal_approx(model.fin_right.rotation.z, -model.fin_left.rotation.z), "the pivots mirror and the flaps' hinges follow them")
+	return [got, want]
+
+
+## The Gliders' rig: the body banks into a turn and lies level when grounded, the wings take the pose, nothing NaN.
+func _ray_rig() -> void:
+	print("the ray's rig:")
+	var gait := GaitSettings.default_for(FishCharacter.FishClass.GLIDER)
+	gait.procedural_rig = true
+	var rows := _ray(true, gait)
+	var finite := true
+	var bank := 0.0
+	var flaps := 0.0
+	for row: Array in rows:
+		for v: float in row:
+			finite = finite and is_finite(v)
+		bank = maxf(bank, absf(row[0]))
+		flaps = maxf(flaps, absf(row[1]))
+	check(finite, "rig on, 10 s of turns, strides and a touchdown: nothing NaN")
+	check(bank > 0.2 and flaps > 0.2, "it banks (%.2f rad) and beats its wings (%.2f) from the rig" % [bank, flaps])
+	var grounded: Array = rows[115]  # frame 460, on the surface since 420
+	check(absf(grounded[0]) < 0.05, "on the surface it lies level (%.3f rad)" % grounded[0])
+
+
+## The Brawlers' rig: the abdomen flexes up and down, the claws barely move.
+func _mantis_rig() -> void:
+	print("the mantis's rig:")
+	var model := FishModel.build(FishCharacter.FishClass.BRAWLER, 0)
+	add_child(model)
+	var gait := GaitSettings.default_for(FishCharacter.FishClass.BRAWLER)
+	gait.procedural_rig = true
+	var s := SwimState.new()
+	s.gait = gait
+	s.speed = 10.0
+	s.speed_frac = 10.0 / 23.0
+	s.effort = 0.8
+	var pitch := 0.0
+	var yaw := 0.0
+	var claws := 0.0
+	for f in 240:
+		model.react(DT, s)
+		pitch = maxf(pitch, absf(model.rig.pose.spine_pitch()))
+		yaw = maxf(yaw, absf(model.rig.pose.spine_yaw()))
+		claws = maxf(claws, absf(model.rig.pose.fin_flap.x) + absf(model.rig.pose.fin_sweep.x))
+	check(model.rig.engaged and pitch > 0.1 and yaw < 1e-4, "the abdomen flexes up and down, not sideways (pitch %.3f, yaw %.5f rad)" % [pitch, yaw])
+	check(claws < 0.05, "swimming straight the claws hold still (%.4f rad)" % claws)
+	model.queue_free()

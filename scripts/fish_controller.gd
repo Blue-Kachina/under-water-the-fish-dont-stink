@@ -2427,17 +2427,19 @@ func _process(delta: float) -> void:
 	_fin_left.rotation.y = lerpf(_fin_left.rotation.y, 0.9 * slide, 1.0 - exp(-15.0 * delta))
 	_fin_right.rotation.y = -_fin_left.rotation.y
 
-	# Reverse swimming: frantic pectoral flutter.
-	var flutter := sin(Time.get_ticks_msec() * 0.05) * 0.7 * s.reverse
-	if s.gait.visual == Gait.Visual.FLAP:
-		# Gait.Visual.FLAP: the flaps beat down with each stride's push and lift
-		# back up between, with a slow idle wave.
-		var beat := s.stride_power
-		var idle_wave := sin(_swim_phase * 0.35) * 0.12
-		_flap = lerpf(_flap, 0.9 * beat + idle_wave, 1.0 - exp(-12.0 * delta))  # + is down on the left pivot
-		flutter += _flap
-	_fin_left.rotation.z = flutter
-	_fin_right.rotation.z = -flutter
+	# Reverse swimming: frantic pectoral flutter. With Gait.rig_bell_flap the rig's
+	# flap layer (RigFlap) rolls the pivots instead, on its own clocks.
+	if not s.gait.rig_bell_flap:
+		var flutter := sin(Time.get_ticks_msec() * 0.05) * 0.7 * s.reverse
+		if s.gait.visual == Gait.Visual.FLAP:
+			# Gait.Visual.FLAP: the flaps beat down with each stride's push and lift
+			# back up between, with a slow idle wave.
+			var beat := s.stride_power
+			var idle_wave := sin(_swim_phase * 0.35) * 0.12
+			_flap = lerpf(_flap, 0.9 * beat + idle_wave, 1.0 - exp(-12.0 * delta))  # + is down on the left pivot
+			flutter += _flap
+		_fin_left.rotation.z = flutter
+		_fin_right.rotation.z = -flutter
 	_visual.react(delta, s)
 	_visual.set_stride_cue(s.stride_cue.x, s.stride_cue.y, s.stride_cue.z)
 	_bubbles.emitting = s.boosting

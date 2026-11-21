@@ -156,6 +156,29 @@ static func default_for(fish_class: FishCharacter.FishClass) -> Gait:
 			"rig_accel_tail": 0.25, "rig_accel_surge": 0.015, "rig_fin_flutter": 0.12, "rig_fin_flutter_hz": 5.0,
 			"rig_idle_scull": 0.35, "rig_idle_sway": 0.1, "rig_idle_hz": 0.6,
 		})
+	elif fish_class == FishCharacter.FishClass.GLIDER:
+		# The ray: its body doesn't bend (no spine chain); the wings and the whip carry the motion. The wave's joints sum
+		# onto the tail pivot, so they lash the whip (a slow, small wave, no head); the Wing beat layer flaps the wings on
+		# the same wave and beats them with strides (the old _beat_wings), and the Turn layer banks it hard, like a bird.
+		_rig_defaults(gait, {
+			"rig_amplitude": 0.35, "rig_wave_lag": 0.9, "rig_strouhal": 0.03, "rig_freq_min": 0.4, "rig_freq_max": 2.0,
+			"rig_envelope": 0.6, "rig_head_sway": 0.0, "rig_caudal_flex": 0.5, "rig_head_span": 0.0, "rig_stride_swing": 0.5,
+			"rig_turn_bend": 2.0, "rig_turn_max": 0.4, "rig_bank": 0.45, "rig_fin_bank": 0.1, "rig_fin_tuck": 0.05,
+			"rig_accel_tail": 0.3, "rig_accel_head": 0.0, "rig_accel_fins": 0.25, "rig_accel_surge": 0.0,
+			"rig_drift_bend": 0.6, "rig_drift_fins": 0.3, "rig_fin_flutter": 0.05, "rig_fin_flutter_hz": 3.0,
+			"rig_idle_scull": 0.12, "rig_idle_sway": 0.1, "rig_idle_hz": 0.5, "rig_wing_beat": 1.0,
+		})
+	elif fish_class == FishCharacter.FishClass.BRAWLER:
+		# The mantis shrimp: an armoured body whose abdomen flexes up and down (rig_wave_axis 1) as its swimmerets beat,
+		# quick and small, the head and carapace nearly still; the raptorial claws on the fin pivots barely move (no
+		# flutter, a small tuck in turns and a twitch at rest).
+		_rig_defaults(gait, {
+			"rig_wave_axis": 1.0, "rig_amplitude": 0.4, "rig_wave_lag": 0.8, "rig_strouhal": 0.05, "rig_freq_min": 0.8,
+			"rig_freq_max": 4.0, "rig_head_sway": 0.1, "rig_caudal_flex": 0.8, "rig_head_span": 0.1, "rig_stride_swing": 0.5,
+			"rig_turn_bend": 3.0, "rig_turn_max": 0.5, "rig_bank": 0.2, "rig_fin_bank": 0.15, "rig_fin_tuck": 0.15,
+			"rig_accel_tail": 0.35, "rig_accel_head": 0.05, "rig_accel_fins": 0.15, "rig_accel_surge": 0.01,
+			"rig_drift_fins": 0.2, "rig_fin_flutter": 0.0, "rig_idle_scull": 0.08, "rig_idle_sway": 0.06, "rig_idle_hz": 0.9,
+		})
 	return gait
 
 

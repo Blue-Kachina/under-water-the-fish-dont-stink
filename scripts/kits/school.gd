@@ -133,6 +133,9 @@ var _steps := 0
 ## The school size last asked for (SchoolSettings.fish_per_school).
 var _planned := 0
 var _looks: Array[MultiMeshInstance3D] = []
+## Whether the looks are the rig's wave phases (SchoolLook.is_wave_bake: the class's Gait.rig_school_bake) rather than
+## the three tail poses.
+var _wave_poses := false
 var _buffers: Array[PackedFloat32Array] = []
 ## Full models, and which fish each shows (fish index -> SchoolFish).
 var _details: Array[SchoolFish] = []
@@ -855,6 +858,9 @@ func _draw(delta: float) -> void:
 		_detail_left = DETAIL_INTERVAL
 		_choose_details(blend)
 	var used := [0, 0, 0]
+	if _wave_poses:
+		used.resize(_looks.size())
+		used.fill(0)
 	var sum := Vector3.ZERO
 	var alive := 0
 	var low := Vector3.INF
@@ -875,7 +881,7 @@ func _draw(delta: float) -> void:
 		if detail:
 			detail.place(Transform3D(Basis(facing), at), size, _velocity[i], _tail[i], delta)
 			continue
-		var pose := SchoolLook.pose_for(_tail[i])
+		var pose := SchoolLook.wave_pose(_tail[i], _looks.size()) if _wave_poses else SchoolLook.pose_for(_tail[i])
 		var buffer := _buffers[pose]
 		var basis := Basis(facing).scaled(Vector3.ONE * size)
 		var k: int = used[pose] * 12
@@ -969,6 +975,7 @@ func _build_looks() -> void:
 	_looks.clear()
 	_buffers.clear()
 	var meshes := SchoolLook.meshes(character)
+	_wave_poses = SchoolLook.is_wave_bake(character)
 	for pose in meshes.size():
 		var multimesh := MultiMesh.new()
 		multimesh.transform_format = MultiMesh.TRANSFORM_3D

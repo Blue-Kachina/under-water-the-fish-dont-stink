@@ -6,7 +6,10 @@ class_name SchoolLook
 ##
 ## There's one mesh per tail pose (POSES: centre, swung right, swung left). A
 ## school shows each fish in the pose for where its tail is in its beat, a
-## flipbook wag (pose_for()).
+## flipbook wag (pose_for()). A class whose Gait has rig_school_bake on (and
+## whose model has a SwimRig) is baked instead at rig_school_poses phases of the
+## rig's wave (SwimRig.sample_wave), shown by wave_pose(); the Horde's
+## detail_meshes() keep the three tail poses.
 ##
 ## Baked the first time each kind is asked for, then kept. A kind is a class
 ## (FishCharacter.FishClass) or a zombie's own look's id (ZombieLooks: "sardine").
@@ -26,6 +29,8 @@ static var _importers := {}
 static var _detailed := {}
 ## Class -> Vector4, its eye_spot().
 static var _eye_spots := {}
+## Bake key -> whether it's baked from the rig's wave (wave_pose()) rather than POSES.
+static var _wave := {}
 
 
 ## Where `fish_class`'s right eye is in its baked meshes' space (xyz; the left
@@ -36,14 +41,43 @@ static func eye_spot(fish_class: Variant) -> Vector4:
 	_importers_for(fish_class)
 	return _eye_spots[fish_class]
 
-## The baked meshes for `fish_class` (a class, or a ZombieLooks id), one per pose in POSES.
+## The baked meshes for `fish_class` (a class, or a ZombieLooks id), one per pose in POSES (or, with its gait's
+## rig_school_bake, one per phase of the rig's wave: is_wave_bake()).
 static func meshes(fish_class: Variant) -> Array:
-	if not _baked.has(fish_class):
+	return _meshes(fish_class, _rig_gait(fish_class))
+
+
+## Whether meshes(`fish_class`) are the rig's wave phases (show them with wave_pose()) rather than POSES (pose_for()).
+static func is_wave_bake(fish_class: Variant) -> bool:
+	var gait := _rig_gait(fish_class)
+	return gait != null and _importers_for(fish_class, gait) != null and _wave.get(_key(fish_class, gait), false)
+
+
+static func _meshes(fish_class: Variant, gait: Gait) -> Array:
+	var key: Variant = _key(fish_class, gait)
+	if not _baked.has(key):
 		var baked := []
-		for importer: ImporterMesh in _importers_for(fish_class):
+		for importer: ImporterMesh in _importers_for(fish_class, gait):
 			baked.append(importer.get_mesh())
-		_baked[fish_class] = baked
-	return _baked[fish_class]
+		_baked[key] = baked
+	return _baked[key]
+
+
+## The class's Gait when it bakes from the rig (rig_school_bake), else null.
+static func _rig_gait(fish_class: Variant) -> Gait:
+	if fish_class is String:
+		return null
+	var gait := GaitSettings.shared().for_class(fish_class)
+	return gait if gait.rig_school_bake else null
+
+
+## The bake cache's key: the class, or with a rig gait the class and the numbers its wave is baked with.
+static func _key(fish_class: Variant, gait: Gait) -> Variant:
+	if gait == null:
+		return fish_class
+	return "rig:%s:%d:%.3f:%.3f:%.3f:%.3f:%.3f:%.3f:%.3f:%.3f" % [str(fish_class), gait.rig_school_poses, gait.rig_school_effort,
+			gait.rig_undulation, gait.rig_amplitude, gait.rig_wave_lag, gait.rig_envelope, gait.rig_head_sway,
+			gait.rig_caudal_flex, gait.rig_wave_axis]
 
 
 ## The baked meshes for `fish_class` at a fixed detail, one per pose: each part at
@@ -52,7 +86,7 @@ static func meshes(fish_class: Variant) -> Array:
 ## where Godot's own LOD, picked by the MultiMesh's bounds, never steps down.
 static func detail_meshes(fish_class: Variant, error: float) -> Array:
 	if error <= 0.0:
-		return meshes(fish_class)
+		return _meshes(fish_class, null)
 	var key := "%s:%.4f" % [str(fish_class), error]
 	if not _detailed.has(key):
 		var built := []
@@ -62,26 +96,38 @@ static func detail_meshes(fish_class: Variant, error: float) -> Array:
 	return _detailed[key]
 
 
-static func _importers_for(fish_class: Variant) -> Array:
-	if not _importers.has(fish_class):
+static func _importers_for(fish_class: Variant, gait: Gait = null) -> Array:
+	var key: Variant = _key(fish_class, gait)
+	if not _importers.has(key):
 		var model: FishModel
 		if fish_class is String:
 			model = ZombieLooks.build(fish_class, FishCharacter.FishClass.SKIRMISHER)
 		else:
 			model = FishModel.build(fish_class)
-		_eye_spots[fish_class] = _find_eyes(model)
+		if gait == null:
+			_eye_spots[fish_class] = _find_eyes(model)
 		var baked := []
-		for swing: float in POSES:
-			if model.tail:
-				if model.fluke:
-					model.tail.rotation.x = swing
-				else:
-					model.tail.rotation.y = swing
-				model.apply_bend()
-			baked.append(_bake(model))
+		if gait != null and model.rig_capable and model.tail:
+			# The rig's wave at evenly spaced phases round one beat.
+			var rig := SwimRig.new()
+			model.add_child(rig)
+			rig.attach(model)
+			for k in gait.rig_school_poses:
+				rig.sample_wave(gait, TAU * k / gait.rig_school_poses, gait.rig_school_effort)
+				baked.append(_bake(model))
+			_wave[key] = true
+		else:
+			for swing: float in POSES:
+				if model.tail:
+					if model.fluke:
+						model.tail.rotation.x = swing
+					else:
+						model.tail.rotation.y = swing
+					model.apply_bend()
+				baked.append(_bake(model))
 		model.free()
-		_importers[fish_class] = baked
-	return _importers[fish_class]
+		_importers[key] = baked
+	return _importers[key]
 
 
 ## eye_spot() for `model` (at rest: eyes sit ahead of any bend).
@@ -167,6 +213,11 @@ static func _material_key(material: Material) -> String:
 static func pose_for(phase: float) -> int:
 	var quarter := int(fposmod(phase, TAU) / (TAU / 4.0))
 	return [CENTRE, RIGHT, CENTRE, LEFT][quarter]
+
+
+## Which of `count` wave phases (a rig bake, is_wave_bake()) is nearest `phase` (rad) in the beat.
+static func wave_pose(phase: float, count: int) -> int:
+	return roundi(fposmod(phase, TAU) / TAU * count) % count
 
 
 ## Every visible mesh part of `model`, merged into one mesh in the model's own
