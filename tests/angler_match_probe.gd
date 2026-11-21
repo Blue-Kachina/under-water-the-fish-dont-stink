@@ -184,7 +184,7 @@ func _player_match() -> void:
 		return
 	victim.freeze = false
 	victim.controls = FishInput.new()
-	victim.set_meta("ws_dashing", false)
+	ModeData.set_value(victim, "what_stinks", "dashing", false)
 	var fwd := -fish.global_basis.z
 	victim.global_position = bite.mouth_point() + fwd * 22.0
 	victim.linear_velocity = Vector3.ZERO

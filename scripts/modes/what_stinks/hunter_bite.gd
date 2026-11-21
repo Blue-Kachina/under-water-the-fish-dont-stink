@@ -89,7 +89,7 @@ func setup(with_fish: FishController, with_form: Dictionary, with_size: HunterSi
 	bite = ChompKit.Bite.new(UnnaturalSettings.shared())
 	bite.charged.connect(func() -> void: charged.emit())
 	fish.ignore_jump = true
-	fish.set_meta("ws_bite", self)
+	ModeData.set_value(fish, "what_stinks", "bite", self)
 	refresh_model()
 	if _fx != null and is_instance_valid(_fx):
 		_fx.queue_free()
@@ -118,12 +118,12 @@ func release_fish() -> void:
 	attack.on_cancel(self)
 	if is_instance_valid(fish) and _owns_fish():
 		fish.ignore_jump = false
-		fish.remove_meta("ws_bite")
+		ModeData.erase(fish, "what_stinks", "bite")
 
 
 ## Whether this is the bite the fish is wearing (a newer one may have replaced it).
 func _owns_fish() -> bool:
-	return fish.has_meta("ws_bite") and fish.get_meta("ws_bite") == self
+	return ModeData.has_value(fish, "what_stinks", "bite") and ModeData.get_value(fish, "what_stinks", "bite") == self
 
 
 func _exit_tree() -> void:

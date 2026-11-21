@@ -72,8 +72,8 @@ func school_of(fish: FishController) -> School:
 
 ## The class a school has to be for `fish` to join it (its own, off a Hunter's form).
 func class_of(fish: FishController) -> FishCharacter.FishClass:
-	if bool(fish.get_meta("ws_swapped", false)):
-		return int((fish.get_meta("ws_base_look") as Array)[0]) as FishCharacter.FishClass
+	if bool(ModeData.get_value(fish, "what_stinks", "swapped", false)):
+		return int((ModeData.get_value(fish, "what_stinks", "base_look") as Array)[0]) as FishCharacter.FishClass
 	return fish.character
 
 

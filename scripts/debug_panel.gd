@@ -40,7 +40,7 @@ const PREVIEW_DIR := "res://assets/ui/previews"
 ## The sections in order: [id, title]. Game, Display and Controls are
 ## UISettings and Controls; the rest are tuning targets.
 const SECTIONS := [["game", "Game"], ["display", "Display"], ["audio", "Audio"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"], ["battery", "Battery"],
-		["gaits", "Gaits"], ["ball", "Ball"], ["unnatural", "Unnatural"], ["powerups", "Powerups"], ["marco_polo", "Marco Polo"], ["what_stinks", "What Stinks?"], ["hunter_size", "Hunter Size"], ["water_look", "Water Look"]]
+		["gaits", "Gaits"], ["ball", "Ball"], ["unnatural", "Unnatural"], ["powerups", "Powerups"], ["marco_polo", "Marco Polo"], ["water_look", "Water Look"]]
 ## Who each tuning section is for ("Used by ...").
 const USED_BY := {
 	"camera": "the follow camera, in every mode",
@@ -235,7 +235,6 @@ func _ready() -> void:
 			_targets[entry[0]] = _mode_settings[entry[0]]
 	_targets.merge({"fish": fish, "gaits": GaitSettings.shared(), "camera": follow_camera, "ball": ball_settings,
 			"unnatural": UnnaturalSettings.shared(), "powerups": PowerupSettings.shared(), "marco_polo": MarcoPoloSettings.shared(),
-			"what_stinks": WhatStinksSettings.shared(), "hunter_size": HunterSize.shared(),
 			"water_look": WaterLook.shared()})
 	for section: String in _targets:
 		_defaults[section] = _snapshot(_targets[section])
@@ -267,11 +266,20 @@ func _build_section_list() -> void:
 		var script: GDScript = d.get("settings", null)
 		if script == null:
 			continue
-		var id := String(d["id"]).to_lower()
-		_mode_settings[id] = script.call(&"shared")
-		_mode_used_by[id] = String(d["title"])
-		_sections.insert(at + 1, [id, d["title"]])
-		at += 1
+		var id: String = d.get("settings_key", String(d["id"]).to_lower())
+		var sections: Array = [[id, d["title"], script]] + (d.get("extra_settings", []) as Array)
+		var place := at  # a descriptor may ask for another spot: "settings_after" (a section id)
+		if d.has("settings_after"):
+			for i in _sections.size():
+				if _sections[i][0] == d["settings_after"]:
+					place = i
+		for entry: Array in sections:
+			_mode_settings[entry[0]] = (entry[2] as GDScript).call(&"shared")
+			_mode_used_by[entry[0]] = String(d["title"])
+			_sections.insert(place + 1, [entry[0], entry[1]])
+			place += 1
+			if not d.has("settings_after"):
+				at += 1
 
 
 func is_open() -> bool:

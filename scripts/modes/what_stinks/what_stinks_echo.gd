@@ -464,7 +464,7 @@ func _read_buttons(hunter: FishController, delta: float) -> void:
 ## Whether `fish` holds `button` (a controller or bot input alike, as HunterBite reads).
 func _held(fish: FishController, button: String) -> bool:
 	if fish.puppet:  # a guest's Hunter: the host knows its buttons from what the guest sent
-		return (int(fish.get_meta("ws_buttons", 0)) >> maxi(BUTTONS.find(button), 0)) & 1 == 1
+		return (int(ModeData.get_value(fish, "what_stinks", "buttons", 0)) >> maxi(BUTTONS.find(button), 0)) & 1 == 1
 	match button:
 		"boost":
 			return fish.boost_held

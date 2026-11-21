@@ -56,8 +56,12 @@ var unnatural_net := UnnaturalNet.new()
 var mpm: MarcoPoloMatch
 var marco_polo_net := MarcoPoloNet.new()
 ## The What Stinks? match in the session (instead of `run`), and its messages.
-var wsm: WhatStinksMatch
-var what_stinks_net := WhatStinksNet.new()
+## A registered mode with a net adapter (descriptor "net"), while it is hooked: its game, its
+## adapter (ModeNet), and its id. _mode_nets: net_key -> adapter, one per such mode.
+var mgame: GameMode
+var mnet: ModeNet
+var _mode_net_id := ""
+var _mode_nets := {}
 ## pid -> {"pid", "peer", "name", "character", "species" (its key), "index"}.
 var roster := {}
 ## The last status line (for the menu).
@@ -97,8 +101,11 @@ func _ready() -> void:
 	add_child(unnatural_net)
 	marco_polo_net.coop = self
 	add_child(marco_polo_net)
-	what_stinks_net.coop = self
-	add_child(what_stinks_net)
+	for d: Dictionary in ModeRegistry.net_descriptors():
+		var adapter: ModeNet = (d["net"] as GDScript).new()
+		adapter.coop = self
+		add_child(adapter)
+		_mode_nets[d["net_key"]] = adapter
 	var session := get_parent()
 	session.session_started.connect(_on_session_started)
 	session.session_ended.connect(_on_session_ended)
@@ -115,8 +122,6 @@ func attach_main(game: Node) -> void:
 	main.unnatural_ended.connect(_on_unnatural_ended)
 	main.marco_polo_started.connect(_on_marco_polo_started)
 	main.marco_polo_ended.connect(_on_marco_polo_ended)
-	main.what_stinks_started.connect(_on_what_stinks_started)
-	main.what_stinks_ended.connect(_on_what_stinks_ended)
 	main._local.players_changed.connect(func(_count: int) -> void: _players_changed())
 	main._panel.tuning_changed.connect(func() -> void:
 		if _is_host():
@@ -141,8 +146,8 @@ func _is_host() -> bool:
 func _game_run() -> Node:
 	if mpm and is_instance_valid(mpm):
 		return mpm
-	if wsm and is_instance_valid(wsm):
-		return wsm
+	if mgame and is_instance_valid(mgame):
+		return mgame
 	if urun and is_instance_valid(urun):
 		return urun
 	if run and is_instance_valid(run):
@@ -160,9 +165,25 @@ func _in_marco_polo() -> bool:
 	return main != null and main.get("current_mode") == "Marco Polo"
 
 
-## Whether this machine is in What Stinks? (the mode a session it hosts is in).
-func _in_what_stinks() -> bool:
-	return main != null and main.get("current_mode") == "What Stinks?"
+## The descriptor of the registered mode with a net adapter that this machine is in ({} when none).
+func _net_mode() -> Dictionary:
+	if main == null:
+		return {}
+	var d := ModeRegistry.describe(str(main.get("current_mode")))
+	return d if d.has("net") else {}
+
+
+## The adapter of net key `key` (what a guest's welcome names), null when none.
+func net_of(key: String) -> ModeNet:
+	return _mode_nets.get(key)
+
+
+## The descriptor of the registered mode whose wire key is `key` ({} when none).
+func _net_mode_of_key(key: String) -> Dictionary:
+	for d: Dictionary in ModeRegistry.net_descriptors():
+		if d["net_key"] == key:
+			return d
+	return {}
 
 
 func _set_status(text: String) -> void:
@@ -185,11 +206,11 @@ func _on_session_started() -> void:
 				else "Hosting on port %d: waiting for friends" % NetSession.port)
 		var unnatural := _in_unnatural()
 		var marco_polo := _in_marco_polo()
-		var what_stinks := _in_what_stinks()
+		var net_mode := _net_mode()
 		if marco_polo:
 			main.host_marco_polo()
-		elif what_stinks:
-			main.host_what_stinks()
+		elif not net_mode.is_empty():
+			main.host_mode(net_mode["id"])
 		elif unnatural:
 			main.host_unnatural_run()
 		else:
@@ -198,8 +219,8 @@ func _on_session_started() -> void:
 			_add_to_roster(entry, 1)
 		if marco_polo:
 			_hook_marco_polo(main.marco_polo)
-		elif what_stinks:
-			_hook_what_stinks(main.what_stinks)
+		elif not net_mode.is_empty():
+			_hook_mode(main.active_mode(), net_mode)
 		elif unnatural:
 			_hook_unnatural(main.unnatural_run)
 		else:
@@ -218,11 +239,12 @@ func _on_session_ended(reason: String) -> void:
 	var was_guest := _welcomed and run and not run.authority
 	var was_unnatural_guest := _welcomed and urun and is_instance_valid(urun) and not urun.authority
 	var was_marco_polo_guest := _welcomed and mpm and is_instance_valid(mpm) and not mpm.authority
-	var was_what_stinks_guest := _welcomed and wsm and is_instance_valid(wsm) and not wsm.authority
+	var was_mode_guest: bool = _welcomed and mgame and is_instance_valid(mgame) and not mgame.get("authority")
+	var guest_of := _mode_net_id
 	_unhook()
 	_unhook_unnatural()
 	_unhook_marco_polo()
-	_unhook_what_stinks()
+	_unhook_mode()
 	for pid: int in _remote.keys():
 		_drop_remote(pid)
 	roster.clear()
@@ -245,9 +267,9 @@ func _on_session_ended(reason: String) -> void:
 		_switching = true
 		main.solo_marco_polo()  # back to Marco Polo against bots, the match ours
 		_switching = false
-	elif was_what_stinks_guest:
+	elif was_mode_guest:
 		_switching = true
-		main.solo_what_stinks()  # back to What Stinks? against bots, the match ours
+		main.solo_mode(guest_of)  # back to the mode against bots, the game ours
 		_switching = false
 
 
@@ -301,9 +323,19 @@ func _unhook_marco_polo() -> void:
 func _on_mode_started(mode: GameMode) -> void:
 	if mode is NatureRun and is_active() and (_welcomed or _is_host()):
 		_hook(mode)
+		return
+	var d := ModeRegistry.describe(String(mode.name))
+	if d.has("net") and is_active() and (_welcomed or _is_host()):
+		_hook_mode(mode, d)
 
 
 func _on_mode_ended(id: String) -> void:
+	var d := ModeRegistry.describe(id)
+	if d.has("net"):
+		_unhook_mode()
+		if is_active() and not _switching:
+			NetSession.leave(("Left %s, so the session ended" % d["title"]) if _is_host() else "Left the session")
+		return
 	if id != main.NATURE:
 		return
 	_unhook()
@@ -555,8 +587,8 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if is_active() and wsm and is_instance_valid(wsm):
-		_what_stinks_tick(delta)
+	if is_active() and mgame and is_instance_valid(mgame):
+		mnet.tick(delta)
 		return
 	if is_active() and mpm and is_instance_valid(mpm):
 		_marco_polo_tick(delta)
@@ -634,60 +666,34 @@ func _marco_polo_tick(delta: float) -> void:
 	marco_polo_net.tick(delta)
 
 
-## What Stinks?: the puppets follow their players (a school's joined fish is moved by the school,
-## not the net; the eaten are hidden), ours goes out, then WhatStinksNet's.
-func _what_stinks_tick(delta: float) -> void:
-	for net: NetFish in _remote.values():
-		if net.has_state() and is_instance_valid(net.fish):
-			net.fish.visible = not wsm.eaten.has(net.fish)
-			if not wsm.join.is_joined(net.fish):
-				net.apply()
-	_send_left -= delta
-	if _send_left <= 0.0:
-		_send_left += 1.0 / SEND_RATE
-		var now := _now()
-		var fish: FishController = wsm.local_fish()
-		var pid := pid_of(fish)
-		if pid >= 0:
-			_send_all("_fish_state", [pid, now, fish.global_position, fish.global_basis.get_rotation_quaternion(),
-					fish.linear_velocity, fish.replay_fx(), _teleports.get(fish, 0)], false)
-	what_stinks_net.tick(delta)
-
-
-func _on_what_stinks_started(match_node: WhatStinksMatch) -> void:
-	if is_active() and (_welcomed or _is_host()):
-		_hook_what_stinks(match_node)
-
-
-func _on_what_stinks_ended() -> void:
-	_unhook_what_stinks()
-	if is_active() and not _switching:
-		NetSession.leave("Left What Stinks?, so the session ended" if _is_host() else "Left the session")
-
-
-## Wires a What Stinks? match up to the session (WhatStinksNet), puppets joining it.
-func _hook_what_stinks(match_node: WhatStinksMatch) -> void:
-	if wsm == match_node or match_node == null:
+## Wires a registered mode's game (descriptor `d`) up to the session through its adapter, puppets joining it.
+func _hook_mode(game: GameMode, d: Dictionary) -> void:
+	if mgame == game or game == null:
 		return
-	_unhook_what_stinks()
-	wsm = match_node
-	what_stinks_net.hook(wsm)
+	_unhook_mode()
+	mgame = game
+	_mode_net_id = str(d["id"])
+	mnet = _mode_nets.get(d["net_key"])
+	mnet.hook(game)
+	var parent := mnet.puppet_parent()
 	for net: NetFish in _remote.values():
-		if is_instance_valid(net.fish) and net.fish.get_parent() != wsm:
-			net.fish.reparent(wsm)
-		wsm.add_player(net.fish)
+		if is_instance_valid(net.fish):
+			if parent != null and net.fish.get_parent() != parent:
+				net.fish.reparent(parent)
+			mnet.puppet_added(net.fish)
 	_sync_puppets()
 
 
-func _unhook_what_stinks() -> void:
-	what_stinks_net.unhook()
-	if wsm == null or not is_instance_valid(wsm):
-		wsm = null
-		return
-	for net: NetFish in _remote.values():
-		if is_instance_valid(net.fish):
-			wsm.remove_player(net.fish)
-	wsm = null
+func _unhook_mode() -> void:
+	if mnet != null:
+		mnet.unhook()
+		if mgame != null and is_instance_valid(mgame):
+			for net: NetFish in _remote.values():
+				if is_instance_valid(net.fish):
+					mnet.puppet_removed(net.fish)
+	mgame = null
+	mnet = null
+	_mode_net_id = ""
 
 
 static func _now() -> float:
@@ -819,8 +825,8 @@ func _host_tuning() -> Dictionary:
 func _world_of_mode() -> Dictionary:
 	if mpm and is_instance_valid(mpm):
 		return marco_polo_net.world()
-	if wsm and is_instance_valid(wsm):
-		return what_stinks_net.world()
+	if mgame and is_instance_valid(mgame):
+		return mnet.world()
 	if urun and is_instance_valid(urun):
 		return unnatural_net.world()
 	return _world()
@@ -930,13 +936,14 @@ func _welcome(host_roster: Dictionary, tuning: Dictionary, world: Dictionary) ->
 		marco_polo_net.apply_world(world)
 		_set_status("Playing with %d others" % (roster.size() - _local_players().size()))
 		return
-	if world.get("mode", "nature") == "what_stinks":
+	var joined_mode := _net_mode_of_key(str(world.get("mode", "nature")))
+	if not joined_mode.is_empty():
 		_apply_tuning(tuning)  # before the match: it reads the host's settings as it starts
 		_switching = true
-		main.guest_what_stinks()  # our own player in the host's match
+		main.guest_mode(joined_mode["id"])  # our own player in the host's game
 		_switching = false
-		_hook_what_stinks(main.what_stinks)
-		what_stinks_net.apply_world(world)
+		_hook_mode(main.active_mode(), joined_mode)
+		mnet.apply_world(world)
 		_set_status("Playing with %d others" % (roster.size() - _local_players().size()))
 		return
 	if world.get("mode", "nature") == "unnatural":

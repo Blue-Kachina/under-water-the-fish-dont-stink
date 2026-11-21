@@ -338,6 +338,11 @@ func share_bar(label: String, values: Array, percent := true) -> Dictionary:
 	return _share_bar(label, values, percent)
 
 
+## Some players' name plates are held back (a plate filter or the mode HUD's).
+func plates_filtered() -> bool:
+	return plate_filter.is_valid() or (_mode_hud_live() and mode_hud.filters_plates)
+
+
 ## A mode's HUD is up and its node still alive.
 func _mode_hud_live() -> bool:
 	return mode_hud != null and mode_hud.live()
@@ -578,6 +583,8 @@ func _update_name_plates() -> void:
 			if other == fish or not other.is_visible_in_tree() or other.battered:
 				continue
 			if plate_filter.is_valid() and not bool(plate_filter.call(other)):
+				continue
+			if _mode_hud_live() and mode_hud.filters_plates and not mode_hud.shows_plate(other):
 				continue
 			var above := other.global_position + Vector3.UP * NAME_PLATE_HEIGHT
 			if camera.is_position_behind(above):

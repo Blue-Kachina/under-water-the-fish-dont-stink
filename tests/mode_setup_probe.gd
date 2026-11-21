@@ -292,7 +292,7 @@ func _check_mid_match() -> void:
 	kept.pool_index = ModeSetup.pool_index_of(kept.pool, other)
 	ModeSetups.apply_character(main, kept)
 	await _frames(3)
-	check(fish.get_meta("ws_base_look")[0] == int(other) and fish.character != other, "a Hunter's pick of a fish waits under its body")
+	check(ModeData.get_value(fish, "what_stinks", "base_look")[0] == int(other) and fish.character != other, "a Hunter's pick of a fish waits under its body")
 	game.apply_role(fish, WhatStinksMatch.Role.PREY)
 	await _frames(3)
 	check(fish.character == other, "and is worn once it's prey")

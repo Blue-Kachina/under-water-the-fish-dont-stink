@@ -118,8 +118,8 @@ func _setup() -> void:
 		return
 	var form := {}
 	var fish: FishController = rig.get("fish")
-	if fish != null and fish.has_meta("ws_bite") and is_instance_valid(fish.get_meta("ws_bite")):
-		form = (fish.get_meta("ws_bite") as HunterBite).form
+	if fish != null and ModeData.has_value(fish, "what_stinks", "bite") and is_instance_valid(ModeData.get_value(fish, "what_stinks", "bite")):
+		form = (ModeData.get_value(fish, "what_stinks", "bite") as HunterBite).form
 	var form_params := {"exaggerate": PRESET, "exaggeration": float(form.get("exaggeration", 1.0))}
 	var source: Object = settings_source if settings_source != null else WhatStinksSettings.shared()
 	ex = KIT.new(KIT.params_from(source, form_params))

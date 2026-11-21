@@ -12,7 +12,7 @@ var _world: ModeWorld
 
 ## THE registry: one line per migrated mode.
 static func scripts() -> Array[GDScript]:
-	return [NatureRun, HuntMatch]
+	return [NatureRun, HuntMatch, WhatStinksMatch]
 
 
 static func descriptors() -> Array[Dictionary]:
@@ -72,6 +72,25 @@ static func merged_tiles(core: Dictionary) -> Dictionary:
 	var out := {}
 	for key: String in order:
 		out[key] = tiles[key]
+	return out
+
+
+## The body a registered mode builds for class `fish_class` (descriptor "models": a Callable(FishModel)),
+## invalid when none does. FishModel.build asks before its own class switch.
+static func model_provider(fish_class: int) -> Callable:
+	for d in descriptors():
+		var models: Dictionary = d.get("models", {})
+		if models.has(fish_class):
+			return models[fish_class]
+	return Callable()
+
+
+## The registered descriptors with a net adapter (descriptor "net").
+static func net_descriptors() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for d in descriptors():
+		if d.has("net"):
+			out.append(d)
 	return out
 
 

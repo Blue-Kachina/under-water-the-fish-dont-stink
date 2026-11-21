@@ -150,7 +150,7 @@ static func intent_of(fish: FishController) -> Vector3:
 
 ## Whether `fish` is dashing (prey's boost).
 static func dashing(fish: FishController) -> bool:
-	return fish.boost_held or (fish.has_meta("ws_dashing") and bool(fish.get_meta("ws_dashing")))
+	return fish.boost_held or (ModeData.has_value(fish, "what_stinks", "dashing") and bool(ModeData.get_value(fish, "what_stinks", "dashing")))
 
 
 ## One angler's field: where the light is and how hard it draws.

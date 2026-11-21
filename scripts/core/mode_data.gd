@@ -41,3 +41,17 @@ static func set_value(node: Object, id: String, key: String, value: Variant) -> 
 static func erase(node: Object, id: String, key: String) -> void:
 	if node.has_meta(META):
 		((node.get_meta(META) as Dictionary).get(id, {}) as Dictionary).erase(key)
+
+
+## The id of the first mode whose dictionary on `node` has `key` set true ("" when none): the
+## core asks "is a mode holding this fish in another body" without naming modes. The keys
+## the core reads: "swapped" (true while the mode has the player in another body) and
+## "base_look" ([class, species, skin] of their own).
+static func mode_with(node: Object, key: String) -> String:
+	if not node.has_meta(META):
+		return ""
+	var all: Dictionary = node.get_meta(META)
+	for id: String in all:
+		if bool((all[id] as Dictionary).get(key, false)):
+			return id
+	return ""

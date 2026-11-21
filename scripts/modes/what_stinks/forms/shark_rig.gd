@@ -113,8 +113,8 @@ func camera_margin(radius: float) -> float:
 
 func _exit_tree() -> void:
 	_unhook()
-	if is_instance_valid(fish) and fish.has_meta("ws_exaggerate_peak"):
-		fish.remove_meta("ws_exaggerate_peak")
+	if is_instance_valid(fish) and ModeData.has_value(fish, "what_stinks", "exaggerate_peak"):
+		ModeData.erase(fish, "what_stinks", "exaggerate_peak")
 
 
 # ------------------------------------------------------------------ beats
@@ -170,8 +170,8 @@ func _unhook() -> void:
 
 func _poll_bite() -> void:
 	var now: Variant = null
-	if is_instance_valid(fish) and fish.has_meta("ws_bite"):
-		now = fish.get_meta("ws_bite")
+	if is_instance_valid(fish) and ModeData.has_value(fish, "what_stinks", "bite"):
+		now = ModeData.get_value(fish, "what_stinks", "bite")
 	if now == bite:
 		return
 	_unhook()
@@ -210,7 +210,7 @@ func _apply(rest: bool) -> void:
 	if not is_equal_approx(peak, _shown_peak):
 		_shown_peak = peak
 		if is_instance_valid(fish):
-			fish.set_meta("ws_exaggerate_peak", peak)
+			ModeData.set_value(fish, "what_stinks", "exaggerate_peak", peak)
 
 
 func _apply_body(rest: bool) -> void:

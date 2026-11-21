@@ -279,7 +279,7 @@ func _snap(label: String) -> void:
 		"fish_monster": fish.character == FishCharacter.FishClass.MONSTER,
 		"camera_ball_cam": camera.ball_cam,
 		"camera_target": camera.get("target") != null,
-		"plate_filter": main._hud.plate_filter.is_valid(),
+		"plate_filter": main._hud.plates_filtered(),
 		"no_split": main._local.no_split_screen,
 		"boundary": snappedf((main._environment as Ocean).boundary_radius, 0.1) if main._environment is Ocean else -1.0,
 	}

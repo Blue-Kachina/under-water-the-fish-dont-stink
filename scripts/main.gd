@@ -33,8 +33,6 @@ signal unnatural_started(run: UnnaturalRun)
 signal unnatural_ended
 signal marco_polo_started(game: MarcoPoloMatch)
 signal marco_polo_ended
-signal what_stinks_started(game: WhatStinksMatch)
-signal what_stinks_ended
 
 ## Environment name -> script. Each script builds its own world and provides
 ## spawn_transform() and configure_environment(env).
@@ -58,11 +56,11 @@ const OBSTACLE_COURSE := "Obstacle Course"
 const REPLAYS := "Replays"
 const MARCO_POLO := "Marco Polo"
 const WHAT_STINKS := "What Stinks?"
-const _CORE_MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS, REPLAYS]
+const _CORE_MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, REPLAYS]
 ## Modes played as a match, which wait on a card for Play.
-const _CORE_MATCH_MODES := [ONE_V_ONE, UNNATURAL, TEST_TANK, MARCO_POLO, WHAT_STINKS]
+const _CORE_MATCH_MODES := [ONE_V_ONE, UNNATURAL, TEST_TANK, MARCO_POLO]
 ## Modes played on Nature's tuning.
-const _CORE_NATURE_MODES := [UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS]
+const _CORE_NATURE_MODES := [UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO]
 ## Nature's tuning: Extra Swishy strides, no boost.
 const NATURE_PRESET := "res://presets/nature.cfg"
 ## Mode -> the environment it's played in.
@@ -74,7 +72,6 @@ const MODE_ENVIRONMENTS := {
 	TEST_TANK: "Ocean",
 	OBSTACLE_COURSE: "Obstacle Course",
 	MARCO_POLO: "Sunken Temple",  # its card's arena picker decides (mode_environment())
-	WHAT_STINKS: "Ocean",
 	REPLAYS: "Aquarium Arena",
 }
 ## Each mode's tile in the home screen's mode picker (ModePicker): its title,
@@ -105,9 +102,6 @@ const _CORE_TILES := {
 	MARCO_POLO: {"title": "Marco Polo", "icon": "mode_marco_polo", "colors": [Color(0.03, 0.14, 0.12), Color(0.4, 1.0, 0.7)],
 		"pitch": "Hide and seek by sound. Score in the seeker's sight, keep quiet, and don't get tagged.",
 		"short": "Hide and seek by sound", "play": ["Solo", "Online"]},
-	WHAT_STINKS: {"title": "What Stinks?", "icon": "mode_what_stinks", "colors": [Color(0.05, 0.13, 0.1), Color(0.75, 0.9, 0.3)],
-		"pitch": "One huge Hunter, a school of prey. Eat every fish in the crowd before the clock runs out, or stay in the swim and get away.",
-		"short": "One Hunter, a crowd of prey", "play": ["Solo"]},
 }
 ## Converted replays are kept here, so a .replay converts only once. Bump the
 ## folder when the converter's output changes, so old conversions are redone.
@@ -144,8 +138,10 @@ var unnatural_run: UnnaturalRun
 var _unnatural_hud: UnnaturalHud
 ## The Marco Polo match being played, if any.
 var marco_polo: MarcoPoloMatch
-## The What Stinks? match being played, if any.
-var what_stinks: WhatStinksMatch
+## The What Stinks? match being played, if any (a registered mode's node).
+var what_stinks: Object:
+	get:
+		return _modes.active if _modes.active_id() == WHAT_STINKS else null
 ## The first player's school wheel and edge arrows, while a Nature run is on.
 var _target_wheel: TargetWheel:
 	get:
@@ -417,14 +413,14 @@ func set_character(character: FishCharacter.FishClass) -> void:
 	var settings := ConfigFile.new()
 	settings.load(SETTINGS_PATH)
 	var species := saved_species(settings, character)
-	var kept := _kept_look_meta()
-	if kept != "":
-		_fish.set_meta(kept, [int(character), species, 0])  # worn once the Hunter's / whale's body comes off
+	var kept := _kept_look()
+	if not kept.is_empty():
+		_set_kept_look([int(character), species, 0])  # worn once the Hunter's / whale's body comes off
 	else:
 		_fish.set_look(character, species)
 	if unnatural_run:
 		unnatural_run.start()  # its loadout comes from the class (Change Character is off there for now)
-	elif not (match_1v1 or _modes.active or marco_polo or what_stinks):
+	elif not (match_1v1 or _modes.active or marco_polo):
 		_fish.set_spawn(_environment.spawn_transform())
 	# Otherwise it's worn now, mid-match: 1v1, Nature and Hunt keep nothing of the class (no
 	# restart), and Marco Polo / What Stinks keep it for when this role's body comes off.
@@ -441,10 +437,9 @@ func set_species(species: int) -> void:
 		return
 	var settings := ConfigFile.new()
 	settings.load(SETTINGS_PATH)
-	var kept := _kept_look_meta()
-	if kept != "":
-		var base: Array = _fish.get_meta(kept)  # the player's own look, under the Hunter's / whale's body
-		_fish.set_meta(kept, [int(base[0]), species, 0])
+	var base := _kept_look()
+	if not base.is_empty():  # the player's own look, under the Hunter's / whale's body
+		_set_kept_look([int(base[0]), species, 0])
 		store_species(settings, int(base[0]) as FishCharacter.FishClass, species)
 	else:
 		_fish.species = species
@@ -453,14 +448,24 @@ func set_species(species: int) -> void:
 	settings.save(SETTINGS_PATH)
 
 
-## The meta a match keeps the player's own look in while it has them in another
-## body (What Stinks?'s Hunter, Marco Polo's whale), or "" when they wear their own.
-func _kept_look_meta() -> String:
-	if bool(_fish.get_meta("ws_swapped", false)):
-		return "ws_base_look"
+## The player's own look ([class, species, skin]) a match keeps while it has them in another
+## body (What Stinks?'s Hunter, Marco Polo's whale), or [] when they wear their own. A mode
+## marks it in its ModeData with "swapped" and "base_look".
+func _kept_look() -> Array:
+	var id := ModeData.mode_with(_fish, "swapped")
+	if id != "":
+		return ModeData.get_value(_fish, id, "base_look")
 	if bool(_fish.get_meta("mp_swapped", false)):
-		return "mp_base_look"
-	return ""
+		return _fish.get_meta("mp_base_look")
+	return []
+
+
+func _set_kept_look(look: Array) -> void:
+	var id := ModeData.mode_with(_fish, "swapped")
+	if id != "":
+		ModeData.set_value(_fish, id, "base_look", look)
+	else:
+		_fish.set_meta("mp_base_look", look)
 
 
 ## The species last picked for `fish_class` in `settings` (playground/species_<class
@@ -523,10 +528,6 @@ func reset_play() -> void:
 		if marco_polo.authority:
 			marco_polo.start_match()
 		return
-	if what_stinks:
-		if what_stinks.authority:
-			what_stinks.start_match()
-		return
 	if unnatural_run:
 		if unnatural_run.authority:
 			unnatural_run.start()  # online, the host's restart is everyone's
@@ -546,11 +547,9 @@ func _reset_label() -> String:
 	if match_1v1:
 		return "Restart kickoff"
 	if _modes.active:
-		return ModeRegistry.describe(_modes.active_id()).get("reset_label", "")
+		return ModeRegistry.describe(_modes.active_id()).get("reset_label", "") if _modes.active.can_reset() else ""
 	if marco_polo:
 		return "Restart match" if marco_polo.authority else ""
-	if what_stinks:
-		return "Restart match" if what_stinks.authority else ""
 	if unnatural_run:
 		return "Reset the tank" if unnatural_run.test_tank else "Restart run"
 	return "Reset"
@@ -765,8 +764,8 @@ func _show_match_card() -> void:
 	_match_card.play_requested.connect(play_match)
 	if current_mode == MARCO_POLO:
 		_marco_polo_card(_match_card)
-	elif current_mode == WHAT_STINKS:
-		_what_stinks_card(_match_card)
+	else:
+		_registered_card(_match_card)
 	add_child(_match_card)
 
 
@@ -790,21 +789,15 @@ func _marco_polo_card(card: MatchCard) -> void:
 				% [_local.dropped_for_marco_polo, "" if _local.dropped_for_marco_polo == 1 else "s"]
 
 
-## What Stinks?'s card picks the variant, whether you hunt or are prey first
-## (Start as) and the Hunter's form.
-func _what_stinks_card(card: MatchCard) -> void:
-	var ws := WhatStinksSettings.shared()
-	card.choices.append({"title": "Variant", "options": WhatStinksSettings.VARIANT_NAMES, "index": int(ws.variant),
-			"changed": func(i: int) -> void: ws.variant = i as WhatStinksSettings.Variant})
-	card.choices.append({"title": "Start as", "options": WhatStinksSettings.START_AS_NAMES, "index": int(ws.start_as),
-			"changed": func(i: int) -> void: ws.start_as = i as WhatStinksSettings.StartAs})
-	var ready: Array[String] = HunterForms.ready_keys()
-	var forms: Array = ready.map(func(key: String) -> String: return HunterForms.name_of(key))
-	card.choices.append({"title": "Hunter", "options": forms, "index": maxi(ready.find(HunterForms.playable(ws.form)), 0),
-			"changed": func(i: int) -> void: ws.form = ready[i]})
-	if _local and _local.dropped_for_marco_polo > 0:
-		card.note = "No split-screen in What Stinks? (play together online): %d local player%s dropped." \
-				% [_local.dropped_for_marco_polo, "" if _local.dropped_for_marco_polo == 1 else "s"]
+## A registered mode's card: its descriptor's "card_choices" (Callable(card, host)) and, for a
+## one-screen mode, the note about split-screen players it dropped.
+func _registered_card(card: MatchCard) -> void:
+	var registered := ModeRegistry.describe(current_mode)
+	if registered.has("card_choices"):
+		(registered["card_choices"] as Callable).call(card, self)
+	if registered.get("one_screen", false) and _local and _local.dropped_for_marco_polo > 0:
+		card.note = "No split-screen in %s: %d local player%s dropped." \
+				% [registered.get("one_screen_note", registered["title"]), _local.dropped_for_marco_polo, "" if _local.dropped_for_marco_polo == 1 else "s"]
 
 
 ## What a match mode's card says.
@@ -821,8 +814,6 @@ static func _match_card_text(mode: String) -> String:
 				return "Unnatural: there's a blood moon tonight, and every fish in the sea has turned but you. Survive the zombie horde. Your fish bites on its own: huge ghost jaws snap on whatever's ahead. Ram them at speed to batter them too (it doesn't hurt you), but any other touch does. Swim through the XP pearls they drop to level up."
 		MARCO_POLO:
 			return "Marco Polo: hide and seek by sound. Each round one fish seeks and the rest hide: you seek once, and a bot seeks while you hide (Start as picks which comes first). Hiders score while they're in the seeker's line of sight, even unseen, but every noise (fast swimming, flips, badly timed strides) shows them to the seeker, layer by layer. The seeker tags by touch (click the left stick, or M, to call \"Marco!\"); hiders throw a Fake Fish with RB. Y swaps follow and free cam, as in Unnatural. Last Fish Swimming: tagged is out. Join the Seekers: tagged hunts with them."
-		WHAT_STINKS:
-			return "What Stinks?: one huge Hunter and a crowd of prey in an open ocean full of fish schools. The Hunter swims at the fish and bites (jump) to eat the ones nearest its mouth, school fish and players alike, and wins by eating every prey player before the clock runs out. Prey swim among the schools and have to be the fish it doesn't bite. An eaten prey watches the others (left / right)."
 	return mode
 
 
@@ -880,7 +871,7 @@ func set_mode(mode: String, remember := true) -> void:
 func _apply_mode() -> void:
 	_sync_terrain_stream()
 	if _local:
-		var one_screen: bool = current_mode == MARCO_POLO or current_mode == WHAT_STINKS
+		var one_screen: bool = current_mode == MARCO_POLO or ModeRegistry.describe(current_mode).get("one_screen", false)
 		_local.no_split_screen = one_screen
 		if one_screen and _local.count() > 1:
 			_local.dropped_for_marco_polo = _local.count() - 1
@@ -938,7 +929,7 @@ func _sync_terrain_stream() -> void:
 
 ## A match, a Nature run or a Hunt is on.
 func _playing() -> bool:
-	return match_1v1 != null or _modes.active != null or unnatural_run != null or marco_polo != null or what_stinks != null
+	return match_1v1 != null or _modes.active != null or unnatural_run != null or marco_polo != null
 
 
 ## The mode of the match being played ("" when none).
@@ -949,8 +940,6 @@ func _playing_mode() -> String:
 		return TEST_TANK if unnatural_run.test_tank else UNNATURAL
 	if marco_polo:
 		return MARCO_POLO
-	if what_stinks:
-		return WHAT_STINKS
 	return _modes.active_id()
 
 
@@ -996,9 +985,6 @@ func _start_match() -> void:
 		return
 	if current_mode == MARCO_POLO:
 		_start_marco_polo()
-		return
-	if current_mode == WHAT_STINKS:
-		_start_what_stinks()
 		return
 	if current_mode in [UNNATURAL, TEST_TANK]:
 		_start_unnatural(current_mode == TEST_TANK)
@@ -1052,6 +1038,8 @@ func _hold_local_players(hold: bool) -> void:
 ## Starts registered mode `id` with every local player (LocalCoop) in its world.
 ## `options` ride on the ModeWorld ({"authority": false}: an online session's guest).
 func _start_registered(id: String, options := {}) -> void:
+	if ModeRegistry.describe(id).get("one_screen", false):
+		_local.drop_extras()  # one screen: no split-screen players
 	var world := ModeWorld.new(self, _environment, _fish, _camera, _hud)
 	world.slots.assign(_local.slots)
 	world.options = options
@@ -1122,49 +1110,39 @@ func solo_marco_polo() -> void:
 	_start_marco_polo(true)
 
 
-## What Stinks? in the Ocean: the player and bots (online and split-screen come
-## later), the follow cam with no ball cam. The world's run here (`authority`).
-func _start_what_stinks(authority := true) -> void:
-	_local.drop_extras()
-	what_stinks = WhatStinksMatch.new()
-	what_stinks.name = "WhatStinks"
-	what_stinks.authority = authority
-	what_stinks.setup(_environment, _fish, _camera)
-	_camera.ball = null
-	_camera.ball_cam = false
-	_environment.add_child(what_stinks)
-	_hud.plate_filter = what_stinks.shows_plate  # the Hunter sees no prey's name plate
-	_camera.snap()
-	what_stinks_started.emit(what_stinks)
-
-
-## Online co-op's host in What Stinks?: the match ours, the world run here. One already running stays.
-func host_what_stinks() -> void:
-	if what_stinks and what_stinks.authority:
+## Online co-op's host in a registered mode with a net adapter (descriptor "net"): the game ours,
+## the world run here. One already running stays.
+func host_mode(id: String) -> void:
+	if _modes.active_id() == id and _modes.active.get("authority"):
 		return
-	set_mode(WHAT_STINKS)
+	set_mode(id)
 	_end_match()
 	_close_match_card()
-	_start_what_stinks(true)
+	_start_registered(id, {"authority": true})
 
 
-## Online co-op's guest in What Stinks?: our fish in the host's match (the host's Ocean).
-func guest_what_stinks() -> void:
-	set_mode(WHAT_STINKS)
-	if current_environment != mode_environment(WHAT_STINKS):
-		set_environment(mode_environment(WHAT_STINKS))
+## Online co-op's guest in registered mode `id`: our players in the host's game (the host's environment).
+func guest_mode(id: String) -> void:
+	set_mode(id)
+	if current_environment != mode_environment(id):
+		set_environment(mode_environment(id))
 	_end_match()
 	_close_match_card()
-	_start_what_stinks(false)
+	_start_registered(id, {"authority": false})
 
 
-## Back from being a guest: What Stinks? on our own again (us and bots).
-func solo_what_stinks() -> void:
-	if current_mode != WHAT_STINKS:
+## The registered mode playing now (null when none).
+func active_mode() -> GameMode:
+	return _modes.active
+
+
+## Back from being a guest: mode `id` on our own again (us and bots), the game ours.
+func solo_mode(id: String) -> void:
+	if current_mode != id:
 		return
 	_end_match()
 	_close_match_card()
-	_start_what_stinks(true)
+	_start_registered(id, {"authority": true})
 
 
 ## Online co-op's host in Unnatural: a run of ours, the world run here.
@@ -1243,13 +1221,6 @@ func _end_match() -> void:
 		_hud.survivor_cam = false
 		_hud.plate_filter = Callable()
 		marco_polo_ended.emit()
-	if what_stinks:
-		what_stinks.end()
-		what_stinks.queue_free()
-		what_stinks = null
-		_hud.plate_filter = Callable()
-		_camera.target = null
-		what_stinks_ended.emit()
 	if _modes.active:
 		var ended := _modes.active_id()
 		_modes.end()
