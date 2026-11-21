@@ -133,6 +133,7 @@ static func build(m: FishModel) -> void:
 	# The rear of the body flexes into the tail; the head and chest stay stiff.
 	m.bend_share = 0.68
 	m._bend_body(shape.z(0.5), bent)
+	m.rig_capable = true  # SwimRig, when the Skirmisher gait turns procedural_rig on
 
 
 static func _body(m: FishModel, shape: Shape, look: Dictionary, span: float) -> void:

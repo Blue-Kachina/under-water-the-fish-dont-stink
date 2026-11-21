@@ -169,6 +169,7 @@ static func build(m: FishModel) -> void:
 	_tail(m, shape, fins)
 	m.bend_share = BEND_SHARE
 	m._bend_body(shape.z(BEND_FROM), bent)
+	m.rig_capable = true  # SwimRig, when the Lancer gait turns procedural_rig on
 	_eyes(m, look, shape)
 
 

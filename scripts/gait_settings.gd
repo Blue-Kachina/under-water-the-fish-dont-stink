@@ -92,13 +92,42 @@ static func default_for(fish_class: FishCharacter.FishClass) -> Gait:
 		gait.stroke_axis = Gait.StrokeAxis.VERTICAL
 		gait.visual = Gait.Visual.FLUKE
 		gait.stroke_time = 1.4
-	elif fish_class == FishCharacter.FishClass.HUNTER:
+	elif fish_class == FishCharacter.FishClass.HUNTER or fish_class == FishCharacter.FishClass.MONSTER:
 		# The shark's procedural rig (SwimRig) is built but off (procedural_rig): when it is switched on the
-		# layers run at full weight and the controller's own tail pose gives way to them.
-		gait.rig_legacy_tail = 0.0
-		for layer in ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel", "rig_drift", "rig_fin_stabilizer", "rig_idle"]:
-			gait.set(layer, 1.0)
+		# layers run at full weight and the controller's own tail pose gives way to them. The Drowned Shark
+		# (the Hunter form, class MONSTER) wears the same shark model, so it takes the shark's numbers.
+		_rig_defaults(gait, {})
+	elif fish_class == FishCharacter.FishClass.SKIRMISHER:
+		# The clownfish: a short, deep body that waves from the rear half with a quick, busy tail, rows itself
+		# with its pectorals (more flutter, a fuller scull at rest), and turns tighter and flatter than a shark.
+		_rig_defaults(gait, {
+			"rig_amplitude": 0.9, "rig_wave_lag": 1.3, "rig_strouhal": 0.05, "rig_freq_min": 0.8, "rig_freq_max": 5.0,
+			"rig_head_sway": 0.4, "rig_caudal_flex": 0.7, "rig_head_span": 0.2, "rig_stride_swing": 0.8,
+			"rig_turn_bend": 5.0, "rig_turn_max": 1.0, "rig_bank": 0.25, "rig_fin_bank": 0.35,
+			"rig_accel_tail": 0.4, "rig_accel_surge": 0.02, "rig_fin_flutter": 0.14, "rig_fin_flutter_hz": 9.0,
+			"rig_idle_scull": 0.4, "rig_idle_sway": 0.18, "rig_idle_hz": 1.1,
+		})
+	elif fish_class == FishCharacter.FishClass.LANCER:
+		# The swordfish: a stiff, tuna-shaped swimmer. The bill and head stay rigid, the wave is small, fast
+		# and held at the tail (the stalk and the lunate fin do the work), and it banks little.
+		_rig_defaults(gait, {
+			"rig_amplitude": 0.4, "rig_wave_lag": 0.8, "rig_strouhal": 0.05, "rig_freq_min": 0.6, "rig_freq_max": 3.0,
+			"rig_envelope": 1.4, "rig_head_sway": 0.1, "rig_caudal_flex": 0.9, "rig_head_span": 0.1,
+			"rig_stride_swing": 0.45, "rig_turn_bend": 3.0, "rig_turn_max": 0.5, "rig_bank": 0.3, "rig_fin_bank": 0.3,
+			"rig_accel_tail": 0.3, "rig_accel_head": 0.1, "rig_accel_surge": 0.02, "rig_fin_flutter": 0.04,
+			"rig_idle_scull": 0.15, "rig_idle_sway": 0.08, "rig_idle_hz": 0.5,
+		})
 	return gait
+
+
+## `gait`'s rig set up for a class: every layer at full weight, the controller's own tail pose given up, and the class's
+## own numbers (`own`: Gait field -> value) over the shark's defaults. procedural_rig stays off.
+static func _rig_defaults(gait: Gait, own: Dictionary) -> void:
+	gait.rig_legacy_tail = 0.0
+	for layer in ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel", "rig_drift", "rig_fin_stabilizer", "rig_idle"]:
+		gait.set(layer, 1.0)
+	for field: String in own:
+		gait.set(field, own[field])
 
 
 ## The Gait exports the panel shows: ranges and bools, and enums with more than
