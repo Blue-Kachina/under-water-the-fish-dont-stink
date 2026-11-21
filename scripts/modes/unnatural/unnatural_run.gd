@@ -356,7 +356,8 @@ static func descriptor() -> Dictionary:
 		"tuning_preset": "res://presets/nature.cfg",
 		"card_text": UnnaturalRun.card_text, "reset_label": "Restart run", "split_screen": true,
 		"settings": UnnaturalSettings, "setup_rows": UnnaturalRun.setup_rows,
-		"extra_settings": [["powerups", "Powerups", PowerupSettings]],
+		"extra_settings": [["powerups", "Powerups", PowerupSettings]], "panel_tabs": {"powerups": Powerup.panel_tab},
+		"class_details": FishDetails.details, "class_growth": FishDetails.growth_title,
 		"sfx": [[UnnaturalSounds, &"sfx_hook"]],
 	}
 

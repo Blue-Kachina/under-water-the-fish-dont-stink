@@ -1,28 +1,13 @@
 {
 	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
-	"total": 24,
+	"total": 11,
 	"violations": {
-		"debug_panel.gd": {
-			"Powerup": 4,
-			"Rarity": 1
-		},
-		"main.gd": {
-			"CourseSkill": 2
-		},
 		"net/coop_session.gd": {
 			"MarcoPoloMatch": 3,
 			"MarcoPoloNet": 1,
 			"NatureRun": 3,
 			"UnnaturalNet": 1,
 			"UnnaturalRun": 3
-		},
-		"ui/hex_badge.gd": {
-			"Powerup": 1
-		},
-		"ui/home_screen.gd": {
-			"FishDetails": 1,
-			"HunterPreview": 2,
-			"StatBlock": 2
 		}
 	}
 }

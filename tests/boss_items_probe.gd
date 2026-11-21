@@ -109,7 +109,7 @@ func _run() -> void:
 	var whole := true
 	for id in ITEMS:
 		var ok: bool = Powerup.INFO.has(id) and HexBadge.has_glyph(id) and PowerupSettings.STACKS.has(id) and Powerup.create(id).get_script() != Powerup \
-				and HexBadge.shape_of(id) == HexBadge.Shape.HEX
+				and Powerup.badge_shape(id) == HexBadge.Shape.HEX
 		if not ok:
 			print("    missing a part: ", id)
 		whole = whole and ok

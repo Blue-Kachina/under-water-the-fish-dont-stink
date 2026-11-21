@@ -103,6 +103,15 @@ static func model_provider(fish_class: int) -> Callable:
 	return Callable()
 
 
+## The first registered descriptor's value for `key` (null when none has it): a provider the
+## core asks for without naming the mode (e.g. "form_preview", "class_details").
+static func provided(key: String) -> Variant:
+	for d in descriptors():
+		if d.has(key):
+			return d[key]
+	return null
+
+
 ## The registered descriptors with a net adapter (descriptor "net").
 static func net_descriptors() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []

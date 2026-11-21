@@ -29,6 +29,12 @@ extends Node
 ## with "current_role" (Callable(host) -> role), "role_pool" (Callable(role) -> {"entry",
 ## "label"} or {}: a role's own character pick), "character_picked_by_mode" (Callable(role)
 ## -> bool) and "apply_pick" (Callable(host)).
+## Providers the core asks for without naming a mode (ModeRegistry.provided, the first
+## registered one wins): "panel_tabs" ({section id: Callable(group) -> tab title}: the tuning
+## panel's tab rule for a mode's section), "form_preview" (a Node3D script with setup(key),
+## fish, focus(), camera_heading(): the home screen's Hunter form showcase), "class_details"
+## (Callable(FishClass) -> Dictionary, FishDetails.details' keys: the Class details panel) and
+## "class_growth" (Callable(FishClass) -> String: the stat the class grows by).
 
 ## A teleport moved `fish` (the host snaps cameras following it).
 signal teleported(fish: FishController)
