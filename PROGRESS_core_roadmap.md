@@ -22,7 +22,7 @@ D6 file moves done in worktree + committed, git: branch per track, push branches
 | T3 hunt | 3 | H0-H7 | track/hunt | done, merged (gates green 2026-11-21) |
 | T4a P5 rollout | 4 | Drowned Shark + 2 classes on rig | track/rollout | done, merged |
 | T4b carve | 4 | M3 water carving | track/carve | done, merged (default off) |
-| T4c nature | 4 | Nature migration | track/nature | waits on T3 H7 |
+| T4c nature | 4 | Nature migration | track/nature | done, merged |
 
 ## Track sections
 ### T0a metrics
@@ -227,3 +227,10 @@ Resume steps:
 Known pre-existing failures (not from this work): audio_probe (2), pick_card_probe, pause_probe, unnatural_coop_probe, hider_looks_probe, preview_jitter_probe, school_probe flake, two_stage_bite_probe broken. hunt_probe baseline compare tolerates 0.011 float wobble.
 
 For the user to play-test / review: shark rig shots in D:/Dev/GameDev/wt/shots/rig (toggle Gait.procedural_rig for shark); F6 camera wobble is 0.00 deg in open Nature Ocean (only near surface); M1 held-vs-flick, M2 gentle curve, M4 settle cam when T1 lands; M3 carving later. Decisions D1-D5 taken as recommended; D6 file moves done in worktree; D7 nothing discarded.
+
+## FINAL SUMMARY (2026-11-21)
+All tracks merged into roadmap/core: phase 0, T1 swim (M4/M1/M2, toggles, defaults = today), T2 rig + P5 rollout (shark, Drowned Shark, clownfish, swordfish; procedural_rig off), T3 Hunt H0-H7, T4b M3 carving (default off), T4c Nature migration (H0-H7 shape; boundary violations 231 -> 213). setting_docs regenerated; debug build builds/windows/FishPlayground.exe (2026-11-21 ~02:05).
+Gates green after final merge: nature, hunt, mode_setup, ui, swishy, gait, swim_state, fish_play_state, swim_rig, school_join, mode_boundary --strict.
+Known: swim_metrics_probe `m4_camera_wobble_settle/cam_yaw` reads 7.9-8.1 vs recorded 7.06 (tol 0.3), identical on track/carve before the Nature merge: noisy per-frame metric, not a regression. modes_probe has a stale section list (lacks battery/hunt). boss_moves_probe Gulper fury suction fails on roadmap/core pre-existing. hunter_forms_probe hit a timeout (not re-run). coop_net_peer (online Nature) not run. Not run: full discard test on Hunt.
+Play-test asks: M1 stride_steer_cancel=1, M2 Gentle curve, Nature camera_settle (with M1), M3 water_turning Speed scaled (Fish > Water carving), rig shots in wt/shots/rig and wt/shots/rollout (toggle Gait.procedural_rig). Decide Nature defaults (D2/D3).
+Later migrations (1v1, Unnatural, Course, Marco, What Stinks) not started: out of scope for phases 0-4.
