@@ -47,7 +47,7 @@ const KITS := [
 ]
 ## Mode folders (every .gd below is that mode's) and single mode files.
 const MODE_DIRS := {
-	"unnatural/": "unnatural", "marco_polo/": "marco", "what_stinks/": "what_stinks",
+	"unnatural/": "unnatural", "modes/hunt/": "hunt", "marco_polo/": "marco", "what_stinks/": "what_stinks",
 }
 const MODE_FILES := {
 	"net/unnatural_net.gd": "unnatural", "net/marco_polo_net.gd": "marco",

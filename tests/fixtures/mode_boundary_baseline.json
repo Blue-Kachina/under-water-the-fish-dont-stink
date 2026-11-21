@@ -1,6 +1,6 @@
 {
 	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
-	"total": 239,
+	"total": 231,
 	"violations": {
 		"audio/sfx_hooks/sfx_hooks.gd": {
 			"BatteredSounds": 1,
@@ -31,7 +31,6 @@
 			"MarcoArena": 4
 		},
 		"hud.gd": {
-			"HuntMatch": 8,
 			"Match1v1": 8,
 			"NatureRun": 2,
 			"NatureScore": 2,

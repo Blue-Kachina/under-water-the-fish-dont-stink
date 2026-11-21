@@ -87,7 +87,7 @@ func _run() -> void:
 	_snap("player_battery")
 	check(hunt.style.points[0] >= StylePoints.POINTS[StylePoints.BATTERY], "+%d points for it (%d)" % [StylePoints.POINTS[StylePoints.BATTERY], hunt.style.points[0]])
 	check(events.any(func(e: Dictionary) -> bool: return e.type == StylePoints.BATTERY and e.player == 0 and e.victim == 1), "called out as a battery")
-	check(StylePoints.TITLES[StylePoints.BATTERY] == "BATTERED" and "BATTERED FISH" in load("res://scripts/hud.gd").HUNT_HEADINGS,
+	check(StylePoints.TITLES[StylePoints.BATTERY] == "BATTERED" and "BATTERED FISH" in HuntHud.HUNT_HEADINGS,
 			"called BATTERED, counted as BATTERED FISH on the scoreboard")
 	fish.swishy.flow = 1.5  # to see the kickoff clear it
 	await _ticks(roundi((HuntMatch.BATTERY_PAUSE + 0.2) * 120.0))
@@ -273,6 +273,24 @@ func _joust(hunt: HuntMatch, player_speed: float, opponent_speed: float) -> void
 	await _ticks(30)
 
 
+## A baseline row matches when its floats are within one physics tick (0.01 s
+## at the snapshot's rounding): the battery's contact frame can land one tick
+## either side from run to run.
+func _same_row(a: Variant, b: Variant) -> bool:
+	if a == b:
+		return true
+	if not (a is Dictionary and b is Dictionary) or (a as Dictionary).size() != (b as Dictionary).size():
+		return false
+	for key: Variant in (a as Dictionary):
+		if not (b as Dictionary).has(key):
+			return false
+		var x: Variant = a[key]
+		var y: Variant = b[key]
+		if x != y and not (x is float and y is float and absf(x - y) <= 0.011):
+			return false
+	return true
+
+
 func _ticks(n: int) -> void:
 	for i in n:
 		await get_tree().physics_frame
@@ -322,7 +340,7 @@ func _finish_baseline() -> void:
 	for i in maxi(want_snaps.size(), got_snaps.size()):
 		var a: Variant = want_snaps[i] if i < want_snaps.size() else null
 		var b: Variant = got_snaps[i] if i < got_snaps.size() else null
-		if a != b:
+		if not _same_row(a, b):
 			bad += 1
 			print("    baseline differs: want %s got %s" % [a, b])
 	if want.events != got.events:
