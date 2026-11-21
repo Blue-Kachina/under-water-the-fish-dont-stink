@@ -164,6 +164,15 @@ How Hunt is launched in probes: `main.set_mode(main.HUNT)` parks on a MatchCard 
 
 ### T4 carve + rollout
 
+### T4a P5 rollout
+Status 2026-11-21: BUILT on `track/rollout` (worktree D:/Dev/GameDev/wt/rollout); `Gait.procedural_rig` still off for every class, rig-off behaviour untouched.
+- Drowned Shark hunter form (class MONSTER, SharkModel inside HunterFormModel): `GaitSettings.default_for(MONSTER)` takes the shark's rig numbers (new helper `_rig_defaults`); the controller drives it, no model change needed.
+- Drowned Shark mini-boss (`unnatural/bosses/drowned_shark.gd`): when the Monsters' gait has procedural_rig on it steps the model's rig from its own velocity/facing (`_swim_rig`), keeps the rig's bank when the chomp sets the rotation, and `mouth_point` goes through `bend_point` while the rig is engaged. Rig off: byte-identical (no rig made, rotation.z stays 0).
+- Two more classes as parameter sets on the same layers: Skirmisher (clownfish: bigger/faster wave, more pectoral flutter, tighter turn) and Lancer (swordfish: stiff head/bill, small tail-weighted wave, little bank). `rig_capable = true` in both models; numbers in `gait_settings.gd`.
+- Probes: `swim_rig_probe` now runs every block per class (hunter, monster, skirmisher, lancer) plus a per-class differences block: all pass, rig adds ~24 us/fish. New `tests/drowned_shark_rig_probe` (boss on/off, engages, banks, mouth follows, chomp lands, off hands body back): all pass. gait_probe, swim_state_probe, b2_shark_probe, hunter_roll_probe, stride_forms_probe pass; hunter_forms_probe is slow (>280 s) but no failures seen; boss_moves_probe has 1 failure (Gulper fury suction) that is identical on roadmap/core.
+- Shots: `shark_rig_shots --class=monster|skirmisher|lancer` -> D:/Dev/GameDev/wt/shots/rollout (48 PNGs: straight, turn, brake; top row rig off, bottom on). NEEDS USER EYES: clownfish/swordfish numbers (the off row uses the shark's copied controller pose, so it is only roughly the old look), swordfish head span with the bill, boss bank/curl at its size.
+- Not done: stride/drift shot sets for the new classes; other classes; setting_docs regeneration (coordinator, end of track).
+
 ## Open items / decisions for the user
 (coordinator collects)
 

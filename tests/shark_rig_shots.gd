@@ -6,8 +6,9 @@ extends Node3D
 ## on the top row and ON (layers at the Hunter gait's defaults) on the bottom. The camera rides with the holder.
 ## Needs a window (not --headless); it quits when done.
 ##   Godot_console.exe --path . res://tests/shark_rig_shots.tscn -- --out=DIR [--set=straight,turn,brake,stride,drift]
-##     [--views=side,three_quarter,top]
-## Writes shark_rig_<scenario>_<view>.png in DIR. Scenarios: straight_0/5/15/30 (steady speeds, tiles across one wave),
+##     [--views=side,three_quarter,top] [--class=hunter|monster|skirmisher|lancer]
+## Writes shark_rig_<scenario>_<view>.png in DIR (<class>_rig_... for a class other than hunter: P5 rolled the rig out to the
+## Drowned Shark form (monster), the clownfish (skirmisher) and the swordfish (lancer)). Scenarios: straight_0/5/15/30 (steady speeds, tiles across one wave),
 ## turn_15 and turn_30 (a full-lock turn from straight, tiles 0.25 s apart from its start), brake_30 (30 m/s to a stop),
 ## stride (a chain of strides), drift (the nose 35 degrees off the travel).
 
@@ -18,6 +19,8 @@ const DT := 1.0 / 60.0
 var out_dir := "user://shark_rig_shots"
 var sets: Array[String] = ["straight", "turn", "brake", "stride", "drift"]
 var views: Array[String] = ["side", "three_quarter", "top"]
+var fish_class := FishCharacter.FishClass.HUNTER
+var prefix := "shark"
 var holder: Node3D
 var camera: Camera3D
 var model: FishModel
@@ -48,6 +51,12 @@ func _ready() -> void:
 			sets.assign(arg.trim_prefix("--set=").split(","))
 		elif arg.begins_with("--views="):
 			views.assign(arg.trim_prefix("--views=").split(","))
+		elif arg.begins_with("--class="):
+			var key := arg.trim_prefix("--class=")
+			for candidate: FishCharacter.FishClass in FishCharacter.FishClass.values():
+				if FishCharacter.CLASSES[candidate]["key"] == key:
+					fish_class = candidate
+			prefix = key if key != "hunter" else "shark"
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	get_window().size = TILE
 	var env := Environment.new()
@@ -70,14 +79,14 @@ func _ready() -> void:
 	add_child(fill)
 	holder = Node3D.new()
 	add_child(holder)
-	model = FishModel.build(FishCharacter.FishClass.HUNTER, 0)
+	model = FishModel.build(fish_class, 0)
 	holder.add_child(model)
 	camera = Camera3D.new()
 	camera.fov = 40.0
 	camera.far = 100.0
 	holder.add_child(camera)
 	camera.make_current()
-	gait = GaitSettings.default_for(FishCharacter.FishClass.HUNTER)
+	gait = GaitSettings.default_for(fish_class)
 	swim.gait = gait
 	_run.call_deferred()
 
@@ -166,7 +175,7 @@ func _sheet(sc: Dictionary, view: String) -> void:
 			_frame_camera(view)
 			var img := await _snap()
 			sheet.blit_rect(img, Rect2i(0, 0, TILE.x, TILE.y), Vector2i(tile * TILE.x, row * TILE.y))
-	sheet.save_png(out_dir.path_join("shark_rig_%s_%s.png" % [sc.name, view]))
+	sheet.save_png(out_dir.path_join("%s_rig_%s_%s.png" % [prefix, sc.name, view]))
 
 
 func _run() -> void:
@@ -177,6 +186,6 @@ func _run() -> void:
 		for view: String in sc.views:
 			if view in views:
 				await _sheet(sc, view)
-				print("wrote shark_rig_%s_%s.png" % [sc.name, view])
+				print("wrote %s_rig_%s_%s.png" % [prefix, sc.name, view])
 	print("shark_rig_shots: done, in %s" % ProjectSettings.globalize_path(out_dir))
 	get_tree().quit()

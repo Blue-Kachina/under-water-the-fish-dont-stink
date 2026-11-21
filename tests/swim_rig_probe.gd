@@ -1,5 +1,6 @@
 extends Node
-## The shark's procedural rig (SwimRig, planning_core_roadmap.md 2.2/2.3, P2 to P4), on bare models stepped by
+## The procedural rig (SwimRig, planning_core_roadmap.md 2.2/2.3, P2 to P4 on the shark, P5 on the Drowned Shark form,
+## the clownfish and the swordfish: every block below runs once per rolled-out class), on bare models stepped by
 ## hand with hand-made SwimStates (no physics, no window):
 ## - toggle off: the model poses as it always did; toggle on with the layers at weight 0: the same pose to 1e-4 (the
 ##   zero-change state);
@@ -13,7 +14,12 @@ const DT := 1.0 / 60.0
 const AT_POINTS := [Vector3(0.0, 0.0, 0.6), Vector3(0.0, 0.1, 1.2), Vector3(0.2, 0.0, 1.6), Vector3(0.0, 0.0, -0.5),
 		Vector3(0.0, 0.1, 0.0)]
 
+## The classes with a rig (P5): the shark first, then the rest.
+const CLASSES := [FishCharacter.FishClass.HUNTER, FishCharacter.FishClass.MONSTER, FishCharacter.FishClass.SKIRMISHER, FishCharacter.FishClass.LANCER]
+
 var failures := 0
+## The class the blocks below build (set by _run, one pass each).
+var fish_class := FishCharacter.FishClass.HUNTER
 
 
 func check(ok: bool, what: String) -> void:
@@ -22,17 +28,17 @@ func check(ok: bool, what: String) -> void:
 		failures += 1
 
 
-## A great white, in the tree, with the gait given.
+## A model of the class under test (a great white first), in the tree, with the gait given.
 func shark(gait: Gait) -> FishModel:
-	var model := FishModel.build(FishCharacter.FishClass.HUNTER, 0)
+	var model := FishModel.build(fish_class, 0)
 	add_child(model)
 	model.swim.gait = gait
 	return model
 
 
-## A Hunter gait: the rig on with every layer weight at 0 and the old pose kept (the zero-change state).
+## The class's gait: the rig on with every layer weight at 0 and the old pose kept (the zero-change state).
 func zero_gait(on := true) -> Gait:
-	var gait := GaitSettings.default_for(FishCharacter.FishClass.HUNTER)
+	var gait := GaitSettings.default_for(fish_class)
 	gait.procedural_rig = on
 	gait.rig_legacy_tail = 1.0
 	for field: String in layer_fields():
@@ -83,8 +89,20 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	_zero_change()
 	_defaults()
+	for rigged: FishCharacter.FishClass in CLASSES:
+		fish_class = rigged
+		print("=== %s ===" % FishCharacter.CLASSES[rigged]["key"])
+		_blocks()
+	fish_class = FishCharacter.FishClass.HUNTER
+	_differences()
+	_bench()
+	print("swim_rig_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
+	get_tree().quit(1 if failures else 0)
+
+
+func _blocks() -> void:
+	_zero_change()
 	_undulation()
 	_tail_drive()
 	_turn()
@@ -94,9 +112,6 @@ func _run() -> void:
 	_idle()
 	_stride_cue()
 	_soak()
-	_bench()
-	print("swim_rig_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
-	get_tree().quit(1 if failures else 0)
 
 
 func _zero_change() -> void:
@@ -349,11 +364,31 @@ func _fin_stabilizer() -> void:
 func _defaults() -> void:
 	print("the toggle:")
 	var any_on := false
-	for fish_class: FishCharacter.FishClass in FishCharacter.FishClass.values():
-		any_on = any_on or GaitSettings.default_for(fish_class).procedural_rig
+	for fc: FishCharacter.FishClass in FishCharacter.FishClass.values():
+		any_on = any_on or GaitSettings.default_for(fc).procedural_rig
 	check(not any_on, "procedural_rig is off for every class by default")
-	check(not FishModel.build(FishCharacter.FishClass.SKIRMISHER, 0).rig_capable and FishModel.build(FishCharacter.FishClass.HUNTER, 0).rig_capable,
-			"only the shark can have a rig")
+	var capable := true
+	var others_not := true
+	for fc: FishCharacter.FishClass in FishCharacter.FishClass.values():
+		var has := FishModel.build(fc, 0).rig_capable
+		if fc in CLASSES:
+			capable = capable and has
+		else:
+			others_not = others_not and not has
+	check(capable and others_not, "only the rolled-out classes (shark, Drowned Shark form, clownfish, swordfish) can have a rig")
+	check(GaitSettings.shared().for_class(FishCharacter.FishClass.MONSTER).rig_undulation == 1.0, "the Drowned Shark form's gait has the layers on (the toggle waits)")
+
+
+## P5: a class is a parameter set on the same layers: the clownfish and the swordfish differ from the shark in numbers, not code.
+func _differences() -> void:
+	print("per-class parameter sets:")
+	var shark_gait := GaitSettings.default_for(FishCharacter.FishClass.HUNTER)
+	var monster := GaitSettings.default_for(FishCharacter.FishClass.MONSTER)
+	check(monster.rig_amplitude == shark_gait.rig_amplitude and monster.rig_strouhal == shark_gait.rig_strouhal, "the Drowned Shark form takes the shark's numbers")
+	for rigged: FishCharacter.FishClass in [FishCharacter.FishClass.SKIRMISHER, FishCharacter.FishClass.LANCER]:
+		var g := GaitSettings.default_for(rigged)
+		check(g.rig_amplitude != shark_gait.rig_amplitude and g.rig_head_span != shark_gait.rig_head_span and g.rig_undulation == 1.0,
+				"%s has its own amplitude / head span (%.2f / %.2f) on the same layers" % [FishCharacter.CLASSES[rigged]["key"], g.rig_amplitude, g.rig_head_span])
 
 
 func _idle() -> void:

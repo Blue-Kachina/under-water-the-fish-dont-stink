@@ -164,8 +164,24 @@ func _puppet_update(delta: float) -> void:
 		if _bite.update(delta):
 			_snap()
 		jaw = _bite.open
+	_swim_rig(delta)
 	_pose_head()
 	_pose_jaw()
+
+
+## Its swimming on the SwimRig, when the Monsters' gait has procedural_rig on (off: the body stays as built, as it
+## always was): the rig reads a SwimState from the boss's own velocity and facing (not the model's, which the
+## chomp tilts and saws), and bends the body's rear, banks it into turns and works the fins.
+func _swim_rig(delta: float) -> void:
+	if not (_model is FishModel):
+		return
+	var model := _model as FishModel
+	var gait := GaitSettings.shared().for_class(FishCharacter.FishClass.MONSTER)
+	if not gait.procedural_rig and model.rig == null:
+		return
+	model.swim.advance_from_velocity(velocity, global_basis, delta, FishModel.SWIM_REF_SPEED)
+	model.swim.gait = gait
+	model.react(delta, model.swim)
 
 
 func _place_body() -> void:
@@ -189,7 +205,10 @@ func mouth_point() -> Vector3:
 	if _mouth.is_empty():
 		return global_position - global_basis.z * _length * 0.45
 	var front: Vector3 = _mouth.front
-	return _model.to_global(front + Vector3(0.0, -0.03, -0.05) * float(_mouth.length))
+	var at := front + Vector3(0.0, -0.03, -0.05) * float(_mouth.length)
+	if _model is FishModel and (_model as FishModel).rig != null and (_model as FishModel).rig.engaged:
+		at = (_model as FishModel).bend_point(at)  # the rig bends the body: the mouth goes with the head
+	return _model.to_global(at)
 
 
 ## Its chomp each tick: a bite's beats (ChompKit.Bite: its head lunging with
@@ -228,7 +247,8 @@ func chomp_winding() -> bool:
 ## flat on impact.
 func _pose_head() -> void:
 	if _model:
-		_model.rotation = Vector3(_bite.lift * settings.chomp_lift, _bite.saw * settings.chomp_saw, 0.0)
+		# z is the rig's bank (0 with the rig off).
+		_model.rotation = Vector3(_bite.lift * settings.chomp_lift, _bite.saw * settings.chomp_saw, _model.rotation.z)
 		_model.scale = Vector3.ONE * settings.shark_size * (Vector3.ONE.lerp(_bite.smear, settings.chomp_smear))
 
 
