@@ -12,7 +12,7 @@ const SECTIONS := {
 	"fish": ["res://scripts/fish_controller.gd"],
 	"camera": ["res://scripts/follow_camera.gd"],
 	"ball": ["res://scripts/ball_settings.gd"],
-	"nature": ["res://scripts/nature_settings.gd"],
+	"nature": ["res://scripts/nature_settings.gd", "res://scripts/kits/school_settings.gd"],
 	"hunt": ["res://scripts/modes/hunt/hunt_settings.gd"],
 	"battery": ["res://scripts/battery_settings.gd"],
 	"unnatural": ["res://scripts/unnatural/unnatural_settings.gd"],

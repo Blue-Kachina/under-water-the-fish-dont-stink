@@ -1,6 +1,6 @@
 {
 	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
-	"total": 231,
+	"total": 227,
 	"violations": {
 		"audio/sfx_hooks/sfx_hooks.gd": {
 			"BatteredSounds": 1,
@@ -35,14 +35,8 @@
 			"NatureScore": 2,
 			"Pearl": 1
 		},
-		"kits/school.gd": {
-			"NatureSettings": 2
-		},
 		"kits/school_look.gd": {
 			"ZombieLooks": 1
-		},
-		"kits/target_wheel.gd": {
-			"NatureSettings": 1
 		},
 		"local_coop.gd": {
 			"Match1v1": 1,
@@ -114,7 +108,6 @@
 			"UnnaturalSettings": 2
 		},
 		"unnatural/seabed.gd": {
-			"NatureSettings": 1,
 			"UnnaturalSettings": 5
 		},
 		"unnatural/traversal.gd": {

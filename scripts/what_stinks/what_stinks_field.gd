@@ -87,7 +87,7 @@ func school_by_id(id: int) -> School:
 
 ## One school of `count` fish at `at` (`force_id`: the host's id for it, on a guest).
 func add_school(at: Vector3, heading: Vector3, kind: FishCharacter.FishClass, count: int, school_seed: int, force_id := -1) -> School:
-	var school_settings: NatureSettings = NatureSettings.shared().duplicate()
+	var school_settings: SchoolSettings = SchoolSettings.shared().duplicate()
 	school_settings.fish_per_school = count
 	school_settings.roam_radius = settings.school_roam
 	school_settings.school_speed = settings.school_speed

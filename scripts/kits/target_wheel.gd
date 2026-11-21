@@ -23,8 +23,8 @@ var camera: Camera3D
 var run: Object
 ## Whose wheel it is (their fish): the run's first player if not set.
 var fish: FishController
-## The wheel's settings: wheel_hold_time and school_arrows (NatureSettings, or WhatStinksSettings).
-var settings: Object = NatureSettings.shared()
+## The wheel's settings: wheel_hold_time and school_arrows (SchoolSettings, or WhatStinksSettings).
+var settings: Object = SchoolSettings.shared()
 ## Open now, and the slice it's on ([node, name, fish left], or empty).
 var is_open := false
 var picked: Array = []
