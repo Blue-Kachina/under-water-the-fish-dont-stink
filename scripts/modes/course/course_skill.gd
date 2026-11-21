@@ -1,6 +1,6 @@
 class_name CourseSkill
 extends Node
-## Unnatural's traversal on the Obstacle Course (main.gd adds one while the
+## Unnatural's traversal on the Obstacle Course (CourseMode adds one while the
 ## course is played): the fish's passive twist and its mobility skill on the
 ## boost button (Traversal, with no run: the skills move the fish and show
 ## their effects, with nothing to hit), and the skill's button at the bottom of

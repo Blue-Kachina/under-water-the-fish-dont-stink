@@ -7,14 +7,13 @@ extends Node3D
 ## (Extra Swishy strides after a fish to batter, NatureRun) and Hunt (a 1v1
 ## on Nature's tuning against a hostile fish, HuntMatch) and Unnatural (zombie
 ## fish under a blood moon, a survivors mode on Nature's tuning, UnnaturalRun)
-## in the Ocean, the Obstacle Course, and Replays.
+## in the Ocean, the Obstacle Course (CourseMode), and Replays.
 ##
 ## Match modes (MATCH_MODES) start on a card (MatchCard) with the fish sitting
 ## out; its Play starts the match (play_match). Nature, Hunt and Unnatural play on Nature's
 ## tuning (NATURE_PRESET), and leaving them puts the tuning from before back.
-## The Obstacle Course plays like Unnatural: its tuning, its survivor cam
-## (UnnaturalSettings' camera, Y swapping follow and free cam) and each fish's
-## traversal, the mobility skill on the boost button (CourseSkill).
+## A registered mode that isn't a match (the Obstacle Course, which plays like
+## Unnatural) starts as soon as it's picked, with no card.
 ## Changes made to the tuning while in them are kept for the next time (until
 ## the game closes).
 ##
@@ -53,18 +52,17 @@ const OBSTACLE_COURSE := "Obstacle Course"
 const REPLAYS := "Replays"
 const MARCO_POLO := "Marco Polo"
 const WHAT_STINKS := "What Stinks?"
-const _CORE_MODES := [FREE_PLAY, FREE_SWIM, OBSTACLE_COURSE, REPLAYS]
+const _CORE_MODES := [FREE_PLAY, FREE_SWIM, REPLAYS]
 ## Modes played as a match, which wait on a card for Play.
 const _CORE_MATCH_MODES := []
 ## Modes played on Nature's tuning.
-const _CORE_NATURE_MODES := [OBSTACLE_COURSE]
+const _CORE_NATURE_MODES := []
 ## Nature's tuning: Extra Swishy strides, no boost.
 const NATURE_PRESET := "res://presets/nature.cfg"
 ## Mode -> the environment it's played in.
 const MODE_ENVIRONMENTS := {
 	FREE_PLAY: "Aquarium Arena",
 	FREE_SWIM: "Ocean",
-	OBSTACLE_COURSE: "Obstacle Course",
 	REPLAYS: "Aquarium Arena",
 }
 ## Each mode's tile in the home screen's mode picker (ModePicker): its title,
@@ -80,9 +78,6 @@ const _CORE_TILES := {
 	FREE_SWIM: {"title": "Free Swim", "icon": "mode_free_swim", "colors": [Color(0.04, 0.16, 0.24), Color(0.45, 0.8, 0.95)],
 		"pitch": "The open ocean and nothing to do but swim it.",
 		"short": "The open ocean, just swimming", "play": ["Solo"]},
-	OBSTACLE_COURSE: {"title": "Obstacle Course", "icon": "mode_obstacle_course", "colors": [Color(0.16, 0.12, 0.05), Color(1.0, 0.8, 0.3)],
-		"pitch": "Hoops, ramps and walls to swim through, round and over.",
-		"short": "Hoops, ramps and walls", "play": ["Solo"]},
 }
 ## Converted replays are kept here, so a .replay converts only once. Bump the
 ## folder when the converter's output changes, so old conversions are redone.
@@ -142,9 +137,10 @@ var _local: LocalCoop
 var _tuning_before_nature := {}
 ## Nature's tuning as it was when last left, changes included (empty: not yet).
 var _nature_tuning := {}
-## The Obstacle Course's survivor cam is on, and its traversal (null: not on the course).
-var _course_cam := false
-var _course_skill: CourseSkill
+## The Obstacle Course's traversal while the course is played (null otherwise; a registered mode's).
+var _course_skill: Object:
+	get:
+		return _modes.active.get("skill") if _modes.active_id() == OBSTACLE_COURSE else null
 ## The Look Tank (WaterLook, planning_abyssal_look.md) while one is on.
 var look_tank: LookTank
 ## Shown in a match mode until Play starts the match.
@@ -321,7 +317,7 @@ func start_mode(mode: String, settle := Callable()) -> void:
 	if mode == current_mode and current_environment == mode_environment(mode):
 		if mode == REPLAYS:
 			return
-		if _playing():
+		if _playing() and current_mode in MATCH_MODES:
 			_end_match()
 			_apply_mode()  # back on its card, which the match starts from below
 		elif _match_card == null:
@@ -399,7 +395,7 @@ func set_character(character: FishCharacter.FishClass) -> void:
 		_fish.set_look(character, species)
 	if unnatural_run:
 		unnatural_run.restart()  # its loadout comes from the class (Change Character is off there for now)
-	elif not (_modes.active or marco_polo):
+	elif not (_modes.active and current_mode in MATCH_MODES):
 		_fish.set_spawn(_environment.spawn_transform())
 	# Otherwise it's worn now, mid-match: 1v1, Nature and Hunt keep nothing of the class (no
 	# restart), and Marco Polo / What Stinks keep it for when this role's body comes off.
@@ -464,8 +460,6 @@ func _process(_delta: float) -> void:
 	if unnatural_run:
 		for slot in _local.slots:
 			SurvivorCam.apply(slot.camera, true, unnatural_run.settings, unnatural_run.camera_pull_of(slot.fish))  # live from the panel
-	elif _course_cam:
-		SurvivorCam.apply(_camera, true, SurvivorCamSettings.shared())  # live from the panel
 	_nature_camera_style()
 
 
@@ -484,8 +478,8 @@ func _nature_camera_style() -> void:
 			view.pop_style(NATURE_CAMERA_KEY)
 
 
-## R or the pause menu's reset: a 1v1 back to a kickoff, otherwise the fish
-## back to the spawn and the course or ball reset. Not in Replays or on a match
+## R or the pause menu's reset: a registered mode's own (GameMode.reset), otherwise
+## the fish back to the spawn and the ball reset. Not in Replays or on a match
 ## card, where the replay bar or card is in charge.
 func reset_play() -> void:
 	if _reset_label().is_empty():
@@ -493,12 +487,9 @@ func reset_play() -> void:
 	if _modes.active:
 		_modes.active.reset()
 		return
-		return
 	_fish.set_spawn(_environment.spawn_transform())  # re-read: the aquarium's depends on the ball type
 	_fish.respawning.emit()
-	if _environment is Arena:
-		(_environment as Arena).reset_course()
-	elif _environment is AquariumArena:
+	if _environment is AquariumArena:
 		(_environment as AquariumArena).reset_kickoff()
 
 
@@ -816,7 +807,6 @@ func _apply_mode() -> void:
 	if not ModeRegistry.describe(current_mode).get("split_screen", false) and _local:
 		_local.drop_extras()  # split-screen co-op is Unnatural's and the modes' that allow it
 	_use_nature_tuning(current_mode in NATURE_MODES)
-	_use_course_cam(current_mode == OBSTACLE_COURSE)
 	var wanted: bool = current_mode in MATCH_MODES and current_environment == mode_environment(current_mode)
 	if wanted:
 		# From one match mode straight to another in the same water (Nature to Hunt):
@@ -829,6 +819,13 @@ func _apply_mode() -> void:
 			_show_match_card()
 		return
 	_close_match_card()
+	if ModeRegistry.has_mode(current_mode) and current_environment == mode_environment(current_mode):
+		# A registered mode with no card (the Obstacle Course) plays as soon as it's on.
+		if _playing() and _playing_mode() != current_mode:
+			_end_match()
+		if not _playing():
+			_start_registered(current_mode)
+		return
 	if not _playing():
 		return
 	_end_match()
@@ -888,27 +885,6 @@ func _use_nature_tuning(on: bool) -> void:
 		_tuning_before_nature = {}
 
 
-## The Obstacle Course as Unnatural plays: its survivor cam and the fish's
-## traversal (on), or the usual camera and swimming back (off).
-func _use_course_cam(on: bool) -> void:
-	if on == _course_cam:
-		return
-	_course_cam = on
-	if on:
-		_camera.ball_cam = false
-		_course_skill = CourseSkill.new()
-		_course_skill.name = "CourseSkill"
-		_course_skill.fish = _fish
-		add_child(_course_skill)
-	elif _course_skill:
-		remove_child(_course_skill)  # now: it gives the fish its own swimming back on leaving
-		_course_skill.queue_free()
-		_course_skill = null
-	SurvivorCam.apply(_camera, on, SurvivorCamSettings.shared())
-	_hud.survivor_cam = on
-	_camera.snap()
-
-
 func _start_match() -> void:
 	if ModeRegistry.has_mode(current_mode):
 		_start_registered(current_mode)
@@ -963,7 +939,8 @@ func _start_registered(id: String, options := {}) -> void:
 	if ModeRegistry.describe(id).get("one_screen", false):
 		_local.drop_extras()  # one screen: no split-screen players
 	var world := ModeWorld.new(self, _environment, _fish, _camera, _hud)
-	world.slots.assign(_local.slots)
+	if _local:  # not yet while _ready sets the saved mode (the course starts there)
+		world.slots.assign(_local.slots)
 	world.options = options
 	mode_started.emit(_modes.start(id, world))
 
