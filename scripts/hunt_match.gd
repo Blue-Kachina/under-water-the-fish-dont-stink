@@ -141,13 +141,12 @@ func enter(world: ModeWorld) -> void:
 
 
 func start() -> void:
-	_world.camera.ball = opponent  # ball cam follows the opponent
-	_world.camera.ball_cam = true
+	_world.camera.claim(opponent)  # ball cam follows the opponent
 	_world.hud.set_mode_hud(HuntHud.new(self))
 
 
 func release() -> void:
-	_world.camera.ball = null
+	_world.camera.release()
 	_world.hud.set_mode_hud(null)
 
 

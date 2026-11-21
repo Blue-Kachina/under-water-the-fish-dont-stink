@@ -327,6 +327,25 @@ func _player_input() -> PlayerInput:
 	return input if input else PlayerInput.everyone()
 
 
+## A mode's claim on the camera (ModeWorld.camera): the camera focuses `focus`
+## (what `ball` is for the environment's ball) with ball cam `ball_cam_on`, set
+## at once (no swing, no ball_cam_toggled). Additive: the old `ball` /
+## `ball_cam` fields still work for the modes not migrated yet.
+func claim(focus: Node3D, ball_cam_on := true) -> void:
+	ball = focus
+	ball_cam = ball_cam_on
+
+
+## Drops a claim: no focus (the normal view). Ball cam stays as it was set.
+func release() -> void:
+	ball = null
+
+
+## What the camera is focused on through `ball` (the claim's read-out).
+func focus_node() -> Node3D:
+	return ball
+
+
 ## Turns ball cam on or off, swinging over at the transition speed.
 func set_ball_cam(on: bool) -> void:
 	if on == ball_cam:
