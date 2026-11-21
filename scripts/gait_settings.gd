@@ -84,6 +84,15 @@ static func default_for(fish_class: FishCharacter.FishClass) -> Gait:
 		# A slower stroke_time cost ~15% of the distance in gait_probe.
 		gait.stroke_axis = Gait.StrokeAxis.VERTICAL
 		gait.visual = Gait.Visual.FLUKE
+		# The calf's rig: cetaceans beat up and down (rig_wave_axis 1), slowly and heavily, the wave starting far
+		# forward and growing to the flukes, the head nodding against it, the flippers steering and banking.
+		_rig_defaults(gait, {
+			"rig_wave_axis": 1.0, "rig_amplitude": 0.5, "rig_wave_lag": 1.1, "rig_strouhal": 0.03, "rig_freq_min": 0.4,
+			"rig_freq_max": 1.8, "rig_envelope": 1.2, "rig_head_sway": 0.2, "rig_caudal_flex": 0.7, "rig_caudal_lead": 12.0,
+			"rig_head_span": 0.15, "rig_stride_swing": 0.5, "rig_turn_bend": 3.5, "rig_turn_max": 0.5, "rig_bank": 0.4,
+			"rig_fin_bank": 0.35, "rig_accel_tail": 0.25, "rig_accel_surge": 0.02, "rig_fin_flutter": 0.06,
+			"rig_idle_scull": 0.1, "rig_idle_sway": 0.05, "rig_idle_hz": 0.35,
+		})
 	elif fish_class == FishCharacter.FishClass.TITAN:
 		# The adult whales (planning_marco_whales.md §7): the calves' up-and-down
 		# flukes, slower (a long, heavy beat), with the Titan-only motion values
@@ -116,6 +125,36 @@ static func default_for(fish_class: FishCharacter.FishClass) -> Gait:
 			"rig_stride_swing": 0.45, "rig_turn_bend": 3.0, "rig_turn_max": 0.5, "rig_bank": 0.3, "rig_fin_bank": 0.3,
 			"rig_accel_tail": 0.3, "rig_accel_head": 0.1, "rig_accel_surge": 0.02, "rig_fin_flutter": 0.04,
 			"rig_idle_scull": 0.15, "rig_idle_sway": 0.08, "rig_idle_hz": 0.5,
+		})
+	elif fish_class == FishCharacter.FishClass.CHARMER:
+		# The koi: a carp's easy sub-carangiform swim. A supple body that waves from mid-body back with a small
+		# head sway, a broad caudal that follows the stalk, and long pectorals that bank and scull at rest.
+		_rig_defaults(gait, {
+			"rig_amplitude": 0.75, "rig_wave_lag": 1.1, "rig_strouhal": 0.05, "rig_freq_min": 0.5, "rig_freq_max": 3.0,
+			"rig_head_sway": 0.3, "rig_caudal_flex": 0.6, "rig_head_span": 0.2, "rig_stride_swing": 0.6,
+			"rig_turn_bend": 5.0, "rig_turn_max": 0.9, "rig_bank": 0.3, "rig_fin_bank": 0.45,
+			"rig_accel_tail": 0.4, "rig_accel_surge": 0.02, "rig_fin_flutter": 0.1, "rig_fin_flutter_hz": 7.0,
+			"rig_idle_scull": 0.3, "rig_idle_sway": 0.15, "rig_idle_hz": 0.8,
+		})
+	elif fish_class == FishCharacter.FishClass.BULWARK:
+		# The boxfish: a rigid shell that cannot bend (ostraciiform swimming). Only the short tail stalk swings, as one
+		# piece and fast, the fan flapping past it; the head never sways and it hardly banks. The pectorals row hard.
+		_rig_defaults(gait, {
+			"rig_amplitude": 0.7, "rig_wave_lag": 0.5, "rig_strouhal": 0.08, "rig_freq_min": 1.0, "rig_freq_max": 4.5,
+			"rig_envelope": 1.6, "rig_head_sway": 0.0, "rig_caudal_flex": 1.2, "rig_caudal_lead": 15.0, "rig_head_span": 0.0,
+			"rig_stride_swing": 0.5, "rig_turn_bend": 1.5, "rig_turn_max": 0.3, "rig_bank": 0.15, "rig_fin_bank": 0.5,
+			"rig_accel_tail": 0.2, "rig_accel_head": 0.0, "rig_accel_surge": 0.0, "rig_fin_flutter": 0.25, "rig_fin_flutter_hz": 12.0,
+			"rig_idle_scull": 0.5, "rig_idle_sway": 0.03, "rig_idle_hz": 1.6,
+		})
+	elif fish_class == FishCharacter.FishClass.SCORCHER:
+		# The lionfish: a slow, hovering ambusher. The wave is small and held in the rear of the body, the head quiet,
+		# the big pectoral fans lazily fluttering, and a gentle scull at rest.
+		_rig_defaults(gait, {
+			"rig_amplitude": 0.45, "rig_wave_lag": 0.9, "rig_strouhal": 0.04, "rig_freq_min": 0.5, "rig_freq_max": 2.5,
+			"rig_envelope": 1.2, "rig_head_sway": 0.15, "rig_caudal_flex": 0.7, "rig_head_span": 0.1, "rig_stride_swing": 0.5,
+			"rig_turn_bend": 4.0, "rig_turn_max": 0.7, "rig_bank": 0.2, "rig_fin_bank": 0.3,
+			"rig_accel_tail": 0.25, "rig_accel_surge": 0.015, "rig_fin_flutter": 0.12, "rig_fin_flutter_hz": 5.0,
+			"rig_idle_scull": 0.35, "rig_idle_sway": 0.1, "rig_idle_hz": 0.6,
 		})
 	return gait
 

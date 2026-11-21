@@ -33,12 +33,19 @@ func evaluate(rig: SwimRig, state: SwimState, gait: Gait, dt: float, pose: SwimP
 	if dt > 0.0:
 		rig.wave_phase = fmod(rig.wave_phase + TAU * freq * dt, TAU)
 	var phase := rig.wave_phase
+	var axis := clampf(gait.rig_wave_axis, 0.0, 1.0)
 	var total := 0.0
 	for j in SwimPose.JOINTS:
 		total += pow(j + 1.0, 2.0 * gait.rig_envelope)
 	for j in SwimPose.JOINTS:
 		var share := pow(j + 1.0, 2.0 * gait.rig_envelope) / total
-		pose.joint_yaw[j] += w * amp * share * sin(phase - j * gait.rig_wave_lag)
-	pose.head_yaw -= w * amp * gait.rig_head_sway * sin(phase + gait.rig_wave_lag)
-	pose.tail_yaw += w * amp * gait.rig_caudal_flex * sin(phase - SwimPose.JOINTS * gait.rig_wave_lag + deg_to_rad(gait.rig_caudal_lead))
+		var beat := w * amp * share * sin(phase - j * gait.rig_wave_lag)
+		pose.joint_yaw[j] += beat * (1.0 - axis)
+		pose.joint_pitch[j] += beat * axis
+	var sway := w * amp * gait.rig_head_sway * sin(phase + gait.rig_wave_lag)
+	pose.head_yaw -= sway * (1.0 - axis)
+	pose.head_pitch -= sway * axis
+	var flex := w * amp * gait.rig_caudal_flex * sin(phase - SwimPose.JOINTS * gait.rig_wave_lag + deg_to_rad(gait.rig_caudal_lead))
+	pose.tail_yaw += flex * (1.0 - axis)
+	pose.tail_pitch += flex * axis
 	pose.wave_amp = maxf(pose.wave_amp, clampf(amp / maxf(gait.rig_amplitude, 0.001), 0.0, 1.0) * minf(w, 1.0))

@@ -148,6 +148,7 @@ static func build(m: FishModel) -> void:
 	var stalk_end := _slice(g, zp)
 	m._tail_pivot(Vector3(0.0, stalk_end[3], zp), inside)
 	m.bend_share = 0.55
+	m.rig_capable = true  # SwimRig, when the Bulwark gait turns procedural_rig on
 	m._bend_body(zc)
 	var stalk: float = stalk_end[2]
 	var tail_lengths: Array = []

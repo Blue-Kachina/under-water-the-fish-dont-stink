@@ -177,6 +177,9 @@ func is_default() -> bool:
 ## Rig, Undulation: how many degrees the caudal fin's flex runs ahead of the spine's own wave (the fin bends before the
 ## stalk does).
 @export_range(0.0, 90.0, 1.0, "or_greater") var rig_caudal_lead := 8.0
+## Rig, Undulation: which way the wave runs. 0: side to side (fish), 1: up and down (whales and dolphins beat their
+## flukes vertically). In between: a diagonal.
+@export_range(0.0, 1.0, 0.05) var rig_wave_axis := 0.0
 ## Rig, Undulation: how much a stride's power deepens the wave (0: not at all), so a stride's timing shows on the
 ## whole body.
 @export_range(0.0, 3.0, 0.05, "or_greater") var rig_cue_amp := 0.5

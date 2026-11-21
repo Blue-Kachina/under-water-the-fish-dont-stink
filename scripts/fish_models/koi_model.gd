@@ -212,6 +212,7 @@ static func build(m: FishModel) -> void:
 
 	# Carp are flexible: the back half of the body takes most of the wag.
 	m.bend_share = 0.82
+	m.rig_capable = true  # SwimRig, when the Charmer gait turns procedural_rig on
 	m._bend_body(nose + length * BEND_FROM, bending)
 
 

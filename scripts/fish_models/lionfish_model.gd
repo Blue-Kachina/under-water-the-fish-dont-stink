@@ -245,6 +245,7 @@ static func build(m: FishModel) -> void:
 		bent.append(_tubes(m, cirri, Vector3.UP, h * 0.016, 4, 3, tentacle_material, "Cirri", 0.15, 1.6))
 	# The rear of the body flexes into the tail.
 	m.bend_share = 0.62
+	m.rig_capable = true  # SwimRig, when the Scorcher gait turns procedural_rig on
 	m._bend_body(at.call(0.42), bent)
 
 

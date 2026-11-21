@@ -263,6 +263,7 @@ static func build(m: FishModel) -> void:
 		lobe.name = "Fluke"
 	if float(look.jaw) > 0.0:
 		_jaw(m, fins, look, w, h, ends)
+	m.rig_capable = true  # SwimRig, when the Breacher gait turns procedural_rig on
 	m._bend_body(at.call(0.48), bent)
 
 	# Small eyes low on the head, near the corner of the mouth.

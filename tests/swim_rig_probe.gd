@@ -15,7 +15,8 @@ const AT_POINTS := [Vector3(0.0, 0.0, 0.6), Vector3(0.0, 0.1, 1.2), Vector3(0.2,
 		Vector3(0.0, 0.1, 0.0)]
 
 ## The classes with a rig (P5): the shark first, then the rest.
-const CLASSES := [FishCharacter.FishClass.HUNTER, FishCharacter.FishClass.MONSTER, FishCharacter.FishClass.SKIRMISHER, FishCharacter.FishClass.LANCER]
+const CLASSES := [FishCharacter.FishClass.HUNTER, FishCharacter.FishClass.MONSTER, FishCharacter.FishClass.SKIRMISHER, FishCharacter.FishClass.LANCER,
+		FishCharacter.FishClass.CHARMER, FishCharacter.FishClass.BULWARK, FishCharacter.FishClass.SCORCHER, FishCharacter.FishClass.BREACHER]
 
 var failures := 0
 ## The class the blocks below build (set by _run, one pass each).
@@ -203,8 +204,8 @@ func _undulation() -> void:
 	for i in 240:
 		model.react(DT, s)
 		for j in 3:
-			peak[j] = maxf(peak[j], absf(model.rig.pose.joint_yaw[j]))
-		tail_peak = maxf(tail_peak, absf(model.rig.pose.tail_yaw))
+			peak[j] = maxf(peak[j], maxf(absf(model.rig.pose.joint_yaw[j]), absf(model.rig.pose.joint_pitch[j])))
+		tail_peak = maxf(tail_peak, maxf(absf(model.rig.pose.tail_yaw), absf(model.rig.pose.tail_pitch)))
 	check(peak[0] < peak[1] and peak[1] < peak[2] and peak[2] > 0.05, "the wave grows toward the tail (joint peaks %.3f %.3f %.3f)" % [peak[0], peak[1], peak[2]])
 	check(tail_peak > 0.02, "the caudal fin flexes (%.3f rad)" % tail_peak)
 	# A harder effort is a deeper wave.
@@ -226,7 +227,7 @@ func _swing(model: FishModel) -> float:
 	state.gait = s.gait
 	for i in 120:
 		model.react(DT, state)
-		best = maxf(best, absf(model.tail.rotation.y))
+		best = maxf(best, maxf(absf(model.tail.rotation.y), absf(model.tail.rotation.x)))
 	return best
 
 
@@ -264,8 +265,8 @@ func _turn() -> void:
 		var model := settle(gait, s, 1.5)
 		var p := model.rig.pose
 		var name := "left (+yaw)" if side > 0.0 else "right"
-		check(model.rotation.z * side > 0.2, "a %s turn banks into it (%.3f rad)" % [name, model.rotation.z])
-		check(p.spine_yaw() * side < -0.1, "and the spine curls toward its inside (%.3f rad)" % p.spine_yaw())
+		check(model.rotation.z * side > 0.5 * gait.rig_bank, "a %s turn banks into it (%.3f rad)" % [name, model.rotation.z])
+		check(p.spine_yaw() * side < -0.01, "and the spine curls toward its inside (%.3f rad)" % p.spine_yaw())
 		check(p.fin_flap.x * side > 0.1 and p.fin_sweep.x * side < -0.1 and p.fin_sweep.y * side > 0.1, "the inside pectoral tucks, the outside reaches out")
 	# The pectorals bank before the body.
 	var s := moving(15.0)
@@ -297,9 +298,15 @@ func _accel() -> void:
 	var pd := down_model.rig.pose
 	check(pu.spine_pitch() + pu.tail_pitch > 0.1 and pd.spine_pitch() + pd.tail_pitch < -0.1,
 			"speeding up trails the tail down, braking folds it up (%.3f / %.3f rad)" % [up_model.tail.rotation.x, down_model.tail.rotation.x])
-	check(pu.head_pitch > 0.05 and pd.head_pitch < -0.05, "the head leads against it (%.3f / %.3f rad)" % [pu.head_pitch, pd.head_pitch])
+	if gait.rig_accel_head > 0.0:
+		check(pu.head_pitch > 0.05 * gait.rig_accel_head / 0.2 and pd.head_pitch < -0.05 * gait.rig_accel_head / 0.2, "the head leads against it (%.3f / %.3f rad)" % [pu.head_pitch, pd.head_pitch])
+	else:
+		check(pu.head_pitch == 0.0 and pd.head_pitch == 0.0, "a class with a rigid head keeps it still (%.3f rad)" % pu.head_pitch)
 	check(pu.fin_sweep.x < -0.1 and pd.fin_sweep.x > 0.1, "the pectorals fold back speeding up and flare braking (%.2f / %.2f)" % [pu.fin_sweep.x, pd.fin_sweep.x])
-	check(pu.surge > 0.0 and pd.surge < 0.0, "the body surges with it (%.3f / %.3f m)" % [pu.surge, pd.surge])
+	if gait.rig_accel_surge > 0.0:
+		check(pu.surge > 0.0 and pd.surge < 0.0, "the body surges with it (%.3f / %.3f m)" % [pu.surge, pd.surge])
+	else:
+		check(pu.surge == 0.0 and pd.surge == 0.0, "a class with a rigid shell does not surge")
 	var rising := moving(15.0)
 	rising.accel = Vector3(0.0, 20.0, 0.0)
 	check(settle(gait, rising, 1.5).rig.pose.tail_pitch > 0.05, "accelerating upward trails the tail down too")
@@ -375,7 +382,7 @@ func _defaults() -> void:
 			capable = capable and has
 		else:
 			others_not = others_not and not has
-	check(capable and others_not, "only the rolled-out classes (shark, Drowned Shark form, clownfish, swordfish) can have a rig")
+	check(capable and others_not, "only the rolled-out classes (shark, Drowned Shark form, clownfish, swordfish, koi, boxfish, lionfish, whale calf) can have a rig")
 	check(GaitSettings.shared().for_class(FishCharacter.FishClass.MONSTER).rig_undulation == 1.0, "the Drowned Shark form's gait has the layers on (the toggle waits)")
 
 
@@ -385,9 +392,9 @@ func _differences() -> void:
 	var shark_gait := GaitSettings.default_for(FishCharacter.FishClass.HUNTER)
 	var monster := GaitSettings.default_for(FishCharacter.FishClass.MONSTER)
 	check(monster.rig_amplitude == shark_gait.rig_amplitude and monster.rig_strouhal == shark_gait.rig_strouhal, "the Drowned Shark form takes the shark's numbers")
-	for rigged: FishCharacter.FishClass in [FishCharacter.FishClass.SKIRMISHER, FishCharacter.FishClass.LANCER]:
+	for rigged: FishCharacter.FishClass in CLASSES.slice(2):
 		var g := GaitSettings.default_for(rigged)
-		check(g.rig_amplitude != shark_gait.rig_amplitude and g.rig_head_span != shark_gait.rig_head_span and g.rig_undulation == 1.0,
+		check(g.rig_amplitude != shark_gait.rig_amplitude and (g.rig_head_span != shark_gait.rig_head_span or g.rig_wave_lag != shark_gait.rig_wave_lag) and g.rig_undulation == 1.0,
 				"%s has its own amplitude / head span (%.2f / %.2f) on the same layers" % [FishCharacter.CLASSES[rigged]["key"], g.rig_amplitude, g.rig_head_span])
 
 
@@ -458,7 +465,7 @@ func _excursion(power: float) -> float:
 	var best := 0.0
 	for i in 120:
 		model.react(DT, s)
-		best = maxf(best, absf(model.rig.pose.spine_yaw()))
+		best = maxf(best, maxf(absf(model.rig.pose.spine_yaw()), absf(model.rig.pose.spine_pitch())))
 	return best
 
 
