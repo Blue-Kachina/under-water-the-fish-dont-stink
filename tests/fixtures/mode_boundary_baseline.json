@@ -1,0 +1,129 @@
+{
+	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
+	"total": 242,
+	"violations": {
+		"audio/sfx_hooks/sfx_hooks.gd": {
+			"BatteredSounds": 1,
+			"Boss": 1,
+			"BossSounds": 1,
+			"FishAttack": 3,
+			"HuntMatch": 1,
+			"Match1v1": 1,
+			"NatureRun": 1,
+			"NatureSounds": 1,
+			"UnnaturalRun": 1,
+			"UnnaturalSounds": 1
+		},
+		"debug_panel.gd": {
+			"HunterSize": 1,
+			"MarcoPoloSettings": 1,
+			"NatureSettings": 1,
+			"Powerup": 4,
+			"PowerupSettings": 1,
+			"Rarity": 1,
+			"UnnaturalSettings": 1,
+			"WhatStinksSettings": 1
+		},
+		"fish_model.gd": {
+			"HunterFormModel": 1
+		},
+		"follow_camera.gd": {
+			"MarcoArena": 4
+		},
+		"hud.gd": {
+			"HuntMatch": 8,
+			"Match1v1": 8,
+			"NatureRun": 2,
+			"NatureScore": 2,
+			"Pearl": 1
+		},
+		"local_coop.gd": {
+			"Match1v1": 1,
+			"NatureRun": 1,
+			"NatureScore": 2,
+			"TreasureChest": 1,
+			"UnnaturalHud": 3,
+			"UnnaturalRun": 7
+		},
+		"main.gd": {
+			"CourseSkill": 2,
+			"HuntMatch": 3,
+			"HunterForms": 3,
+			"MarcoPoloMatch": 3,
+			"MarcoPoloSettings": 11,
+			"Match1v1": 3,
+			"NatureRun": 3,
+			"UnnaturalHud": 2,
+			"UnnaturalRun": 8,
+			"UnnaturalSettings": 3,
+			"WhatStinksMatch": 3,
+			"WhatStinksSettings": 5,
+			"path:marco_polo/fish_tank_arena.gd": 1,
+			"path:marco_polo/temple_arena.gd": 1
+		},
+		"net/coop_session.gd": {
+			"MarcoPoloMatch": 3,
+			"MarcoPoloNet": 1,
+			"NatureRun": 3,
+			"UnnaturalNet": 1,
+			"UnnaturalRun": 3,
+			"WhatStinksMatch": 3,
+			"WhatStinksNet": 1
+		},
+		"school.gd": {
+			"NatureSettings": 2
+		},
+		"school_look.gd": {
+			"ZombieLooks": 1
+		},
+		"terrain/ocean_floor.gd": {
+			"UnnaturalSettings": 3
+		},
+		"terrain/terrain.gd": {
+			"UnnaturalSettings": 4
+		},
+		"terrain/terrain_layout.gd": {
+			"UnnaturalSettings": 4
+		},
+		"terrain/terrain_light.gd": {
+			"UnnaturalSettings": 2
+		},
+		"terrain/terrain_stream.gd": {
+			"UnnaturalSettings": 1
+		},
+		"ui/hex_badge.gd": {
+			"Powerup": 1
+		},
+		"ui/home_screen.gd": {
+			"FishDetails": 1,
+			"HunterPreview": 2,
+			"StatBlock": 2
+		},
+		"ui/mode_setups.gd": {
+			"HunterForms": 4,
+			"MarcoPoloMatch": 1,
+			"MarcoPoloSettings": 12,
+			"UnnaturalSettings": 1,
+			"WhatStinksMatch": 1,
+			"WhatStinksSettings": 13
+		},
+		"unnatural/chomp_kit.gd": {
+			"Boss": 2,
+			"UnnaturalHud": 6,
+			"UnnaturalRun": 9,
+			"UnnaturalSettings": 2
+		},
+		"unnatural/seabed.gd": {
+			"NatureSettings": 1,
+			"UnnaturalSettings": 5
+		},
+		"unnatural/traversal.gd": {
+			"CavitationPunch": 7,
+			"FishAttack": 4,
+			"PowerupFx": 9,
+			"PurpleHaze": 7,
+			"UnnaturalRun": 3,
+			"UnnaturalSettings": 2
+		}
+	}
+}
