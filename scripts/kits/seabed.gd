@@ -37,7 +37,7 @@ var terrain: Terrain
 ## The set pieces (phase 7) and the background schools.
 var pieces: Array[Node3D] = []
 var schools: Array[School] = []
-var _settings: UnnaturalSettings
+var _settings: TerrainSettings
 var _glow := ShaderMaterial.new()
 var _clusters: Array[MeshInstance3D] = []
 var _reef_noise := FastNoiseLite.new()
@@ -58,7 +58,7 @@ var _prefetch_task := -1
 
 
 ## The seabed `settings.arena_radius` round, its top at this node's height.
-func setup(settings: UnnaturalSettings, rng_seed := 11, edge_tall := 40.0) -> void:
+func setup(settings: TerrainSettings, rng_seed := 11, edge_tall := 40.0) -> void:
 	_settings = settings
 	radius = settings.arena_radius
 	edge_height = edge_tall
@@ -128,7 +128,7 @@ func setup(settings: UnnaturalSettings, rng_seed := 11, edge_tall := 40.0) -> vo
 
 ## Starts generating the terrain setup() will want for `rng_seed` on a worker thread (the stage-clear screen calls it
 ## for the next stage, so the stage change only builds the nodes). A no-op with terrain off.
-func prefetch(settings: UnnaturalSettings, rng_seed: int, edge_tall: float) -> void:
+func prefetch(settings: TerrainSettings, rng_seed: int, edge_tall: float) -> void:
 	if not settings.terrain_enabled:
 		return
 	var key := _terrain_key(settings, rng_seed, edge_tall)
@@ -142,7 +142,7 @@ func prefetch(settings: UnnaturalSettings, rng_seed: int, edge_tall: float) -> v
 			"terrain prefetch")
 
 
-func _terrain_key(settings: UnnaturalSettings, rng_seed: int, edge_tall: float) -> String:
+func _terrain_key(settings: TerrainSettings, rng_seed: int, edge_tall: float) -> String:
 	return "%d/%.1f/%.1f/%.2f/%d" % [rng_seed, settings.arena_radius, edge_tall, settings.terrain_cell, settings.terrain_quality]
 
 
@@ -195,7 +195,7 @@ func set_murk(density: float) -> void:
 	_murk = density
 	var reach := _settings.scenery_draw_distance
 	if reach <= 0.0 and density > 0.0:
-		reach = UnnaturalSettings.fog_reach(_settings.murk_cull, density) + _settings.murk_cull_margin + Scatter.TILE * 0.7
+		reach = TerrainSettings.fog_reach(_settings.murk_cull, density) + _settings.murk_cull_margin + Scatter.TILE * 0.7
 	scatter.draw_distance = reach
 	if flora:
 		flora.draw_distance = _settings.flora_draw_distance if _settings.flora_draw_distance > 0.0 else reach

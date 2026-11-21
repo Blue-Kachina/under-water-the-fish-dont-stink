@@ -47,7 +47,7 @@ func _run() -> void:
 	await _frames(10)
 	run = main.unnatural_run
 	horde = run.horde
-	run.start()
+	run.restart()
 	await _frames(20)
 	fish.freeze = true
 	var ahead := -fish.global_basis.z

@@ -111,8 +111,6 @@ func attach_main(game: Node) -> void:
 	main = game
 	main.mode_started.connect(_on_mode_started)
 	main.mode_ended.connect(_on_mode_ended)
-	main.unnatural_started.connect(_on_unnatural_started)
-	main.unnatural_ended.connect(_on_unnatural_ended)
 	main.marco_polo_started.connect(_on_marco_polo_started)
 	main.marco_polo_ended.connect(_on_marco_polo_ended)
 	main.what_stinks_started.connect(_on_what_stinks_started)
@@ -301,9 +299,14 @@ func _unhook_marco_polo() -> void:
 func _on_mode_started(mode: GameMode) -> void:
 	if mode is NatureRun and is_active() and (_welcomed or _is_host()):
 		_hook(mode)
+	elif mode.get(&"test_tank") != null:  # an Unnatural run (or the Test Tank)
+		_on_unnatural_started(mode)
 
 
 func _on_mode_ended(id: String) -> void:
+	if id == main.UNNATURAL or id == main.TEST_TANK:
+		_on_unnatural_ended()
+		return
 	if id != main.NATURE:
 		return
 	_unhook()
@@ -993,7 +996,7 @@ func _restart() -> void:
 	if run and not run.authority:
 		run.restart()
 	elif urun and is_instance_valid(urun) and not urun.authority:
-		urun.start()
+		urun.restart()
 
 
 @rpc("authority", "call_remote", "reliable")

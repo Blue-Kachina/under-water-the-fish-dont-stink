@@ -46,7 +46,7 @@ func _run() -> void:
 	main._match_card.play_requested.emit()
 	await _frames(10)
 	run = main.unnatural_run
-	run.start()
+	run.restart()
 	await _frames(10)
 	fish.global_position = run.centre + Vector3(0.0, 0.0, -400.0)  # out of every shot (and its bubbles with it)
 	await _frames(2)

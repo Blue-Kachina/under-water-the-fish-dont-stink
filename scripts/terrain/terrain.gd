@@ -25,17 +25,17 @@ var body: StaticBody3D
 var stats := {}
 var material: ShaderMaterial
 var _built_data: Array = []
-var _settings: UnnaturalSettings
+var _settings: TerrainSettings
 
 
 ## Builds the terrain for `seed_value` (blocking): generate, mesh, then the nodes. `height` is the depth band's height.
-func build(settings: UnnaturalSettings, seed_value: int, radius: float, height: float) -> void:
+func build(settings: TerrainSettings, seed_value: int, radius: float, height: float) -> void:
 	prepare(settings, seed_value, radius, height)
 	apply(settings)
 
 
 ## The heavy half (thread-safe: touches no nodes): generates the field and meshes every chunk.
-func prepare(settings: UnnaturalSettings, seed_value: int, radius: float, height: float) -> void:
+func prepare(settings: TerrainSettings, seed_value: int, radius: float, height: float) -> void:
 	var t0 := Time.get_ticks_usec()
 	layout = TerrainLayout.roll(settings, seed_value, radius, height)
 	field = TerrainField.new()
@@ -54,7 +54,7 @@ func prepare(settings: UnnaturalSettings, seed_value: int, radius: float, height
 
 
 ## The node half (main thread): the chunk meshes and the collision.
-func apply(settings: UnnaturalSettings) -> void:
+func apply(settings: TerrainSettings) -> void:
 	var t0 := Time.get_ticks_usec()
 	for child in get_children():
 		child.queue_free()

@@ -14,10 +14,9 @@ extends Node
 ## Everything tuned in the tuning panel is the first player's, and is copied
 ## to every other player's fish and camera as it changes.
 ##
-## attach_run() wires each player (and anyone joining later) into a run. A
-## NatureRun: their ball cam on their own focus, their school wheel, their
-## HUD's counts. An UnnaturalRun: the survivor cam and their own UnnaturalHud
-## (mode_hud; the first player's is main's). detach_run() undoes it. Leaving
+## attach_run() wires each player (and anyone joining later) into a run (a
+## GameMode's attach_player(): Nature's ball cam, wheel and counts, Unnatural's
+## survivor cam and own HUD). detach_run() undoes it. Leaving
 ## for a mode without co-op drops the extra players (drop_extras()).
 
 signal players_changed(count: int)
@@ -247,13 +246,9 @@ func attach_run(game_run: Node) -> void:
 		var slot := slot_of(fish)
 		if slot:
 			slot.camera.snap())
-	if run is UnnaturalRun:
-		for slot in slots:
-			_wire(slot)
-		_refresh_views()
-		return
 	for slot in slots:
 		_wire(slot)
+	_refresh_views()
 
 
 ## Undoes attach_run() (the run's ending).
@@ -264,44 +259,12 @@ func detach_run() -> void:
 
 
 func _wire(slot: PlayerSlot) -> void:
-	if run is UnnaturalRun:
-		_wire_unnatural(slot)
-		return
 	(run as GameMode).attach_player(slot)
-
-
-## Unnatural: the survivor cam, and (past the first player) their own HUD in their view.
-func _wire_unnatural(slot: PlayerSlot) -> void:
-	var unnatural := run as UnnaturalRun
-	slot.camera.ball = null
-	slot.camera.ball_cam = false
-	slot.camera.cull_mask = TreasureChest.view_mask(slot.index)  # their chests, not the others'
-	UnnaturalRun.steady_camera(slot.camera, true, unnatural.settings)
-	if slot.index > 0 and not is_instance_valid(slot.mode_hud):
-		var hud := UnnaturalHud.new()
-		hud.name = "UnnaturalHud%d" % (slot.index + 1)
-		hud.run = unnatural
-		hud.fish = slot.fish
-		slot.mode_hud = hud
-		slot.camera.get_parent().add_child(hud)
-	if slot.mode_hud is UnnaturalHud:
-		(slot.mode_hud as UnnaturalHud).player_camera = slot.camera  # its follow / free cam note
-	if slot.index > 0 and is_instance_valid(slot.hud):
-		slot.hud.survivor_cam = true  # no controls line, as for the first player
 
 
 func _unwire(slot: PlayerSlot) -> void:
 	var camera := slot.camera
 	if not is_instance_valid(camera):
-		return
-	if run is UnnaturalRun:
-		UnnaturalRun.steady_camera(camera, false, (run as UnnaturalRun).settings)
-		camera.cull_mask = 0xFFFFF
-		if slot.index > 0 and is_instance_valid(slot.mode_hud):
-			slot.mode_hud.queue_free()
-		slot.mode_hud = null
-		if slot.index > 0 and is_instance_valid(slot.hud):
-			slot.hud.survivor_cam = false
 		return
 	(run as GameMode).detach_player(slot)
 

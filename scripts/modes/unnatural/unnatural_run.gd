@@ -1,5 +1,5 @@
 class_name UnnaturalRun
-extends Node
+extends GameMode
 ## Unnatural mode in the Ocean (planning_unnatural.md): there's a blood moon
 ## tonight and every fish in the sea has turned, except the players. The
 ## zombies (a Horde) come after them; they survive, level up and (later) dig up
@@ -156,7 +156,7 @@ signal rift_claimed(by: FishController)
 signal choices_changed(fish: FishController)
 
 ## The key its survivor cam is pushed on the FollowCamera under (push_style).
-const CAMERA_STYLE_KEY := &"unnatural"
+const CAMERA_STYLE_KEY := SurvivorCam.KEY
 
 ## Players spawn side by side, this far apart (m).
 const SPAWN_SPACING := 3.0
@@ -345,6 +345,39 @@ var _kind_rng: RandomNumberGenerator
 var _seabed_seed := SEABED_SEED
 
 
+## The picker tile, environment, tuning, card and settings (GameMode's descriptor).
+static func descriptor() -> Dictionary:
+	return {
+		"id": "Unnatural", "title": "Unnatural", "icon": "mode_unnatural",
+		"colors": [Color(0.25, 0.04, 0.08), Color(0.93, 0.25, 0.3)],
+		"pitch": "A blood moon has turned every fish but you. Survive the zombie horde, level up and stack powerups from chests.",
+		"short": "Survive the zombie horde", "play": ["Solo", "Split-screen", "Online"],
+		"environment": "Ocean", "match": true, "after": "Hunt", "tile_before": "Fish Sticks",
+		"tuning_preset": "res://presets/nature.cfg",
+		"card_text": UnnaturalRun.card_text, "reset_label": "Restart run", "split_screen": true,
+		"settings": UnnaturalSettings, "setup_rows": UnnaturalRun.setup_rows,
+		"extra_settings": [["powerups", "Powerups", PowerupSettings]],
+		"sfx": [[UnnaturalSounds, &"sfx_hook"]],
+	}
+
+
+static func card_text() -> String:
+	return "Unnatural: there's a blood moon tonight, and every fish in the sea has turned but you. Survive the zombie horde. Your fish bites on its own: huge ghost jaws snap on whatever's ahead. Ram them at speed to batter them too (it doesn't hurt you), but any other touch does. Swim through the XP pearls they drop to level up."
+
+
+## The mode setup modal's rows (ModeSetups): the run's length.
+static func setup_rows(setup: ModeSetup, row: Callable) -> void:
+	var us := UnnaturalSettings.shared()
+	setup.rows.append(row.call("Run length", [["Short", "One stage."], ["Standard", "%d stages." % us.standard_stages],
+			["Endless", "Until the sea wins."]], clampi(us.run_length, 0, 2), func(i: int) -> void: us.run_length = i))
+
+
+## The host's world for this start (the survivor cam, HUD and split-screen players).
+var _world: ModeWorld
+## The first player's HUD (UnnaturalHud), made at start() and freed at release().
+var hud: UnnaturalHud
+
+
 func setup(run_ocean: Ocean, player_fish: FishController) -> void:
 	ocean = run_ocean
 	player = player_fish
@@ -408,11 +441,11 @@ func _ready() -> void:
 		stage_completed.connect(func() -> void: run_log.finish("won"))
 	for fish in players:
 		_join(fish)
-	start()
+	restart()
 
 
-## Everyone back at the start: the horde gone, level 1, full health.
-func start() -> void:
+## Everyone back at the start: the horde gone, level 1, full health (R; the old start()).
+func restart() -> void:
 	_log_quit()
 	if authority:
 		restarted.emit()
@@ -496,7 +529,7 @@ func _log_quit() -> void:
 
 
 ## The class survival sim's scenario (planning_bosses_and_survival.md §5b),
-## right after start(): the run's clock jumps to `seconds`, so difficulty,
+## right after restart(): the run's clock jumps to `seconds`, so difficulty,
 ## zombie hp, the roster's unlocks and the director's baseline follow. The
 ## stage events already past are dropped (all of them unless `keep_events`),
 ## and the boss rift stays shut. The team is at `player_level` (each level's
@@ -582,7 +615,88 @@ func spawn_for(fish: FishController, spawn: Transform3D) -> Transform3D:
 
 
 ## Hands the players' fish back. Call before freeing the run.
+## The environment is ready: the world's local players (split-screen ones past the first)
+## and whether this machine runs the world (an online guest's doesn't).
+func enter(world: ModeWorld) -> void:
+	_world = world
+	authority = world.options.get("authority", true)
+	setup(world.environment as Ocean, world.fish)
+	for slot: PlayerSlot in world.slots:
+		slot.fish.set_meta("coop_index", slot.index)
+		if slot.index > 0:
+			players.append(slot.fish)
+
+
+## Play: the survivor cam on the first player's view, their HUD, and every local player wired in.
+func start() -> void:
+	var camera: Node = _world.camera
+	camera.ball = null
+	camera.ball_cam = false
+	SurvivorCam.apply(camera, true, settings)
+	camera.snap()
+	_world.hud.survivor_cam = true
+	hud = UnnaturalHud.new()
+	hud.name = "UnnaturalHud"
+	hud.run = self
+	hud.fish = _world.fish
+	_world.host.add_child(hud)
+	_world.slots[0].mode_hud = hud
+	_world.host.attach_local_players(self)  # each player's survivor cam and HUD
+
+
+## R: the run again (online, only the host's restart is everyone's).
+func reset() -> void:
+	if authority:
+		restart()
+
+
+## A local player's own survivor cam, chest view and (past the first) HUD
+## (LocalCoop calls it for each slot, and for anyone joining later).
+func attach_player(slot: PlayerSlot) -> void:
+	slot.camera.ball = null
+	slot.camera.ball_cam = false
+	slot.camera.cull_mask = TreasureChest.view_mask(slot.index)  # their chests, not the others'
+	SurvivorCam.apply(slot.camera, true, settings)
+	if slot.index > 0 and not is_instance_valid(slot.mode_hud):
+		var their_hud := UnnaturalHud.new()
+		their_hud.name = "UnnaturalHud%d" % (slot.index + 1)
+		their_hud.run = self
+		their_hud.fish = slot.fish
+		slot.mode_hud = their_hud
+		slot.camera.get_parent().add_child(their_hud)
+	if slot.mode_hud is UnnaturalHud:
+		(slot.mode_hud as UnnaturalHud).player_camera = slot.camera  # its follow / free cam note
+	if slot.index > 0 and is_instance_valid(slot.hud):
+		slot.hud.survivor_cam = true  # no controls line, as for the first player
+
+
+func detach_player(slot: PlayerSlot) -> void:
+	var camera: Node = slot.camera
+	if not is_instance_valid(camera):
+		return
+	SurvivorCam.apply(camera, false, settings)
+	camera.cull_mask = 0xFFFFF
+	if slot.index > 0 and is_instance_valid(slot.mode_hud):
+		slot.mode_hud.queue_free()
+	slot.mode_hud = null
+	if slot.index > 0 and is_instance_valid(slot.hud):
+		slot.hud.survivor_cam = false
+
+
+## After end(): the first player's HUD goes.
+func release() -> void:
+	if is_instance_valid(hud):
+		hud.queue_free()
+	hud = null
+
+
+## Leaving: the players' views back to the usual chase cam, then the run's own teardown.
 func end() -> void:
+	if _world != null:
+		_world.host.detach_local_players()
+		_world.slots[0].mode_hud = null
+		SurvivorCam.apply(_world.camera, false, settings)
+		_world.hud.survivor_cam = false
 	_log_quit()
 	set_physics_process(false)
 	horde.set_physics_process(false)
@@ -622,44 +736,14 @@ func remove_player(fish: FishController) -> void:
 	players.erase(fish)
 
 
-## Puts the survivor cam (UnnaturalSettings' Camera group) on `camera` (a
-## FollowCamera), or takes it off (`on` false: the usual chase view). Called
-## every frame, live from the panel: camera_mode only sets the follow or free
-## cam when it's put on, or when the setting changes, so the camera's own swap
-## button sticks in between. `pull`: m further back on top (camera_pull_of()).
+## Puts the survivor cam on `camera` (see SurvivorCam; kept for the modes that still call it here).
 static func steady_camera(camera: Node, on: bool, from: UnnaturalSettings, pull := 0.0) -> void:
-	if not is_instance_valid(camera):
-		return
-	if on and from.steady_camera:
-		camera.push_style(CAMERA_STYLE_KEY, survivor_style(from, pull))
-	else:
-		camera.pop_style(CAMERA_STYLE_KEY)
+	SurvivorCam.apply(camera, on, from, pull)
 
 
-## The survivor cam as a CameraStyle (UnnaturalSettings' Camera group).
+## The survivor cam as a CameraStyle (see SurvivorCam).
 static func survivor_style(from: UnnaturalSettings, pull := 0.0) -> CameraStyle:
-	var style := CameraStyle.new()
-	style.view_mode = from.camera_mode
-	style.follow_style = from.camera_follow
-	style.swing_rate = from.camera_swing_rate
-	style.settle_rate = from.camera_settle_rate
-	style.settle_turning_rate = from.camera_settle_turning_rate
-	style.settle_turn_full = deg_to_rad(from.camera_settle_turn)
-	style.settle_smoothing = from.camera_settle_smoothing
-	style.settle_delay = from.camera_settle_delay
-	style.settle_max_angle = deg_to_rad(from.camera_settle_max_angle)
-	style.settle_coast_rate = from.camera_settle_coast_rate
-	style.settle_coast_ease = from.camera_settle_coast_ease
-	style.free_turn_speed = deg_to_rad(from.free_cam_speed)
-	style.free_pitch_limit = deg_to_rad(from.free_cam_pitch)
-	style.free_follow_rate = from.free_cam_follow
-	style.free_invert_y = from.free_cam_invert_y
-	style.heading_rate = from.camera_turn_rate
-	style.heading_climb = from.camera_climb
-	style.extra_distance = from.camera_distance + pull
-	style.extra_height = from.camera_height + pull * 0.3
-	style.extra_angle = from.camera_tilt
-	return style
+	return SurvivorCam.style(from, pull)
 
 
 ## A player's health.
@@ -686,6 +770,51 @@ func is_quiet(fish: FishController) -> bool:
 ## `fish's traversal twist and mobility skill.
 func twist_of(fish: FishController) -> Traversal:
 	return _twists.get(fish)
+
+
+## The punch a Recoil Dash throws (Traversal asks): the fish's own Cavitation Punch,
+## else a second one it holds, else a spare at its stats (the panel gave it another attack).
+func recoil_punch(twist: Traversal) -> CavitationPunch:
+	var fish := twist.fish
+	var own := attack_of(fish) as CavitationPunch
+	if own:
+		return own
+	var held := powerups_of(fish)
+	var weapon: CavitationPunch = held.weapon("attack_punch") as CavitationPunch if held else null
+	if weapon:
+		return weapon
+	if not is_instance_valid(twist.spare_punch):
+		twist.spare_punch = _spare_attack(twist, FishAttack.Kind.PUNCH)
+	(twist.spare_punch as CavitationPunch).configure(block_of(fish), {}, 1)
+	return twist.spare_punch as CavitationPunch
+
+
+## The Purple Haze Flutter drops its cloud with (Traversal asks): likewise.
+func flutter_haze(twist: Traversal) -> PurpleHaze:
+	var fish := twist.fish
+	var own := attack_of(fish) as PurpleHaze
+	if own:
+		return own
+	var held := powerups_of(fish)
+	var weapon: PurpleHaze = held.weapon("attack_purple_haze") as PurpleHaze if held else null
+	if weapon:
+		return weapon
+	if not is_instance_valid(twist.spare_haze):
+		twist.spare_haze = _spare_attack(twist, FishAttack.Kind.HAZE)
+	(twist.spare_haze as PurpleHaze).configure(block_of(fish), {}, 1)
+	return twist.spare_haze as PurpleHaze
+
+
+func _spare_attack(twist: Traversal, kind: FishAttack.Kind) -> FishAttack:
+	var spare := FishAttack.make(kind)
+	spare.fish = twist.fish
+	spare.horde = horde
+	spare.settings = settings
+	spare.run = self
+	spare.powers = powerup_settings
+	spare.on_hit = hit
+	add_child(spare)
+	return spare
 
 
 ## A player's run so far: kills, damage (and by source: "bite", "battery"),

@@ -19,7 +19,7 @@ static var _shadow_ready := false
 
 
 ## Bakes `terrain`'s volume and shadow and points the globals at them. Returns timings (ms) for stats.
-static func bake(terrain: Terrain, settings: UnnaturalSettings) -> Dictionary:
+static func bake(terrain: Terrain, settings: TerrainSettings) -> Dictionary:
 	var out := {}
 	if terrain == null or terrain.field == null or not settings.terrain_light_enabled:
 		clear()
@@ -88,7 +88,7 @@ static func bake(terrain: Terrain, settings: UnnaturalSettings) -> Dictionary:
 
 
 ## The live strengths (the panel's values) into the globals (the sun's shadow only once one is baked).
-static func push(settings: UnnaturalSettings) -> void:
+static func push(settings: TerrainSettings) -> void:
 	var shadow_baked := _shadow_ready
 	var on := 1.0 if settings.terrain_light_enabled else 0.0
 	RenderingServer.global_shader_parameter_set("terrain_light", Vector4(settings.terrain_skylight,

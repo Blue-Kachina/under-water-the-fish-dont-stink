@@ -18,7 +18,7 @@ var reach := 160.0
 var cell := 2.0
 var stream_seed := 1
 var follow: Node3D
-var settings: UnnaturalSettings
+var settings: TerrainSettings
 ## Tiles being built or built: Vector2i -> {"task": id or -1, "data": Array, "node": Node3D or null}.
 var _tiles := {}
 var _material: ShaderMaterial

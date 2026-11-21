@@ -81,7 +81,7 @@ func _start() -> void:
 	if run == null:
 		push_warning("LookTank: no Unnatural run to look at")
 		return
-	main.unnatural_ended.connect(queue_free, CONNECT_ONE_SHOT)
+	main.mode_ended.connect(func(_id: String) -> void: queue_free(), CONNECT_ONE_SHOT)
 	camera = Camera3D.new()
 	camera.name = "LookCamera"
 	camera.far = 1000.0

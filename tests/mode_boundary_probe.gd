@@ -35,26 +35,24 @@ const CORE := [
 	"audio/sfx.gd", "audio/sound_catalog.gd", "audio/sound_profile.gd", "audio/sfx_hooks/sfx_hooks.gd",
 	"net/net_session.gd", "net/coop_session.gd", "net/net_fish.gd",
 ]
-## Kits (shared building blocks), where they live today. Seabed, Traversal and
-## ChompKit still sit inside the unnatural folder: listing them by file takes
-## them out of that mode's own files.
+## Kits (shared building blocks), where they live today (Seabed, Traversal, ChompKit and
+## the survivor cam moved to kits/ in the Unnatural migration, step A).
 const KITS := [
-	"unnatural/seabed.gd", "terrain/",
-	"unnatural/traversal.gd", "battery.gd", "style_points.gd", "match_stats.gd",
+	"terrain/",
+	"battery.gd", "style_points.gd", "match_stats.gd",
 	"goal_recorder.gd", "goal_replay.gd", "replay/", "fish_bot.gd", "kits/",
-	"fx_kit.gd", "unnatural/chomp_kit.gd", "scenery/", "water_look.gd", "fx/", "xray_outline.gd",
+	"fx_kit.gd", "scenery/", "water_look.gd", "fx/", "xray_outline.gd",
 	"rl/",
 ]
 ## Mode folders (every .gd below is that mode's) and single mode files.
 const MODE_DIRS := {
-	"unnatural/": "unnatural", "modes/hunt/": "hunt", "modes/nature/": "nature", "modes/one_v_one/": "1v1", "marco_polo/": "marco", "what_stinks/": "what_stinks",
+	"modes/unnatural/": "unnatural", "modes/hunt/": "hunt", "modes/nature/": "nature", "modes/one_v_one/": "1v1", "marco_polo/": "marco", "what_stinks/": "what_stinks",
 }
 const MODE_FILES := {
-	"net/unnatural_net.gd": "unnatural", "net/marco_polo_net.gd": "marco",
+	"net/marco_polo_net.gd": "marco",
 	"net/what_stinks_net.gd": "what_stinks",
 	"course_skill.gd": "course",
-	"audio/sfx_hooks/unnatural_sounds.gd": "unnatural",
-	"audio/sfx_hooks/boss_sounds.gd": "unnatural", "audio/sfx_hooks/battered_sounds.gd": "unnatural",
+	"audio/sfx_hooks/battered_sounds.gd": "unnatural",
 }
 
 var failures := 0

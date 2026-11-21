@@ -29,13 +29,13 @@ var _mesa_records := PackedFloat32Array()
 
 
 ## The layout for `seed_value` in an arena `radius` round whose depth band is `height` tall (the Seabed's edge_height).
-static func roll(settings: UnnaturalSettings, seed_value: int, radius: float, height: float) -> TerrainLayout:
+static func roll(settings: TerrainSettings, seed_value: int, radius: float, height: float) -> TerrainLayout:
 	var layout := TerrainLayout.new()
 	layout._roll(settings, seed_value, radius, height)
 	return layout
 
 
-func _roll(s: UnnaturalSettings, seed_value: int, radius: float, height: float) -> void:
+func _roll(s: TerrainSettings, seed_value: int, radius: float, height: float) -> void:
 	_rng.seed = seed_value * 977 + 13
 	open_radius = minf(s.terrain_open_radius, radius * 0.7)
 	ring_height = s.terrain_ring_height * height
@@ -215,12 +215,12 @@ func _roll(s: UnnaturalSettings, seed_value: int, radius: float, height: float) 
 
 
 ## The grid cell (m) at the settings' quality tier.
-static func quality_cell(s: UnnaturalSettings) -> float:
+static func quality_cell(s: TerrainSettings) -> float:
 	return s.terrain_cell * [1.5, 1.0, 0.75][clampi(s.terrain_quality, 0, 2)]
 
 
 ## How much of the dressing (kelp, fronds, tufts, carpets, corals, boulders) the quality tier keeps.
-static func quality_dressing(s: UnnaturalSettings) -> float:
+static func quality_dressing(s: TerrainSettings) -> float:
 	return [0.6, 1.0, 1.25][clampi(s.terrain_quality, 0, 2)]
 
 

@@ -12,7 +12,7 @@ var _world: ModeWorld
 
 ## THE registry: one line per migrated mode.
 static func scripts() -> Array[GDScript]:
-	return [Match1v1, NatureRun, HuntMatch]
+	return [Match1v1, NatureRun, HuntMatch, UnnaturalRun, TestTankRun]
 
 
 static func descriptors() -> Array[Dictionary]:

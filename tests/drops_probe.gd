@@ -108,6 +108,8 @@ func _run() -> void:
 	var local: LocalCoop = main._local
 	_press(PADS[0], LocalCoop.JOIN_BUTTON)
 	await _ticks(5)
+	_press(PADS[0], JOY_BUTTON_A)  # the joiner's character screen: Dive in
+	await _ticks(5)
 	var second: PlayerSlot = local.slots[1]
 	check(local.count() == 2 and run.players.size() == 2, "a second player joins")
 	check(local.slots[0].camera.cull_mask == TreasureChest.view_mask(0) and second.camera.cull_mask == TreasureChest.view_mask(1),
