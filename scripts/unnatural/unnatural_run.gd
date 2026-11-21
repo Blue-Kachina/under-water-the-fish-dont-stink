@@ -155,6 +155,9 @@ signal rift_claimed(by: FishController)
 ## A player's rerolls, skips or banishes changed (P4).
 signal choices_changed(fish: FishController)
 
+## The key its survivor cam is pushed on the FollowCamera under (push_style).
+const CAMERA_STYLE_KEY := &"unnatural"
+
 ## Players spawn side by side, this far apart (m).
 const SPAWN_SPACING := 3.0
 ## Final bosses switched off (never picked, not in the Test Tank); the code stays so one can come back.
@@ -627,32 +630,36 @@ func remove_player(fish: FishController) -> void:
 static func steady_camera(camera: Node, on: bool, from: UnnaturalSettings, pull := 0.0) -> void:
 	if not is_instance_valid(camera):
 		return
-	var steady := on and from.steady_camera
-	if not steady:
-		camera.remove_meta("survivor_mode")
-	elif camera.get_meta("survivor_mode", -1) != from.camera_mode:
-		camera.set_meta("survivor_mode", from.camera_mode)
-		camera.set("free_cam", from.camera_mode == 1)
-	camera.set("follow_style", from.camera_follow)
-	camera.set("swing_rate", from.camera_swing_rate)
-	camera.set("settle_rate", from.camera_settle_rate)
-	camera.set("settle_turning_rate", from.camera_settle_turning_rate)
-	camera.set("settle_turn_full", deg_to_rad(from.camera_settle_turn))
-	camera.set("settle_smoothing", from.camera_settle_smoothing)
-	camera.set("settle_delay", from.camera_settle_delay)
-	camera.set("settle_max_angle", deg_to_rad(from.camera_settle_max_angle))
-	camera.set("settle_coast_rate", from.camera_settle_coast_rate)
-	camera.set("settle_coast_ease", from.camera_settle_coast_ease)
-	camera.set("free_turn_speed", deg_to_rad(from.free_cam_speed))
-	camera.set("free_pitch_limit", deg_to_rad(from.free_cam_pitch))
-	camera.set("free_follow_rate", from.free_cam_follow)
-	camera.set("free_invert_y", from.free_cam_invert_y)
-	camera.set("steady_heading", steady)
-	camera.set("heading_rate", from.camera_turn_rate)
-	camera.set("heading_climb", from.camera_climb)
-	camera.set("extra_distance", from.camera_distance + pull if steady else 0.0)
-	camera.set("extra_height", from.camera_height + pull * 0.3 if steady else 0.0)
-	camera.set("extra_angle", from.camera_tilt if steady else 0.0)
+	if on and from.steady_camera:
+		camera.push_style(CAMERA_STYLE_KEY, survivor_style(from, pull))
+	else:
+		camera.pop_style(CAMERA_STYLE_KEY)
+
+
+## The survivor cam as a CameraStyle (UnnaturalSettings' Camera group).
+static func survivor_style(from: UnnaturalSettings, pull := 0.0) -> CameraStyle:
+	var style := CameraStyle.new()
+	style.view_mode = from.camera_mode
+	style.follow_style = from.camera_follow
+	style.swing_rate = from.camera_swing_rate
+	style.settle_rate = from.camera_settle_rate
+	style.settle_turning_rate = from.camera_settle_turning_rate
+	style.settle_turn_full = deg_to_rad(from.camera_settle_turn)
+	style.settle_smoothing = from.camera_settle_smoothing
+	style.settle_delay = from.camera_settle_delay
+	style.settle_max_angle = deg_to_rad(from.camera_settle_max_angle)
+	style.settle_coast_rate = from.camera_settle_coast_rate
+	style.settle_coast_ease = from.camera_settle_coast_ease
+	style.free_turn_speed = deg_to_rad(from.free_cam_speed)
+	style.free_pitch_limit = deg_to_rad(from.free_cam_pitch)
+	style.free_follow_rate = from.free_cam_follow
+	style.free_invert_y = from.free_cam_invert_y
+	style.heading_rate = from.camera_turn_rate
+	style.heading_climb = from.camera_climb
+	style.extra_distance = from.camera_distance + pull
+	style.extra_height = from.camera_height + pull * 0.3
+	style.extra_angle = from.camera_tilt
+	return style
 
 
 ## A player's health.

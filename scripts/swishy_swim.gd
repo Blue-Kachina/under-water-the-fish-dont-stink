@@ -134,10 +134,14 @@ func cue() -> Vector3:
 func sample(stick: Vector2, delta: float) -> void:
 	var striding := fish.input_forward > 0.0 or not fish.stride_needs_throttle
 	var smoothing := fish.stride_steer_smoothing
+	var steering := stick
+	if striding and phase >= 0.0 and _dir != Vector2.ZERO and fish.stride_steer_cancel > 0.0:
+		# While a stride builds and peaks, the stick along its sweep is the stroke.
+		steering = stick - _dir * maxf(stick.dot(_dir), 0.0) * power * fish.stride_steer_cancel
 	if striding and smoothing > 0.0:
-		steer = steer.lerp(stick, 1.0 - exp(-delta / smoothing))
+		steer = steer.lerp(steering, 1.0 - exp(-delta / smoothing))
 	else:
-		steer = stick  # not striding: plain, direct steering
+		steer = steering if striding else stick  # not striding: plain, direct steering
 	if phase >= 0.0:
 		phase += delta
 		if phase > peak_time() + fade_time():
@@ -175,6 +179,33 @@ func reach_scale() -> float:
 	return lerpf(0.6, 1.0, clampf((_reach - threshold) / maxf(1.0 - threshold, 0.01), 0.0, 1.0))
 
 
+## What a stride of timing `t` (0..1) earns, 0..1: the fish's curve (a Curve, or its
+## stride_timing_shape; today's is t itself) with stride_partial_credit on top.
+func timing_credit(t: float) -> float:
+	var credit := clampf(t, 0.0, 1.0)
+	var curve := fish.stride_timing_curve
+	if curve == null and fish.stride_timing_shape == 1:
+		curve = gentle_curve()
+	if curve != null:
+		credit = clampf(curve.sample(credit), 0.0, 1.0)
+	if fish.stride_partial_credit > 0.0:
+		credit = lerpf(credit, sqrt(credit), fish.stride_partial_credit)
+	return credit
+
+
+static var _gentle: Curve
+
+
+## The shipped gentle reward curve (stride_timing_shape Gentle): a stride at 0.7 earns about 0.85.
+static func gentle_curve() -> Curve:
+	if _gentle == null:
+		_gentle = Curve.new()
+		for point: Vector2 in [Vector2(0.0, 0.0), Vector2(0.5, 0.7), Vector2(0.7, 0.85), Vector2(1.0, 1.0)]:
+			_gentle.add_point(point, 0.0, 0.0, Curve.TANGENT_LINEAR, Curve.TANGENT_LINEAR)
+		_gentle.bake()
+	return _gentle
+
+
 func _start(dir: Vector2, reach: float) -> void:
 	var fresh := phase < 0.0
 	var timing := -1.0 if fresh else envelope(phase)
@@ -183,8 +214,9 @@ func _start(dir: Vector2, reach: float) -> void:
 		strength = fish.stride_fresh
 	else:
 		strides += 1
-		flow = clampf(flow + fish.stride_flow_gain * (2.0 * timing - 1.0), 0.0, fish.stride_flow_max)
-		strength = lerpf(fish.stride_fresh, 1.0, timing) * (1.0 + flow)
+		var credit := timing_credit(timing)
+		flow = clampf(flow + fish.stride_flow_gain * (2.0 * credit - 1.0), 0.0, fish.stride_flow_max)
+		strength = lerpf(fish.stride_fresh, 1.0, credit) * (1.0 + flow)
 	last_timing = timing
 	last_early = not fresh and phase < peak_time()
 	phase = 0.0

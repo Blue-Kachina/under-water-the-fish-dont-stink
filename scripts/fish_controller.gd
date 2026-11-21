@@ -310,6 +310,20 @@ const TIME_EPSILON := 0.0001
 ## alternating sweeps mostly cancel out while a held direction still turns.
 ## 0 = the stick steers directly, sweeps and all.
 @export_range(0.0, 1.0, 0.01) var stride_steer_smoothing := 0.35
+## While a stride builds and peaks, the part of the stick along its own sweep is the stroke, not
+## steering: this much of it is taken out of the steering, scaled by the stride's power (0 = off, as
+## before; 1 = a held stick strokes through the stride and turns the fish as the stride fades). A held
+## sweep then no longer yaws or pitches the fish through its stride.
+@export_range(0.0, 1.0, 0.01) var stride_steer_cancel := 0.0
+## What a stride's timing (0..1) earns, for flow and strength. Today: timing counts as it is (flow gain
+## 2t-1, strength lerp(fresh, 1, t)). Gentle: a shipped curve that pays partial timing better (a stride at
+## 0.7 earns about 0.85). A Curve in stride_timing_curve replaces both.
+@export_enum("Today", "Gentle") var stride_timing_shape := 0
+## Overrides stride_timing_shape when set: a Curve from timing 0..1 to credit 0..1.
+@export var stride_timing_curve: Curve
+## Extra credit for a poorly timed stride: 0 = the curve as is, 1 = credit follows its square root
+## (a stride at 0.25 earns 0.5). Perfect and zero stay as they are.
+@export_range(0.0, 1.0, 0.01) var stride_partial_credit := 0.0
 ## How far the tail swings to each side on a stride (rad). A stride sweeps it
 ## across, away from the push, arriving at the far side at the peak.
 @export_range(0.0, 5.0, 0.01, "or_greater") var stride_tail_swing := 0.6

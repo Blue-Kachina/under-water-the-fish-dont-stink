@@ -13,6 +13,23 @@ extends Resource
 static var _shared: NatureSettings
 
 
+## Nature's camera as a CameraStyle (the settle style, camera_settle), or null while it is off.
+func camera_style() -> CameraStyle:
+	if not camera_settle:
+		return null
+	var style := CameraStyle.settle()
+	style.settle_rate = settle_rate
+	style.settle_turning_rate = settle_turning_rate
+	style.settle_turn_full = deg_to_rad(settle_turn)
+	style.settle_smoothing = settle_smoothing
+	style.settle_delay = settle_delay
+	style.settle_max_angle = deg_to_rad(settle_max_angle)
+	style.settle_coast_rate = settle_coast_rate
+	style.settle_coast_ease = settle_coast_ease
+	style.heading_climb = settle_climb
+	return style
+
+
 ## The copy the panel edits and Nature reads.
 static func shared() -> NatureSettings:
 	if _shared == null:
@@ -157,6 +174,32 @@ static func shared() -> NatureSettings:
 @export_range(0.1, 2.0, 0.05) var wheel_hold_time := 0.3
 ## Arrows at the screen's edge point to schools off screen (the target's always shows).
 @export var school_arrows := true
+
+@export_group("Camera")
+## Nature's chase camera in the settle style (CameraStyle, the survivor cam's): it turns by its own
+## smoothed heading instead of straight with the nose, so stride sweeps don't swing the view, and swings
+## round behind the fish once it swims straight. Off: the usual nose-following chase view. Play-test
+## switch: off by default until it has been tried.
+@export var camera_settle := false
+## How quickly the view swings round behind the fish swimming straight (1/s). Slower than the survivor cam's 3, so a
+## stride chain's weave (which M1 keeps small) is not followed: the stride-rate wobble is about 1.4 degrees peak to peak.
+@export_range(0.1, 30.0, 0.1, "or_greater") var settle_rate := 1.5
+## ...and while it is turning (1/s): lower shows the turn longer.
+@export_range(0.0, 30.0, 0.05, "or_greater") var settle_turning_rate := 0.5
+## The turn rate (degrees/s) that counts as fully turning.
+@export_range(5.0, 720.0, 5.0, "or_greater") var settle_turn := 90.0
+## How long (s) the fish's turning is averaged over, so a stride's sweep one way and back cancels out.
+@export_range(0.0, 3.0, 0.05, "or_greater") var settle_smoothing := 0.3
+## How long (s) the swing round takes to build once a turn ends.
+@export_range(0.0, 5.0, 0.05, "or_greater") var settle_delay := 0.4
+## How far (degrees) the nose can get off to the side before the view is turned with it (180: any).
+@export_range(10.0, 180.0, 1.0) var settle_max_angle := 75.0
+## How quickly the view swings round behind while accelerate, reverse and boost are let go (1/s; 0: no faster than swimming).
+@export_range(0.0, 30.0, 0.1, "or_greater") var settle_coast_rate := 6.0
+## How long (s) that takes to come in once they are.
+@export_range(0.0, 2.0, 0.05, "or_greater") var settle_coast_ease := 0.15
+## How much of the nose's climb the view follows (0: stays level).
+@export_range(0.0, 1.0, 0.05) var settle_climb := 0.4
 
 @export_group("Sea Floor")
 ## A sea floor (planning_procedural_world.md, phase 8): Nature gets endless terrain far below, streamed round the player;
