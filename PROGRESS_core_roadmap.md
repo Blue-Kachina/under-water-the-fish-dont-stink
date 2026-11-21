@@ -16,10 +16,10 @@ D6 file moves done in worktree + committed, git: branch per track, push branches
 |---|---|---|---|---|
 | T0a metrics | 0 | M0 swim_metrics_probe + fixture | track/metrics | done |
 | T0b boundary | 0 | mode_boundary_probe (report only) | track/boundary | done |
-| T0c swimstate | 0 | M5 SwimState | track/swimstate | not started |
-| T1 swim | 1 | M4, M1, M2 | track/swim | blocked on phase 0 |
-| T2 rig | 2 | P1-P4 shark rig | track/rig | blocked on phase 0 |
-| T3 hunt | 3 | H0-H4 done; H5-H7 wait on M5 | track/hunt | H0-H4 merged |
+| T0c swimstate | 0 | M5 SwimState | track/swimstate | done, merged |
+| T1 swim | 1 | M4, M1, M2 | track/swim | running |
+| T2 rig | 2 | P1-P4 shark rig | track/rig | running |
+| T3 hunt | 3 | H0-H4 done; H5-H7 | track/hunt | H5-H7 running |
 | T4 carve/rollout | 4 | M3, P5, Nature migration | track/carve etc | blocked |
 
 ## Track sections
@@ -155,3 +155,4 @@ How Hunt is launched in probes: `main.set_mode(main.HUNT)` parks on a MatchCard 
 - 2026-11-20: roadmap branch created, phase 0 launching.
 - 2026-11-20: T0a + T0b merged into roadmap/core. Finding (T0a): in open Ocean on Nature the FollowCamera yaw wobble is 0.00 deg (follow_air_rotation off), so plan F6 holds only near a surface; M4 acceptance must use `camera_wobble_follow` (7.17 deg). Verify F6 in real play.
 - 2026-11-20: T3 H1-H4 merged. hunt_probe baseline compare tolerates 0.011 float wobble (overtime_elapsed 1-tick jitter). audio_probe has 2 pre-existing failures.
+- 2026-11-20: T0c merged (phase 0 complete). Names: model.swim.* replaces old model fields (stride_swing->stride_dir, bell_gait->gait). Phases 1-3 launched in parallel.
