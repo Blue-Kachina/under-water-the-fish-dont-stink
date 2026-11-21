@@ -240,6 +240,27 @@ const TIME_EPSILON := 0.0001
 @export_range(0.0, 15.0, 0.1) var max_angular_speed := 5.4
 @export var invert_pitch := false
 
+@export_group("Water carving")
+## Turning in water by speed. Off: today's turning, as fast at 30 m/s as at 5 (the spin cap is flat).
+## Speed scaled: the pitch and yaw rate cap shrinks with speed (tight at a crawl, wide at speed) and a
+## hard turn at speed scrubs some of it (carve_drag), so a fast fish sweeps wide and visibly slides.
+## Composes with the modifiers: the cap starts from turn_scale / rl_turn_scale, the drag from drag_scale.
+@export_enum("Off", "Speed scaled") var water_turning := 0
+## Below this speed (m/s) turning is untouched.
+@export_range(0.0, 60.0, 0.5, "or_greater") var water_turn_free_speed := 5.0
+## At and above this speed (m/s) the turn rate cap has shrunk to water_turn_min.
+@export_range(1.0, 80.0, 0.5, "or_greater") var water_turn_ref_speed := 30.0
+## The pitch and yaw rate cap at water_turn_ref_speed, as a fraction of the normal cap.
+@export_range(0.05, 1.0, 0.01) var water_turn_min := 0.12
+## Speed lost per second per unit of slip (the sine of the drift angle) while turning in water.
+@export_range(0.0, 10.0, 0.05, "or_greater") var carve_drag := 1.5
+## Share of the speed the lateral drag would scrub in a turn that is kept instead, the velocity turning
+## with the nose (0 = today's scrub, 1 = the drag only turns the velocity). Carve_drag is then the cost.
+@export_range(0.0, 1.0, 0.01) var carve_grip := 0.8
+## The speed the turn cap reads is held up this long (s) after the fish slows: a hard turn at speed
+## bleeds its speed within half a second, and without the hold the cap would open again mid-turn.
+@export_range(0.0, 3.0, 0.05) var water_turn_hold := 3.0
+
 @export_group("Steering")
 ## Off a surface, turn with Rocket League's exact air control (RocketSim's
 ## torques and damping): turns on the spot, air roll, 5.5 rad/s cap. Off = the
@@ -572,6 +593,7 @@ var belly_width := 0.70:
 var speed := 0.0
 var forward_speed := 0.0
 var drift_angle := 0.0
+var _carve_speed := 0.0  # water_turning's held speed, see _carve_spin
 var angular_speed := 0.0
 var boost_amount := 100.0
 var is_boosting := false
@@ -1379,6 +1401,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		pass  # on its roof, as in RL: air roll can't right it, only the auto-flip jump
 	else:
 		local_spin = _apply_rotation(local_spin, dt)
+		if water_turning != 0:
+			local_spin = _carve_spin(local_spin, dt)
 	if _autoflip_left > 0.0:
 		_autoflip_left -= dt
 		# Roll about the nose (local -Z); capped like all spin at the next tick's start.
@@ -1918,9 +1942,31 @@ func _apply_water(velocity: Vector3, forward: Vector3, dt: float) -> Vector3:
 		# Between strides the class's gait sets how it coasts (Gait.coast_drag).
 		velocity *= exp(-linear_drag * (1.0 if stroking else gait.coast_drag) * drag_scale * dt)
 	var slip := velocity - forward * velocity.dot(forward)
+	if water_turning != 0:
+		return _carve_water(velocity, forward, slip, dt)
 	velocity -= slip * (1.0 - exp(-_effective_lateral_drag(dt) * dt))
 	velocity.y += (buoyancy + (0.0 if stroking else gait.coast_buoyancy)) * dt
 	return velocity
+
+
+## The lateral drag and buoyancy step under water_turning: the lateral drag still pulls the velocity round
+## to the nose, but carve_grip of what it removes turns the velocity instead of scrubbing it (the speed
+## is kept), and the scrub is the sine of the drift angle times carve_drag, so how much a turn costs is
+## its own setting rather than a by-product of the drag.
+func _carve_water(velocity: Vector3, forward: Vector3, slip: Vector3, dt: float) -> Vector3:
+	var before := velocity.length()
+	var scrub := _carve_scrub(velocity, slip, dt)
+	velocity -= slip * (1.0 - exp(-_effective_lateral_drag(dt) * dt))
+	var now := velocity.length()
+	if carve_grip > 0.0 and now > 0.001:
+		velocity *= lerpf(1.0, before / now, carve_grip)
+	velocity *= scrub
+	velocity.y += (buoyancy + (0.0 if _carve_stroking() else gait.coast_buoyancy)) * dt
+	return velocity
+
+
+func _carve_stroking() -> bool:
+	return swishy.power > 0.0 if swim_style == SwimStyle.EXTRA_SWISHY else stroke_chain >= 2
 
 
 func _apply_flip_z_damp(velocity: Vector3, dt: float) -> Vector3:
@@ -2081,6 +2127,31 @@ func _start_rl_flip() -> void:
 func _start_cooldown() -> void:
 	jump_state = JumpState.COOLDOWN
 	_jump_timer = jump_cooldown
+
+
+## Water carving (water_turning), the one place for it: the pitch and yaw rate cap falls off with
+## speed, between water_turn_free_speed (untouched) and water_turn_ref_speed (water_turn_min of the
+## normal cap, which is turn_scale / rl_turn_scale aware). Roll is not turning and stays free.
+func _carve_spin(local_spin: Vector3, dt: float) -> Vector3:
+	var held := absf(_steer_speed)
+	if water_turn_hold > 0.0:
+		held = maxf(held, _carve_speed * exp(-dt / water_turn_hold))
+	_carve_speed = held
+	var t := smoothstep(water_turn_free_speed, maxf(water_turn_ref_speed, water_turn_free_speed + 0.1), held)
+	if t <= 0.0:
+		return local_spin
+	var base := RL_MAX_ANGULAR_SPEED * rl_turn_scale if rl_roll_timing else max_angular_speed * turn_scale
+	var steer := Vector2(local_spin.x, local_spin.y).limit_length(base * lerpf(1.0, water_turn_min, t))
+	return Vector3(steer.x, steer.y, local_spin.z)
+
+
+## The speed scrub of a turn (water_turning): carve_drag times the slip's share of the speed (the sine
+## of the drift angle), over dt, times drag_scale. 1.0 = nothing lost.
+func _carve_scrub(velocity: Vector3, slip: Vector3, dt: float) -> float:
+	var speed_now := velocity.length()
+	if speed_now < 0.5:
+		return 1.0
+	return exp(-carve_drag * drag_scale * (slip.length() / speed_now) * dt)
 
 
 func _apply_rotation(local_spin: Vector3, dt: float) -> Vector3:

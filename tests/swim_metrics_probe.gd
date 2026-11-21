@@ -49,6 +49,10 @@ func _run() -> void:
 		await _options(peak, fade)
 		get_tree().quit(0)
 		return
+	if "--carve-only" in args:  # iterate on M3's numbers alone
+		await _carve()
+		get_tree().quit(0)
+		return
 	if "--camera-sweep" in args:  # try settle numbers: wobble and catch-up for each
 		await _camera_sweep(peak)
 		get_tree().quit(0)
@@ -179,6 +183,31 @@ func _options(peak: float, fade: float) -> void:
 	await _catchup("m4_catchup_nature", settle)
 	await _catchup("m4_catchup_unnatural", UnnaturalRun.survivor_style(UnnaturalSettings.new()))
 	await _catchup("m4_catchup_chase", null)
+	await _carve()
+
+
+## M3 water carving: the turn sweep with water_turning on, and the modifier stack composing with it.
+func _carve() -> void:
+	print("M3 water carving (water_turning Speed scaled, free %.0f ref %.0f min %.2f carve_drag %.2f):" % [
+			fish.water_turn_free_speed, fish.water_turn_ref_speed, fish.water_turn_min, fish.carve_drag])
+	fish.water_turning = 1
+	for v in [5.0, 15.0, 30.0]:
+		await _turn(v, "m3_turn_")
+	fish.carve_drag = 0.0
+	await _turn(30.0, "m3_nodrag_turn_")  # the cap alone, to see the scrub's share
+	fish.carve_drag = 1.5
+	fish.drag_scale = 2.0  # modifier stack: the scrub follows drag_scale
+	await _turn(30.0, "m3_dragx2_turn_")
+	fish.drag_scale = 1.0
+	fish.rl_turn_scale = 0.5  # modifier stack: the cap starts from rl_turn_scale
+	await _turn(15.0, "m3_slowturn_turn_")
+	fish.rl_turn_scale = 1.0
+	fish.water_turning = 0
+	await _turn(30.0, "m3_off_turn_")  # off in the same run: equals turn_30
+	metrics["m3_radius_monotonic/ok"] = 1.0 if metrics["m3_turn_5/radius"] < metrics["m3_turn_15/radius"] and metrics["m3_turn_15/radius"] < metrics["m3_turn_30/radius"] else 0.0
+	metrics["m3_turn_30/lost_frac"] = metrics["m3_turn_30/lost"] / 30.0
+	for k in ["m3_turn_30", "m3_nodrag_turn_30", "m3_turn_15"]: print("  ", k, " scrub_frac ", metrics[k + "/scrub_frac"])
+	print("  radius monotonic %s, speed lost per 90 at 30 m/s %.0f%%" % [metrics["m3_radius_monotonic/ok"] > 0.5, metrics["m3_turn_30/lost_frac"] * 100.0])
 
 
 ## Settle numbers tried against the stride chain's wobble and a 90 degree turn's catch-up (tuning aid).
@@ -314,7 +343,7 @@ func _scenario(label: String, stick_at: Callable, throttle := true, lock := fals
 ## Full stick to one side with no throttle, from `v` m/s straight ahead, until the
 ## nose has turned 90 degrees: the path's radius, the drift angle (velocity vs
 ## nose) at its worst, and the speed lost over the quarter turn.
-func _turn(v: float) -> void:
+func _turn(v: float, prefix := "turn_") -> void:
 	input.clear()
 	fish.request_reset()
 	await _ticks(5)
@@ -337,13 +366,16 @@ func _turn(v: float) -> void:
 		var vel := fish.linear_velocity
 		if vel.length() > 0.5:
 			max_drift = maxf(max_drift, absf(rad_to_deg(vel.angle_to(-fish.global_basis.z))))
-	var key := "turn_%d" % int(v)
+	var key := "%s%d" % [prefix, int(v)]
 	var radius := path / maxf(turned, 0.01)
 	var lost := (v0 - fish.linear_velocity.length()) * (PI * 0.5 / maxf(turned, 0.01))
 	metrics[key + "/radius"] = radius
 	metrics[key + "/drift"] = max_drift
 	metrics[key + "/lost"] = lost
 	metrics[key + "/turned"] = rad_to_deg(turned)
+	# the coast alone (linear drag over the same time) is not the turn's cost: what is left is the carve
+	var coast := v0 * (1.0 - exp(-fish.linear_drag * fish.gait.coast_drag * fish.drag_scale * t))
+	metrics[key + "/scrub_frac"] = ((v0 - fish.linear_velocity.length()) - coast) / maxf(v0, 0.001) * (PI * 0.5 / maxf(turned, 0.01))
 	print("  %2.0f m/s: turned %3.0f° in %.2fs  radius %5.2f m  drift %4.0f°  speed lost per 90° %5.2f m/s" % [
 			v, rad_to_deg(turned), t, radius, max_drift, lost])
 	input.clear()
