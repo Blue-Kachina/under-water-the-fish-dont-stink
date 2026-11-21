@@ -33,14 +33,24 @@ var _heading := 0.0
 
 
 func _ready() -> void:
-	main = load("res://scenes/main.tscn").instantiate()
-	add_child(main)
-	fish = main.get_node("Fish")
 	for arg in OS.get_cmdline_user_args() + OS.get_cmdline_args():
 		record = record or arg == "--record"
 		if arg.begins_with("--only="):
 			only = arg.trim_prefix("--only=")
 	_run.call_deferred()
+
+
+## A fresh game for each form: what one form's run leaves in the fish (its smoothing, its old body) must not reach the next.
+func _fresh_main() -> void:
+	if main != null:
+		main.queue_free()
+		await get_tree().process_frame
+	main = load("res://scenes/main.tscn").instantiate()
+	add_child(main)
+	fish = main.get_node("Fish")
+	await _frames(5)
+	main.set_environment("Ocean")
+	await _frames(5)
 
 
 func _check(ok: bool, what: String) -> void:
@@ -79,6 +89,23 @@ func _dress(key: String) -> Node:
 	return fish._visual.get_node_or_null(FORMS[key])
 
 
+## Every course starts from the same place, at rest.
+## A fresh game with the form dressed and the fish settled: the node of its body.
+func _start_form(key: String) -> Node:
+	await _fresh_main()
+	await _settle()
+	var node := _dress(key)
+	await _settle()
+	return node
+
+
+func _settle() -> void:
+	fish.global_transform = Transform3D(Basis.IDENTITY, main._environment.spawn_transform().origin + Vector3(0.0, 40.0, 0.0))
+	fish.linear_velocity = Vector3.ZERO
+	fish.angular_velocity = Vector3.ZERO
+	await _frames(20)
+
+
 func _sample(node: Node) -> Dictionary:
 	var row := {}
 	for f in FIELDS:
@@ -96,6 +123,10 @@ func _sample(node: Node) -> Dictionary:
 		for i in [8, 24, 47]:
 			var p: Vector3 = (rig as SpineRig).points[i]
 			row["p%d" % i] = [p.x, p.y, p.z]
+	var tr: Variant = node.get("_adapter")
+	if tr is TrailAdapter:
+		row["tclock"] = (tr as TrailAdapter).clock
+		row["tspeed"] = (tr as TrailAdapter).speed
 	var model: Variant = node.get("model")
 	if model != null and model.get("tail_bend") is float:
 		row["tail_bend"] = model.get("tail_bend")
@@ -125,19 +156,14 @@ func _course(node: Node) -> Array:
 
 
 func _run() -> void:
-	await _frames(5)
-	main.set_environment("Ocean")
-	await _frames(5)
 	var results := {}
 	for key: String in FORMS:
 		if only != "" and key != only:
 			continue
-		var node := _dress(key)
+		var node := await _start_form(key)  # dressed from the same place every time: a form's first frames read the jump from where it was
 		_check(node != null, "%s: dressed (%s)" % [key, FORMS[key]])
 		if node == null:
 			continue
-		fish.global_position = main._environment.spawn_transform().origin + Vector3(0.0, 40.0, 0.0)
-		await _frames(10)
 		results[key] = await _course(node)
 		await _extra(key, node, results)
 	if record:
@@ -151,9 +177,66 @@ func _run() -> void:
 	get_tree().quit(1 if failures else 0)
 
 
-## Hook for the rig-on checks (below).
-func _extra(_key: String, _node: Node, _results: Dictionary) -> void:
-	pass
+## The rig-on checks for one form: off-run rows are in `results[key]`.
+func _extra(key: String, node: Node, results: Dictionary) -> void:
+	if record:
+		return
+	var gait := fish.gait
+	_check(not gait.trail_rig and gait.trail_pose == 0.0, "%s: Gait.trail_rig defaults off, trail_pose 0" % key)
+	_check(node.get("_adapter") == null, "%s: rig off builds no adapter" % key)
+	var off: Array = results[key]
+	gait.trail_rig = true
+	node = await _start_form(key)
+	var on: Array = await _course(node)
+	_check(node.get("_adapter") is TrailAdapter, "%s: rig on builds the adapter" % key)
+	var finite := true
+	for row: Dictionary in on:
+		var flat := {}
+		_flatten(row, "", flat)
+		for k: String in flat:
+			finite = finite and is_finite(flat[k])
+	_check(finite, "%s: rig on, every value finite" % key)
+	# The adapter's speed follows the SwimState: still at the start, near the run's speed at the end of the cruise.
+	var still: float = on[1]["tspeed"]
+	var cruise: float = on[5]["tspeed"]
+	_check(still < 1.0 and cruise > 4.0 and cruise < 12.0, "%s: adapter speed follows the state (%.2f still, %.2f cruising at 8)" % [key, still, cruise])
+	# The wave clock runs faster at speed than still.
+	var slow := fposmod(float(on[1]["tclock"]) - float(on[0]["tclock"]), TAU)
+	var fast := fposmod(float(on[9]["tclock"]) - float(on[8]["tclock"]), TAU)
+	_check(fast > slow * 1.2, "%s: the shared wave clock runs faster at speed (%.2f vs %.2f rad per sample)" % [key, fast, slow])
+	# With trail_pose 0 the adapter's bend leaves the spine's points exactly as the form laid them.
+	if node.get("rig") is SpineRig:
+		var spine := node.get("rig") as SpineRig
+		var before := spine.points.duplicate()
+		(node.get("_adapter") as TrailAdapter).bend(spine, 1.0 / 60.0, 10.0)
+		_check(before == spine.points, "%s: rig on with trail_pose 0 leaves the spine points as the form laid them" % key)
+	if node.get("rig") is SpineRig and key != "lantern_angler":
+		gait.trail_pose = 1.0
+		node = await _start_form(key)
+		var posed: Array = await _course(node)
+		var moved := 0.0
+		var pose_finite := true
+		for i in posed.size():
+			var a: Array = posed[i]["p47"]
+			var b: Array = on[i]["p47"]
+			moved = maxf(moved, (Vector3(a[0], a[1], a[2]) - Vector3(b[0], b[1], b[2])).length())
+			pose_finite = pose_finite and is_finite(a[0]) and is_finite(a[1]) and is_finite(a[2])
+		_check(pose_finite and moved > 0.01, "%s: trail_pose 1 bends the spine (tail point moved up to %.2f m), finite" % [key, moved])
+		var spacing := _spacing_ok(node.get("rig") as SpineRig)
+		_check(spacing, "%s: the bent spine keeps its segment lengths" % key)
+	gait.trail_pose = 0.0
+	gait.trail_rig = false
+	await _frames(3)
+	_check(node.get("_adapter") == null, "%s: switching off drops the adapter" % key)
+
+
+func _spacing_ok(spine: SpineRig) -> bool:
+	var first := spine.points[1].distance_to(spine.points[0])
+	for i in range(2, SpineRig.SPINE_N):
+		var d := spine.points[i].distance_to(spine.points[i - 1])
+		if absf(d - first) > maxf(first * 0.35, 0.02):
+			return false
+	return true
 
 
 func _flatten(v: Variant, prefix: String, out: Dictionary) -> void:

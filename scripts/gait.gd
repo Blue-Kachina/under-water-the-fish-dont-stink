@@ -143,6 +143,13 @@ func is_default() -> bool:
 ## always was. With every layer weight at 0 and rig_legacy_tail at 1 the rig
 ## poses exactly as the old pose does.
 @export var procedural_rig := false
+## Hunter forms and bosses with a spine trail (King, Lamprey, Angel, Gulper, Lantern): read their speed, turn and wave clock
+## from the SwimState through a TrailAdapter instead of each form's own estimate and clock. Off: the forms swim as they
+## always did.
+@export var trail_rig := false
+## Trail rig: how much of the rig's pose (its undulation, turn and acceleration layers, the Rig settings below) bends the
+## form's spine points on top of the path the body trails. 0: none, only the shared speed, turn and clock. Needs trail_rig.
+@export_range(0.0, 2.0, 0.05, "or_greater") var trail_pose := 0.0
 ## Rig: how much of the controller's own tail pose (its swim stroke and stride swing) is kept. 1: all of it (the old
 ## pose). 0: none, the layers move the tail.
 @export_range(0.0, 2.0, 0.05, "or_greater") var rig_legacy_tail := 1.0

@@ -70,6 +70,8 @@ var _pect_phase := 0.0
 var _sway_amp := 0.0
 var _pect_amp := 0.0
 var _speed_t := 0.0
+## Gait.trail_rig: the shared speed and tail clock (TrailAdapter); null (the default) is the form's own.
+var _adapter: TrailAdapter
 var _burst := 0.0
 var _burst_s := 0.0  # _burst eased (it jumps on a snap); the fin channels read this one
 var _snap := 0.0
@@ -223,7 +225,12 @@ func _sense(delta: float, body: Basis) -> void:
 	var local_omega := body.inverse() * omega
 	_turn = lerpf(_turn, clampf(local_omega.y / 1.5, -1.0, 1.0), _rate(delta, 0.15))
 	_roll = lerpf(_roll, clampf(local_omega.z / 2.5, -1.0, 1.0), _rate(delta, 0.15))
-	var speed_t := clampf(vel.length() / maxf(length * 0.5, 1.0), 0.0, 1.0)
+	_adapter = TrailAdapter.sync(_adapter, fish)
+	var along := vel.length()
+	if _adapter != null:  # the SwimState's speed, in place of the body's velocity read here
+		_adapter.update(delta, along)
+		along = fish.swim_state.speed
+	var speed_t := clampf(along / maxf(length * 0.5, 1.0), 0.0, 1.0)
 	_speed_t = lerpf(_speed_t, speed_t, _rate(delta, 0.4))
 
 
@@ -268,7 +275,10 @@ func _gait(delta: float) -> void:
 	# The cruise sway: slow, low, a little bigger at speed, easing in and out.
 	var sway_target := settings_sway * lerpf(0.5, 1.0, _speed_t) * (1.0 - 0.7 * _burst)
 	_sway_amp = lerpf(_sway_amp, sway_target, _rate(delta, 0.5))
-	_tail_phase = fmod(_tail_phase + delta * TAU * lerpf(0.3, 1.1, _speed_t), TAU)
+	if _adapter != null:
+		_tail_phase = _adapter.advance(delta, TAU * lerpf(0.3, 1.1, _speed_t))
+	else:
+		_tail_phase = fmod(_tail_phase + delta * TAU * lerpf(0.3, 1.1, _speed_t), TAU)
 	var sway := sin(_tail_phase) * _sway_amp * (1.0 - _stride_w)
 	var tail := clampf(sway + _snap + _stride_tail, -1.4, 1.4)
 	model.tail_bend = tail

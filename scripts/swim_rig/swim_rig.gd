@@ -70,6 +70,22 @@ func step(dt: float, state: SwimState, gait: Gait) -> void:
 	_apply(gait)
 
 
+## The layers alone, for a body with no FishModel (TrailAdapter): `body_length` m long, its bend spanning all of it (turn curvature x length).
+## Fills `pose`, `wave_phase` and `wave_freq`; nothing is posed.
+func step_bare(dt: float, state: SwimState, gait: Gait, body_length: float) -> void:
+	length = body_length
+	span = maxf(body_length, 0.01)
+	pose.clear()
+	for layer in layers:
+		if layer is RigLegacy:
+			continue
+		if layer.weight(gait) != 0.0:
+			layer.evaluate(self, state, gait, dt, pose)
+		elif dt > 0.0:
+			layer.reset()
+	pose.wave_phase = wave_phase
+
+
 func _engage() -> void:
 	engaged = true
 	model._rig_chain = true

@@ -74,6 +74,8 @@ const WAVE_AMP := 0.04
 @export_range(0.1, 20.0, 0.1, "or_greater") var stroke_full := 6.0
 var _wing_skin: ShaderMaterial
 var _wave_clock := 0.0
+## Gait.trail_rig: the shared speed, turn and wave clock (TrailAdapter); null (the default) is the form's own.
+var _adapter: TrailAdapter
 ## Longest the lash throws a tentacle (x its rest length).
 const LASH_REACH_MAX := 2.4
 var ex: AttackExaggerate
@@ -306,7 +308,12 @@ func _process(delta: float) -> void:
 		omega = spin.get_axis() * (angle if angle < PI else angle - TAU) / delta
 	var turn := Vector2(omega.dot(basis.y), omega.dot(basis.x)).limit_length(8.0)
 	_turn = _turn.lerp(turn, 1.0 - exp(-12.0 * delta))
-	_speed = lerpf(_speed, at.distance_to(_last_at) / delta, 1.0 - exp(-8.0 * delta))
+	_adapter = TrailAdapter.sync(_adapter, fish)
+	if _adapter != null:  # the SwimState's speed, in place of the measured one
+		_adapter.update(delta, _speed)
+		_speed = _adapter.speed
+	else:
+		_speed = lerpf(_speed, at.distance_to(_last_at) / delta, 1.0 - exp(-8.0 * delta))
 	_last_basis = basis
 	_last_at = at
 	speed_frac = clampf(_speed / maxf(fish.max_boost_speed * fish.top_speed_scale * wave_full_speed, 0.1), 0.0, 1.0)
@@ -354,6 +361,8 @@ func _pose(delta: float) -> void:
 	for s in range(1, N):
 		var dir := Basis(Vector3.RIGHT, _lag_pitch[s]) * (Basis(Vector3.UP, _lag_yaw[s]) * Vector3.BACK)
 		rig.points[s] = rig.points[s - 1] + dir * step
+	if _adapter != null:  # the rig layers' pose on the lagged spine, when Gait.trail_pose is above 0
+		_adapter.bend(rig, delta, rig.length * global_basis.x.length())
 	rig._frames()
 	rig.apply()
 	_pose_wings()
@@ -424,7 +433,10 @@ func _dress(delta: float) -> void:
 		crown_open = 1.0  # snap chomp: the crown and lock-on ring flash shut on the strike (no wind-up opened them)
 	lash = maxf(lash - delta / maxf(lash_time, 0.01), 0.0)
 	var swim := lerpf(wave_idle, wave_swim, speed_frac)
-	_wave_clock = fposmod(_wave_clock + delta * lerpf(stroke_idle, stroke_full, speed_frac), TAU)
+	if _adapter != null:
+		_wave_clock = _adapter.advance(delta, lerpf(stroke_idle, stroke_full, speed_frac))
+	else:
+		_wave_clock = fposmod(_wave_clock + delta * lerpf(stroke_idle, stroke_full, speed_frac), TAU)
 	skin.set_shader_parameter("wave_clock", _wave_clock)
 	skin.set_shader_parameter("spine_wave", Vector4(MODEL.H * WAVE_AMP * swim, 0.4, 1.0, 0.45))
 	_wing_skin.set_shader_parameter("wing_beat", beat_clock * TAU)
