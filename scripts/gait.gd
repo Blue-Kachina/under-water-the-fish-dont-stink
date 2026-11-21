@@ -138,18 +138,18 @@ func is_default() -> bool:
 # Only the Hunter class's shark has one so far. Every number is a field here so the
 # GAITS panel tunes it live. A layer with weight 0 adds nothing.
 
-## Shark only: animate the body with the procedural SwimRig (layers that read how
+## Rig-capable classes: animate the body with the procedural SwimRig (layers that read how
 ## the fish is moving) instead of the controller's tail pose. Off: the pose as it
 ## always was. With every layer weight at 0 and rig_legacy_tail at 1 the rig
 ## poses exactly as the old pose does.
-@export var procedural_rig := false
+@export var procedural_rig := true
 ## Hunter forms and bosses with a spine trail (King, Lamprey, Angel, Gulper, Lantern): read their speed, turn and wave clock
 ## from the SwimState through a TrailAdapter instead of each form's own estimate and clock. Off: the forms swim as they
 ## always did.
-@export var trail_rig := false
+@export var trail_rig := true
 ## Trail rig: how much of the rig's pose (its undulation, turn and acceleration layers, the Rig settings below) bends the
 ## form's spine points on top of the path the body trails. 0: none, only the shared speed, turn and clock. Needs trail_rig.
-@export_range(0.0, 2.0, 0.05, "or_greater") var trail_pose := 0.0
+@export_range(0.0, 2.0, 0.05, "or_greater") var trail_pose := 0.3
 ## Rig: how much of the controller's own tail pose (its swim stroke and stride swing) is kept. 1: all of it (the old
 ## pose). 0: none, the layers move the tail.
 @export_range(0.0, 2.0, 0.05, "or_greater") var rig_legacy_tail := 1.0
@@ -307,7 +307,7 @@ func is_default() -> bool:
 ## Rig, Bell and flap layers: the jelly's bell pulse and the fins' flap and reverse flutter (the sea hare's parapodia
 ## beating with strides, every fish's pectorals fluttering when it swims backwards) come from SwimRig layers on the
 ## rig's own clocks instead of the model and the controller. Works with or without procedural_rig. Off: as always.
-@export var rig_bell_flap := false
+@export var rig_bell_flap := true
 ## Rig, Flap (Gait.Visual.FLAP): how far a full stride beats the flaps down (rad on the fin pivots).
 @export_range(0.0, 3.0, 0.01, "or_greater") var rig_flap_beat := 0.9
 ## Rig, Flap: the slow idle wave between strides (rad).
@@ -325,7 +325,7 @@ func is_default() -> bool:
 ## Undulation layer, at rig_school_effort) instead of three tail swings, so a school wags with the wave the fish swims
 ## with. Only for a class whose model has a rig (and not the Horde, which keeps three poses). Applies to schools made
 ## after it changes.
-@export var rig_school_bake := false
+@export var rig_school_bake := true
 ## School bakes: how many poses round the beat.
 @export_range(3, 12, 1) var rig_school_poses := 5
 ## School bakes: the effort the baked wave is swum at (its size).

@@ -21,6 +21,7 @@ var failures := 0
 
 
 func _ready() -> void:
+	GaitSettings.rig_defaults_off = true  # its off-path recordings predate the rig defaults going on
 	for arg in OS.get_cmdline_user_args() + OS.get_cmdline_args():
 		record = record or arg == "--record"
 	_run.call_deferred()

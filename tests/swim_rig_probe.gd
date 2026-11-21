@@ -42,6 +42,7 @@ func shark(gait: Gait) -> FishModel:
 func zero_gait(on := true) -> Gait:
 	var gait := GaitSettings.default_for(fish_class)
 	gait.procedural_rig = on
+	gait.rig_bell_flap = false  # its own probe (rig_rest_probe); on by default, it makes a rig too
 	gait.rig_legacy_tail = 1.0
 	for field: String in layer_fields():
 		gait.set(field, 0.0)
@@ -377,10 +378,10 @@ func _fin_stabilizer() -> void:
 
 func _defaults() -> void:
 	print("the toggle:")
-	var any_on := false
+	var any_on := true
 	for fc: FishCharacter.FishClass in FishCharacter.FishClass.values():
-		any_on = any_on or GaitSettings.default_for(fc).procedural_rig
-	check(not any_on, "procedural_rig is off for every class by default")
+		any_on = any_on and GaitSettings.default_for(fc).procedural_rig
+	check(any_on, "procedural_rig is on by default (core roadmap defaults, 2026-11-21)")
 	var capable := true
 	var others_not := true
 	for fc: FishCharacter.FishClass in FishCharacter.FishClass.values():

@@ -99,9 +99,8 @@ static func shared() -> NatureSettings:
 @export_group("Camera")
 ## Nature's chase camera in the settle style (CameraStyle, the survivor cam's): it turns by its own
 ## smoothed heading instead of straight with the nose, so stride sweeps don't swing the view, and swings
-## round behind the fish once it swims straight. Off: the usual nose-following chase view. Play-test
-## switch: off by default until it has been tried.
-@export var camera_settle := false
+## round behind the fish once it swims straight. Off: the usual nose-following chase view.
+@export var camera_settle := true
 ## How quickly the view swings round behind the fish swimming straight (1/s). Slower than the survivor cam's 3, so a
 ## stride chain's weave (which M1 keeps small) is not followed: the stride-rate wobble is about 1.4 degrees peak to peak.
 @export_range(0.1, 30.0, 0.1, "or_greater") var settle_rate := 1.5

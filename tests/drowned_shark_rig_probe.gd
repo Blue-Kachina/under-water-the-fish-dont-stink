@@ -13,6 +13,7 @@ var failures := 0
 
 
 func _ready() -> void:
+	GaitSettings.rig_defaults_off = true  # its off-path recordings predate the rig defaults going on
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	fish = main.get_node("Fish")

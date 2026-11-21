@@ -32,6 +32,10 @@ func _ready() -> void:
 	panel = main.get_node("DebugPanel")
 	panel.load_mode_preset(main.NATURE_PRESET)
 	fish = main.get_node("Fish")
+	# The recorded swim is the one before the core roadmap: its M1-M3 defaults (nature.cfg) off here.
+	fish.stride_steer_cancel = 0.0
+	fish.stride_timing_shape = 0
+	fish.water_turning = 0
 	fish.controls = input
 	_run.call_deferred()
 

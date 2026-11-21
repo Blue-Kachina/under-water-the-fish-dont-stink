@@ -78,7 +78,7 @@ func _run() -> void:
 
 	print("drawn:")
 	var looks := school.find_children("*", "MultiMeshInstance3D", true, false)
-	check(looks.size() == SchoolLook.POSES.size(), "one baked look per tail pose (%d)" % looks.size())
+	check(looks.size() == SchoolLook.meshes(school.character).size(), "one baked look per tail pose (%d)" % looks.size())
 	check(_shown(looks) == 8 and school.detail_count() == 0, "far from the camera every fish is in the looks (%d), no full models" % _shown(looks))
 	var drawn_size := _drawn_size(looks)
 	check(is_equal_approx(drawn_size, 0.5), "drawn at fish_scale (%.2f)" % drawn_size)

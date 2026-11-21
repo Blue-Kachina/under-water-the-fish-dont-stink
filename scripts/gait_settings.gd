@@ -17,6 +17,10 @@ static var _field_names: Array[String] = []
 ## the plain lateral gait while it's set.
 static var fish_sticks_now := false
 static var _plain: Gait
+## Probes that diff against recordings made before the rig toggles went on by default (core roadmap,
+## 2026-11-21) set this before any gait is built: every class then starts with procedural_rig, trail_rig,
+## rig_bell_flap and rig_school_bake off and trail_pose 0, as it was.
+static var rig_defaults_off := false
 
 ## Whether the classes' gaits apply in Fish Sticks too. Off: every class swims
 ## there with the plain lateral fish gait, as before gaits (the other modes
@@ -102,7 +106,7 @@ static func default_for(fish_class: FishCharacter.FishClass) -> Gait:
 		gait.visual = Gait.Visual.FLUKE
 		gait.stroke_time = 1.4
 	elif fish_class == FishCharacter.FishClass.HUNTER or fish_class == FishCharacter.FishClass.MONSTER:
-		# The shark's procedural rig (SwimRig) is built but off (procedural_rig): when it is switched on the
+		# The shark's procedural rig (SwimRig, on by default: procedural_rig): its
 		# layers run at full weight and the controller's own tail pose gives way to them. The Drowned Shark
 		# (the Hunter form, class MONSTER) wears the same shark model, so it takes the shark's numbers.
 		_rig_defaults(gait, {})
@@ -179,11 +183,17 @@ static func default_for(fish_class: FishCharacter.FishClass) -> Gait:
 			"rig_accel_tail": 0.35, "rig_accel_head": 0.05, "rig_accel_fins": 0.15, "rig_accel_surge": 0.01,
 			"rig_drift_fins": 0.2, "rig_fin_flutter": 0.0, "rig_idle_scull": 0.08, "rig_idle_sway": 0.06, "rig_idle_hz": 0.9,
 		})
+	if rig_defaults_off:
+		gait.procedural_rig = false
+		gait.trail_rig = false
+		gait.trail_pose = 0.0
+		gait.rig_bell_flap = false
+		gait.rig_school_bake = false
 	return gait
 
 
 ## `gait`'s rig set up for a class: every layer at full weight, the controller's own tail pose given up, and the class's
-## own numbers (`own`: Gait field -> value) over the shark's defaults. procedural_rig stays off.
+## own numbers (`own`: Gait field -> value) over the shark's defaults.
 static func _rig_defaults(gait: Gait, own: Dictionary) -> void:
 	gait.rig_legacy_tail = 0.0
 	for layer in ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel", "rig_drift", "rig_fin_stabilizer", "rig_idle"]:
