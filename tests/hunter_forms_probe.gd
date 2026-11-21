@@ -286,7 +286,7 @@ func _registry() -> void:
 	print("registry:")
 	_check(HunterForms.KEYS == EXPECTED, "eleven forms, five whales and six bosses, in card order")
 	for key: String in EXPECTED:
-		_check(HunterForms.has(key) and FileAccess.file_exists("res://scripts/what_stinks/forms/%s.gd" % key), "%s: registered, with its own file" % key)
+		_check(HunterForms.has(key) and FileAccess.file_exists("res://scripts/modes/what_stinks/forms/%s.gd" % key), "%s: registered, with its own file" % key)
 		var sheet := HunterForms.sheet(key)
 		var whole := true
 		for need: String in HunterForm.SHARK:

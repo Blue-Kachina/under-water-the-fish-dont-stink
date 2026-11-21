@@ -5,7 +5,7 @@
 ## Run headless: Godot_console.exe --headless --path . res://tests/octopus_form_probe.tscn
 extends Node
 
-const FORM := preload("res://scripts/what_stinks/forms/ember_octopus.gd")
+const FORM := preload("res://scripts/modes/what_stinks/forms/ember_octopus.gd")
 const SIZES := [0.5, 1.0, 2.0]
 
 var main: Node

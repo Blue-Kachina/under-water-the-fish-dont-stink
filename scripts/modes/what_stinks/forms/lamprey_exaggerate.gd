@@ -13,7 +13,7 @@ extends Node
 ## Not a class_name: the Lamprey form's jaw preloads it.
 
 const SKIN := preload("res://shaders/boss_lamprey.gdshader")
-const KIT := preload("res://scripts/what_stinks/attack_exaggerate.gd")
+const KIT := preload("res://scripts/modes/what_stinks/attack_exaggerate.gd")
 
 ## Per-channel look of the drill (AttackExaggerate channel keys). disc: flare factor. body: length factor (below 1 is drawn in).
 ## spin: a multiplier on the teeth's spin (the rate is (scale - 1) x lamprey_teeth_spin rad/s, so below 1 it winds backwards).

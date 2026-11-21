@@ -7,8 +7,8 @@ extends RefCounted
 ## attacks/drill_attack.gd) the rasp speeds up with the charge and the release is a corkscrew dash that drills through the fish in her path.
 ## This file is the form's own: its sheet, its ready flag and its dress hook (see HunterForms).
 
-const LampreyRig := preload("res://scripts/what_stinks/forms/lamprey_rig.gd")
-const LampreyJaw := preload("res://scripts/what_stinks/forms/lamprey_jaw.gd")
+const LampreyRig := preload("res://scripts/modes/what_stinks/forms/lamprey_rig.gd")
+const LampreyJaw := preload("res://scripts/modes/what_stinks/forms/lamprey_jaw.gd")
 
 
 ## Offered on the match card only once this is true (the form plays end to end: model, swim, bite, camera, hitbox).

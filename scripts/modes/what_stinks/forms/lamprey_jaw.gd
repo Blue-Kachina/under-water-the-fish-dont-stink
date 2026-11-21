@@ -4,7 +4,7 @@ extends HunterJaw
 ## The first pose also seats the drill's exaggeration (lamprey_exaggerate.gd: disc flare, teeth spin-up, body telescope) beside the rig.
 ## Not a class_name: the Lamprey form preloads it.
 
-const Exaggerate := preload("res://scripts/what_stinks/forms/lamprey_exaggerate.gd")
+const Exaggerate := preload("res://scripts/modes/what_stinks/forms/lamprey_exaggerate.gd")
 
 var rig: Node3D  # lamprey_rig.gd
 var _shown_open := -1.0

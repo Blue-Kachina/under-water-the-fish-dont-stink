@@ -6,7 +6,7 @@ extends Node
 ##            teeth grow, the eyes burn hotter: all of it climbing with the charge
 ##   release  the head THRUSTS forward, the teeth balloon for the snap and the jaw slams past shut, eyes flare, then
 ##            everything rings out (damped springs, overshoot) and settles; the landing adds hit-stop and a camera punch
-## Every size comes from AttackExaggerate (scripts/what_stinks/attack_exaggerate.gd); nothing here touches the world's
+## Every size comes from AttackExaggerate (scripts/modes/what_stinks/attack_exaggerate.gd); nothing here touches the world's
 ## clock. The bite's own pose runs first (process_priority), this layers on top and puts everything back exactly at rest.
 ## Nodes it touches: the model (position z / stretch), HunterJaw's upper jaw and lower jaw (the teeth rows are split into one
 ## mesh per tooth so each grows about its own root and stays rooted in the gum), the Eye* meshes (scale + ember glow).

@@ -6,9 +6,9 @@ extends RefCounted
 ## attacks/coil_attack.gd) the body coils tighter with the charge and the release whips a flat arc as wide as the coil was tight.
 ## This file is the form's own: its sheet, its ready flag and its dress hook (see HunterForms).
 
-const KingRig := preload("res://scripts/what_stinks/forms/king_rig.gd")
-const KingJaw := preload("res://scripts/what_stinks/forms/king_jaw.gd")
-const KingExaggerate := preload("res://scripts/what_stinks/forms/king_exaggerate.gd")
+const KingRig := preload("res://scripts/modes/what_stinks/forms/king_rig.gd")
+const KingJaw := preload("res://scripts/modes/what_stinks/forms/king_jaw.gd")
+const KingExaggerate := preload("res://scripts/modes/what_stinks/forms/king_exaggerate.gd")
 
 
 ## Offered on the match card only once this is true (the form plays end to end: model, swim, bite, camera, hitbox).

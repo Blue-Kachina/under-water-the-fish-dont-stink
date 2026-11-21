@@ -60,8 +60,8 @@ enum Phase { COUNTDOWN, LIVE, ROUND_OVER, OVER }
 
 const FISH_SCENE := preload("res://scenes/fish.tscn")
 const BOT_NAMES := ["Guppy", "Minnow", "Tetra", "Danio", "Molly", "Platy", "Rasbora", "Barb", "Loach", "Pleco", "Gourami", "Cory"]
-const BOT_PATH := "res://scripts/what_stinks/what_stinks_bot.gd"
-const HUD_PATH := "res://scripts/what_stinks/what_stinks_hud.gd"
+const BOT_PATH := "res://scripts/modes/what_stinks/what_stinks_bot.gd"
+const HUD_PATH := "res://scripts/modes/what_stinks/what_stinks_hud.gd"
 
 var settings := WhatStinksSettings.shared()
 var size := HunterSize.shared()

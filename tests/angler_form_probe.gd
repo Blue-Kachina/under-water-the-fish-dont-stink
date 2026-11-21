@@ -6,7 +6,7 @@
 ## Run headless: Godot_console.exe --headless --path . res://tests/angler_form_probe.tscn
 extends Node
 
-const FORM := preload("res://scripts/what_stinks/forms/lantern_angler.gd")
+const FORM := preload("res://scripts/modes/what_stinks/forms/lantern_angler.gd")
 const SIZES := [0.5, 1.0, 3.0]
 
 var main: Node
@@ -265,7 +265,7 @@ func _bite(form: Dictionary, rig: Node3D, tag: String) -> void:
 ## The tail spring's maths: an impulse rings and settles inside its cap.
 func _spring_unit() -> void:
 	print("spring:")
-	var rig = load("res://scripts/what_stinks/forms/lantern_rig.gd").new()
+	var rig = load("res://scripts/modes/what_stinks/forms/lantern_rig.gd").new()
 	var w := TAU * float(rig.opt("angler_tail_hz"))
 	var zeta := float(rig.opt("angler_tail_zeta"))
 	var cap := deg_to_rad(float(rig.opt("angler_tail_snap_deg")))

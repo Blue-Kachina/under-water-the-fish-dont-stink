@@ -9,8 +9,8 @@ extends Node3D
 ## The slime was let go: world point, radius (m), how long it hangs (s).
 signal slimed(at: Vector3, radius: float, life: float)
 
-const MODEL := preload("res://scripts/what_stinks/forms/whalefall_model.gd")
-const JAW := preload("res://scripts/what_stinks/forms/whalefall_jaw.gd")
+const MODEL := preload("res://scripts/modes/what_stinks/forms/whalefall_model.gd")
+const JAW := preload("res://scripts/modes/what_stinks/forms/whalefall_jaw.gd")
 const SKIN := preload("res://shaders/boss_hagfish.gdshader")
 const ROPE := 20
 const IDLE := 0

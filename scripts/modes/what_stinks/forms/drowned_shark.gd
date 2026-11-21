@@ -4,7 +4,7 @@ extends RefCounted
 ## Phase B2: the chomp's exaggeration (shark_rig.gd on AttackExaggerate): the head thrusts, the jaw unhinges wider, the teeth
 ## row grows, the eyes flare. This file is the form's own: its sheet, its ready flag and its dress hook (see HunterForms).
 
-const SharkRig := preload("res://scripts/what_stinks/forms/shark_rig.gd")
+const SharkRig := preload("res://scripts/modes/what_stinks/forms/shark_rig.gd")
 
 ## The shark's own tuning of the exaggeration kit (channels: the kit's names; "teeth" and "eye" are the shark's). Peaks are
 ## multiples of rest at hunter_exaggeration 1; the master and the sheet's "exaggeration" scale the departure from 1.

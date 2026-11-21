@@ -6,7 +6,7 @@ extends RefCounted
 ## knot and leave a cloud of slime that scatters fish (see sheet()).
 ## This file is the form's own: its sheet, its ready flag and its dress hook (see HunterForms).
 
-const RIG := preload("res://scripts/what_stinks/forms/whalefall_rig.gd")
+const RIG := preload("res://scripts/modes/what_stinks/forms/whalefall_rig.gd")
 
 
 ## Offered on the match card only once this is true (the form plays end to end: model, swim, bite, camera, hitbox).
