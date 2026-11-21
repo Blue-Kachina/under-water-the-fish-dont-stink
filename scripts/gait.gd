@@ -217,3 +217,19 @@ func is_default() -> bool:
 @export_range(0.5, 120.0, 0.5, "or_greater") var rig_fin_rate := 18.0
 ## Rig, Turn: how far the inside pectoral tucks in and the outside one reaches out in a full turn (rad).
 @export_range(0.0, 1.5, 0.01, "or_greater") var rig_fin_tuck := 0.4
+
+## Rig, Accel layer: its weight (0 off). Speeding up trails the tail down and lifts the nose, folds the pectorals back
+## and surges the body ahead; braking does the opposite (the tail folds up, the pectorals flare as brakes).
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_accel := 0.0
+## Rig, Accel: the acceleration (m/s squared, along the nose or up) that counts as full.
+@export_range(1.0, 200.0, 1.0, "or_greater") var rig_accel_ref := 25.0
+## Rig, Accel: how far the tail trails at full acceleration (rad of pitch at its end, + tip down when speeding up).
+@export_range(0.0, 2.0, 0.01, "or_greater") var rig_accel_tail := 0.5
+## Rig, Accel: how far the head lifts against the trailing tail at full acceleration (rad).
+@export_range(0.0, 1.0, 0.01, "or_greater") var rig_accel_head := 0.2
+## Rig, Accel: how far the pectorals fold back at full acceleration and flare at full braking (rad).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_accel_fins := 0.5
+## Rig, Accel: how far the whole body surges ahead at full acceleration (of its length).
+@export_range(0.0, 0.2, 0.001, "or_greater") var rig_accel_surge := 0.03
+## Rig, Accel: how quickly all of that follows the acceleration (1/s).
+@export_range(0.5, 60.0, 0.5, "or_greater") var rig_accel_rate := 6.0

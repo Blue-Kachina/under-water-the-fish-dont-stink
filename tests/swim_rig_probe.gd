@@ -42,7 +42,7 @@ func zero_gait(on := true) -> Gait:
 
 ## The Gait's layer weights, in layer order (each step adds its own).
 func layer_fields() -> Array[String]:
-	return ["rig_undulation", "rig_tail_drive", "rig_turn"]
+	return ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel"]
 
 
 ## A state at `speed` m/s straight ahead, effort from the throttle.
@@ -86,6 +86,7 @@ func _run() -> void:
 	_undulation()
 	_tail_drive()
 	_turn()
+	_accel()
 	print("swim_rig_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)
 
@@ -256,3 +257,34 @@ func _turn() -> void:
 	slow.spin = Vector3(0.0, 1.5, 0.0)
 	var spot := settle(gait, slow, 1.5)
 	check(absf(spot.rotation.z) < 0.01 and absf(spot.rig.pose.spine_yaw()) < gait.rig_turn_max, "turning on the spot doesn't bank or curl without limit")
+
+
+func _accel() -> void:
+	print("Accel:")
+	var gait := only(["rig_accel"])
+	var cruise := settle(gait, moving(15.0), 1.0)
+	check(absf(cruise.rig.pose.tail_pitch) < 1e-5 and absf(cruise.rig.pose.surge) < 1e-6, "cruising at a steady speed: nothing")
+	var speeding := moving(15.0)
+	speeding.accel = Vector3(0.0, 0.0, -20.0)  # forward is -Z
+	var up_model := settle(gait, speeding, 1.5)
+	var braking := moving(15.0)
+	braking.accel = Vector3(0.0, 0.0, 20.0)
+	var down_model := settle(gait, braking, 1.5)
+	var pu := up_model.rig.pose
+	var pd := down_model.rig.pose
+	check(pu.spine_pitch() + pu.tail_pitch > 0.1 and pd.spine_pitch() + pd.tail_pitch < -0.1,
+			"speeding up trails the tail down, braking folds it up (%.3f / %.3f rad)" % [up_model.tail.rotation.x, down_model.tail.rotation.x])
+	check(pu.head_pitch > 0.05 and pd.head_pitch < -0.05, "the head leads against it (%.3f / %.3f rad)" % [pu.head_pitch, pd.head_pitch])
+	check(pu.fin_sweep.x < -0.1 and pd.fin_sweep.x > 0.1, "the pectorals fold back speeding up and flare braking (%.2f / %.2f)" % [pu.fin_sweep.x, pd.fin_sweep.x])
+	check(pu.surge > 0.0 and pd.surge < 0.0, "the body surges with it (%.3f / %.3f m)" % [pu.surge, pd.surge])
+	var rising := moving(15.0)
+	rising.accel = Vector3(0.0, 20.0, 0.0)
+	check(settle(gait, rising, 1.5).rig.pose.tail_pitch > 0.05, "accelerating upward trails the tail down too")
+	# It eases: a step in acceleration doesn't snap the tail.
+	var step := moving(15.0)
+	var eased := shark(gait)
+	step.gait = gait
+	run(eased, step, 0.5)
+	step.accel = Vector3(0.0, 0.0, -25.0)
+	eased.react(DT, step)
+	check(eased.rig.pose.tail_pitch < 0.05, "a jolt of acceleration is eased in (%.3f rad after one frame)" % eased.rig.pose.tail_pitch)
