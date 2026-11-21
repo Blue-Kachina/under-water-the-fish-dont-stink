@@ -37,7 +37,7 @@ func _run() -> void:
 	for mode: String in [main.FREE_SWIM, main.OBSTACLE_COURSE, main.ONE_V_ONE, main.FREE_PLAY]:
 		main.set_mode(mode)
 		await _frames(3)
-		check(main.current_environment == main.MODE_ENVIRONMENTS[mode], "%s plays in %s" % [mode, main.current_environment])
+		check(main.current_environment == main.mode_environment(mode), "%s plays in %s" % [mode, main.current_environment])
 		check(main.match_1v1 == null, "%s: no match yet" % mode)
 		check((main._match_card != null) == (mode == main.ONE_V_ONE), "%s: match card only in 1v1" % mode)
 		check(fish.visible == (mode != main.ONE_V_ONE), "%s: fish sits out only on the match card" % mode)

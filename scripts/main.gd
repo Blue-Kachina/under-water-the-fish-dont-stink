@@ -58,9 +58,9 @@ const OBSTACLE_COURSE := "Obstacle Course"
 const REPLAYS := "Replays"
 const MARCO_POLO := "Marco Polo"
 const WHAT_STINKS := "What Stinks?"
-const _CORE_MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS, REPLAYS]
+const _CORE_MODES := [FREE_PLAY, FREE_SWIM, UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS, REPLAYS]
 ## Modes played as a match, which wait on a card for Play.
-const _CORE_MATCH_MODES := [ONE_V_ONE, UNNATURAL, TEST_TANK, MARCO_POLO, WHAT_STINKS]
+const _CORE_MATCH_MODES := [UNNATURAL, TEST_TANK, MARCO_POLO, WHAT_STINKS]
 ## Modes played on Nature's tuning.
 const _CORE_NATURE_MODES := [UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS]
 ## Nature's tuning: Extra Swishy strides, no boost.
@@ -68,7 +68,6 @@ const NATURE_PRESET := "res://presets/nature.cfg"
 ## Mode -> the environment it's played in.
 const MODE_ENVIRONMENTS := {
 	FREE_PLAY: "Aquarium Arena",
-	ONE_V_ONE: "Aquarium Arena",
 	FREE_SWIM: "Ocean",
 	UNNATURAL: "Ocean",
 	TEST_TANK: "Ocean",
@@ -87,9 +86,6 @@ const _CORE_TILES := {
 	"Fish Sticks": {"title": "Fish Sticks", "icon": "mode_1v1", "colors": [Color(0.04, 0.17, 0.3), Color(0.35, 0.65, 1.0)],
 		"pitch": "Fish-ball in the aquarium arena: play a 1v1 against a bot, or Free Play with no clock.",
 		"short": "1v1 or Free Play with a ball", "play": ["Solo"]},
-	ONE_V_ONE: {"title": "Fish Sticks: 1v1", "icon": "mode_1v1", "colors": [Color(0.04, 0.17, 0.3), Color(0.35, 0.65, 1.0)],
-		"pitch": "Fish-ball in the aquarium against a bot: five minutes on the clock, overtime on a tie.",
-		"short": "Fish-ball against a bot", "play": ["Solo"]},
 	FREE_PLAY: {"title": "Fish Sticks: Free Play", "icon": "mode_free_play", "colors": [Color(0.05, 0.14, 0.24), Color(0.22, 0.89, 0.84)],
 		"pitch": "The aquarium arena and a ball, no clock: practise touches, aerials and shots.",
 		"short": "The arena and a ball, no clock", "play": ["Solo"]},
@@ -119,8 +115,10 @@ const CONVERTED_DIR := "user://replays/converter-1.2"
 var current_environment := ""
 var current_mode := ""
 var replay: ReplayPlayer
-## The 1v1 being played, if any.
-var match_1v1: Match1v1
+## The 1v1 being played, if any (a registered mode's node).
+var match_1v1: Object:
+	get:
+		return _modes.active if _modes.active_id() == ONE_V_ONE else null
 ## The Nature run being played, if any (a registered mode's node).
 var nature_run: Object:
 	get:
@@ -424,7 +422,7 @@ func set_character(character: FishCharacter.FishClass) -> void:
 		_fish.set_look(character, species)
 	if unnatural_run:
 		unnatural_run.start()  # its loadout comes from the class (Change Character is off there for now)
-	elif not (match_1v1 or _modes.active or marco_polo or what_stinks):
+	elif not (_modes.active or marco_polo or what_stinks):
 		_fish.set_spawn(_environment.spawn_transform())
 	# Otherwise it's worn now, mid-match: 1v1, Nature and Hunt keep nothing of the class (no
 	# restart), and Marco Polo / What Stinks keep it for when this role's body comes off.
@@ -513,9 +511,6 @@ func _nature_camera_style() -> void:
 func reset_play() -> void:
 	if _reset_label().is_empty():
 		return
-	if match_1v1:
-		match_1v1.kickoff()
-		return
 	if _modes.active:
 		_modes.active.reset()
 		return
@@ -543,8 +538,6 @@ func reset_play() -> void:
 func _reset_label() -> String:
 	if current_mode == REPLAYS or _match_card:
 		return ""
-	if match_1v1:
-		return "Restart kickoff"
 	if _modes.active:
 		return ModeRegistry.describe(_modes.active_id()).get("reset_label", "")
 	if marco_polo:
@@ -813,8 +806,6 @@ static func _match_card_text(mode: String) -> String:
 	if not registered.is_empty():
 		return (registered["card_text"] as Callable).call()
 	match mode:
-		ONE_V_ONE:
-			return "1v1 against a bot: %d minutes on the clock, overtime on a tie." % int(Match1v1.MATCH_TIME / 60.0)
 		TEST_TANK:
 			return "Test Tank: Unnatural's shooting range. Immortal dummies wait ahead (a cluster, and lines at 10, 20 and 40 m) and the DPS readout shows each damage source. Set your level, every stat, the dummies and a chasing horde in the tuning panel's UNNATURAL > Test Tank. R resets."
 		UNNATURAL:
@@ -938,13 +929,11 @@ func _sync_terrain_stream() -> void:
 
 ## A match, a Nature run or a Hunt is on.
 func _playing() -> bool:
-	return match_1v1 != null or _modes.active != null or unnatural_run != null or marco_polo != null or what_stinks != null
+	return _modes.active != null or unnatural_run != null or marco_polo != null or what_stinks != null
 
 
 ## The mode of the match being played ("" when none).
 func _playing_mode() -> String:
-	if match_1v1:
-		return ONE_V_ONE
 	if unnatural_run:
 		return TEST_TANK if unnatural_run.test_tank else UNNATURAL
 	if marco_polo:
@@ -1003,15 +992,6 @@ func _start_match() -> void:
 	if current_mode in [UNNATURAL, TEST_TANK]:
 		_start_unnatural(current_mode == TEST_TANK)
 		return
-	match_1v1 = Match1v1.new()
-	match_1v1.name = "Match"
-	match_1v1.setup(_environment as AquariumArena, _fish)
-	match_1v1.goal_replays = UISettings.goal_replays
-	match_1v1.fish_teleported.connect(func(fish: FishController) -> void:
-		if fish == _fish:
-			_camera.snap())
-	_environment.add_child(match_1v1)
-	_hud.set_match(match_1v1)
 
 
 ## Online co-op's host: a Nature run of ours, the world run here (the one
@@ -1254,12 +1234,6 @@ func _end_match() -> void:
 		var ended := _modes.active_id()
 		_modes.end()
 		mode_ended.emit(ended)
-	if match_1v1 == null:
-		return
-	match_1v1.end()
-	match_1v1.queue_free()
-	match_1v1 = null
-	_hud.set_match(null)
 
 
 func _exit_tree() -> void:

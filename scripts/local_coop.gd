@@ -416,7 +416,7 @@ func _copy_tuning(slot: PlayerSlot) -> void:
 	if is_instance_valid(slot.fish):
 		var character := slot.fish.character
 		var species := slot.fish.species
-		Match1v1.copy_tuning(first.fish, slot.fish)
+		FishTuning.copy(first.fish, slot.fish)
 		slot.fish.set_look(character, species)
 	if is_instance_valid(slot.camera):
 		_copy_camera(first.camera, slot.camera)

@@ -1,5 +1,5 @@
 class_name Match1v1
-extends Node
+extends GameMode
 ## A 1v1 in the aquarium: the player (Blue, defending +Z) against a FishBot
 ## (Orange). Runs Rocket League's match flow: everyone lined up on one of RL's
 ## kickoff spots with 33 boost, frozen through a 3-2-1 countdown; after a goal
@@ -19,8 +19,10 @@ extends Node
 ## centre field in the winners' colour with both fish in it, and everyone's free
 ## to swim about, on unlimited boost, until the next match (or Start / R).
 ##
-## Lives under the AquariumArena (setup() before adding it). end() hands the
-## arena and the player's fish back as they were, for Free Play.
+## Lives under the AquariumArena (enter() before adding it). end() hands the
+## arena and the player's fish back as they were, for Free Play. Registered in
+## ModeRegistry; main.gd starts it through the registry. The arena is the
+## environment (Free Play uses it without a match).
 
 ## A kickoff or respawn has moved `fish` (cameras following it can snap).
 signal fish_teleported(fish: FishController)
@@ -55,13 +57,7 @@ const BOT_CHARACTER := FishCharacter.FishClass.SKIRMISHER
 ## RL's kickoff spots for the team defending +Z (x, z in m) and whether the
 ## fish there faces the ball (the diagonals) or straight down the tank. The
 ## other team gets the same spot mirrored through the centre.
-const KICKOFF_SPOTS := [
-	[Vector2(-20.48, 25.60), true],
-	[Vector2(20.48, 25.60), true],
-	[Vector2(-2.56, 38.40), false],
-	[Vector2(2.56, 38.40), false],
-	[Vector2(0.0, 46.08), false],
-]
+const KICKOFF_SPOTS := AquariumArena.KICKOFF_SPOTS
 ## RL's respawn spots after a demo (ours after a battery), for the team defending +Z (mirrored likewise).
 const RESPAWN_SPOTS := [Vector2(-23.04, 46.08), Vector2(-26.88, 46.08), Vector2(23.04, 46.08), Vector2(26.88, 46.08)]
 
@@ -95,6 +91,7 @@ var over_left := 0.0
 var bubble_column: BubbleColumn
 ## Each fish's own boost_unlimited, put back after the celebration's free boost.
 var _saved_unlimited := {}
+var _world: ModeWorld
 ## The team that touched the ball last, -1 since the kickoff.
 var _possession := -1
 var _recorder := GoalRecorder.new()
@@ -112,9 +109,58 @@ var _pending_touches: Array = []
 var _ball_before := [Vector3.ZERO, Vector3.ZERO]
 
 
+## The mode's picker tile, environment and card text (read by main.gd through
+## ModeRegistry). No tuning preset (the player's own tuning) and no settings
+## section: its numbers are the ball's (BallSettings) and the consts above.
+static func descriptor() -> Dictionary:
+	return {
+		"id": "1v1", "title": "Fish Sticks: 1v1", "icon": "mode_1v1",
+		"colors": [Color(0.04, 0.17, 0.3), Color(0.35, 0.65, 1.0)],
+		"pitch": "Fish-ball in the aquarium against a bot: five minutes on the clock, overtime on a tie.",
+		"short": "Fish-ball against a bot", "play": ["Solo"],
+		"environment": "Aquarium Arena", "match": true, "after": "Free Play", "tile_before": "Free Play",
+		"tuning_preset": "",
+		"card_text": Match1v1.card_text, "reset_label": "Restart kickoff",
+		"sfx": [[MatchSounds, &"sfx_hook"], [BatteredSounds, &"sfx_battered"]],
+	}
+
+
+static func card_text() -> String:
+	return "1v1 against a bot: %d minutes on the clock, overtime on a tie." % int(MATCH_TIME / 60.0)
+
+
 func setup(match_arena: AquariumArena, player_fish: FishController) -> void:
 	arena = match_arena
 	player = player_fish
+
+
+func enter(world: ModeWorld) -> void:
+	_world = world
+	setup(world.environment as AquariumArena, world.fish)
+	goal_replays = UISettings.goal_replays
+	fish_teleported.connect(func(fish: FishController) -> void:
+		if fish == world.fish:
+			world.camera.snap())
+
+
+func start() -> void:
+	# Ball cam on the arena's ball, as the player had it.
+	_world.camera.claim(arena.ball, _world.camera.ball_cam)
+	_world.hud.set_mode_hud(OneVOneHud.new(self))
+
+
+func release() -> void:
+	# Back to the environment's own focus (Free Play keeps the ball).
+	if is_instance_valid(arena):
+		_world.camera.claim(arena.ball, _world.camera.ball_cam)
+	else:
+		_world.camera.release()
+	_world.hud.set_mode_hud(null)
+
+
+## R: back to a kickoff (a new match once it's over).
+func reset() -> void:
+	kickoff()
 
 
 ## The fish across from the player (the sound hooks and HUD ask each game the same).
@@ -487,12 +533,7 @@ func _respawn_transform(team: int) -> Transform3D:
 	return Transform3D(Basis.looking_at(Vector3(0.0, 0.0, -signf(at.z)), Vector3.UP), at)
 
 
-## Copies `from`'s tunable settings (everything exported but the character and
-## the hitbox view) onto `to`, so a bot plays by the same physics as the player.
+## Copies `from`'s tunable settings onto `to` (FishTuning.copy; kept for the
+## modes not migrated yet).
 static func copy_tuning(from: FishController, to: FishController) -> void:
-	for property in from.get_property_list():
-		if not (property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE) or not (property.usage & PROPERTY_USAGE_EDITOR):
-			continue
-		if property.name in ["character", "show_hitbox"]:
-			continue
-		to.set(property.name, from.get(property.name))
+	FishTuning.copy(from, to)

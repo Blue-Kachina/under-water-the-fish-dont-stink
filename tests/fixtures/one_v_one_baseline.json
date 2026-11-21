@@ -1,0 +1,1703 @@
+{
+	"events": [
+		{
+			"player": 0,
+			"type": "shot",
+			"victim": -1
+		},
+		{
+			"player": 0,
+			"type": "goal",
+			"victim": -1
+		},
+		{
+			"player": 1,
+			"type": "battery",
+			"victim": 0
+		},
+		{
+			"player": 0,
+			"type": "battery",
+			"victim": 1
+		},
+		{
+			"player": 1,
+			"type": "shot",
+			"victim": -1
+		},
+		{
+			"player": 1,
+			"type": "goal",
+			"victim": -1
+		},
+		{
+			"player": 0,
+			"type": "shot",
+			"victim": -1
+		},
+		{
+			"player": 0,
+			"type": "goal",
+			"victim": -1
+		}
+	],
+	"snaps": [
+		{
+			"at": "free_play",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": false,
+				"locked": false,
+				"swim": 0,
+				"team": -1,
+				"visible": true
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "FREE PLAY",
+				"clock": "--:--",
+				"countdown": "",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: reset    Right stick/IJKL: look around    Y: ball cam    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					""
+				],
+				"scorebug": true,
+				"scores": [
+					0,
+					0
+				],
+				"splash": false,
+				"splash_title": "",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": false
+		},
+		{
+			"at": "card",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": false,
+				"locked": false,
+				"swim": 0,
+				"team": -1,
+				"visible": false
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "FREE PLAY",
+				"clock": "--:--",
+				"countdown": "",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					""
+				],
+				"scorebug": false,
+				"scores": [
+					0,
+					0
+				],
+				"splash": false,
+				"splash_title": "",
+				"teams": []
+			},
+			"match": false
+		},
+		{
+			"at": "countdown",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": true,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 300.0,
+				"events": 0,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "COUNTDOWN",
+				"replay": false,
+				"scores": [
+					0,
+					0
+				],
+				"stats": [
+					[
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0
+					],
+					[
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "1V1",
+				"clock": "5:00",
+				"countdown": "3",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					0,
+					0
+				],
+				"splash": false,
+				"splash_title": "",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "go_live",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": false,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 299.87,
+				"events": 0,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "LIVE",
+				"replay": false,
+				"scores": [
+					0,
+					0
+				],
+				"stats": [
+					[
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0
+					],
+					[
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "1V1",
+				"clock": "5:00",
+				"countdown": "GO!",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					0,
+					0
+				],
+				"splash": false,
+				"splash_title": "",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "live_1s",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": false,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 298.87,
+				"events": 0,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "LIVE",
+				"replay": false,
+				"scores": [
+					0,
+					0
+				],
+				"stats": [
+					[
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0
+					],
+					[
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "1V1",
+				"clock": "4:59",
+				"countdown": "",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					0,
+					0
+				],
+				"splash": false,
+				"splash_title": "",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "player_goal",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": false,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 297.52,
+				"events": 2,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "GOAL",
+				"replay": false,
+				"scores": [
+					1,
+					0
+				],
+				"stats": [
+					[
+						126,
+						1,
+						1,
+						0,
+						0,
+						0,
+						3
+					],
+					[
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "1V1",
+				"clock": "4:58",
+				"countdown": "",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					1,
+					0
+				],
+				"splash": true,
+				"splash_title": "GOAL!",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "replay_starts",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": true,
+				"swim": 0,
+				"team": 0,
+				"visible": false
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 297.52,
+				"events": 2,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "REPLAY",
+				"replay": true,
+				"scores": [
+					1,
+					0
+				],
+				"stats": [
+					[
+						126,
+						1,
+						1,
+						0,
+						0,
+						0,
+						3
+					],
+					[
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "REPLAY",
+				"clock": "4:58",
+				"countdown": "",
+				"course": "",
+				"feed_visible": false,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": false,
+				"lists": [
+					true,
+					true
+				],
+				"overlay": true,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					1,
+					0
+				],
+				"splash": false,
+				"splash_title": "GOAL!",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "replay_hud",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": true,
+				"swim": 0,
+				"team": 0,
+				"visible": false
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 297.52,
+				"events": 2,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "REPLAY",
+				"replay": true,
+				"scores": [
+					1,
+					0
+				],
+				"stats": [
+					[
+						126,
+						1,
+						1,
+						0,
+						0,
+						0,
+						3
+					],
+					[
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "REPLAY",
+				"clock": "4:58",
+				"countdown": "",
+				"course": "",
+				"feed_visible": false,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": false,
+				"lists": [
+					true,
+					true
+				],
+				"overlay": true,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					1,
+					0
+				],
+				"splash": false,
+				"splash_title": "GOAL!",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "replay_ends",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": true,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 297.52,
+				"events": 2,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "COUNTDOWN",
+				"replay": false,
+				"scores": [
+					1,
+					0
+				],
+				"stats": [
+					[
+						126,
+						1,
+						1,
+						0,
+						0,
+						0,
+						3
+					],
+					[
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "1V1",
+				"clock": "4:58",
+				"countdown": "3",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					1,
+					0
+				],
+				"splash": false,
+				"splash_title": "GOAL!",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "battery",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": true,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": false,
+				"swim": 0,
+				"team": 0,
+				"visible": false
+			},
+			"game": {
+				"battered": [
+					true,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 295.14,
+				"events": 3,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "LIVE",
+				"replay": false,
+				"scores": [
+					1,
+					0
+				],
+				"stats": [
+					[
+						126,
+						1,
+						1,
+						0,
+						0,
+						0,
+						3
+					],
+					[
+						15,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "BATTERED!  Respawning...",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "1V1",
+				"clock": "4:56",
+				"countdown": "",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					1,
+					0
+				],
+				"splash": false,
+				"splash_title": "GOAL!",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "respawned",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": false,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 292.12,
+				"events": 3,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "LIVE",
+				"replay": false,
+				"scores": [
+					1,
+					0
+				],
+				"stats": [
+					[
+						126,
+						1,
+						1,
+						0,
+						0,
+						0,
+						3
+					],
+					[
+						15,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "1V1",
+				"clock": "4:53",
+				"countdown": "",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					1,
+					0
+				],
+				"splash": false,
+				"splash_title": "GOAL!",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "player_battery",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": false,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					true
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 289.74,
+				"events": 4,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "LIVE",
+				"replay": false,
+				"scores": [
+					1,
+					0
+				],
+				"stats": [
+					[
+						141,
+						1,
+						1,
+						0,
+						0,
+						1,
+						3
+					],
+					[
+						15,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "BATTERED!",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "1V1",
+				"clock": "4:50",
+				"countdown": "",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					1,
+					0
+				],
+				"splash": false,
+				"splash_title": "GOAL!",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "bot_goal",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": false,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 285.08,
+				"events": 6,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "GOAL",
+				"replay": false,
+				"scores": [
+					1,
+					1
+				],
+				"stats": [
+					[
+						141,
+						1,
+						1,
+						0,
+						0,
+						1,
+						3
+					],
+					[
+						141,
+						1,
+						1,
+						0,
+						0,
+						1,
+						3
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "1V1",
+				"clock": "4:46",
+				"countdown": "",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					1,
+					1
+				],
+				"splash": true,
+				"splash_title": "GOAL!",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "after_goal_kickoff",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": true,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 285.08,
+				"events": 6,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "COUNTDOWN",
+				"replay": false,
+				"scores": [
+					1,
+					1
+				],
+				"stats": [
+					[
+						141,
+						1,
+						1,
+						0,
+						0,
+						1,
+						3
+					],
+					[
+						141,
+						1,
+						1,
+						0,
+						0,
+						1,
+						3
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "1V1",
+				"clock": "4:46",
+				"countdown": "3",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					1,
+					1
+				],
+				"splash": false,
+				"splash_title": "GOAL!",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "overtime_start",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": true,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 0.0,
+				"events": 6,
+				"overtime": true,
+				"overtime_elapsed": 0.0,
+				"phase": "COUNTDOWN",
+				"replay": false,
+				"scores": [
+					1,
+					1
+				],
+				"stats": [
+					[
+						141,
+						1,
+						1,
+						0,
+						0,
+						1,
+						3
+					],
+					[
+						141,
+						1,
+						1,
+						0,
+						0,
+						1,
+						3
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "OVERTIME",
+				"clock": "+0:00",
+				"countdown": "3",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					1,
+					1
+				],
+				"splash": false,
+				"splash_title": "GOAL!",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "overtime_live",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": false,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 0.0,
+				"events": 6,
+				"overtime": true,
+				"overtime_elapsed": 0.5,
+				"phase": "LIVE",
+				"replay": false,
+				"scores": [
+					1,
+					1
+				],
+				"stats": [
+					[
+						141,
+						1,
+						1,
+						0,
+						0,
+						1,
+						3
+					],
+					[
+						141,
+						1,
+						1,
+						0,
+						0,
+						1,
+						3
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "OVERTIME",
+				"clock": "+0:00",
+				"countdown": "GO!",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					1,
+					1
+				],
+				"splash": false,
+				"splash_title": "GOAL!",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "over",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": false,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": true,
+				"clock": 0.0,
+				"events": 8,
+				"overtime": true,
+				"overtime_elapsed": 1.85,
+				"phase": "OVER",
+				"replay": false,
+				"scores": [
+					2,
+					1
+				],
+				"stats": [
+					[
+						267,
+						2,
+						2,
+						0,
+						0,
+						1,
+						6
+					],
+					[
+						141,
+						1,
+						1,
+						0,
+						0,
+						1,
+						3
+					]
+				],
+				"winner": 0
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "MATCH STATS",
+				"caption": "FINAL",
+				"clock": "+0:01",
+				"countdown": "",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					2,
+					1
+				],
+				"splash": true,
+				"splash_title": "BLUE WINS",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "scoreboard_held",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": false,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": true,
+				"clock": 0.0,
+				"events": 8,
+				"overtime": true,
+				"overtime_elapsed": 1.85,
+				"phase": "OVER",
+				"replay": false,
+				"scores": [
+					2,
+					1
+				],
+				"stats": [
+					[
+						267,
+						2,
+						2,
+						0,
+						0,
+						1,
+						6
+					],
+					[
+						141,
+						1,
+						1,
+						0,
+						0,
+						1,
+						3
+					]
+				],
+				"winner": 0
+			},
+			"hud": {
+				"banner": "",
+				"board": true,
+				"board_title": "FINAL STATS",
+				"caption": "FINAL",
+				"clock": "+0:01",
+				"countdown": "",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					2,
+					1
+				],
+				"splash": true,
+				"splash_title": "BLUE WINS",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "new_match",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": true,
+				"locked": true,
+				"swim": 0,
+				"team": 0,
+				"visible": true
+			},
+			"game": {
+				"battered": [
+					false,
+					false
+				],
+				"bot_colored": true,
+				"bot_team": 1,
+				"bubble": false,
+				"clock": 300.0,
+				"events": 8,
+				"overtime": false,
+				"overtime_elapsed": 0.0,
+				"phase": "COUNTDOWN",
+				"replay": false,
+				"scores": [
+					0,
+					0
+				],
+				"stats": [
+					[
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0
+					],
+					[
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0
+					]
+				],
+				"winner": -1
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "FINAL STATS",
+				"caption": "1V1",
+				"clock": "5:00",
+				"countdown": "3",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: restart kickoff    Right stick/IJKL: look around    Y: ball cam    Hold D-pad up/B: scoreboard    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					"Mackerel"
+				],
+				"scorebug": true,
+				"scores": [
+					0,
+					0
+				],
+				"splash": true,
+				"splash_title": "BLUE WINS",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": true
+		},
+		{
+			"at": "left",
+			"camera": {
+				"ball_cam": false,
+				"ball_set": true
+			},
+			"fish": {
+				"battered": false,
+				"boost_enabled": true,
+				"colored": false,
+				"locked": false,
+				"swim": 0,
+				"team": -1,
+				"visible": true
+			},
+			"hud": {
+				"banner": "",
+				"board": false,
+				"board_title": "FINAL STATS",
+				"caption": "FREE PLAY",
+				"clock": "--:--",
+				"countdown": "",
+				"course": "",
+				"feed_visible": true,
+				"hint": "Start/Esc: pause, settings    R: reset    Right stick/IJKL: look around    Y: ball cam    F11: fullscreen",
+				"hint_visible": true,
+				"lists": [
+					false,
+					false
+				],
+				"overlay": false,
+				"players": [
+					"Blue Kachina",
+					""
+				],
+				"scorebug": true,
+				"scores": [
+					0,
+					0
+				],
+				"splash": false,
+				"splash_title": "BLUE WINS",
+				"teams": [
+					"BLUE",
+					"ORANGE"
+				]
+			},
+			"match": false
+		}
+	]
+}
