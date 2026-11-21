@@ -59,6 +59,12 @@ enum Role { PREY, HUNTER }
 enum Phase { COUNTDOWN, LIVE, ROUND_OVER, OVER }
 
 const FISH_SCENE := preload("res://scenes/fish.tscn")
+## Every name the match and its parts push on a fish's modifiers: a prey (or the player leaving) is
+## back to its own swimming once they're all popped (_restore_values).
+const MODS: Array[String] = [HunterSize.MODS, HunterBite.COST_MODS, WhatStinksEcho.SNIFF_MODS, DrillAttack.DASH_MODS,
+		GrappleAttack.TOW_MODS]
+## A spat-out prey's daze on its capabilities (no boost).
+const DAZE_CAPS := "what_stinks.daze"
 const BOT_NAMES := ["Guppy", "Minnow", "Tetra", "Danio", "Molly", "Platy", "Rasbora", "Barb", "Loach", "Pleco", "Gourami", "Cory"]
 const BOT_PATH := "res://scripts/modes/what_stinks/what_stinks_bot.gd"
 const HUD_PATH := "res://scripts/modes/what_stinks/what_stinks_hud.gd"
@@ -127,7 +133,7 @@ var round_places := {}
 
 var _local: FishController
 var _world: ModeWorld
-## Spat-out prey -> {left: seconds of daze left, boost: their boost_enabled before}.
+## Spat-out prey -> {left: seconds of daze left} (their boost is off under DAZE_CAPS meanwhile).
 var _daze := {}
 ## Hunter (a guest's) -> msec of the last bite the host judged for it.
 var _net_bite_at := {}
@@ -224,10 +230,9 @@ func _ready() -> void:
 	_rng.randomize()
 	LureField.reset()
 	center = environment.spawn_transform().origin if environment.has_method("spawn_transform") else Vector3.ZERO
-	_player_base = {"buoyancy": _local.buoyancy, "boost_enabled": _local.boost_enabled, "bow_scale": _local.bow_scale,
-			"speed_scale": _local.speed_scale, "turn_scale": _local.turn_scale, "rl_turn_scale": _local.rl_turn_scale,
-			"drag_scale": _local.drag_scale, "top_speed_scale": _local.top_speed_scale, "boost_scale": _local.boost_scale,
-			"accel_scale": _local.accel_scale, "hitbox_scale": _local.hitbox_scale, "body_scale": _local.body_scale,
+	# The swimming scales aren't kept here: the Hunter's come off its modifiers (MODS). boost_enabled and
+	# rl_surface_mechanics stay values (not capabilities): every prey, bots too, gets the player's own back.
+	_player_base = {"buoyancy": _local.buoyancy, "boost_enabled": _local.boost_enabled,
 			"rl_surface_mechanics": _local.rl_surface_mechanics}
 	if authority:
 		_fill_with_bots()
@@ -291,7 +296,7 @@ func end() -> void:
 	_restore_values(_local)
 	_restore_layers(_local)
 	_local.team = -1
-	_local.controls_locked = false
+	_local.play_state = FishController.PlayState.LIVE
 	_local.freeze = false
 	_local.visible = true
 
@@ -484,7 +489,7 @@ func _begin_round(index: int, starting: Array[FishController], places: Dictionar
 		_restore_layers(fish)
 		fish.visible = true
 		fish.freeze = fish.puppet
-		fish.controls_locked = false
+		fish.play_state = FishController.PlayState.LIVE
 		if not fish.puppet:
 			if bots.has(fish):
 				Match1v1.copy_tuning(_local, fish)  # tuning changes since the last round apply to bots too
@@ -495,7 +500,7 @@ func _begin_round(index: int, starting: Array[FishController], places: Dictionar
 		apply_role(fish, role[fish], school_homes)
 	for fish in starting:
 		if not fish.puppet:
-			fish.controls_locked = true  # held at the start while the prey scatter
+			fish.play_state = FishController.PlayState.HELD  # held at the start while the prey scatter
 	field.set_threats(hunters)
 	refresh_alarm()
 	for hunter in hunters:
@@ -559,7 +564,7 @@ func _become_hunter(fish: FishController) -> void:
 		fish.set_look(form["class"], int(form["species"]), 0)
 	size.apply(fish, form)
 	HunterForms.dress(fish, str(form.get("key", "")))
-	fish.boost_enabled = false
+	fish.boost_enabled = false  # a value, not a capability: a prey gets _player_base's back (the player's own, bots too)
 	fish.team = 1
 	var bite := HunterBite.new()
 	bite.name = "HunterBite"
@@ -613,6 +618,8 @@ func _restore_look(fish: FishController) -> void:
 
 
 func _restore_values(fish: FishController) -> void:
+	for mods in MODS:
+		fish.modifiers.pop(mods)
 	for key: String in _player_base:
 		fish.set(key, _player_base[key])
 	var model: Node = fish.get("_visual")
@@ -658,7 +665,7 @@ func _process(delta: float) -> void:
 func _go_live() -> void:
 	for fish in hunters:
 		if not fish.puppet:
-			fish.controls_locked = false
+			fish.play_state = FishController.PlayState.LIVE
 	_set_phase(Phase.LIVE)
 	time_left = settings.round_time
 
@@ -734,7 +741,7 @@ func _undaze(prey: Variant) -> void:
 	var was: Dictionary = _daze.get(prey, {})
 	_daze.erase(prey)
 	if is_instance_valid(prey) and not was.is_empty():
-		(prey as FishController).boost_enabled = bool(was["boost"])
+		(prey as FishController).capabilities.pop(DAZE_CAPS)
 
 
 func _end_round(hunters_won: bool, reason := "") -> void:
@@ -759,7 +766,7 @@ func _end_round(hunters_won: bool, reason := "") -> void:
 	phase_left = settings.round_over_time
 	for fish in hunters:
 		if not fish.puppet:
-			fish.controls_locked = true
+			fish.play_state = FishController.PlayState.HELD
 	round_over.emit(last_results)
 
 
@@ -1088,9 +1095,9 @@ func _spit(prey: FishController, hunter: FishController, mouth: Vector3) -> void
 		prey.angular_velocity = Vector3.ZERO
 	if settings.spit_daze > 0.0:
 		if not _daze.has(prey):
-			_daze[prey] = {"left": settings.spit_daze, "boost": prey.boost_enabled}
+			_daze[prey] = {"left": settings.spit_daze}
 		_daze[prey]["left"] = settings.spit_daze
-		prey.boost_enabled = false
+		prey.capabilities.push(DAZE_CAPS, {"boost": false})
 		if join != null:
 			join.cooldown[prey] = maxf(float(join.cooldown.get(prey, 0.0)), settings.spit_daze)
 	spat.emit(prey, hunter)
@@ -1103,7 +1110,7 @@ func _spit(prey: FishController, hunter: FishController, mouth: Vector3) -> void
 func _hurl(hunter: FishController) -> void:
 	hurled_out[hunter] = true
 	if not hunter.puppet:
-		hunter.controls_locked = true
+		hunter.play_state = FishController.PlayState.HELD
 	hurled.emit(hunter)
 	for other in hunters:
 		if not hurled_out.has(other):
@@ -1124,7 +1131,7 @@ func _eat(prey: FishController, hunter: FishController) -> void:
 	prey.visible = false
 	if not prey.puppet:
 		prey.freeze = true
-		prey.controls_locked = true
+		prey.play_state = FishController.PlayState.HELD
 	prey.collision_layer = 0
 	prey.collision_mask = 0
 	eaten_fish.emit(prey, hunter)
@@ -1247,14 +1254,14 @@ func apply_net_world(index: int, starting: Array[FishController], eaten_now: Arr
 	if phase_now != Phase.COUNTDOWN:
 		for fish in starting:
 			if not fish.puppet:
-				fish.controls_locked = phase_now != Phase.LIVE
+				fish.play_state = FishController.PlayState.LIVE if phase_now == Phase.LIVE else FishController.PlayState.HELD
 
 
 func apply_net_phase(new_phase: int, phase_left_now: float, time_left_now: float) -> void:
 	if new_phase == Phase.LIVE:
 		for fish in hunters:
 			if not fish.puppet:
-				fish.controls_locked = false
+				fish.play_state = FishController.PlayState.LIVE
 	_set_phase(new_phase)
 	phase_left = phase_left_now
 	time_left = time_left_now
@@ -1292,10 +1299,10 @@ func apply_net_spit(prey: FishController, hunter: FishController, velocity: Vect
 		prey.angular_velocity = Vector3.ZERO
 	if daze > 0.0:
 		if not _daze.has(prey):
-			_daze[prey] = {"left": daze, "boost": prey.boost_enabled}
+			_daze[prey] = {"left": daze}
 		_daze[prey]["left"] = daze
 		if not prey.puppet:
-			prey.boost_enabled = false
+			prey.capabilities.push(DAZE_CAPS, {"boost": false})
 		if join != null:
 			join.cooldown[prey] = maxf(float(join.cooldown.get(prey, 0.0)), daze)
 	var spitter: HunterBite = bites.get(hunter)
@@ -1307,7 +1314,7 @@ func apply_net_spit(prey: FishController, hunter: FishController, velocity: Vect
 func apply_net_hurl(hunter: FishController) -> void:
 	hurled_out[hunter] = true
 	if not hunter.puppet:
-		hunter.controls_locked = true
+		hunter.play_state = FishController.PlayState.HELD
 	hurled.emit(hunter)
 
 
@@ -1335,7 +1342,7 @@ func apply_net_round_over(results: Dictionary, totals_now: Dictionary) -> void:
 	phase_left = settings.round_over_time
 	for fish in hunters:
 		if not fish.puppet:
-			fish.controls_locked = true
+			fish.play_state = FishController.PlayState.HELD
 	round_over.emit(last_results)
 
 

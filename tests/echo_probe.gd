@@ -358,10 +358,10 @@ func _part_one() -> void:
 	# An open bite's cost (x hold_speed_mult) coming and going while sniffing must not leave a drift.
 	hunter.powerslide_held = true
 	_step(0.1)
-	hunter.speed_scale *= 0.8
+	hunter.modifiers.push("probe.slow", {"speed": 0.8})  # as HunterBite's cost does (its own modifier set)
 	hunter.powerslide_held = false
 	_step(0.1)
-	hunter.speed_scale /= 0.8
+	hunter.modifiers.pop("probe.slow")
 	check(absf(hunter.speed_scale - base_speed[0]) < 0.0001, "sniffing across another slowdown leaves no drift (x%.3f)" % (hunter.speed_scale / base_speed[0]))
 	hunter.powerslide_held = true
 	_step(0.1)

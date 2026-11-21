@@ -124,7 +124,7 @@ func on_hold(bite: HunterBite, delta: float) -> void:
 			_budget -= 1.0
 			held.append({"prey": prey, "slot": bite.fish.to_local(_slot_world(bite)), "from": prey.global_position, "age": 0.0})
 			if not prey.puppet:
-				prey.controls_locked = true  # doomed once inside
+				prey.play_state = FishController.PlayState.HELD  # doomed once inside
 				prey.freeze = true
 				prey.linear_velocity = Vector3.ZERO
 			_took(bite, prey.global_position)
@@ -307,6 +307,6 @@ func _release_all(bite: HunterBite) -> void:
 				eaten = (bite.world.get("eaten") as Dictionary).has(prey)
 			if not eaten:
 				prey.freeze = false
-				prey.controls_locked = false
+				prey.play_state = FishController.PlayState.LIVE
 	held.clear()
 	_expire = 0.0

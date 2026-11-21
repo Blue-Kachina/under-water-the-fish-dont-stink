@@ -479,10 +479,10 @@ static func _find_views(fish: FishController) -> void:
 static func _freeze(run, fish: FishController, seconds: float) -> void:
 	if fish.controls_locked:
 		return
-	fish.controls_locked = true
+	fish.play_state = FishController.PlayState.HELD
 	run.get_tree().create_timer(seconds, true, true).timeout.connect(func() -> void:
 		if is_instance_valid(fish) and is_instance_valid(run) and run.is_up(fish):
-			fish.controls_locked = false)
+			fish.play_state = FishController.PlayState.LIVE)
 
 
 ## The victim's model squashed by `amount` (0.3: 30% flatter), springing back.

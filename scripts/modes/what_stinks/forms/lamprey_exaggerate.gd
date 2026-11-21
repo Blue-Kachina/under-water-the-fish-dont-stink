@@ -297,4 +297,4 @@ func _reseat_riders(spine: SpineRig) -> void:
 func _publish(mult: float) -> void:
 	var fish: FishController = rig.get("fish")
 	if fish != null:
-		fish.set_meta("exaggerate_peak", mult)
+		ModeData.set_value(fish, "what_stinks", "exaggerate_peak", mult)

@@ -427,7 +427,7 @@ func end() -> void:
 	_restore_look(_local)
 	_restore_layers(_local)
 	_local.team = -1
-	_local.controls_locked = false
+	_local.play_state = FishController.PlayState.LIVE
 	_local.freeze = false
 	_local.visible = true
 
@@ -649,7 +649,7 @@ func _begin_round(index: int, starting: Array[FishController], places: Dictionar
 		_restore_layers(fish)
 		fish.visible = true
 		fish.freeze = fish.puppet
-		fish.controls_locked = false
+		fish.play_state = FishController.PlayState.LIVE
 		if not fish.puppet:
 			if bots.has(fish):
 				Match1v1.copy_tuning(_local, fish)  # tuning changes since the last round apply to bots too
@@ -663,7 +663,7 @@ func _begin_round(index: int, starting: Array[FishController], places: Dictionar
 		_fake_charges[fish] = settings.fake_charges if not as_seeker else 0
 	for fish in starting:
 		if not fish.puppet:
-			fish.controls_locked = true  # counting to ten, held at the start (neutral buoyancy)
+			fish.play_state = FishController.PlayState.HELD  # counting to ten, held at the start (neutral buoyancy)
 	_set_phase(Phase.COUNTDOWN)
 	phase_left = settings.hide_time
 	time_left = settings.round_time
@@ -772,7 +772,7 @@ func _process(delta: float) -> void:
 func _go_live() -> void:
 	for fish in starting_seekers:
 		if not fish.puppet:
-			fish.controls_locked = false
+			fish.play_state = FishController.PlayState.LIVE
 		if authority and settings.whale_seeker and not bool(whale_pick_of(fish).locked):
 			_finish_pick(fish)  # the pick window is over: the whale on show is the one they get
 		_start_auto_beat(fish)
@@ -813,7 +813,7 @@ func _tick_holds(delta: float) -> void:
 			_hold.erase(fish)
 			if is_instance_valid(fish) and not fish.puppet and not eliminated.has(fish) \
 					and not (phase == Phase.COUNTDOWN and starting_seekers.has(fish)) and not (fish == _local and _parked):
-				fish.controls_locked = false
+				fish.play_state = FishController.PlayState.LIVE
 		else:
 			_hold[fish] = left
 
@@ -1354,7 +1354,7 @@ func _eliminate(hider: FishController) -> void:
 
 ## The eliminated fish floats up belly-up and fades (eliminated_float).
 func _float_up(fish: FishController) -> void:
-	fish.controls_locked = true
+	fish.play_state = FishController.PlayState.HELD
 	fish.collision_layer = 0
 	fish.collision_mask = 0
 	if not fish.puppet:
@@ -1392,7 +1392,7 @@ func _hold_fish(fish: FishController, seconds: float) -> void:
 		return
 	_hold[fish] = maxf(float(_hold.get(fish, 0.0)), seconds)
 	if not fish.puppet:
-		fish.controls_locked = true
+		fish.play_state = FishController.PlayState.HELD
 
 
 # --- Whales (planning_marco_whales.md) --------------------------------------
@@ -1446,6 +1446,8 @@ func _restore_look(fish: FishController) -> void:
 func _whale_values(fish: FishController, whale: bool) -> void:
 	var hitbox := settings.whale_hitbox_scale if whale else 1.0
 	var body := whale_body_scale() if whale else 1.0
+	# hitbox_scale and body_scale stay direct writes (not modifiers): the Titan's grow tween writes
+	# body_scale every frame, and each write rebuilds the hitbox (_apply_size), so only real changes go in.
 	if not is_equal_approx(fish.hitbox_scale, hitbox):
 		fish.hitbox_scale = hitbox
 	if not is_equal_approx(fish.body_scale, body):
@@ -2129,14 +2131,15 @@ func _hold_parked() -> void:
 	if not is_instance_valid(_local) or _local.puppet or is_spectating():
 		return
 	if _parked or (_wheel and _wheel.is_open):
-		_local.controls_locked = true
+		_local.play_state = FishController.PlayState.HELD
 
 
 ## The local hider's controls back, unless it's parked, held or out.
 func _release_controls() -> void:
 	if not is_instance_valid(_local) or _local.puppet or eliminated.has(_local) or _parked:
 		return
-	_local.controls_locked = _hold.has(_local) or (phase == Phase.COUNTDOWN and starting_seekers.has(_local))
+	var held := _hold.has(_local) or (phase == Phase.COUNTDOWN and starting_seekers.has(_local))
+	_local.play_state = FishController.PlayState.HELD if held else FishController.PlayState.LIVE
 
 
 # --- The local player's buttons ---------------------------------------------
@@ -2477,7 +2480,7 @@ func apply_net_state(index: int, roles_now: Dictionary, out: Array[FishControlle
 	time_left = new_time_left
 	_set_phase(new_phase)
 	if eliminated.has(_local):
-		_local.controls_locked = true
+		_local.play_state = FishController.PlayState.HELD
 		_local.visible = false
 		_spectate(_nearest_live_hider(_local.global_position))
 	_announce_local_role()

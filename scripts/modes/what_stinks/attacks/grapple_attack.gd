@@ -77,6 +77,8 @@ const DEFAULTS := {
 }
 ## Seconds a prey's grabbed cue takes to fade after the arm lets go.
 const CUE_FADE_S := 0.4
+## The tow's lift on the fish's modifiers.
+const TOW_MODS := "what_stinks.tow"
 
 ## A probe's overrides (win over the panel).
 var tune: Dictionary = {}
@@ -981,7 +983,7 @@ func _tow(bite: HunterBite, delta: float) -> void:
 	var base := fish.max_boost_speed * fish.top_speed_scale / _raised
 	var lift := clampf(need / maxf(base, 0.001), 1.0, 4.0)
 	if absf(lift - _raised) > 0.01:
-		fish.top_speed_scale = fish.top_speed_scale / _raised * lift
+		fish.modifiers.push(TOW_MODS, {"top_speed": lift})
 		_raised = lift
 
 
@@ -1001,7 +1003,7 @@ func _start_tow(fish: FishController) -> void:
 
 func _end_tow(fish: FishController) -> void:
 	if _raised != 1.0 and fish != null and is_instance_valid(fish):
-		fish.top_speed_scale /= _raised
+		fish.modifiers.pop(TOW_MODS)
 	_raised = 1.0
 	if _thrust_rig != null and is_instance_valid(_thrust_rig) and _thrust_mult != 1.0 and "thrust_scale" in _thrust_rig:
 		_thrust_rig.set("thrust_scale", float(_thrust_rig.get("thrust_scale")) / _thrust_mult)

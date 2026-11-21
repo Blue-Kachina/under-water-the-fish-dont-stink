@@ -325,6 +325,13 @@ const SHRINE_PEARL := 1900000000
 const FREE_CHEST := "free"
 ## The seabed's seed is this plus the stage.
 const SEABED_SEED := 11
+## The run's names on a fish's services (FishController.modifiers / capabilities): its swim speed (Swim
+## Speed stat, twist, chill), its stride power, Bow Grow Bow's bow wave (BowGrowBow.MODS), the mobility
+## skill on the boost button and the rock rule.
+const SPEED_MODS := "unnatural.speed"
+const STRIDE_MODS := "unnatural.stride"
+const SKILL_CAPS := "unnatural.skill"
+const TERRAIN_CAPS := "unnatural.terrain"
 ## Tools only (terrain_shots): the seabed's seed instead of SEABED_SEED's (-1: off).
 static var seabed_seed_override := -1
 ## Per player (P4): rerolls, skips and banishes left ({"rerolls", "skips",
@@ -704,13 +711,12 @@ func end() -> void:
 	for fish in players.duplicate():
 		_leave(fish)
 		if is_instance_valid(fish) and not fish.puppet:
-			fish.controls_locked = false
-			fish.set_model_visible(true)
-			fish.speed_scale = 1.0
-			fish.stride_scale = 1.0
-			fish.bow_scale = 1.0
-			fish.turn_scale = 1.0
-			fish.drag_scale = 1.0
+			fish.play_state = FishController.PlayState.LIVE
+			fish.set_model_visible(true)  # the i-frame flicker's: not a play_state (the fish stays LIVE through it)
+			fish.modifiers.pop(SPEED_MODS)
+			fish.modifiers.pop(STRIDE_MODS)
+			fish.modifiers.pop(BowGrowBow.MODS)
+			fish.modifiers.pop(Traversal.MODS)
 			if fish.battered:
 				fish.revive(fish.global_transform)
 	ocean.boundary_radius = 0.0
@@ -919,11 +925,9 @@ func _join(fish: FishController) -> void:
 	_make_attack(fish)
 	if not fish.puppet and fish.controls == null and not _twists.has(fish):
 		_twists[fish] = Traversal.new(self, fish)
-		fish.set_meta("boost_before", fish.boost_enabled)
-		fish.boost_enabled = false  # the boost button is the fish's mobility skill here
-	if settings.terrain_enabled and not fish.has_meta("surface_before"):
-		fish.set_meta("surface_before", fish.rl_surface_mechanics)
-		fish.rl_surface_mechanics = settings.terrain_stick_to_rock  # rock is scenery to swim round (rule N)
+		fish.capabilities.push(SKILL_CAPS, {"boost": false})  # the boost button is the fish's mobility skill here
+	if settings.terrain_enabled and not fish.capabilities.has(TERRAIN_CAPS):
+		fish.capabilities.push(TERRAIN_CAPS, {"surface": settings.terrain_stick_to_rock})  # rock is scenery to swim round (rule N)
 	stats_of(fish)
 	powerups_of(fish)
 	if not _stride_hooks.has(fish):
@@ -945,13 +949,11 @@ func _leave(fish: FishController) -> void:
 	_attacks.erase(fish)
 	if _twists.has(fish):
 		(_twists[fish] as Traversal).clear()
-		if is_instance_valid(fish) and fish.has_meta("boost_before"):
-			fish.boost_enabled = fish.get_meta("boost_before")
-			fish.remove_meta("boost_before")
+		if is_instance_valid(fish):
+			fish.capabilities.pop(SKILL_CAPS)
 		_twists.erase(fish)
-	if is_instance_valid(fish) and fish.has_meta("surface_before"):
-		fish.rl_surface_mechanics = fish.get_meta("surface_before")
-		fish.remove_meta("surface_before")
+	if is_instance_valid(fish):
+		fish.capabilities.pop(TERRAIN_CAPS)
 	_health.erase(fish)
 	_offers.erase(fish)
 	_offer_kind.erase(fish)
@@ -1014,9 +1016,14 @@ func _reset_player(fish: FishController) -> void:
 		(_twists[fish] as Traversal).reset()
 	_stats[fish] = _fresh_stats()
 	if is_instance_valid(fish) and not fish.puppet:
-		fish.controls_locked = false
+		fish.play_state = FishController.PlayState.LIVE
 		fish.set_model_visible(true)
 	_apply_stats(fish)
+
+
+## Puts `fish`'s swim speed (_swim_scale) on it.
+func _push_speed(fish: FishController) -> void:
+	fish.modifiers.push(SPEED_MODS, {"speed": _swim_scale(fish)})
 
 
 ## `fish`'s swim speed: its Swim Speed stat, times its twist's (frenzy, armour).
@@ -1064,8 +1071,8 @@ func _apply_stats(fish: FishController) -> void:
 		attack.configure(block, loadout.facets_of(Weapons.ATTACK), level)
 		_attack_levels[fish] = level
 	if is_instance_valid(fish) and not fish.puppet:
-		fish.speed_scale = _swim_scale(fish)
-		fish.stride_scale = 1.0 + block.value("stride_power")
+		_push_speed(fish)
+		fish.modifiers.push(STRIDE_MODS, {"stride": 1.0 + block.value("stride_power")})
 	var health: FishHealth = _health.get(fish)
 	if health:
 		health.set_max(max_hp_of(fish))
@@ -1133,7 +1140,7 @@ func _physics_process(delta: float) -> void:
 		var twist: Traversal = _twists.get(fish)
 		if twist:
 			twist.update(delta)
-			fish.speed_scale = _swim_scale(fish)
+			_push_speed(fish)
 		var powerups := powerups_of(fish)
 		powerups.refresh()  # the testing override, live
 		if health.down and not is_over:
@@ -1491,10 +1498,10 @@ func _touch_zombies(fish: FishController) -> void:
 			return
 		if horde.affix_of(i) == Horde.Affix.FROZEN and settings.frozen_time > 0.0:
 			_chill[fish] = settings.frozen_time  # its touch slows (P5)
-			fish.speed_scale = _swim_scale(fish)
+			_push_speed(fish)
 		elif kind.contact_slow and settings.jelly_sting_time > 0.0:
 			_chill[fish] = maxf(_chill.get(fish, 0.0), settings.jelly_sting_time)  # a grave jelly's sting
-			fish.speed_scale = _swim_scale(fish)
+			_push_speed(fish)
 		var away := offset.normalized() if offset.length_squared() > 0.0001 else -nose
 		horde.damage(i, 0.0, "contact", null, away)  # knocked back off the fish
 		if boss == null and horde.enemy_mode(i) == Horde.Lunge.LUNGE:
@@ -1530,7 +1537,7 @@ func _touch_clouds(fish: FishController) -> void:
 		if is_instance_valid(cloud) and cloud.contains(fish.global_position, PLAYER_RADIUS):
 			if cloud.slows:
 				_chill[fish] = maxf(_chill.get(fish, 0.0), 1.2)  # slime: it slows as well as stings
-				fish.speed_scale = _swim_scale(fish)
+				_push_speed(fish)
 			var amount := settings.burst_damage if cloud.damage < 0.0 else cloud.damage
 			hurt(fish, amount * settings.enemy_damage_scale * stage_damage(), -1, cloud.cause)
 			return
@@ -1593,7 +1600,7 @@ func _cause_of(from: int) -> String:
 
 
 func _on_down(fish: FishController) -> void:
-	fish.controls_locked = true
+	fish.play_state = FishController.PlayState.HELD
 	fish.set_model_visible(true)
 	_revive[fish] = 0.0
 	player_down.emit(fish)
@@ -1638,7 +1645,7 @@ func revive(fish: FishController) -> void:
 	health.revive(settings.revive_hp)
 	_revive.erase(fish)
 	if not fish.puppet:
-		fish.controls_locked = false
+		fish.play_state = FishController.PlayState.LIVE
 	player_revived.emit(fish)
 
 

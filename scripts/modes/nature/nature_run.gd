@@ -79,6 +79,8 @@ const RESPAWN_DISTANCE := Vector2(30.0, 50.0)
 const RESPAWN_TIME := 1.5
 ## The target's colour (and its explosion's).
 const TARGET_COLOR := Color(0.55, 0.95, 0.75)
+## The lone target's name on its capabilities (it just cruises: no strokes, no boost).
+const TARGET_CAPS := "nature.target"
 const TARGET_NAMES := ["Wanda", "Gill", "Bubbles", "Finley", "Coral", "Squirt", "Nemo-ish", "Sardine Steve"]
 ## A wandering target further than this from every player (m) is brought back near them.
 const LEASH := 150.0
@@ -158,6 +160,8 @@ var _world: ModeWorld
 ## Each local player's slot, by their fish (attach_player()).
 var _slots := {}
 var _slot_signals_wired := false
+## Each slot camera's ball_cam_toggled hook (attach_player()), to undo in detach_player().
+var _cam_toggled := {}
 
 
 ## The mode's picker tile, environment, tuning and card text (read by main.gd
@@ -230,7 +234,7 @@ func attach_player(slot: PlayerSlot) -> void:
 	var toggled := func(on: bool) -> void:
 		if on:
 			pick_focus(fish)
-	camera.set_meta("coop_toggled", toggled)
+	_cam_toggled[camera] = toggled
 	camera.ball_cam_toggled.connect(toggled)
 	slot.wheel = TargetWheel.new()
 	slot.wheel.name = "TargetWheel" if slot.index == 0 else "TargetWheel%d" % (slot.index + 1)
@@ -249,11 +253,11 @@ func detach_player(slot: PlayerSlot) -> void:
 	if not is_instance_valid(camera):
 		return
 	camera.release()
-	if camera.has_meta("coop_toggled"):
-		var toggled: Callable = camera.get_meta("coop_toggled")
+	if _cam_toggled.has(camera):
+		var toggled: Callable = _cam_toggled[camera]
 		if camera.ball_cam_toggled.is_connected(toggled):
 			camera.ball_cam_toggled.disconnect(toggled)
-		camera.remove_meta("coop_toggled")
+		_cam_toggled.erase(camera)
 	if is_instance_valid(slot.wheel):
 		if camera.wheel_opened.is_connected(slot.wheel.open):
 			camera.wheel_opened.disconnect(slot.wheel.open)
@@ -283,7 +287,7 @@ func _ready() -> void:
 	target.display_name = TARGET_NAMES[rng.randi_range(0, TARGET_NAMES.size() - 1)]
 	add_child(target)
 	FishTuning.copy(player, target)
-	target.swim_strokes = false  # it just cruises
+	target.capabilities.push(TARGET_CAPS, {"strokes": false})  # it just cruises
 	target.team_color = TARGET_COLOR
 	if authority:
 		bot = WanderBot.new()
@@ -994,9 +998,8 @@ func _respawn_target() -> void:
 
 func _place_target(at: Vector3, heading: Vector3) -> void:
 	FishTuning.copy(player, target)  # tuning changes since apply to it too
-	target.swim_strokes = false
+	target.capabilities.push(TARGET_CAPS, {"strokes": false, "boost": false})
 	target.bow_wave = false
-	target.boost_enabled = false
 	target.spawn_boost = 0.0
 	target.display_name = TARGET_NAMES[rng.randi_range(0, TARGET_NAMES.size() - 1)]
 	_target_generation += 1

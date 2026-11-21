@@ -39,6 +39,9 @@ extends RefCounted
 ## still move the fish and show their effects, but there's nothing to hit,
 ## shield or heal.
 
+## The twist's name on the fish's modifiers (Nimble's turn, Glide's and the dashes' drag).
+const MODS := "traversal.twist"
+
 ## Passive twist titles.
 const NAMES := {
 	FishCharacter.FishClass.SKIRMISHER: "Nimble",
@@ -143,8 +146,7 @@ func _init(owner, of: FishController, effects_in: Node = null) -> void:
 ## Gives the fish its own swimming back.
 func clear() -> void:
 	if is_instance_valid(fish):
-		fish.turn_scale = 1.0
-		fish.drag_scale = 1.0
+		fish.modifiers.pop(MODS)
 	reset()
 	if is_instance_valid(spare_punch):
 		spare_punch.queue_free()
@@ -221,10 +223,10 @@ func halo_bonus() -> int:
 
 
 func update(delta: float) -> void:
-	fish.turn_scale = settings.nimble_turn if is_on(FishCharacter.FishClass.SKIRMISHER) else 1.0
 	_surge_left = maxf(_surge_left - delta, 0.0)
 	_brace_left = maxf(_brace_left - delta, 0.0)
-	fish.drag_scale = 0.0 if _surge_left > 0.0 or _recoil_left > 0.0 else (settings.glide_drag if is_on(FishCharacter.FishClass.GLIDER) else 1.0)
+	fish.modifiers.push(MODS, {"turn": settings.nimble_turn if is_on(FishCharacter.FishClass.SKIRMISHER) else 1.0,
+			"drag": 0.0 if _surge_left > 0.0 or _recoil_left > 0.0 else (settings.glide_drag if is_on(FishCharacter.FishClass.GLIDER) else 1.0)})
 	if run and is_on(FishCharacter.FishClass.BREACHER) and settings.escort_regen > 0.0 and fish.speed <= settings.chest_still_speed:
 		var health = run.health_of(fish)
 		if health and not health.down:

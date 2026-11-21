@@ -30,6 +30,8 @@ var _on := false
 
 ## The default lunge scale: the dash was too far (A3 feedback), this is about 55 percent of the travel it had.
 const LUNGE_IMPULSE_DEFAULT := 0.55
+## The dash's lift on the fish's modifiers.
+const DASH_MODS := "what_stinks.drill"
 
 
 func _init() -> void:
@@ -130,12 +132,12 @@ func _start(bite: HunterBite) -> void:
 	speed = base * settings.drill_dash * charge * lunge_impulse(settings)
 	if not fish.puppet:
 		_raised = maxf(speed / maxf(base, 0.001), 1.0)
-		fish.top_speed_scale *= _raised  # the integrator caps a fish at its top speed: lift it for the dash
+		fish.modifiers.push(DASH_MODS, {"top_speed": _raised})  # the integrator caps a fish at its top speed: lift it for the dash
 
 
 func _end(bite: HunterBite) -> void:
 	if _raised != 1.0 and is_instance_valid(bite.fish):
-		bite.fish.top_speed_scale /= _raised
+		bite.fish.modifiers.pop(DASH_MODS)
 	_raised = 1.0
 	if _on and _taken > 0:
 		bite.cooldown += bite.settings.chew_delay  # one chew for the whole run, not one per tick

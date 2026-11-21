@@ -7,13 +7,17 @@ extends Powerup
 ## always out-reaches the bow wave). From bow_low_speed_stacks stacks the bow
 ## wave batters below the battering speed too (Powerups.batter_speed_share()).
 
+## Its name on the fish's modifiers.
+const MODS := "unnatural.bow"
+
+
 func on_stacks_changed() -> void:
-	fish.bow_scale = 1.0 + settings.bow_growth * eff()
+	fish.modifiers.push(MODS, {"bow": 1.0 + settings.bow_growth * eff()})
 
 
 func on_removed() -> void:
 	if is_instance_valid(fish):
-		fish.bow_scale = 1.0
+		fish.modifiers.pop(MODS)
 
 
 ## Two loops and a knot, on top of the fish's head.

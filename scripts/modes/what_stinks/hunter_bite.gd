@@ -39,6 +39,9 @@ signal landed(taken: int)
 
 ## Seconds a puppet's reported charge may run ahead of what the host saw for it (lag).
 const NET_SLACK := 0.3
+## Its names on the fish's services: the held bite's slowdown (modifiers) and the jump it takes (capabilities).
+const COST_MODS := "what_stinks.bite_cost"
+const JUMP_CAPS := "what_stinks.bite"
 
 ## The input that bites: "jump", "boost", "powerslide" or "air_roll".
 @export_enum("jump", "boost", "powerslide", "air_roll") var button := "jump"
@@ -88,7 +91,7 @@ func setup(with_fish: FishController, with_form: Dictionary, with_size: HunterSi
 	attack = HunterAttack.make(str(form.get("attack", "chomp")))
 	bite = ChompKit.Bite.new(UnnaturalSettings.shared())
 	bite.charged.connect(func() -> void: charged.emit())
-	fish.ignore_jump = true
+	fish.capabilities.push(JUMP_CAPS, {"jump": false})
 	ModeData.set_value(fish, "what_stinks", "bite", self)
 	refresh_model()
 	if _fx != null and is_instance_valid(_fx):
@@ -117,7 +120,7 @@ func release_fish() -> void:
 	_open_held = false
 	attack.on_cancel(self)
 	if is_instance_valid(fish) and _owns_fish():
-		fish.ignore_jump = false
+		fish.capabilities.pop(JUMP_CAPS)
 		ModeData.erase(fish, "what_stinks", "bite")
 
 
@@ -378,15 +381,9 @@ func _apply_costs(on: bool) -> void:
 		return
 	if on:
 		_cost = Vector2(maxf(settings.hold_speed_mult, 0.01), maxf(settings.hold_turn_mult, 0.01))
-		fish.speed_scale *= _cost.x
-		fish.top_speed_scale *= _cost.x
-		fish.turn_scale *= _cost.y
-		fish.rl_turn_scale *= _cost.y
+		fish.modifiers.push(COST_MODS, {"speed": _cost.x, "top_speed": _cost.x, "turn": _cost.y, "rl_turn": _cost.y})
 	else:
-		fish.speed_scale /= _cost.x
-		fish.top_speed_scale /= _cost.x
-		fish.turn_scale /= _cost.y
-		fish.rl_turn_scale /= _cost.y
+		fish.modifiers.pop(COST_MODS)
 	_costed = on
 
 

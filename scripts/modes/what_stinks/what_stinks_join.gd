@@ -264,7 +264,7 @@ func _attach(fish: FishController, school: School) -> void:
 	fish.collision_mask = 0
 	fish.freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 	fish.freeze = true
-	fish.controls_locked = true
+	fish.play_state = FishController.PlayState.HELD
 	fish.set_model_visible(false)  # the school fish it stands in for is what shows
 
 
@@ -279,7 +279,7 @@ func _detach(fish: FishController) -> void:
 		fish.collision_layer = int(layers[0])
 		fish.collision_mask = int(layers[1])
 		fish.freeze_mode = saved["mode"]
-		fish.controls_locked = bool(saved["locked"])
+		fish.play_state = FishController.PlayState.HELD if bool(saved["locked"]) else FishController.PlayState.LIVE
 	fish.freeze = fish.puppet
 	fish.set_model_visible(true)
 	var marker: Variant = _markers.get(fish)

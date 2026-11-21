@@ -222,7 +222,7 @@ func end() -> void:
 			arena.ball.remove_player(bot_fish)
 	player.team_color = Color.TRANSPARENT
 	player.team = -1
-	player.controls_locked = false
+	player.play_state = FishController.PlayState.LIVE
 	player.visible = not player.battered  # a goal replay hides it
 	player.freeze = player.battered
 	player.spawn_boost = 100.0
@@ -257,7 +257,7 @@ func kickoff() -> void:
 	for team in 2:
 		var fish := _fish_of(team)
 		fish.spawn_boost = SPAWN_BOOST
-		fish.controls_locked = true
+		fish.play_state = FishController.PlayState.HELD
 		fish.revive(_kickoff_transform(spot[0], spot[1], team))
 	_announce_teleport([player, bot_fish])
 
@@ -269,8 +269,8 @@ func _physics_process(delta: float) -> void:
 			if countdown_left <= 0.0:
 				phase = Phase.LIVE
 				go_time_left = GO_TIME
-				player.controls_locked = false
-				bot_fish.controls_locked = false
+				player.play_state = FishController.PlayState.LIVE
+				bot_fish.play_state = FishController.PlayState.LIVE
 		Phase.LIVE:
 			if overtime:
 				overtime_elapsed += delta
@@ -426,7 +426,7 @@ func _celebrate() -> void:
 		var fish := _fish_of(team)
 		var side := -1.0 if team == 0 else 1.0
 		var at := Vector3(side * 2.5, y, 0.0)
-		fish.controls_locked = false
+		fish.play_state = FishController.PlayState.LIVE
 		_saved_unlimited[fish] = fish.boost_unlimited
 		fish.boost_unlimited = true
 		fish.revive(Transform3D(Basis.looking_at(Vector3(-side, 0.0, 0.0), Vector3.UP), at))
@@ -469,7 +469,7 @@ func _start_replay() -> bool:
 	phase = Phase.REPLAY
 	# The live fish wait out of sight; the next kickoff (revive) brings them back.
 	for fish: FishController in [player, bot_fish]:
-		fish.controls_locked = true
+		fish.play_state = FishController.PlayState.HELD
 		fish.visible = false
 		fish.freeze = true
 	add_child(goal_replay)
