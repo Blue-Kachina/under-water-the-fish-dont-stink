@@ -239,7 +239,7 @@ func attach_player(slot: PlayerSlot) -> void:
 	camera.get_parent().add_child(slot.wheel)
 	camera.wheel_opened.connect(slot.wheel.open)
 	camera.wheel_closed.connect(slot.wheel.close)
-	slot.hud.set_nature(self)
+	slot.hud.set_mode_hud(NatureHud.new(self))
 
 
 func detach_player(slot: PlayerSlot) -> void:
@@ -260,7 +260,7 @@ func detach_player(slot: PlayerSlot) -> void:
 		slot.wheel.queue_free()
 	slot.wheel = null
 	if is_instance_valid(slot.hud):
-		slot.hud.set_nature(null)
+		slot.hud.set_mode_hud(null)
 
 
 ## R: the world's restart (online, the host's is everyone's), or just a guest's own fish back.

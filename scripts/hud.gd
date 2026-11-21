@@ -15,7 +15,7 @@ extends CanvasLayer
 ##
 ## With Extra Swishy swimming, the stroke rhythm meter
 ## (StrideMeter) sits at the bottom centre and the boost gauge hides while boost is off; in Nature
-## (set_nature) the battery count shows at the top, and the scoreboard (held)
+## (NatureHud, a ModeHud) the battery count shows at the top, and the scoreboard (held)
 ## each player's points, battered fish, pearls, best multi and spree, perfect
 ## strides and top speed, with the run's time. In Hunt (HuntHud, a ModeHud given to set_mode_hud) the
 ## scorebug shows both fish's goals (battered fish), the clock and each fish's
@@ -35,16 +35,6 @@ const NAME_PLATE_HEIGHT := 0.9
 ## How long a line stays in the points feed (s), and the most lines it shows.
 const FEED_TIME := 2.5
 const FEED_LINES := 4
-## Nature's multis get hotter each step: Battered, Double Dip, Triple Fry,
-## Fish Supper, Feeding Frenzy, Monster Catch (and sprees, the hottest).
-const NATURE_HEAT := [Color(0.95, 0.95, 0.9), Color(1.0, 0.82, 0.3), Color(1.0, 0.6, 0.2),
-		Color(1.0, 0.38, 0.18), Color(0.95, 0.2, 0.35), Color(0.85, 0.25, 0.95)]
-## Nature's scoreboard columns: BEST MULTI is the longest chain (x3: a Triple
-## Fry), BEST SPREE the most battered fish without slowing.
-const NATURE_HEADINGS := ["POINTS", "BATTERED FISH", "PEARLS", "BEST MULTI", "BEST SPREE", "PERFECT", "TOP KM/H"]
-## Nature's scoreboard panel colour (there are no teams: everyone's on one).
-const NATURE_BOARD_COLOR := Color(0.15, 0.55, 0.62)
-
 @export var fish: FishController
 ## A split-screen player who joined (LocalCoop): the hint shows their own controls.
 var joined_player := false
@@ -77,7 +67,6 @@ var _events: Array[Dictionary] = []
 var _events_time := 0.0
 var replay: ReplayPlayer
 var match_1v1: Match1v1
-var nature_run: NatureRun
 ## The playing mode's HUD (ModeHud), if any: Hunt's so far.
 var mode_hud: ModeHud
 var _stride_meter: StrideMeter
@@ -277,28 +266,6 @@ func set_match(new_match: Match1v1) -> void:
 		_update_hint()
 
 
-## Show a Nature run's battered fish, or null when there's none.
-func set_nature(new_run: NatureRun) -> void:
-	nature_run = new_run
-	_feed_lines.clear()
-	_chain_bar.visible = false
-	_splash.hide_now()
-	if nature_run:
-		nature_run.battered.connect(_on_battered)
-		nature_run.school_fish_battered.connect(func(attacker: FishController, _school: School, _at: Vector3) -> void:
-			_on_battered(attacker, null))
-		nature_run.awarded.connect(_on_nature_award)
-		nature_run.pearl_collected.connect(func(by: FishController) -> void:
-			var own := by == fish or not is_instance_valid(by)
-			_feed_lines.append(["PEARL  +1" if own else "%s:  PEARL  +1" % _name_of(by).to_upper(), Pearl.GLOW, FEED_TIME])
-			while _feed_lines.size() > FEED_LINES:
-				_feed_lines.pop_front())
-	if _course:
-		_course.text = ""
-	if _hint:
-		_update_hint()
-
-
 ## Slots a ModeHud fills (the HudHost surface).
 var scorebug: Node:
 	get:
@@ -309,6 +276,9 @@ var splash: Node:
 var board: Node:
 	get:
 		return _board
+var chain_bar: ChainBar:
+	get:
+		return _chain_bar
 var replay_overlay: Node:
 	get:
 		return _replay_overlay
@@ -324,6 +294,7 @@ func set_mode_hud(new_hud: ModeHud) -> void:
 	if mode_hud:
 		mode_hud.detach()
 	mode_hud = new_hud
+	_chain_bar.visible = false
 	_replay_overlay.stop()
 	_splash.hide_now()
 	_feed_lines.clear()
@@ -346,6 +317,12 @@ func feed_add(text: String, color: Color) -> void:
 
 func feed_clear() -> void:
 	_feed_lines.clear()
+
+
+## The banner under the top row, for `seconds`.
+func show_banner(text: String, seconds := 2.5) -> void:
+	_banner.text = text
+	_banner_time_left = seconds
 
 
 ## The name a fish goes by on the HUD.
@@ -383,33 +360,9 @@ func _on_battered(attacker: FishController, victim: FishController) -> void:
 		_banner.text = "BATTERED!  Respawning..."
 	elif attacker == fish:
 		_banner.text = "BATTERED!"
-		if is_instance_valid(nature_run):
-			_banner.text = "BATTERED!  %s" % _speed_text(nature_run.last_battery_speed_of(fish))
 	else:
 		return
 	_banner_time_left = 2.5
-
-
-## Nature's points: a feed line for each, and the splash for a multi (from a
-## Double Dip up, hotter each step) or a spree milestone.
-func _on_nature_award(event: Dictionary) -> void:
-	var color: Color = NATURE_HEAT[clampi(event.get("chain", 1) - 1, 0, NATURE_HEAT.size() - 1)]
-	var by: Variant = event.get("by")
-	if is_instance_valid(by) and by != fish:
-		# A teammate's: a feed line with their name, the splash is theirs.
-		_feed_lines.append(["%s:  %s  +%d" % [_name_of(by).to_upper(), event.title, event.points], Color(color, 0.85), FEED_TIME])
-		while _feed_lines.size() > FEED_LINES:
-			_feed_lines.pop_front()
-		return
-	match event.type:
-		NatureScore.MULTI:
-			_splash.play("%s!" % event.title, "x%d" % event.chain, "+%d" % event.points, color, 1.2 + 0.15 * event.chain)
-		NatureScore.SPREE:
-			color = NATURE_HEAT[-1]
-			_splash.play("%s!" % event.title, "%d battered fish without slowing" % event.spree, "+%d" % event.points, color, 2.2)
-	_feed_lines.append(["%s  +%d" % [event.title, event.points], color, FEED_TIME])
-	while _feed_lines.size() > FEED_LINES:
-		_feed_lines.pop_front()
 
 
 func _update_hint() -> void:
@@ -419,15 +372,15 @@ func _update_hint() -> void:
 		_hint.text = "P/jump: play    , . / D-pad: 5 s    [ ]: goals    V/boost: camera    T G / D-pad: target    - =: speed    H: hitboxes    Y: ball cam"
 	elif fish_sitting_out:
 		_hint.text = "Start/Esc: pause, settings    F11: fullscreen"
-	elif nature_run and joined_player:
+	elif mode_hud and mode_hud.joined_hint != "" and joined_player:
 		# A split-screen player who joined: their own few controls.
-		_hint.text = "D-pad left/right: change class    D-pad down: species    Hold D-pad up: scoreboard    Hold Back/View: leave"
+		_hint.text = mode_hud.joined_hint
 	else:
 		_hint.text = "Start/Esc: pause, settings    R: %s    Right stick/IJKL: look around    Y: %s cam    %s%sF11: fullscreen" % [
 				"restart kickoff" if match_1v1 else (mode_hud.restart_hint if mode_hud else "reset"),
-				"follow/free" if survivor_cam else ("ring" if arena else (mode_hud.camera_word if mode_hud else ("fish" if nature_run else "ball"))),
-				"Hold D-pad up/B: scoreboard    " if match_1v1 or (mode_hud and mode_hud.has_board) or nature_run else "",
-				"Back/View on another controller: join    " if nature_run else ""]
+				"follow/free" if survivor_cam else ("ring" if arena else (mode_hud.camera_word if mode_hud else "ball")),
+				"Hold D-pad up/B: scoreboard    " if match_1v1 or (mode_hud and mode_hud.has_board) else "",
+				mode_hud.join_hint if mode_hud else ""]
 
 
 func _process(delta: float) -> void:
@@ -485,16 +438,6 @@ func _process(delta: float) -> void:
 			_course.text = "Hoop %d / %d    %.2f s    best %s" % [arena.next_hoop + 1, arena.hoops.size(), arena.course_time, best]
 		else:
 			_course.text = "Swim through the yellow hoop to start    best %s" % best
-	elif is_instance_valid(nature_run):
-		var score := nature_run.score_of(fish)
-		if nature_run.players.size() > 1:
-			# Co-op: the team's counts, then this player's own.
-			_course.text = "Team  %d fish  %d pearls    ·    You  %d fish  %d pts" % [nature_run.battered_fish, nature_run.pearls,
-					nature_run.rules.battered_by(fish), score.points]
-		else:
-			_course.text = "Battered fish  %d    Points  %d    Pearls  %d" % [nature_run.battered_fish, score.points, nature_run.pearls]
-		_chain_bar.show_chain(score.chain_left / maxf(score.settings.multi_window, 0.01), score.chain,
-				NATURE_HEAT[clampi(score.chain - 1, 0, NATURE_HEAT.size() - 1)])
 	elif _mode_hud_live():
 		mode_hud.update_slots(self)
 	elif is_instance_valid(aquarium):
@@ -584,9 +527,6 @@ func _update_board() -> void:
 	if _mode_hud_live() and mode_hud.has_board:
 		mode_hud.update_board(self)
 		return
-	if is_instance_valid(nature_run):
-		_update_nature_board()
-		return
 	_board.headings = BroadcastUI.StatsBoard.HEADINGS
 	var over := is_instance_valid(match_1v1) and match_1v1.phase == Match1v1.Phase.OVER
 	var result_up := over and match_1v1.over_left < Match1v1.OVER_TIME - RESULT_TIME
@@ -614,40 +554,6 @@ func _update_board() -> void:
 			"rows": [{"name": _name_of(fish_of_team), "values": values, "focus": fish_of_team == fish}],
 		})
 	_board.teams = teams
-
-
-## Nature's scoreboard, held up like the others: every player in the run (most
-## points first), the team's battered fish on the plate, and the run's time,
-## pearls and shared batteries underneath. Each player holds their own.
-func _update_nature_board() -> void:
-	var input: PlayerInput = fish.input_source if fish and fish.input_source else PlayerInput.everyone()
-	_board.shown = not is_instance_valid(replay) and input.pressed("show_scoreboard")
-	if not _board.shown:
-		return
-	_board.headings = NATURE_HEADINGS
-	_board.title = "RUN STATS"
-	_board.bars = []
-	var whole := floori(nature_run.elapsed)
-	var footer := "TIME  %d:%02d    ·    PEARLS  %d" % [whole / 60, whole % 60, nature_run.pearls]
-	if nature_run.players.size() > 1:
-		footer += "    ·    SHARED BATTERIES  %d" % nature_run.rules.shared_batteries
-	_board.footer = footer
-	var rows := []
-	for player: FishController in nature_run.players:
-		if not is_instance_valid(player):
-			continue
-		var score := nature_run.score_of(player)
-		rows.append({"name": _name_of(player), "focus": player == fish, "values": [
-			score.points, nature_run.rules.battered_by(player), nature_run.rules.pearls_of(player),
-			"x%d" % score.best_chain if score.best_chain > 0 else "-", score.best_spree, score.perfect,
-			roundi(score.top_speed * 3.6)]})
-	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.values[0] > b.values[0])
-	_board.teams = [{
-		"name": "Team" if rows.size() > 1 else "This run",
-		"score": nature_run.battered_fish,
-		"color": NATURE_BOARD_COLOR,
-		"rows": rows,
-	}]
 
 
 ## A StatsBoard bar: Blue's and Orange's shares of `values`, written at the

@@ -73,7 +73,7 @@ func _run() -> void:
 		spots.append(slot.fish.global_position)
 		check(slot.camera.current and slot.camera.get_viewport() == split.view(slot.index) and slot.camera.fish == slot.fish,
 				"player %d: own camera, current in view %d" % [slot.index + 1, slot.index])
-		check(slot.hud.fish == slot.fish and slot.hud.nature_run == run and is_instance_valid(slot.wheel) and slot.wheel.fish == slot.fish,
+		check(slot.hud.fish == slot.fish and slot.hud.mode_hud is NatureHud and (slot.hud.mode_hud as NatureHud).run == run and is_instance_valid(slot.wheel) and slot.wheel.fish == slot.fish,
 				"player %d: own HUD and school wheel" % [slot.index + 1])
 	check(characters.size() == 4, "everyone's a different fish")
 	var apart := INF

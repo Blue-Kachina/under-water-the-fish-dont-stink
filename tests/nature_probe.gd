@@ -169,7 +169,7 @@ func _snap(label: String) -> void:
 		row["ball_on_target"] = camera.ball == run.target
 		row["players"] = run.players.size()
 		row["schools"] = run.schools.size() > 0
-		row["hud_run"] = main._hud.nature_run == run
+		row["hud_run"] = main._hud.mode_hud is NatureHud and (main._hud.mode_hud as NatureHud).run == run
 	snaps.append(row)
 
 
