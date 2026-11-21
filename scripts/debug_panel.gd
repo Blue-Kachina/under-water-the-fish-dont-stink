@@ -39,7 +39,7 @@ const PREVIEW_DIR := "res://assets/ui/previews"
 
 ## The sections in order: [id, title]. Game, Display and Controls are
 ## UISettings and Controls; the rest are tuning targets.
-const SECTIONS := [["game", "Game"], ["display", "Display"], ["audio", "Audio"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"],
+const SECTIONS := [["game", "Game"], ["display", "Display"], ["audio", "Audio"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"], ["battery", "Battery"],
 		["gaits", "Gaits"], ["ball", "Ball"], ["nature", "Nature"], ["unnatural", "Unnatural"], ["powerups", "Powerups"], ["marco_polo", "Marco Polo"], ["what_stinks", "What Stinks?"], ["hunter_size", "Hunter Size"], ["water_look", "Water Look"]]
 ## Who each tuning section is for ("Used by ...").
 const USED_BY := {
@@ -47,7 +47,8 @@ const USED_BY := {
 	"fish": "your fish, in every mode",
 	"gaits": "each class's strides, in every mode",
 	"ball": "the ball in Fish Sticks",
-	"nature": "Nature, Hunt and Unnatural",
+	"nature": "Nature and Unnatural",
+	"battery": "every mode that batters: Nature, Hunt, Fish Sticks 1v1 and Unnatural",
 	"unnatural": "Unnatural and the Test Tank",
 	"marco_polo": "Marco Polo",
 	"what_stinks": "What Stinks?",
@@ -80,6 +81,12 @@ const GAME_OPTIONS := {
 	"audio/beep_missing": ["Beep for missing sounds", "Making sounds", "A sound the profile doesn't have plays its placeholder beep instead of nothing, to hear where the gaps are.", "making sound profiles"],
 	"audio/reload": ["Reload sounds", "Making sounds", "Reads the sound profile's files again, so a file just saved is heard. Running from the project, files load straight from disk.", "making sound profiles"],
 	"audio/sheet": ["Write recording sheet", "Making sounds", "Writes audio/sound_sheet.csv: every sound, what it's for, how it plays and which profiles have it.", "making sound profiles"],
+}
+## Presets saved before a value moved sections: old key -> new key.
+const LEGACY_KEYS := {
+	"fish/nature_batter_speed": "battery/batter_speed",
+	"nature/hunt_floor": "hunt/floor_enabled",
+	"nature/hunt_floor_depth": "hunt/floor_depth",
 }
 ## The big sections' tabs, across the top: section -> [[title, [@export_group
 ## names]], ...]. A group not listed gets a tab of its own after these.
@@ -202,6 +209,11 @@ var _scroll_held := 0.0
 var _scroll_time := 0.0
 ## Section id -> its tabs, each {"title", "list": VBoxContainer, "groups": [names]}.
 var _tabs := {}
+## The sections shown: SECTIONS with the registered modes' (_build_section_list).
+var _sections: Array = SECTIONS
+## Registered mode section id -> its settings object, and who uses it.
+var _mode_settings := {}
+var _mode_used_by := {}
 ## Section id -> the tab shown.
 var _tab_at := {}
 var _tab_bar: HBoxContainer
@@ -215,10 +227,16 @@ var _capture_age := 0.0
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 7  # over the pause menu and the home screen
-	_targets = {"fish": fish, "gaits": GaitSettings.shared(), "camera": follow_camera, "ball": ball_settings, "nature": NatureSettings.shared(),
+	_build_section_list()
+	# battery and the modes' own sections come first: a preset's old keys for them (LEGACY_KEYS) are applied after their defaults.
+	_targets = {"battery": BatterySettings.shared()}
+	for entry: Array in _sections:
+		if _mode_settings.has(entry[0]):
+			_targets[entry[0]] = _mode_settings[entry[0]]
+	_targets.merge({"fish": fish, "gaits": GaitSettings.shared(), "camera": follow_camera, "ball": ball_settings, "nature": NatureSettings.shared(),
 			"unnatural": UnnaturalSettings.shared(), "powerups": PowerupSettings.shared(), "marco_polo": MarcoPoloSettings.shared(),
 			"what_stinks": WhatStinksSettings.shared(), "hunter_size": HunterSize.shared(),
-			"water_look": WaterLook.shared()}
+			"water_look": WaterLook.shared()})
 	for section: String in _targets:
 		_defaults[section] = _snapshot(_targets[section])
 	_build_ui()
@@ -232,6 +250,28 @@ func _ready() -> void:
 		if _detail_key.ends_with("/" + key):
 			_sync_detail())  # not rebuilt: its control may have focus (a dropdown closing, typing)
 	get_viewport().gui_focus_changed.connect(_on_focus_changed)
+
+
+## SECTIONS plus a section for each registered mode whose descriptor has "settings"
+## (a script with a static shared()), after Nature, titled like the mode and
+## keyed by its lower-cased id.
+func _build_section_list() -> void:
+	_sections = SECTIONS.duplicate()
+	_mode_settings.clear()
+	_mode_used_by.clear()
+	var at := -1
+	for i in _sections.size():
+		if _sections[i][0] == "nature":
+			at = i
+	for d: Dictionary in ModeRegistry.descriptors():
+		var script: GDScript = d.get("settings", null)
+		if script == null:
+			continue
+		var id := String(d["id"]).to_lower()
+		_mode_settings[id] = script.call(&"shared")
+		_mode_used_by[id] = String(d["title"])
+		_sections.insert(at + 1, [id, d["title"]])
+		at += 1
 
 
 func is_open() -> bool:
@@ -366,7 +406,7 @@ func _build_ui() -> void:
 		rail_margin.add_theme_constant_override("margin_" + side, roundi(10.0 * s))
 	rail.add_child(rail_margin)
 	rail_margin.add_child(rail_list)
-	for entry: Array in SECTIONS:
+	for entry: Array in _sections:
 		var button := SectionButton.new()
 		button.setup(entry[0], entry[1], s)
 		button.focus_entered.connect(_show_section.bind(entry[0]))
@@ -419,7 +459,7 @@ func _build_ui() -> void:
 	var lists := VBoxContainer.new()
 	lists.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(lists)
-	for entry: Array in SECTIONS:
+	for entry: Array in _sections:
 		var list := VBoxContainer.new()
 		list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		list.add_theme_constant_override("separation", roundi(6.0 * s))
@@ -1145,7 +1185,7 @@ func _show_section(section: String) -> void:
 		_section_lists[id].visible = id == section
 	for id: String in _section_buttons:
 		(_section_buttons[id] as SectionButton).current = id == section
-	for entry: Array in SECTIONS:
+	for entry: Array in _sections:
 		if entry[0] == section:
 			_title.text = entry[1]
 	_subtitle.text = ""
@@ -1193,11 +1233,11 @@ func _link_rows(section: String) -> void:
 ## The next (+1) or previous (-1) section (LT / RT), at the tab it was left on.
 func _step_section(direction: int) -> void:
 	var at := 0
-	for i in SECTIONS.size():
-		if SECTIONS[i][0] == _section:
+	for i in _sections.size():
+		if _sections[i][0] == _section:
 			at = i
-	for n in SECTIONS.size():
-		var next: String = SECTIONS[posmod(at + direction * (n + 1), SECTIONS.size())][0]
+	for n in _sections.size():
+		var next: String = _sections[posmod(at + direction * (n + 1), _sections.size())][0]
 		if (_section_buttons[next] as Button).visible:
 			_step_section_to(next)
 			return
@@ -1352,7 +1392,7 @@ func _show_detail(key: String) -> void:
 	var section := key.get_slice("/", 0)
 	var group: String = meta.get("group", "")
 	var section_title := ""
-	for entry: Array in SECTIONS:
+	for entry: Array in _sections:
 		if entry[0] == section:
 			section_title = entry[1]
 	_subtitle.text = ("%s · %s" % [section_title, group]).to_upper()
@@ -1377,7 +1417,7 @@ func _show_detail(key: String) -> void:
 		_detail_control.remove_child(child)  # now: _sync_detail mustn't see the last option's
 		child.queue_free()
 	_build_detail_control(key, meta)
-	var used: String = GAME_OPTIONS[key][3] if GAME_OPTIONS.has(key) else USED_BY.get(section, "")
+	var used: String = GAME_OPTIONS[key][3] if GAME_OPTIONS.has(key) else USED_BY.get(section, _mode_used_by.get(section, ""))
 	var default_value: Variant = _default(key)
 	var default_text := ""
 	if meta.get("kind", "") != "action" and default_value != null:
@@ -1792,6 +1832,11 @@ func _apply(section: String, values: Dictionary) -> void:
 	var target: Object = _targets[section]
 	for prop: String in values:
 		var key := "%s/%s" % [section, prop]
+		if LEGACY_KEYS.has(key):  # saved before the value moved sections
+			var moved: PackedStringArray = LEGACY_KEYS[key].split("/")
+			if _targets.has(moved[0]):
+				_apply(moved[0], {moved[1]: values[prop]})
+			continue
 		if not _rows.has(key):
 			continue
 		var value: Variant = values[prop]
