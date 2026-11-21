@@ -29,10 +29,10 @@ D6 file moves done in worktree + committed, git: branch per track, push branches
 | mig-unnatural | 5 | Unnatural + Test Tank as GameModes, kits | track/mig-unnatural | done, merged |
 | mig-stinks | 5 | What Stinks? as a GameMode, ModeNet, ModeData | track/mig-stinks | done, merged |
 | mig-marco | 5 | Marco Polo as a GameMode, CameraClaim | track/mig-marco | done, merged (APIs unified with stinks) |
-| course | 5 | Obstacle Course as a GameMode, core boundary leftovers | track/course | running |
-| net | 5 | coop_session mode-agnostic (ModeNet for all) | track/net | running |
-| services | 5 | modes use modifiers/capabilities/play_state | track/services | running |
-| rig-rest | 5 | ray/mantis, jelly + sea hare layers, school bakes | track/rig-rest | running |
+| course | 5 | Obstacle Course as a GameMode, core boundary leftovers | track/course | done, merged |
+| net | 5 | coop_session mode-agnostic (ModeNet for all) | track/net | done, merged |
+| services | 5 | modes use modifiers/capabilities/play_state | track/services | done, merged |
+| rig-rest | 5 | ray/mantis, jelly + sea hare layers, school bakes | track/rig-rest | done, merged |
 
 ## Track sections
 ### T0a metrics
@@ -347,7 +347,10 @@ Status 2026-11-21: BUILT on `track/rig-rest` (worktree D:/Dev/GameDev/wt/rig-res
 - Play-test asks: Gaits panel, Gliders `procedural_rig` on: bank and wing beat in turns and strides, whip lash, lying on the floor; Brawlers `procedural_rig` on: abdomen flex; any class `rig_bell_flap` on: jelly pulse and sea hare flaps should look as today, reverse flutter on a backing fish; Hunters `rig_school_bake` on then start a Nature round: shark schools wag with the rig's wave.
 
 ## Open items / decisions for the user
-(coordinator collects)
+- one_v_one_probe: from ~11:00 on 2026-11-21 it fails its baseline in EVERY tree, including track/mig-1v1 where it was recorded and course/services trees that passed it earlier the same day: the player makes one ball touch fewer in the opening goal play (stats touches 3 -> 2, score 126 -> 124, overtime_elapsed 1.85 -> 1.87); everything else in the match is identical. Ruled out: code (same commits pass then fail), playground.cfg (fails with none), the controls profile, CPU load. Earlier in the day it was bimodal (failed once cold, then passed). Not re-recorded on purpose: find the environmental input first (candidates: Jolt thread scheduling, something under user:// or the .godot import of the ball/arena).
+- Nature defaults (D2/D3): stride_steer_cancel, Gentle timing curve, camera_settle, water_turning are all built and off; the user picks after play-test.
+- Rig toggles all default off (procedural_rig per class, trail_rig, rig_bell_flap, rig_school_bake): the user decides from shots + play-test.
+- Not built: gill beat (needs a shader input), Unnatural bosses on the rig (no controller: a synthetic SwimState from velocity is a feel change), Titans on the layers (feel change), CourseSkill still names UnnaturalHud.SkillButton (move SkillButton to a kit), freeze/collision/set_model_visible writes in modes (no clean play_state match), WhatStinksNet not on the shared puppet helpers, adapters read 3 CoopSession private fields.
 
 ## Log
 - 2026-11-20: roadmap branch created, phase 0 launching.
@@ -357,6 +360,7 @@ Status 2026-11-21: BUILT on `track/rig-rest` (worktree D:/Dev/GameDev/wt/rig-res
 - 2026-11-21: T2 merged. setting_docs not regenerated for rig_* (do once at end: tools/gen_setting_docs.gd). P5 launched.
 - 2026-11-21 (second coordinator session): merged rig-classes, rig-converge, mig-1v1, mig-unnatural, mig-stinks, mig-marco into roadmap/core (bd1c3e4). Reconciled parallel APIs: one ModeData (union), host_mode/join_mode/solo_mode (guest_mode = join_mode), descriptor settings_key (Marco's settings_id renamed), Marco's setup hook is "role_rows" (Unnatural keeps "setup_rows", What Stinks "setup"), ModeRegistry ordering (after/tile_before) no longer depends on registration order. main.gd has no per-mode start/end code. Boundary violations 213 -> 24. Gates green: all mode baselines (hunt, nature, 1v1, unnatural, what_stinks, marco), ui, mode_setup, modes, coop_local, audio_hooks 1-2, camera, survivor_cam, swim_rig, trail_rig, gait, swishy, swim_state, marco_watch.
 - 2026-11-21: launched course, net, services, rig-rest tracks (worktrees D:/Dev/GameDev/wt/<name>).
+- 2026-11-21: merged net (b97499c), services (d7f0902), course (0482231: boundary violations 0), rig-rest. Online after net+services: coop_net, unnatural_net, marco_polo_net, what_stinks_net all passed (unnatural_net failed its late_check wait twice while workers loaded the machine, passed when quiet). setting_docs regenerated (3413 descriptions, additions only). Debug build builds/windows/FishPlayground.exe 2026-11-21 11:18, headless smoke run clean.
 
 ## HANDOFF (written 2026-11-21, session limit reached)
 Resume as coordinator in a new session. Read this file + planning_core_roadmap.md first.
@@ -387,3 +391,8 @@ Gates green after final merge: nature, hunt, mode_setup, ui, swishy, gait, swim_
 Known: swim_metrics_probe `m4_camera_wobble_settle/cam_yaw` reads 7.9-8.1 vs recorded 7.06 (tol 0.3), identical on track/carve before the Nature merge: noisy per-frame metric, not a regression. modes_probe has a stale section list (lacks battery/hunt). boss_moves_probe Gulper fury suction fails on roadmap/core pre-existing. hunter_forms_probe hit a timeout (not re-run). coop_net_peer (online Nature) not run. Not run: full discard test on Hunt.
 Play-test asks: M1 stride_steer_cancel=1, M2 Gentle curve, Nature camera_settle (with M1), M3 water_turning Speed scaled (Fish > Water carving), rig shots in wt/shots/rig and wt/shots/rollout (toggle Gait.procedural_rig). Decide Nature defaults (D2/D3).
 Later migrations (1v1, Unnatural, Course, Marco, What Stinks) not started: out of scope for phases 0-4.
+
+## FINAL SUMMARY, phase 5 (2026-11-21, second coordinator session)
+Every item of planning_core_roadmap.md is built on roadmap/core except the ones listed under Open items (each with its reason). All 8 game modes with their own logic are registered GameModes (1v1, Nature, Hunt, Unnatural, Test Tank, Obstacle Course, Marco Polo, What Stinks?); Free Play, Free Swim and Replays stay core (no mode logic). mode_boundary_probe: 242 -> 0 violations (core and kits name no mode). CoopSession is mode-agnostic (ModeNet adapters per mode). Modes push modifiers/capabilities/play_state instead of poking fish fields (114 -> 57 direct writes; the rest documented). Rig: 10 classes as parameter sets, TrailAdapter for 5 hunter forms, bell/flap layers, school bakes, all toggles off = byte-identical (rig_rest_probe, trail_rig_probe, gait_probe baselines).
+Gates on the final tree: every mode baseline matches (hunt, nature, unnatural, what_stinks, marco, course) except one_v_one (see Open items); rig_rest, swim_rig, trail_rig, gait, swishy, swim_state, fish_play_state, jelly_pulse, nature_schools, ui, mode_setup, modes, console, camera, survivor_cam, mobility, boss_items, coop_local, unnatural_coop, echo, mode_boundary --strict; online coop/unnatural/marco/what_stinks nets. Known cold-run flakes (first run after --import, pass on re-run): nature pearl count, hunt Fish Fry, what_stinks. Pre-existing failures unchanged: boss_moves Gulper fury suction, flora "kelp only", terrain 2.5 s under load, audio_probe 2, pick_card, pause, hider_looks, two_stage_bite, preview_jitter, roster ("missing Titans, Monsters"), whale_spike 2, whale_sight 1, b6_lamprey 2, grapple 1, whalefall 7 (Whale Fall off).
+Play-test asks: see each track section (course, net, services, rig-rest, mig-*). Headline: every mode end to end (card, play, R, leave); one online session per mode (host + guest, host restart, guest leave, tuning locked); Obstacle Course (survivor cam, skill, R); Gaits panel toggles (procedural_rig for Glider/Brawler/Skirmisher..., rig_bell_flap, rig_school_bake, trail_rig); shots in D:/Dev/GameDev/wt/shots/{rig,rollout,rig-classes,rig-rest}.
