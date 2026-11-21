@@ -233,7 +233,7 @@ func kickoff() -> void:
 	countdown_left = COUNTDOWN_TIME
 	go_time_left = 0.0
 	_battery_left = 0.0
-	Match1v1.copy_tuning(player, opponent)  # tuning changes since the last kickoff apply to it too
+	FishTuning.copy(player, opponent)  # tuning changes since the last kickoff apply to it too
 	var layout: Vector2 = KICKOFF_LAYOUTS.pick_random()
 	for team in 2:
 		var fish := _fish_of(team)

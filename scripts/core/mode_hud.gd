@@ -52,3 +52,8 @@ func update_board(_hud: Node) -> void:
 ## A replay of the mode's own is playing (the HUD hides its live readouts).
 func replay_live() -> bool:
 	return false
+
+
+## The replay whose ghosts the HUD lists in the top corners (null for none).
+func ghost_replay() -> GoalReplay:
+	return null

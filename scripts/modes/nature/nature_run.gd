@@ -282,7 +282,7 @@ func _ready() -> void:
 	target.character = FishCharacter.FishClass.CHARMER
 	target.display_name = TARGET_NAMES[rng.randi_range(0, TARGET_NAMES.size() - 1)]
 	add_child(target)
-	Match1v1.copy_tuning(player, target)
+	FishTuning.copy(player, target)
 	target.swim_strokes = false  # it just cruises
 	target.team_color = TARGET_COLOR
 	if authority:
@@ -993,7 +993,7 @@ func _respawn_target() -> void:
 
 
 func _place_target(at: Vector3, heading: Vector3) -> void:
-	Match1v1.copy_tuning(player, target)  # tuning changes since apply to it too
+	FishTuning.copy(player, target)  # tuning changes since apply to it too
 	target.swim_strokes = false
 	target.bow_wave = false
 	target.boost_enabled = false

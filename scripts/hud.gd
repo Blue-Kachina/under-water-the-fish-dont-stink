@@ -1,7 +1,7 @@
 extends CanvasLayer
 ## The game's HUD, broadcast style (see BroadcastUI): in the Aquarium Arena a
 ## scoreboard at the top, a boost gauge in the bottom right, and a splash when
-## someone scores; in a 1v1 (set_match) also the clock, the kickoff countdown,
+## someone scores; in a 1v1 (OneVOneHud, a ModeHud) also the clock, the kickoff countdown,
 ## battered fish, the goal replay's overlay and the result. While a Rocket League
 ## replay plays (set_replay), the same for the replay and its followed player.
 ## In both kinds of replay, each team's players are listed in the top corners
@@ -66,8 +66,7 @@ var _events_source: ReplayData
 var _events: Array[Dictionary] = []
 var _events_time := 0.0
 var replay: ReplayPlayer
-var match_1v1: Match1v1
-## The playing mode's HUD (ModeHud), if any: Hunt's so far.
+## The playing mode's HUD (ModeHud), if any.
 var mode_hud: ModeHud
 var _stride_meter: StrideMeter
 ## The points feed: each line [text, colour, seconds left], newest last.
@@ -250,22 +249,6 @@ func set_replay(new_replay: ReplayPlayer) -> void:
 	_update_hint()
 
 
-## Show a 1v1's clock, countdown, battered fish and goal replays, or null when there's none.
-func set_match(new_match: Match1v1) -> void:
-	match_1v1 = new_match
-	_replay_overlay.stop()
-	_splash.hide_now()
-	if match_1v1:
-		match_1v1.battered.connect(_on_battered)
-		match_1v1.goal_replay_started.connect(_on_goal_replay_started)
-		match_1v1.goal_replay_ended.connect(_replay_overlay.stop)
-		match_1v1.match_over.connect(_on_match_over)
-	if _countdown:
-		_countdown.text = ""
-	if _hint:
-		_update_hint()
-
-
 ## Slots a ModeHud fills (the HudHost surface).
 var scorebug: Node:
 	get:
@@ -355,16 +338,6 @@ func _update_feed(delta: float) -> void:
 	_feed.text = "[center]%s[/center]" % "\n".join(lines)
 
 
-func _on_battered(attacker: FishController, victim: FishController) -> void:
-	if victim == fish:
-		_banner.text = "BATTERED!  Respawning..."
-	elif attacker == fish:
-		_banner.text = "BATTERED!"
-	else:
-		return
-	_banner_time_left = 2.5
-
-
 func _update_hint() -> void:
 	if _hint == null:
 		return
@@ -377,9 +350,9 @@ func _update_hint() -> void:
 		_hint.text = mode_hud.joined_hint
 	else:
 		_hint.text = "Start/Esc: pause, settings    R: %s    Right stick/IJKL: look around    Y: %s cam    %s%sF11: fullscreen" % [
-				"restart kickoff" if match_1v1 else (mode_hud.restart_hint if mode_hud else "reset"),
+				mode_hud.restart_hint if mode_hud else "reset",
 				"follow/free" if survivor_cam else ("ring" if arena else (mode_hud.camera_word if mode_hud else "ball")),
-				"Hold D-pad up/B: scoreboard    " if match_1v1 or (mode_hud and mode_hud.has_board) else "",
+				"Hold D-pad up/B: scoreboard    " if mode_hud and mode_hud.has_board else "",
 				mode_hud.join_hint if mode_hud else ""]
 
 
@@ -447,12 +420,7 @@ func _process(delta: float) -> void:
 		if aquarium.ball.popped and aquarium.auto_respawn:
 			_course.text = "Next ball in %.1f s" % maxf(aquarium.respawn_time_left, 0.0)
 
-	if is_instance_valid(match_1v1):
-		if match_1v1.phase == Match1v1.Phase.COUNTDOWN:
-			_countdown.text = str(ceili(match_1v1.countdown_left))
-		else:
-			_countdown.text = "GO!" if match_1v1.go_time_left > 0.0 else ""
-	elif _mode_hud_live():
+	if _mode_hud_live():
 		_countdown.text = mode_hud.countdown_text()
 
 	_banner_time_left -= delta
@@ -472,24 +440,9 @@ func _update_scorebug() -> void:
 	_scorebug.team_names = ["BLUE", "ORANGE"]
 	_scorebug.scores = aquarium.scores.duplicate()
 	_scorebug.clock_color = Color.WHITE
-	if is_instance_valid(match_1v1):
-		_scorebug.players = [match_1v1.player.display_name, match_1v1.bot_fish.display_name]
-		if match_1v1.overtime:
-			_scorebug.clock = BroadcastUI.clock_text(match_1v1.overtime_elapsed, true)
-			_scorebug.clock_color = BroadcastUI.GOLD
-		else:
-			_scorebug.clock = BroadcastUI.clock_text(match_1v1.clock_left)
-		match match_1v1.phase:
-			Match1v1.Phase.REPLAY:
-				_scorebug.caption = "REPLAY"
-			Match1v1.Phase.OVER:
-				_scorebug.caption = "FINAL"
-			_:
-				_scorebug.caption = "OVERTIME" if match_1v1.overtime else "1V1"
-	else:
-		_scorebug.players = [fish.display_name, ""]
-		_scorebug.clock = "--:--"
-		_scorebug.caption = "FREE PLAY"
+	_scorebug.players = [fish.display_name, ""]
+	_scorebug.clock = "--:--"
+	_scorebug.caption = "FREE PLAY"
 
 
 ## The player lists: a Rocket League replay's players or a goal replay's
@@ -497,7 +450,7 @@ func _update_scorebug() -> void:
 func _update_player_lists() -> void:
 	var rows: Array = [[], []]
 	_row_of.clear()
-	var goal_replay: GoalReplay = match_1v1.goal_replay if is_instance_valid(match_1v1) else null
+	var goal_replay: GoalReplay = mode_hud.ghost_replay() if _mode_hud_live() else null
 	if is_instance_valid(replay):
 		for car in replay.cars:
 			_add_row(rows, car.player.index, car.team, car.player.name, car.boost_amount, car.visible, car == replay.target)
@@ -516,44 +469,18 @@ func _update_player_lists() -> void:
 		_lists[team].rows.assign(rows[team])
 
 
-## A 1v1's goal replay or a mode's own replay (Hunt's battery) is playing.
+## A mode's own replay (the 1v1's goal, Hunt's battery) is playing.
 func _in_live_replay() -> bool:
-	return (is_instance_valid(match_1v1) and match_1v1.phase == Match1v1.Phase.REPLAY) \
-			or (_mode_hud_live() and mode_hud.replay_live())
+	return _mode_hud_live() and mode_hud.replay_live()
 
 
-## The 1v1's scoreboard, while the button's held (not over a Rocket League replay).
+## The playing mode's scoreboard, while the button's held (not over a Rocket League replay).
 func _update_board() -> void:
 	if _mode_hud_live() and mode_hud.has_board:
 		mode_hud.update_board(self)
 		return
 	_board.headings = BroadcastUI.StatsBoard.HEADINGS
-	var over := is_instance_valid(match_1v1) and match_1v1.phase == Match1v1.Phase.OVER
-	var result_up := over and match_1v1.over_left < Match1v1.OVER_TIME - RESULT_TIME
-	_board.shown = is_instance_valid(match_1v1) and match_1v1.stats.size() == 2 and not is_instance_valid(replay) \
-			and (Input.is_action_pressed("show_scoreboard") or result_up)
-	if not _board.shown:
-		return
-	_board.title = "FINAL STATS" if over else "MATCH STATS"
-	_board.footer = "NEXT MATCH IN %d    ·    START / R: PLAY AGAIN" % ceili(match_1v1.over_left) if over else ""
-	var totals: Dictionary = match_1v1.team_stats
-	_board.bars = [
-		_share_bar("BALL POSSESSION", totals.possession),
-		_share_bar("BOOST USED", totals.boost, false),
-		_share_bar("FIELD DOMINATION", totals.territory),
-	]
-	var teams := []
-	for team in 2:
-		var fish_of_team := match_1v1.player if team == 0 else match_1v1.bot_fish
-		var line: Dictionary = match_1v1.stats[team]
-		var values := MatchStats.COLUMNS.map(func(column: String) -> int: return line[column])
-		teams.append({
-			"name": AquariumArena.TEAM_NAMES[team],
-			"score": aquarium.scores[team] if is_instance_valid(aquarium) else 0,
-			"color": AquariumArena.TEAM_COLORS[team],
-			"rows": [{"name": _name_of(fish_of_team), "values": values, "focus": fish_of_team == fish}],
-		})
-	_board.teams = teams
+	_board.shown = false
 
 
 ## A StatsBoard bar: Blue's and Orange's shares of `values`, written at the
@@ -715,23 +642,6 @@ func _on_goal_scored(team: int) -> void:
 	details.append(_speed_text(credit.get("speed", 0.0)))
 	_splash.play("GOAL!", headline, "    ·    ".join(details), AquariumArena.TEAM_COLORS[team], SPLASH_TIME)
 	_scorebug.flash(team)
-
-
-func _on_goal_replay_started(goal_replay: GoalReplay) -> void:
-	var credit := aquarium.last_goal if is_instance_valid(aquarium) else {}
-	var team: int = credit.get("team", 0)
-	var scorer: Node3D = credit.get("scorer")
-	var assister: Node3D = credit.get("assister")
-	_splash.hide_now()
-	_replay_overlay.start(goal_replay, _name_of(scorer) if is_instance_valid(scorer) else AquariumArena.TEAM_NAMES[team],
-			_name_of(assister) if is_instance_valid(assister) else "", _speed_text(credit.get("speed", 0.0)),
-			AquariumArena.TEAM_COLORS[team])
-
-
-func _on_match_over(winner: int) -> void:
-	var winner_fish := match_1v1.player if winner == 0 else match_1v1.bot_fish
-	_splash.play("%s WINS" % AquariumArena.TEAM_NAMES[winner].to_upper(), _name_of(winner_fish),
-			"Final  %d - %d" % [aquarium.scores[0], aquarium.scores[1]], AquariumArena.TEAM_COLORS[winner], RESULT_TIME)
 
 
 func _name_of(node: Node3D) -> String:

@@ -13,6 +13,15 @@ extends Node3D
 ## last_goal says who scored it.
 signal goal_scored(team: int)
 
+## RL's kickoff spots (x, z in m, whether the fish there faces the ball) for the
+## team defending +Z; the 1v1 mirrors them for the other team.
+const KICKOFF_SPOTS := [
+	[Vector2(-20.48, 25.60), true],
+	[Vector2(20.48, 25.60), true],
+	[Vector2(-2.56, 38.40), false],
+	[Vector2(2.56, 38.40), false],
+	[Vector2(0.0, 46.08), false],
+]
 const SIZE := Vector3(81.92, 20.48, 102.4)  # floor at y = 0, centred on x/z
 ## The vertical corners are cut at 45 degrees: the tank is inside |x| + |z| <= CORNER_PLANE.
 const CORNER_PLANE := 80.64
@@ -551,7 +560,7 @@ func _field_material() -> ShaderMaterial:
 	material.set_shader_parameter("goal_area", GOAL_AREA)
 	material.set_shader_parameter("penalty_area", PENALTY_AREA)
 	var kickoff := PackedVector2Array()
-	for spot: Array in Match1v1.KICKOFF_SPOTS:
+	for spot: Array in KICKOFF_SPOTS:
 		kickoff.append(spot[0])
 	material.set_shader_parameter("kickoff_spots", kickoff)
 	return material
