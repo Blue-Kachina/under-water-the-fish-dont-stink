@@ -103,7 +103,11 @@ func _on_node_added(node: Node) -> void:
 		_attach.call_deferred(node, BallSounds.new())
 	elif node is AquariumArena:
 		_attach.call_deferred(node, ArenaSounds.new())
-	elif node is Match1v1 or node is HuntMatch:
+	elif node is GameMode:
+		# A registered mode lists its own hooks: [[script, meta key], ...].
+		for entry: Array in ((node.get_script() as GDScript).call(&"descriptor") as Dictionary).get("sfx", []):
+			_attach.call_deferred(node, (entry[0] as GDScript).new(), entry[1])
+	elif node is Match1v1:
 		_attach.call_deferred(node, MatchSounds.new(), &"sfx_hook")
 		_attach.call_deferred(node, BatteredSounds.new(), &"sfx_battered")
 	elif node is NatureRun:

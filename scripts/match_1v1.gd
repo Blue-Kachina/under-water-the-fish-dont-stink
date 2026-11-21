@@ -117,6 +117,21 @@ func setup(match_arena: AquariumArena, player_fish: FishController) -> void:
 	player = player_fish
 
 
+## The fish across from the player (the sound hooks and HUD ask each game the same).
+func opponent_fish() -> FishController:
+	return bot_fish
+
+
+## The two signals that start and end a replay, by name.
+func replay_signal_names() -> Array[StringName]:
+	return [&"goal_replay_started", &"goal_replay_ended"]
+
+
+## A battery's speed (m/s); a 1v1 has none of its own, so `fallback`.
+func battery_speed(fallback: float) -> float:
+	return fallback
+
+
 func _ready() -> void:
 	arena.auto_respawn = false
 	arena.scores = [0, 0]

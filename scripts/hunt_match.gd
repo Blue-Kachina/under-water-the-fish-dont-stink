@@ -119,6 +119,7 @@ static func descriptor() -> Dictionary:
 		"environment": "Ocean", "match": true, "after": "Nature", "tile_before": "Nature",
 		"tuning_preset": "res://presets/nature.cfg",
 		"card_text": HuntMatch.card_text, "reset_label": "Restart match",
+		"sfx": [[MatchSounds, &"sfx_hook"], [BatteredSounds, &"sfx_battered"], [HuntSounds, &"sfx_hunt"]],
 	}
 
 
@@ -129,6 +130,21 @@ static func card_text() -> String:
 func setup(hunt_ocean: Ocean, player_fish: FishController) -> void:
 	ocean = hunt_ocean
 	player = player_fish
+
+
+## The fish across from the player (the sound hooks ask each game the same).
+func opponent_fish() -> FishController:
+	return opponent
+
+
+## The two signals that start and end a replay, by name.
+func replay_signal_names() -> Array[StringName]:
+	return [&"battery_replay_started", &"battery_replay_ended"]
+
+
+## The last battery's speed (m/s), `fallback` before there is one.
+func battery_speed(fallback: float) -> float:
+	return float(last_battery.get("speed", fallback))
 
 
 func enter(world: ModeWorld) -> void:

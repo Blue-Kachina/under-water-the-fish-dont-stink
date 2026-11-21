@@ -2,7 +2,8 @@ class_name MatchSounds
 extends Node
 ## A 1v1's or a Hunt's sounds (planning_audio.md §3.4): the 3-2-1 and GO, the
 ## last ten seconds, the buzzer, overtime, replays and the result. SfxHooks
-## adds one to every Match1v1 and HuntMatch. The goal horn is the arena's
+## adds one to every Match1v1 and to each game mode that lists it in its descriptor's
+## "sfx". The goal horn is the arena's
 ## (ArenaSounds), so Free Play's goals get it too. Read off the match's state
 ## each tick (the two share their phases' order, and their clock).
 
@@ -18,8 +19,9 @@ var _clock := 0.0
 func _ready() -> void:
 	game = get_parent()
 	process_physics_priority = 100  # after the match has ticked
-	var started := &"battery_replay_started" if game is HuntMatch else &"goal_replay_started"
-	var ended := &"battery_replay_ended" if game is HuntMatch else &"goal_replay_ended"
+	var names: Array = game.replay_signal_names()
+	var started: StringName = names[0]
+	var ended: StringName = names[1]
 	game.connect(started, func(_replay: GoalReplay) -> void: Sfx.play("match/goal_replay_in"))
 	game.connect(ended, func() -> void: Sfx.play("match/goal_replay_out"))
 	game.match_over.connect(_on_match_over)
