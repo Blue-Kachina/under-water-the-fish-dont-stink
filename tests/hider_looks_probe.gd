@@ -68,7 +68,7 @@ func _drawn(fish: FishController) -> Array[GeometryInstance3D]:
 func _reveal_parts(fish: FishController, shown_only: bool) -> int:
 	var count := 0
 	for node: Node in fish.find_children("*", "GeometryInstance3D", true, false):
-		if node.has_meta("marco_reveal") and not node.is_queued_for_deletion():
+		if node.has_meta(FishModel.OVERLAY_META) and not node.is_queued_for_deletion():
 			if not shown_only or (node as GeometryInstance3D).is_visible_in_tree():
 				count += 1
 	return count
@@ -104,7 +104,7 @@ func _probe() -> void:
 	var reveal := looks.reveal_of(hider)
 	check(reveal != null and reveal.layers.x > 0.0 and reveal.layers.y == 0.0, "bones growing, no vessels yet (%s)" % [reveal.layers if reveal else null])
 	check(_reveal_parts(hider, true) > 0, "reveal parts drawn (%d)" % _reveal_parts(hider, true))
-	check(not _drawn(hider).any(func(p: GeometryInstance3D) -> bool: return not p.has_meta("marco_reveal")), "the real model stays hidden")
+	check(not _drawn(hider).any(func(p: GeometryInstance3D) -> bool: return not p.has_meta(FishModel.OVERLAY_META)), "the real model stays hidden")
 	print("exposure 0.75 (skin):")
 	stub.exposures[hider] = 0.75
 	await _frames(2)
@@ -146,7 +146,7 @@ func _probe() -> void:
 	await get_tree().create_timer(0.35).timeout
 	var own := looks.reveal_of(hider)
 	check(own != null and own.self_look, "their own fish is a self look")
-	check(not _drawn(hider).any(func(p: GeometryInstance3D) -> bool: return not p.has_meta("marco_reveal")), "drawn as the seekers see it (nothing real at exposure 0)")
+	check(not _drawn(hider).any(func(p: GeometryInstance3D) -> bool: return not p.has_meta(FishModel.OVERLAY_META)), "drawn as the seekers see it (nothing real at exposure 0)")
 	var sketch := _part(hider, HiderLooks.SKETCH_SHADER)
 	check(sketch != null and sketch.visible and own.sketch > 0.9, "the dashed outline keeps them in sight (%.2f)" % (own.sketch if own else -1.0))
 	stub.exposures[hider] = 0.95

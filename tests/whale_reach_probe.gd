@@ -15,7 +15,7 @@ extends Node3D
 ## width times whale_hitbox_scale. A hideaway is a spot the arena lists in
 ## hideaway_spots() or any node in group "mp_hideaway" with a global_position and `radius`.
 
-const ARENAS := {"temple": "res://scripts/marco_polo/temple_arena.gd", "tank": "res://scripts/marco_polo/fish_tank_arena.gd"}
+const ARENAS := {"temple": "res://scripts/modes/marco/temple_arena.gd", "tank": "res://scripts/modes/marco/fish_tank_arena.gd"}
 ## Both layers: the arena's furniture and its sight blockers.
 const MASK := 1 | (1 << 5)
 ## A pocket within this of a porthole's mouth belongs to the porthole (m).

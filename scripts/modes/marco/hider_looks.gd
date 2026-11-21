@@ -18,9 +18,9 @@ extends Node
 const REVEAL_SHADER := preload("res://shaders/marco_reveal.gdshader")
 const AURA_SHADER := preload("res://shaders/marco_aura.gdshader")
 const SKETCH_SHADER := preload("res://shaders/marco_sketch.gdshader")
-const TITAN_VIEW_PATH := "res://scripts/marco_polo/titan_view.gd"
-const WAKE_FX_PATH := "res://scripts/marco_polo/titan_wake_fx.gd"
-const PICK_CARD_PATH := "res://scripts/marco_polo/whale_pick_card.gd"
+const TITAN_VIEW_PATH := "res://scripts/modes/marco/titan_view.gd"
+const WAKE_FX_PATH := "res://scripts/modes/marco/titan_wake_fx.gd"
+const PICK_CARD_PATH := "res://scripts/modes/marco/whale_pick_card.gd"
 ## MarcoPoloMatch.Role.SEEKER (Role { HIDER, SEEKER }).
 const SEEKER := 1
 ## Copied once from a real material onto its reveal one, when the real has them.
@@ -39,7 +39,7 @@ var self_fish: FishController
 var _looks := {}  # FishController -> Reveal
 ## The "Marco!" scan pulse and its ghosts (made in bind).
 var scan: MarcoScan
-## The local whale seeker's thicker murk (scripts/marco_polo/titan_view.gd, loaded by path).
+## The local whale seeker's thicker murk (scripts/modes/marco/titan_view.gd, loaded by path).
 var titan_view: Node
 ## The whale pick card (whale_pick_card.gd, loaded by path).
 var pick_card: Node
@@ -213,7 +213,7 @@ class Reveal:
 		var body := FishAnatomy.body_of(model)
 		var body_real: Material = _real_material(body) if body else null
 		for node: Node in model.find_children("*", "GeometryInstance3D", true, false):
-			if node.has_meta("marco_reveal"):
+			if node.has_meta(FishModel.OVERLAY_META):
 				continue
 			var part := node as GeometryInstance3D
 			_real.append(part)
@@ -266,7 +266,7 @@ class Reveal:
 	func _copy_beside(real: Node3D, mesh: Mesh, material: Material) -> MeshInstance3D:
 		var copy := MeshInstance3D.new()
 		copy.name = "Reveal" + String(real.name)
-		copy.set_meta("marco_reveal", true)
+		copy.set_meta(FishModel.OVERLAY_META, true)
 		copy.mesh = mesh
 		copy.material_override = material
 		copy.transform = real.transform

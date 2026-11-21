@@ -68,7 +68,7 @@ func _run(shots: bool) -> void:
 	titan.global_position = Vector3(0.0, 4.0, 0.0)
 	titan.freeze = true
 	stub.players = [titan]
-	fx = load("res://scripts/marco_polo/titan_wake_fx.gd").new()
+	fx = load("res://scripts/modes/marco/titan_wake_fx.gd").new()
 	stub.add_child(fx)
 	fx.call("bind", stub)
 	await get_tree().process_frame

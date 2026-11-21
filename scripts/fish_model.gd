@@ -15,6 +15,8 @@ extends Node3D
 ## it swims (_waving) are moved by react(), which also squashes and stretches a
 ## model's `squash` node, if it has one, with the fish's acceleration.
 
+## Set on a mode's copy of a part of the model (not the fish's own): the tail cue and other scans skip it.
+const OVERLAY_META := &"fish_overlay"
 const RAY_SKIN := preload("res://shaders/ray_skin.gdshader")
 const FIN_MEMBRANE := preload("res://shaders/fin_membrane.gdshader")
 const STRIDE_OVERLAY := preload("res://shaders/stride_overlay.gdshader")
@@ -294,8 +296,8 @@ func _setup_tail_cue() -> void:
 	var plain: Array[MeshInstance3D] = []
 	var bounds := AABB()
 	for node in tail.find_children("*", "MeshInstance3D", true, false):
-		if node.has_meta("marco_reveal"):
-			continue  # Marco Polo's reveal copies (HiderLooks) come and go
+		if node.has_meta(OVERLAY_META):
+			continue  # a mode's copies of parts (Marco Polo's reveal, HiderLooks) come and go
 		var part := node as MeshInstance3D
 		var shader_material := part.material_override as ShaderMaterial
 		if shader_material and shader_material.shader in [FIN_MEMBRANE, RAY_SKIN]:

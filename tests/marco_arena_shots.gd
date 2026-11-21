@@ -7,7 +7,7 @@ extends Node
 ## with --headless it only prints those. ("arena_shots" is the match tank's.)
 ##   Godot_console.exe --path . res://tests/marco_arena_shots.tscn -- --out=DIR [--arena=temple,tank] [--what=over,start,spots,portholes,close] [--clear]
 
-const ARENAS := {"temple": "res://scripts/marco_polo/temple_arena.gd", "tank": "res://scripts/marco_polo/fish_tank_arena.gd"}
+const ARENAS := {"temple": "res://scripts/modes/marco/temple_arena.gd", "tank": "res://scripts/modes/marco/fish_tank_arena.gd"}
 
 var out_dir := "user://marco_arena_shots"
 var arenas := ["temple", "tank"]

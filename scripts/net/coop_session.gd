@@ -113,8 +113,6 @@ func attach_main(game: Node) -> void:
 	main.mode_ended.connect(_on_mode_ended)
 	main.unnatural_started.connect(_on_unnatural_started)
 	main.unnatural_ended.connect(_on_unnatural_ended)
-	main.marco_polo_started.connect(_on_marco_polo_started)
-	main.marco_polo_ended.connect(_on_marco_polo_ended)
 	main.what_stinks_started.connect(_on_what_stinks_started)
 	main.what_stinks_ended.connect(_on_what_stinks_ended)
 	main._local.players_changed.connect(func(_count: int) -> void: _players_changed())
@@ -187,13 +185,13 @@ func _on_session_started() -> void:
 		var marco_polo := _in_marco_polo()
 		var what_stinks := _in_what_stinks()
 		if marco_polo:
-			main.host_marco_polo()
+			main.host_mode(main.MARCO_POLO)
 		elif what_stinks:
 			main.host_what_stinks()
 		elif unnatural:
 			main.host_unnatural_run()
 		else:
-			main.host_nature_run()
+			main.host_mode(main.NATURE)
 		for entry in _local_players():
 			_add_to_roster(entry, 1)
 		if marco_polo:
@@ -235,7 +233,7 @@ func _on_session_ended(reason: String) -> void:
 	_set_status(reason)
 	if was_guest:
 		_switching = true
-		main.solo_nature_run()  # back to Nature on our own, the world ours again
+		main.solo_mode(main.NATURE)  # back to Nature on our own, the world ours again
 		_switching = false
 	elif was_unnatural_guest:
 		_switching = true
@@ -243,7 +241,7 @@ func _on_session_ended(reason: String) -> void:
 		_switching = false
 	elif was_marco_polo_guest:
 		_switching = true
-		main.solo_marco_polo()  # back to Marco Polo against bots, the match ours
+		main.solo_mode(main.MARCO_POLO)  # back to Marco Polo against bots, the match ours
 		_switching = false
 	elif was_what_stinks_guest:
 		_switching = true
@@ -260,11 +258,6 @@ func _on_peer_left(peer: int) -> void:
 	_sync_puppets()
 	_send_all("_roster", [roster], true)
 	_set_status("A friend left: %d playing" % roster.size())
-
-
-func _on_marco_polo_started(match_node: MarcoPoloMatch) -> void:
-	if is_active() and (_welcomed or _is_host()):
-		_hook_marco_polo(match_node)
 
 
 func _on_marco_polo_ended() -> void:
@@ -299,11 +292,18 @@ func _unhook_marco_polo() -> void:
 
 
 func _on_mode_started(mode: GameMode) -> void:
-	if mode is NatureRun and is_active() and (_welcomed or _is_host()):
+	if not is_active() or not (_welcomed or _is_host()):
+		return
+	if mode is NatureRun:
 		_hook(mode)
+	elif mode is MarcoPoloMatch:
+		_hook_marco_polo(mode)
 
 
 func _on_mode_ended(id: String) -> void:
+	if id == main.MARCO_POLO:
+		_on_marco_polo_ended()
+		return
 	if id != main.NATURE:
 		return
 	_unhook()
@@ -417,8 +417,8 @@ static func player_entry(pid: int, fish: FishController) -> Dictionary:
 	var character := fish.character
 	var species := fish.species
 	# A Marco Polo whale is sent as the player's own fish: the role swap is local.
-	if fish.has_meta("mp_base_look"):
-		var base: Array = fish.get_meta("mp_base_look")
+	var base := ModeData.swapped_look(fish)
+	if not base.is_empty():
 		character = base[0] as FishCharacter.FishClass
 		species = int(base[1])
 	return {"pid": pid, "name": fish.display_name, "character": int(character),
@@ -517,8 +517,8 @@ func _sync_puppets() -> void:
 			if game:
 				game.add_player(net.fish)
 		var species := entry_species(entry)
-		# A puppet the match has grown into a whale keeps that body (mp_swapped).
-		var swapped: bool = net.fish.has_meta("mp_swapped") and bool(net.fish.get_meta("mp_swapped"))
+		# A puppet a match has grown into a whale keeps that body (ModeData: swapped).
+		var swapped: bool = ModeData.swapped_owner(net.fish) != ""
 		if not swapped and (net.fish.character != entry.character or net.fish.species != species):
 			net.fish.set_look(entry.character, species)
 		net.fish.display_name = entry.name
@@ -924,7 +924,7 @@ func _welcome(host_roster: Dictionary, tuning: Dictionary, world: Dictionary) ->
 	if world.get("mode", "nature") == "marco_polo":
 		_apply_tuning(tuning)  # before the match: it reads the host's settings as it starts
 		_switching = true
-		main.guest_marco_polo(str(world.get("arena", "Ocean")))  # our own player in the host's match
+		main.join_mode(main.MARCO_POLO, {"arena": str(world.get("arena", "Ocean"))})  # our own player in the host's match
 		_switching = false
 		_hook_marco_polo(main.marco_polo)
 		marco_polo_net.apply_world(world)
@@ -949,7 +949,7 @@ func _welcome(host_roster: Dictionary, tuning: Dictionary, world: Dictionary) ->
 		_set_status("Playing with %d others" % (roster.size() - _local_players().size()))
 		return
 	_switching = true
-	main.guest_nature_run()  # a run of our own players, the world the host's
+	main.join_mode(main.NATURE)  # a run of our own players, the world the host's
 	_switching = false
 	_apply_tuning(tuning)
 	_hook(main.nature_run)

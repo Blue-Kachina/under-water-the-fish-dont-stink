@@ -5,7 +5,7 @@ extends Node
 ## - Getting in (porthole_jump_entry, the default): a live hider presses Jump
 ##   within porthole_jump_range of a free porthole's mouth, in front of its
 ##   wall, and slides in from wherever it is. That jump makes no noise
-##   (JUMP_IN_META tells the NoiseMeter). With porthole_jump_entry off: only
+##   (JUMP_IN_KEY tells the NoiseMeter). With porthole_jump_entry off: only
 ##   nose first, lined up (within porthole_entry_angle of the axis), slowly
 ##   (under porthole_entry_speed), not mid-flip, with its nose through the
 ##   opening (each fish's own: its hitbox's half width times
@@ -56,7 +56,7 @@ const FLOP_SPEED := 2.0
 const GASP_FROM := 0.6
 ## Set on a live hider while Jump would take it into a porthole (porthole_jump_entry):
 ## its NoiseMeter lets that jump go quietly.
-const JUMP_IN_META := &"mp_jump_in"
+const JUMP_IN_KEY := "jump_in"
 ## After getting out, this long (s) before Jump takes the fish back in.
 const JUMP_IN_COOLDOWN := 1.0
 
@@ -141,7 +141,7 @@ func reset() -> void:
 	_net_occupants.clear()
 	for fish: FishController in _jump_was_held.keys():
 		if is_instance_valid(fish):
-			fish.remove_meta(JUMP_IN_META)
+			ModeData.erase_value(fish, MarcoPoloMatch.MODE_ID, JUMP_IN_KEY)
 	_jump_was_held.clear()
 	_pending = -1
 	for p in _portholes:
@@ -184,7 +184,7 @@ func step(delta: float) -> void:
 func _try_enter(fish: FishController) -> void:
 	var able := match_node.is_live_hider(fish) and not fish.battered and not fish.freeze
 	if not settings.porthole_jump_entry:
-		fish.remove_meta(JUMP_IN_META)
+		ModeData.erase_value(fish, MarcoPoloMatch.MODE_ID, JUMP_IN_KEY)
 		if able:
 			_try_portholes(fish)
 		return
@@ -195,9 +195,9 @@ func _try_enter(fish: FishController) -> void:
 	_jump_was_held[fish] = held
 	var p := jump_porthole(fish) if able else null
 	if p == null:
-		fish.remove_meta(JUMP_IN_META)
+		ModeData.erase_value(fish, MarcoPoloMatch.MODE_ID, JUMP_IN_KEY)
 		return
-	fish.set_meta(JUMP_IN_META, true)
+	ModeData.set_value(fish, MarcoPoloMatch.MODE_ID, JUMP_IN_KEY, true)
 	if pressed:
 		_enter(fish, p)
 		if not match_node.authority:
@@ -283,7 +283,7 @@ func _enter(fish: FishController, p: Porthole) -> void:
 	fish.angular_velocity = Vector3.ZERO
 	fish.collision_layer = 0
 	fish.collision_mask = 0
-	fish.remove_meta(JUMP_IN_META)
+	ModeData.erase_value(fish, MarcoPoloMatch.MODE_ID, JUMP_IN_KEY)
 	if not fish.puppet:
 		fish.freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 		fish.freeze = true

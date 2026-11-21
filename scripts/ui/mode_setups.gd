@@ -9,7 +9,6 @@ extends RefCounted
 
 const FISH_STICKS := "Fish Sticks"
 const UNNATURAL := "Unnatural"
-const MARCO_POLO := "Marco Polo"
 const WHAT_STINKS := "What Stinks?"
 const FISH_STICKS_MODES := ["1v1", "Free Play"]
 
@@ -33,18 +32,6 @@ static func build(main: Node, mode: String) -> ModeSetup:
 			setup.set_meta("variant", FISH_STICKS_MODES[0])
 			setup.rows.append(_row("Mode", [["1v1", "Against a bot: five minutes, overtime on a tie."], ["Free Play", "The arena and a ball, no clock."]], 0,
 					func(i: int) -> void: setup.set_meta("variant", FISH_STICKS_MODES[i])))
-		MARCO_POLO:
-			var mp := MarcoPoloSettings.shared()
-			setup.rows.append(_row("Variant", MarcoPoloSettings.VARIANT_NAMES, int(mp.variant),
-					func(i: int) -> void: mp.variant = i as MarcoPoloSettings.Variant))
-			setup.rows.append(_row("Start as", [["Seeker", "Hunt the hiders first."], ["Hider", "Hide while a bot seeks."]], int(mp.start_as),
-					func(i: int) -> void:
-						mp.start_as = i as MarcoPoloSettings.StartAs
-						ModeSetups._use_role(setup, "hider" if i == MarcoPoloSettings.StartAs.HIDER else "seeker"),
-					func(i: int) -> void: mp.start_as = i as MarcoPoloSettings.StartAs))
-			var arenas: Array = MarcoPoloSettings.ARENAS.filter(func(arena_name: String) -> bool: return main.ENVIRONMENTS.has(arena_name))
-			setup.rows.append(_row("Arena", arenas, maxi(arenas.find(mp.arena), 0), func(i: int) -> void: mp.arena = arenas[i]))
-			role = "hider" if mp.start_as == MarcoPoloSettings.StartAs.HIDER else "seeker"
 		WHAT_STINKS:
 			var ws := WhatStinksSettings.shared()
 			setup.rows.append(_row("Variant", WhatStinksSettings.VARIANT_NAMES, int(ws.variant),
@@ -55,6 +42,9 @@ static func build(main: Node, mode: String) -> ModeSetup:
 						ModeSetups._use_role(setup, "hunter" if i == WhatStinksSettings.StartAs.HUNTER else "prey"),
 					func(i: int) -> void: ws.start_as = i as WhatStinksSettings.StartAs))
 			role = "hunter" if ws.start_as == WhatStinksSettings.StartAs.HUNTER else "prey"
+	var registered: Variant = ModeRegistry.describe(mode).get("setup_rows", null)
+	if registered is Callable:
+		role = (registered as Callable).call(main, setup)  # a registered mode lists its own rows, and gives its starting role
 	_use_role(setup, role)
 	return setup
 
@@ -89,10 +79,9 @@ static func build_join(player: String, pad: int, fish_class: FishCharacter.FishC
 ## The role the player plays now: a Marco Polo / What Stinks? match's own, or
 ## the one it starts on from its settings, else the one every other mode has.
 static func current_role(main: Node) -> String:
-	if main.current_mode == MARCO_POLO:
-		if main.marco_polo and is_instance_valid(main.marco_polo):
-			return "seeker" if main.marco_polo.local_view_role() == MarcoPoloMatch.Role.SEEKER else "hider"
-		return "hider" if MarcoPoloSettings.shared().start_as == MarcoPoloSettings.StartAs.HIDER else "seeker"
+	var registered: Variant = ModeRegistry.describe(main.current_mode).get("current_role", null)
+	if registered is Callable:
+		return (registered as Callable).call(main)
 	if main.current_mode == WHAT_STINKS:
 		if main.what_stinks and is_instance_valid(main.what_stinks):
 			return "hunter" if main.what_stinks.local_view_role() == WhatStinksMatch.Role.HUNTER else "prey"
@@ -100,10 +89,11 @@ static func current_role(main: Node) -> String:
 	return RoleCharacters.DEFAULT
 
 
-## Whether the player is a Marco Polo seeker that's a whale: they pick it on the whale
-## card (whale_pick_card.gd) as the round starts, not from the fish classes.
+## Whether the player's character is picked by the mode itself (Marco Polo's whale
+## seeker picks on the whale card as the round starts), not from the fish classes.
 static func whale_seeker_now(main: Node) -> bool:
-	return main.current_mode == MARCO_POLO and MarcoPoloSettings.shared().whale_seeker and current_role(main) == "seeker"
+	var registered: Variant = ModeRegistry.describe(main.current_mode).get("character_picked_by_mode", null)
+	return registered is Callable and bool((registered as Callable).call(current_role(main)))
 
 
 ## Applies a confirmed picker screen: its options are set already (they apply as
@@ -113,10 +103,9 @@ static func apply(main: Node, setup: ModeSetup) -> String:
 	var mode: String = setup.get_meta("mode")
 	var role: String = setup.get_meta("role", RoleCharacters.DEFAULT)
 	var entry: Dictionary = setup.pool[setup.pool_index]
-	if entry.has("whale"):
-		# A whale seeker: the whale card picks it; the fish under it (worn as a hider) is the hider's last.
-		var hider := RoleCharacters.character("hider")
-		main.apply_look(hider, RoleCharacters.species("hider", hider))
+	if entry.has("mode_pick"):
+		# The mode picks it itself (a whale seeker: the whale card); it says what to wear meanwhile.
+		(ModeRegistry.describe(str(entry.mode_pick))["apply_pick"] as Callable).call(main)
 	elif entry.has("form"):
 		# A What Stinks? hunter: the form, and the fish worn as prey is the prey's last.
 		WhatStinksSettings.shared().form = entry.form
@@ -145,8 +134,8 @@ static func settle(setup: ModeSetup) -> void:
 static func apply_character(main: Node, setup: ModeSetup) -> void:
 	var role: String = setup.get_meta("role", RoleCharacters.DEFAULT)
 	var entry: Dictionary = setup.pool[setup.pool_index]
-	if entry.has("whale"):
-		return  # the whale card's to pick
+	if entry.has("mode_pick"):
+		return  # the mode's to pick (the whale card)
 	if entry.has("form"):
 		WhatStinksSettings.shared().form = entry.form
 		RoleCharacters.store_form(role, entry.form)
@@ -180,9 +169,10 @@ static func _use_role(setup: ModeSetup, role: String, current := false) -> void:
 		var at := ready.find(HunterForms.playable(last))
 		setup.pool_index = maxi(at, 0)
 		setup.species_index = 0
-	elif role == "seeker" and MarcoPoloSettings.shared().whale_seeker:
-		setup.pool = [_whale_entry()]
-		setup.pool_label = "Whale"
+	elif not _role_pool(role).is_empty():
+		var special := _role_pool(role)  # a registered mode's own pick for the role (Marco Polo's whale seeker)
+		setup.pool = [special.entry]
+		setup.pool_label = special.label
 		setup.pool_index = 0
 		setup.species_index = 0
 	else:
@@ -195,10 +185,25 @@ static func _use_role(setup: ModeSetup, role: String, current := false) -> void:
 	setup.refresh()
 
 
-## A whale seeker's one item: no fish to choose, the whale card does it.
-static func _whale_entry() -> Dictionary:
-	return {"name": "Your whale", "character": FishCharacter.FishClass.TITAN, "whale": true, "slot": 0, "species": [],
-			"preview_species": 0, "line": "As the round starts a card shows your whale: left / right the species, up / down the skin, A locks it in."}
+## What a registered mode offers instead of the fish classes for `role`: {"entry", "label"}
+## (descriptor "role_pool"), or {}.
+static func _role_pool(role: String) -> Dictionary:
+	for d: Dictionary in ModeRegistry.descriptors():
+		if d.has("role_pool"):
+			var pool: Dictionary = (d["role_pool"] as Callable).call(role)
+			if not pool.is_empty():
+				return pool
+	return {}
+
+
+## Public for the descriptors' "setup_rows": one option row of a mode's setup screen.
+static func row(label: String, options: Array, index: int, changed: Callable, setter := Callable()) -> Dictionary:
+	return _row(label, options, index, changed, setter)
+
+
+## Public for the descriptors' "setup_rows": the character pool of `role`.
+static func use_role(setup: ModeSetup, role: String) -> void:
+	_use_role(setup, role)
 
 
 static func _form_pool() -> Array:

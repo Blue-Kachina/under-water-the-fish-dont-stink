@@ -13,6 +13,17 @@ extends Node
 ## (String), after (the id of the mode listed before it in the picker order),
 ## split_screen (true: local players can join, see attach_player()), sfx (the
 ## sound scripts attached to the mode's node), settings (its tuning script).
+##
+## Further keys (Marco Polo's migration): "environment" may be a Callable of the
+## host returning the name (a card's arena pick); "reset_label" a Callable of
+## the mode's node; "one_screen" (no split-screen: local extras are dropped);
+## "card_fill" (Callable(host, MatchCard): the card's pickers and note); "join"
+## (Callable(host, args): an online guest's prep, see Main.join_mode);
+## "settings_id" / "settings_after" (the panel section's id and the section it
+## follows); "setup_rows" (Callable(host, ModeSetup) -> role: the setup screen's
+## rows), "current_role" (Callable(host) -> role), "role_pool" (Callable(role) ->
+## {"entry", "label"} or {}: a role's own character pick), "character_picked_by_mode"
+## (Callable(role) -> bool) and "apply_pick" (Callable(host)): see ModeSetups.
 
 ## A teleport moved `fish` (the host snaps cameras following it).
 signal teleported(fish: FishController)

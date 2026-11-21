@@ -1,5 +1,5 @@
 class_name MarcoPoloMatch
-extends Node
+extends GameMode
 ## Marco Polo (planning_marco_polo.md): hide-and-seek by sound. Each round one
 ## fish is the seeker and the rest are hiders. Hiders score while they're in a
 ## seeker's line of sight (SightCone), visible or not, and more the further up
@@ -77,12 +77,18 @@ const SOUNDS := {"bump": "mp/bump", "tag": "mp/tag", "eliminated": "mp/eliminate
 		"round_over": "mp/round_over", "count": "mp/count", "seen": "mp/seen", "fooled": "mp/fooled",
 		"ping": "mp/ping", "aura": "mp/aura", "heartbeat": "mp/heartbeat"}
 ## Where the helpers others own live (wired once they parse).
-const SONAR_MAP_PATH := "res://scripts/marco_polo/sonar_map.gd"
-const PORTHOLE_SYSTEM_PATH := "res://scripts/marco_polo/porthole_system.gd"
-const HIDEAWAY_SYSTEM_PATH := "res://scripts/marco_polo/hideaway.gd"
-const BOT_PATH := "res://scripts/marco_polo/marco_polo_bot.gd"
-const FAKE_FISH_PATH := "res://scripts/marco_polo/fake_fish.gd"
+const SONAR_MAP_PATH := "res://scripts/modes/marco/sonar_map.gd"
+const PORTHOLE_SYSTEM_PATH := "res://scripts/modes/marco/porthole_system.gd"
+const HIDEAWAY_SYSTEM_PATH := "res://scripts/modes/marco/hideaway.gd"
+const BOT_PATH := "res://scripts/modes/marco/marco_polo_bot.gd"
+const FAKE_FISH_PATH := "res://scripts/modes/marco/fake_fish.gd"
 ## Ocean spawns: hiders on a ring this far (m) round the seeker's start.
+## The mode's id (ModeData's key for what it keeps on a fish) and the key of its CameraClaim.
+const MODE_ID := "Marco Polo"
+const CLAIM_KEY := &"Marco Polo"
+## The names of its modifier sets on a fish (FishModifiers): the role's, and the whale's.
+const ROLE_MODS := "marco.role"
+const WHALE_MODS := "marco.whale"
 const OCEAN_SPAWN_RING := 22.0
 ## Past the Ocean arena's edge: pushed back in, as Hunt.
 const BOUNDARY_STIFFNESS := 2.0
@@ -203,11 +209,157 @@ var _looks: Node
 var _sonar: Node
 var _rng := RandomNumberGenerator.new()
 var _time := 0.0
+## What the match asks of the follow camera (pose override, the button, the body
+## zoom); pushed in _ready, popped in end().
+var _claim := CameraClaim.new()
+var _world: ModeWorld
 ## The sound cues: the count's last whole second, each hider's last layer
 ## (the aura flare), each hider's next heartbeat.
 var _count_second := -1
 var _cue_layer := {}
 var _heartbeat_left := {}
+
+
+## The mode's descriptor (GameMode): its picker tile, the arena its card picks, the
+## card's pickers and note, reset label and tuning section.
+static func descriptor() -> Dictionary:
+	return {
+		"id": "Marco Polo", "title": "Marco Polo", "icon": "mode_marco_polo",
+		"colors": [Color(0.03, 0.14, 0.12), Color(0.4, 1.0, 0.7)],
+		"pitch": "Hide and seek by sound. Score in the seeker's sight, keep quiet, and don't get tagged.",
+		"short": "Hide and seek by sound", "play": ["Solo", "Online"],
+		"environment": MarcoPoloMatch.arena_environment, "match": true, "after": "Obstacle Course", "tile_before": "What Stinks?",
+		"tuning_preset": "res://presets/nature.cfg", "one_screen": true,
+		"card_text": MarcoPoloMatch.card_text, "card_fill": MarcoPoloMatch.fill_card,
+		"reset_label": MarcoPoloMatch.reset_label, "join": MarcoPoloMatch.join_args,
+		"setup_rows": MarcoPoloMatch.setup_rows, "current_role": MarcoPoloMatch.current_role,
+		"role_pool": MarcoPoloMatch.role_pool, "character_picked_by_mode": MarcoPoloMatch.whale_seeker_role,
+		"apply_pick": MarcoPoloMatch.apply_whale_pick,
+		"settings": MarcoPoloSettings, "settings_id": "marco_polo", "settings_after": "powerups",
+	}
+
+
+## The environment Marco Polo plays in: its card's arena pick (the plain Ocean
+## only inside a test probe; a saved "Ocean" anywhere else plays the first of the
+## card's arenas). `host` is the mode host (main.gd).
+static func arena_environment(host: Node) -> String:
+	var arena: String = MarcoPoloSettings.shared().arena
+	var in_probe: bool = host.get_tree() != null and host.get_tree().current_scene != host
+	var available: Dictionary = host.ENVIRONMENTS
+	if arena in MarcoPoloSettings.ARENAS or (in_probe and arena == MarcoPoloSettings.TEST_ARENA):
+		if available.has(arena):
+			return arena
+	for fallback: String in MarcoPoloSettings.ARENAS:
+		if available.has(fallback):
+			return fallback
+	return "Sunken Temple"
+
+
+## The mode's setup screen rows (ModeSetups): the variant, whether you seek or hide
+## first (it picks the role whose last character the screen opens on) and the
+## arena. Returns the role the screen starts on.
+static func setup_rows(host: Node, setup: ModeSetup) -> String:
+	var mp := MarcoPoloSettings.shared()
+	setup.rows.append(ModeSetups.row("Variant", MarcoPoloSettings.VARIANT_NAMES, int(mp.variant),
+			func(i: int) -> void: mp.variant = i as MarcoPoloSettings.Variant))
+	setup.rows.append(ModeSetups.row("Start as", [["Seeker", "Hunt the hiders first."], ["Hider", "Hide while a bot seeks."]], int(mp.start_as),
+			func(i: int) -> void:
+				mp.start_as = i as MarcoPoloSettings.StartAs
+				ModeSetups.use_role(setup, "hider" if i == MarcoPoloSettings.StartAs.HIDER else "seeker"),
+			func(i: int) -> void: mp.start_as = i as MarcoPoloSettings.StartAs))
+	var arenas: Array = MarcoPoloSettings.ARENAS.filter(func(arena_name: String) -> bool: return host.ENVIRONMENTS.has(arena_name))
+	setup.rows.append(ModeSetups.row("Arena", arenas, maxi(arenas.find(mp.arena), 0), func(i: int) -> void: mp.arena = arenas[i]))
+	return "hider" if mp.start_as == MarcoPoloSettings.StartAs.HIDER else "seeker"
+
+
+## The role the player plays now: the match's own, or the one it starts on from its settings.
+static func current_role(host: Node) -> String:
+	var game: Variant = host.marco_polo
+	if game != null and is_instance_valid(game):
+		return "seeker" if game.local_view_role() == Role.SEEKER else "hider"
+	return "hider" if MarcoPoloSettings.shared().start_as == MarcoPoloSettings.StartAs.HIDER else "seeker"
+
+
+## Whether `role`'s character is picked on the whale card (a whale seeker), not from the fish classes.
+static func whale_seeker_role(role: String) -> bool:
+	return role == "seeker" and MarcoPoloSettings.shared().whale_seeker
+
+
+## A whale seeker's one item on the character screen: no fish to choose, the whale card does it.
+static func role_pool(role: String) -> Dictionary:
+	if not whale_seeker_role(role):
+		return {}
+	return {"label": "Whale", "entry": {"name": "Your whale", "character": FishCharacter.FishClass.TITAN, "mode_pick": MODE_ID, "slot": 0, "species": [],
+			"preview_species": 0, "line": "As the round starts a card shows your whale: left / right the species, up / down the skin, A locks it in."}}
+
+
+## The whale card picks the whale; the fish under it (worn as a hider) is the hider's last.
+static func apply_whale_pick(host: Node) -> void:
+	var hider := RoleCharacters.character("hider")
+	host.apply_look(hider, RoleCharacters.species("hider", hider))
+
+
+## An online guest joining: the host's arena (when it's built here) is the one played.
+static func join_args(host: Node, args: Dictionary) -> void:
+	var arena := str(args.get("arena", ""))
+	if arena != "" and host.ENVIRONMENTS.has(arena):
+		MarcoPoloSettings.shared().arena = arena
+
+
+static func card_text() -> String:
+	return "Marco Polo: hide and seek by sound. Each round one fish seeks and the rest hide: you seek once, and a bot seeks while you hide (Start as picks which comes first). Hiders score while they're in the seeker's line of sight, even unseen, but every noise (fast swimming, flips, badly timed strides) shows them to the seeker, layer by layer. The seeker tags by touch (click the left stick, or M, to call \"Marco!\"); hiders throw a Fake Fish with RB. Y swaps follow and free cam, as in Unnatural. Last Fish Swimming: tagged is out. Join the Seekers: tagged hunts with them."
+
+
+## "Restart match" for the world's host; an online guest's match is the host's to restart.
+static func reset_label(game: Node) -> String:
+	return "Restart match" if game != null and game.authority else ""
+
+
+## The card's pickers: the variant, whether you seek or hide first (Start as) and
+## the arena (only arenas that are built), and a note for split-screen players it
+## dropped. `host` is the mode host (main.gd).
+static func fill_card(host: Node, card: MatchCard) -> void:
+	var mp := MarcoPoloSettings.shared()
+	card.choices.append({"title": "Variant", "options": MarcoPoloSettings.VARIANT_NAMES, "index": int(mp.variant),
+			"changed": func(i: int) -> void: mp.variant = i as MarcoPoloSettings.Variant})
+	card.choices.append({"title": "Start as", "options": MarcoPoloSettings.START_AS_NAMES, "index": int(mp.start_as),
+			"changed": func(i: int) -> void: mp.start_as = i as MarcoPoloSettings.StartAs})
+	var arenas: Array = MarcoPoloSettings.ARENAS.filter(func(arena_name: String) -> bool: return host.ENVIRONMENTS.has(arena_name))
+	card.choices.append({"title": "Arena", "options": arenas, "index": maxi(arenas.find(mp.arena), 0),
+			"changed": func(i: int) -> void:
+				mp.arena = arenas[i]
+				if host.current_environment != mp.arena:
+					host.set_environment.call_deferred(mp.arena)})  # a new card comes with it
+	var dropped: int = host.dropped_extra_players()
+	if dropped > 0:
+		card.note = "No split-screen in Marco Polo (one screen would give the hiders away): %d local player%s dropped. Play together online." \
+				% [dropped, "" if dropped == 1 else "s"]
+
+
+## The environment is ready: the world's host or an online guest's (`authority`),
+## the local player and the camera. Called before the node joins the tree.
+func enter(world: ModeWorld) -> void:
+	_world = world
+	authority = world.options.get("authority", true)
+	setup(world.environment, world.fish, world.camera)
+	world.camera.release()  # no ball focus; the claim below turns ball cam off
+
+
+## Play: the player's HUD wiring (follow/free cam, the plate filter) and the view.
+func start() -> void:
+	_world.hud.set_mode_hud(MarcoHud.new(self))
+	_world.camera.snap()
+
+
+func release() -> void:
+	if _world != null and is_instance_valid(_world.hud):
+		_world.hud.set_mode_hud(null)
+
+
+## R: a new match (the host's; a guest's is the host's to restart).
+func reset() -> void:
+	if authority:
+		start_match()
 
 
 ## `env`: the Ocean or a MarcoArena; `player_fish`: this machine's player;
@@ -240,8 +392,9 @@ func _ready() -> void:
 	_sight.name = "SightCone"
 	add_child(_sight)
 	_wire_helpers()
-	if is_instance_valid(camera) and "pose_override" in camera:
-		camera.set("pose_override", _porthole_pose)
+	if is_instance_valid(camera) and camera.has_method("push_claim"):
+		_claim.pose_override = _porthole_pose
+		camera.call("push_claim", CLAIM_KEY, _claim)
 	_register_commands()
 	start_match()
 
@@ -257,14 +410,15 @@ func end() -> void:
 	if is_instance_valid(environment) and environment is Ocean and arena == null:
 		(environment as Ocean).boundary_radius = 0.0
 	if is_instance_valid(camera):
-		camera.set("target", null)
-		if "body_follow" in camera:
-			camera.set("body_follow", 1.0)
-		if "button_taken" in camera:
-			camera.set("button_taken", false)
-		if "pose_override" in camera:
-			camera.set("pose_override", Callable())
+		_claim.follow(null, CameraClaim.Snap.NONE)
+		if camera.has_method("pop_claim"):
+			camera.call("pop_claim", CLAIM_KEY)  # the pose override, button and body zoom are the camera's own again
 		UnnaturalRun.steady_camera(camera, false, UnnaturalSettings.shared())
+	for fish: FishController in players:
+		if is_instance_valid(fish):
+			fish.modifiers.pop(ROLE_MODS)
+			fish.modifiers.pop(WHALE_MODS)
+			fish.capabilities.pop(MODE_ID)
 	if not is_instance_valid(_local):
 		return
 	for key: String in _player_base:
@@ -513,9 +667,7 @@ func _begin_round(index: int, starting: Array[FishController], places: Dictionar
 	phase_left = settings.hide_time
 	time_left = settings.round_time
 	if is_instance_valid(camera):
-		camera.set("target", null)
-		if camera.has_method("snap"):
-			camera.call_deferred("snap")
+		_claim.follow(null, CameraClaim.Snap.DEFERRED)
 	round_started.emit(index, starting[0] if not starting.is_empty() else null)
 	if authority:
 		for fish in starting:
@@ -531,12 +683,10 @@ func _begin_round(index: int, starting: Array[FishController], places: Dictionar
 ## as it is (a convert waits out its join cooldown before it grows, _grow()).
 func apply_role(fish: FishController, new_role: int, defer_body := false) -> void:
 	var seeker := new_role == Role.SEEKER
-	fish.boost_enabled = seeker and settings.seeker_boost
+	fish.capabilities.push(MODE_ID, {"boost": seeker and settings.seeker_boost, "surface": settings.stick_to_surfaces})
 	fish.boost_amount = 100.0
-	fish.bow_scale = settings.seeker_bow_scale if seeker else 1.0
+	fish.modifiers.push(ROLE_MODS, {"bow": settings.seeker_bow_scale if seeker else 1.0, "speed": settings.seeker_speed_scale if seeker else 1.0})
 	fish.buoyancy = settings.seeker_buoyancy if seeker else settings.hider_buoyancy
-	fish.speed_scale = settings.seeker_speed_scale if seeker else 1.0
-	fish.rl_surface_mechanics = settings.stick_to_surfaces
 	fish.team = 1 if seeker else 0
 	if not defer_body:
 		_apply_body(fish, seeker)
@@ -579,7 +729,7 @@ func _physics_process(delta: float) -> void:
 	_hold_parked()
 	for fish in players:
 		if is_instance_valid(fish) and fish.rl_surface_mechanics != settings.stick_to_surfaces:
-			fish.rl_surface_mechanics = settings.stick_to_surfaces  # the panel's changes, live
+			fish.capabilities.push(MODE_ID, {"surface": settings.stick_to_surfaces})  # the panel's changes, live
 	_float_eliminated(delta)
 	_keep_in_arena(delta)
 	if not authority:
@@ -607,10 +757,7 @@ func _physics_process(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	if is_instance_valid(camera):
-		camera.set("ball_cam", false)
-		if "body_follow" in camera:
-			camera.set("body_follow", settings.whale_cam_follow)  # a whale's cam sits back in proportion
-		camera.set("hold_opens_wheel", false)  # Y swaps views, never a wheel
+		_claim.body_follow = settings.whale_cam_follow  # a whale's cam sits back in proportion (also: no ball cam, no wheel)
 		# Unnatural's two views (follow and free cam, Y swaps them) for every role
 		# and the spectator; a porthole's view (pose_override) comes first.
 		UnnaturalRun.steady_camera(camera, true, UnnaturalSettings.shared())
@@ -995,8 +1142,8 @@ func eye_of(seeker: FishController) -> Vector3:
 func view_of(seeker: FishController) -> Basis:
 	if seeker == _local and is_instance_valid(camera) and camera is Node3D and (camera as Node3D).is_inside_tree():
 		return (camera as Node3D).global_basis
-	if seeker.has_meta("mp_view"):
-		return seeker.get_meta("mp_view") as Basis  # a guest's camera, sent to the host
+	if ModeData.has_value(seeker, MODE_ID, "view"):
+		return ModeData.get_value(seeker, MODE_ID, "view") as Basis  # a guest's camera, sent to the host
 	return seeker.global_basis
 
 
@@ -1135,7 +1282,7 @@ func is_seen_now(hider: FishController) -> bool:
 	if hider != _local:
 		return false
 	if not authority:
-		return bool(_local.get_meta("mp_seen", false))
+		return bool(ModeData.get_value(_local, MODE_ID, "seen", false))
 	return _seen_now.has(hider)
 
 
@@ -1264,10 +1411,10 @@ func _apply_body(fish: FishController, seeker: bool) -> void:
 
 
 func _become_titan(fish: FishController) -> void:
-	if not bool(fish.get_meta("mp_swapped", false)):
+	if not bool(ModeData.get_value(fish, MODE_ID, "swapped", false)):
 		# The player's own look, for CoopSession's roster and for putting back.
-		fish.set_meta("mp_base_look", [int(fish.character), fish.species])
-		fish.set_meta("mp_swapped", true)
+		ModeData.set_value(fish, MODE_ID, "base_look", [int(fish.character), fish.species])
+		ModeData.set_value(fish, MODE_ID, "swapped", true)
 	var pick := whale_pick_of(fish)
 	if fish.character != FishCharacter.FishClass.TITAN or fish.species != int(pick.species) or fish.skin != int(pick.skin):
 		fish.set_look(FishCharacter.FishClass.TITAN, int(pick.species), int(pick.skin))
@@ -1287,9 +1434,9 @@ func _rescale_lod(fish: FishController) -> void:
 func _restore_look(fish: FishController) -> void:
 	if not is_instance_valid(fish):
 		return
-	if bool(fish.get_meta("mp_swapped", false)):
-		var base: Array = fish.get_meta("mp_base_look", [int(fish.character), fish.species])
-		fish.set_meta("mp_swapped", false)
+	if bool(ModeData.get_value(fish, MODE_ID, "swapped", false)):
+		var base: Array = ModeData.get_value(fish, MODE_ID, "base_look", [int(fish.character), fish.species])
+		ModeData.set_value(fish, MODE_ID, "swapped", false)
 		fish.set_look(int(base[0]) as FishCharacter.FishClass, int(base[1]))
 	_whale_values(fish, false)
 
@@ -1302,13 +1449,12 @@ func _whale_values(fish: FishController, whale: bool) -> void:
 		fish.hitbox_scale = hitbox
 	if not is_equal_approx(fish.body_scale, body):
 		fish.body_scale = body
-	fish.turn_scale = settings.whale_turn_scale if whale else 1.0
-	fish.accel_scale = settings.whale_accel_scale if whale else 1.0
-	fish.drag_scale = settings.whale_accel_scale if whale else 1.0  # heavy to start, hard to stop
-	fish.top_speed_scale = settings.whale_speed_scale if whale else 1.0
-	fish.boost_scale = settings.whale_boost_scale if whale else 1.0
 	if whale:
-		fish.speed_scale = settings.seeker_speed_scale * settings.whale_speed_scale
+		fish.modifiers.push(WHALE_MODS, {"turn": settings.whale_turn_scale, "accel": settings.whale_accel_scale,
+				"drag": settings.whale_accel_scale,  # heavy to start, hard to stop
+				"top_speed": settings.whale_speed_scale, "boost": settings.whale_boost_scale, "speed": settings.whale_speed_scale})
+	else:
+		fish.modifiers.pop(WHALE_MODS)
 
 
 ## Skins each species of the Titans has.
@@ -1820,9 +1966,7 @@ func _spectate(fish: FishController) -> void:
 	_spectating = fish
 	_spectate_move_left = -1.0
 	if is_instance_valid(camera):
-		camera.set("target", fish)
-		if camera.has_method("snap"):
-			camera.call("snap")
+		_claim.follow(fish)
 	spectate_target_changed.emit(fish)
 	_announce_local_role()
 
@@ -1906,10 +2050,10 @@ func _update_spectating(delta: float) -> void:
 ## slice: back to its own cam). Seekers keep the button's view swap.
 func _watch_button(delta: float) -> void:
 	var can := is_instance_valid(_local) and (is_spectating() or (is_live_hider(_local) and phase in [Phase.COUNTDOWN, Phase.LIVE]))
-	if is_instance_valid(camera) and "button_taken" in camera:
-		if can and not bool(camera.get("button_taken")):
-			camera.set("free_cam", false)  # a hider's own view is the follow cam: Y watches instead
-		camera.set("button_taken", can)
+	if is_instance_valid(camera):
+		if can and not _claim.button_taken:
+			_claim.show_follow_cam()  # a hider's own view is the follow cam: Y watches instead
+		_claim.button_taken = can
 	if not can:
 		_watch_held = -1.0
 		if _wheel and _wheel.is_open:
@@ -1974,9 +2118,7 @@ func _unpark() -> void:
 	_spectate_move_left = -1.0
 	_release_controls()
 	if is_instance_valid(camera):
-		camera.set("target", null)
-		if camera.has_method("snap"):
-			camera.call("snap")
+		_claim.follow(null)
 	spectate_target_changed.emit(null)
 	_announce_local_role()
 
@@ -2216,7 +2358,7 @@ func apply_net_exposure(values: Dictionary) -> void:
 func apply_net_own_tally(points: float, seen: bool) -> void:
 	_net_own_tally = points
 	if is_instance_valid(_local):
-		_local.set_meta("mp_seen", seen)
+		ModeData.set_value(_local, MODE_ID, "seen", seen)
 
 
 ## A guest: a round starts. `starting` seek; our own fish goes to `place`;

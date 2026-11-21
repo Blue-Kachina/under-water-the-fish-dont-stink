@@ -111,7 +111,7 @@ func _on_dodged(_direction: Vector3) -> void:
 
 
 func _on_jumped() -> void:
-	if fish.has_meta(PortholeSystem.JUMP_IN_META):
+	if ModeData.has_value(fish, MarcoPoloMatch.MODE_ID, PortholeSystem.JUMP_IN_KEY):
 		return  # jumping into a porthole is quiet
 	add(settings.jump_noise)
 

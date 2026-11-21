@@ -182,6 +182,10 @@ Status 2026-11-21: BUILT on `track/rollout` (worktree D:/Dev/GameDev/wt/rollout)
 - Shots: `shark_rig_shots --class=monster|skirmisher|lancer` -> D:/Dev/GameDev/wt/shots/rollout (48 PNGs: straight, turn, brake; top row rig off, bottom on). NEEDS USER EYES: clownfish/swordfish numbers (the off row uses the shark's copied controller pose, so it is only roughly the old look), swordfish head span with the bill, boss bank/curl at its size.
 - Not done: stride/drift shot sets for the new classes; other classes; setting_docs regeneration (coordinator, end of track).
 
+### mig-marco
+Status 2026-11-22: IN PROGRESS (branch track/mig-marco, worktree D:/Dev/GameDev/wt/mig-marco). Marco Polo to the H0-H7 shape.
+- M0 DONE: `tests/marco_baseline_probe` (seed 20261122, 13 coarse rows: card with pickers, Play, countdown, live, a bot's tag that sends the player to spectate, leave, then host / guest / solo entry points; camera claim fields, HUD flags, tuning restored) -> `tests/fixtures/marco_baseline.json` (`-- --record` rewrites). 4 consecutive runs identical (the match node's auto name was dropped from the rows: not deterministic). Also on HEAD: `marco_polo_probe` 0 fail, `tests/marco_polo_net.sh` (host + 2 guests, one laggy) all pass.
+
 ### T4c nature
 **Nature migration DONE 2026-11-21 (branch track/nature, worktree D:/Dev/GameDev/wt/nature), H0-H7 shape, each step gated.**
 - H0: `tests/nature_probe.gd` seeds and records 8 coarse snapshot rows (mode, card, fish tuning, camera claim, run counts, HUD attach) to `tests/fixtures/nature_baseline.json` (`-- --record` rewrites it). Gate "matches nature_baseline.json" held after every step. The first run after an edit that needs a class-cache refresh can differ once; re-run (same cold-run effect as hunt_probe's Fish Fry).

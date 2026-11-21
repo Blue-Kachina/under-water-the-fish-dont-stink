@@ -1,6 +1,6 @@
 {
 	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
-	"total": 213,
+	"total": 181,
 	"violations": {
 		"audio/sfx_hooks/sfx_hooks.gd": {
 			"BatteredSounds": 1,
@@ -13,7 +13,6 @@
 		},
 		"debug_panel.gd": {
 			"HunterSize": 1,
-			"MarcoPoloSettings": 1,
 			"Powerup": 4,
 			"PowerupSettings": 1,
 			"Rarity": 1,
@@ -22,9 +21,6 @@
 		},
 		"fish_model.gd": {
 			"HunterFormModel": 1
-		},
-		"follow_camera.gd": {
-			"MarcoArena": 4
 		},
 		"hud.gd": {
 			"Match1v1": 8
@@ -41,16 +37,14 @@
 		"main.gd": {
 			"CourseSkill": 2,
 			"HunterForms": 3,
-			"MarcoPoloMatch": 3,
-			"MarcoPoloSettings": 11,
 			"Match1v1": 3,
 			"UnnaturalHud": 2,
 			"UnnaturalRun": 8,
 			"UnnaturalSettings": 3,
 			"WhatStinksMatch": 3,
 			"WhatStinksSettings": 5,
-			"path:marco_polo/fish_tank_arena.gd": 1,
-			"path:marco_polo/temple_arena.gd": 1
+			"path:modes/marco/fish_tank_arena.gd": 1,
+			"path:modes/marco/temple_arena.gd": 1
 		},
 		"net/coop_session.gd": {
 			"MarcoPoloMatch": 3,
@@ -86,8 +80,6 @@
 		},
 		"ui/mode_setups.gd": {
 			"HunterForms": 4,
-			"MarcoPoloMatch": 1,
-			"MarcoPoloSettings": 12,
 			"UnnaturalSettings": 1,
 			"WhatStinksMatch": 1,
 			"WhatStinksSettings": 13

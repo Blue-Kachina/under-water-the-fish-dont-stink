@@ -443,7 +443,7 @@ func _mp_porthole_exit(pid: int) -> void:
 func _mp_look(pid: int, view: Basis) -> void:
 	var fish := fish_by_id(pid)
 	if is_host() and fish and pid / 100 == multiplayer.get_remote_sender_id():
-		fish.set_meta("mp_view", view)
+		ModeData.set_value(fish, MarcoPoloMatch.MODE_ID, "view", view)
 
 
 # --- RPCs: guest side ------------------------------------------------------

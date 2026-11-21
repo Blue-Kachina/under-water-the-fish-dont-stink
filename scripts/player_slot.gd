@@ -29,3 +29,8 @@ func view_nodes() -> Array[Node]:
 		if is_instance_valid(node):
 			nodes.append(node)
 	return nodes
+
+
+## What `mode_id` keeps about this player's fish (ModeData's bag for that mode).
+func mode_data(mode_id: String) -> Dictionary:
+	return ModeData.bag(fish, true).get_or_add(mode_id, {})
