@@ -92,6 +92,12 @@ static func default_for(fish_class: FishCharacter.FishClass) -> Gait:
 		gait.stroke_axis = Gait.StrokeAxis.VERTICAL
 		gait.visual = Gait.Visual.FLUKE
 		gait.stroke_time = 1.4
+	elif fish_class == FishCharacter.FishClass.HUNTER:
+		# The shark's procedural rig (SwimRig) is built but off (procedural_rig): when it is switched on the
+		# layers run at full weight and the controller's own tail pose gives way to them.
+		gait.rig_legacy_tail = 0.0
+		for layer in ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel", "rig_drift", "rig_fin_stabilizer", "rig_idle"]:
+			gait.set(layer, 1.0)
 	return gait
 
 

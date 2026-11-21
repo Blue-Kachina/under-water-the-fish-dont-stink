@@ -258,3 +258,15 @@ func is_default() -> bool:
 @export_range(0.5, 30.0, 0.5, "or_greater") var rig_fin_flutter_hz := 6.0
 ## Rig, FinStabilizer: how quickly the pectorals follow all of that (1/s).
 @export_range(0.5, 120.0, 0.5, "or_greater") var rig_fin_stab_rate := 15.0
+
+## Rig, Idle layer: its weight (0 off). A low hover when it isn't working: the pectorals scull and the tail sways
+## slowly. It fades out as effort and speed rise.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_idle := 0.0
+## Rig, Idle: how far the pectorals scull (rad).
+@export_range(0.0, 1.0, 0.01, "or_greater") var rig_idle_scull := 0.25
+## Rig, Idle: how far the tail sways (rad along the spine).
+@export_range(0.0, 1.0, 0.01, "or_greater") var rig_idle_sway := 0.12
+## Rig, Idle: how fast the hover beats (Hz).
+@export_range(0.1, 5.0, 0.05, "or_greater") var rig_idle_hz := 0.7
+## Rig, Idle: the speed (m/s) at which the hover has faded out completely.
+@export_range(0.1, 30.0, 0.1, "or_greater") var rig_idle_speed := 3.0

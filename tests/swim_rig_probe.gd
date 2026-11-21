@@ -42,7 +42,8 @@ func zero_gait(on := true) -> Gait:
 
 ## The Gait's layer weights, in layer order (each step adds its own).
 func layer_fields() -> Array[String]:
-	return ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel", "rig_drift", "rig_fin_stabilizer"]
+	var fields: Array[String] = ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel", "rig_drift", "rig_fin_stabilizer", "rig_idle"]
+	return fields
 
 
 ## A state at `speed` m/s straight ahead, effort from the throttle.
@@ -83,12 +84,17 @@ func _ready() -> void:
 
 func _run() -> void:
 	_zero_change()
+	_defaults()
 	_undulation()
 	_tail_drive()
 	_turn()
 	_accel()
 	_drift()
 	_fin_stabilizer()
+	_idle()
+	_stride_cue()
+	_soak()
+	_bench()
 	print("swim_rig_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)
 
@@ -338,3 +344,164 @@ func _fin_stabilizer() -> void:
 			best = maxf(best, absf(model.rig.pose.fin_flap.x))
 		amps.append(best)
 	check(amps[1] > amps[0] * 3.0 and amps[1] > 0.03, "the pectorals flutter more at speed (%.3f vs %.3f rad)" % [amps[1], amps[0]])
+
+
+func _defaults() -> void:
+	print("the toggle:")
+	var any_on := false
+	for fish_class: FishCharacter.FishClass in FishCharacter.FishClass.values():
+		any_on = any_on or GaitSettings.default_for(fish_class).procedural_rig
+	check(not any_on, "procedural_rig is off for every class by default")
+	check(not FishModel.build(FishCharacter.FishClass.SKIRMISHER, 0).rig_capable and FishModel.build(FishCharacter.FishClass.HUNTER, 0).rig_capable,
+			"only the shark can have a rig")
+
+
+func _idle() -> void:
+	print("Idle:")
+	var gait := only(["rig_idle"])
+	var rest := settle(gait, moving(0.0, 0.0), 0.2)
+	var peak := 0.0
+	var fins := 0.0
+	var s := rest.swim
+	for i in 180:
+		rest.react(DT, s)
+		peak = maxf(peak, absf(rest.rig.pose.joint_yaw[2]))
+		fins = maxf(fins, absf(rest.rig.pose.fin_flap.x))
+	check(peak > 0.01 and peak < 0.2 and fins > 0.05, "at rest it hovers a little (tail joint %.3f rad, pectoral %.3f rad)" % [peak, fins])
+	var fast := settle(gait, moving(10.0, 0.9), 0.5)
+	var p := fast.rig.pose
+	check(absf(p.joint_yaw[2]) < 1e-6 and absf(p.fin_flap.x) < 1e-6, "swimming (effort 0.9, 10 m/s) it's gone")
+	var coasting := settle(gait, moving(1.5, 0.0), 0.5)
+	var mid := 0.0
+	for i in 180:
+		coasting.react(DT, coasting.swim)
+		mid = maxf(mid, absf(coasting.rig.pose.fin_flap.x))
+	check(mid > 0.0 and mid < fins, "and fades out between (%.3f at 1.5 m/s, %.3f at rest)" % [mid, fins])
+
+
+func _stride_cue() -> void:
+	print("the stride cue:")
+	var gait := only(layer_fields())
+	var off := shark(zero_gait(false))
+	var on := shark(gait)
+	var s := moving(14.0)
+	s.gait = gait
+	s.stride_dir = Vector2(1.0, 0.0)
+	s.stride_power = 0.8
+	var s_off := moving(14.0)
+	s_off.gait = off.swim.gait
+	run(on, s, 0.5)
+	run(off, s_off, 0.5)
+	on.set_stride_cue(0.55, 0.9, 0.3)
+	off.set_stride_cue(0.55, 0.9, 0.3)
+	var ok := not on._tail_cue.is_empty() and on._tail_cue.size() == off._tail_cue.size()
+	for part in on._tail_cue:
+		ok = ok and is_equal_approx(float(part.get_instance_shader_parameter("stride_fill")), 0.55)
+	check(ok, "the cue still reaches every tail mesh with the rig on (%d parts, fill 0.55)" % on._tail_cue.size())
+	var same := true
+	for i in on._tail_cue.size():
+		var a := on._tail_cue[i].material_overlay as ShaderMaterial
+		var b := off._tail_cue[i].material_overlay as ShaderMaterial
+		if a != null and b != null:
+			same = same and is_equal_approx(float(a.get_shader_parameter("root")), float(b.get_shader_parameter("root"))) \
+					and is_equal_approx(float(a.get_shader_parameter("tip")), float(b.get_shader_parameter("tip")))
+	check(same, "it still fills from the tail's root to its tip (the overlay's span is the rig-off one)")
+	# The stride rides the wave amplitude as well: a stride deepens the wave.
+	var calm := _excursion(0.0)
+	var deep := _excursion(1.0)
+	check(deep > calm * 1.2, "a stride deepens the wave over the whole body (spine swing %.3f rad with a full stride, %.3f without)" % [deep, calm])
+
+
+## The spine's biggest total yaw over 2 s of the Undulation layer alone at 14 m/s with the given stride power.
+func _excursion(power: float) -> float:
+	var gait := only(["rig_undulation"])
+	var s := moving(14.0)
+	s.gait = gait
+	s.stride_power = power
+	var model := shark(gait)
+	run(model, s, 1.5)
+	var best := 0.0
+	for i in 120:
+		model.react(DT, s)
+		best = maxf(best, absf(model.rig.pose.spine_yaw()))
+	return best
+
+
+## 60 s of random states: a random walk through speed, effort, spin, slip, acceleration and strides, with now and then a
+## teleport-sized jump, nothing NaN and the bend bounded.
+func _soak() -> void:
+	print("the soak:")
+	var gait := only(layer_fields())
+	var model := shark(gait)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	var s := SwimState.new()
+	s.gait = gait
+	var bad := 0
+	var worst := 0.0
+	var speed := 5.0
+	for i in 3600:
+		speed = clampf(speed + rng.randf_range(-1.5, 1.5), 0.0, 23.0)
+		if rng.randf() < 0.01:
+			speed = rng.randf_range(0.0, 40.0)
+		s.speed = speed
+		s.speed_frac = minf(speed / 23.0, 1.0)
+		s.effort = rng.randf()
+		s.forward_speed = speed * rng.randf_range(0.7, 1.0)
+		s.spin = Vector3(rng.randf_range(-3.0, 3.0), rng.randf_range(-6.0, 6.0), rng.randf_range(-3.0, 3.0))
+		s.accel = Vector3(rng.randf_range(-60.0, 60.0), rng.randf_range(-60.0, 60.0), rng.randf_range(-80.0, 80.0))
+		s.slip = Vector3(rng.randf_range(-20.0, 20.0), rng.randf_range(-20.0, 20.0), 0.0)
+		s.velocity = Vector3(s.slip.x, s.slip.y, -speed)
+		s.stride_dir = Vector2(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0))
+		s.stride_power = rng.randf()
+		model.react(DT if rng.randf() > 0.02 else rng.randf_range(0.0, 0.3), s)
+		var p := model.rig.pose
+		var finite := p.is_finite_pose() and model.tail.position.is_finite() and model.tail.rotation.is_finite() \
+				and model.bend_point(Vector3(0.1, 0.1, 1.0)).is_finite() and model.bend_point(Vector3(0.0, 0.0, -0.4)).is_finite()
+		if not finite:
+			bad += 1
+		worst = maxf(worst, maxf(absf(p.spine_yaw()), absf(p.spine_pitch())))
+	check(bad == 0, "no NaN or infinity in 3600 frames of random states and frame times (bad frames: %d)" % bad)
+	check(worst < 4.0, "and the spine's bend stays bounded (worst total turn %.2f rad)" % worst)
+	# Zero and negative frame times don't blow up either.
+	model.react(0.0, s)
+	model.react(-0.1, s)
+	check(model.rig.pose.is_finite_pose(), "a zero or negative frame time is harmless")
+
+
+## 50 sharks with every layer on, against the rig off and against the budget (planning_core_roadmap.md 2.2: 0.05 ms per
+## fish per frame for the layers). The editor binary is slower than an export, so this is an upper bound.
+func _bench() -> void:
+	print("the cost (50 fish, 600 frames):")
+	var on_gait := only(layer_fields())
+	var off_gait := zero_gait(false)
+	var fish_on: Array[FishModel] = []
+	var fish_off: Array[FishModel] = []
+	var states: Array[SwimState] = []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	for i in 50:
+		fish_on.append(shark(on_gait))
+		fish_off.append(shark(off_gait))
+		var s := moving(rng.randf_range(2.0, 22.0))
+		s.spin = Vector3(0.0, rng.randf_range(-2.0, 2.0), 0.0)
+		s.accel = Vector3(rng.randf_range(-10.0, 10.0), 0.0, rng.randf_range(-10.0, 10.0))
+		s.slip = Vector3(rng.randf_range(-4.0, 4.0), 0.0, 0.0)
+		s.stride_dir = Vector2(rng.randf_range(-1.0, 1.0), 0.0)
+		s.stride_power = rng.randf()
+		states.append(s)
+	var time := func(models: Array[FishModel], gait: Gait) -> float:
+		for i in 50:
+			states[i].gait = gait
+		var start := Time.get_ticks_usec()
+		for frame in 600:
+			for i in 50:
+				models[i].react(DT, states[i])
+		return float(Time.get_ticks_usec() - start) / (600.0 * 50.0)
+	time.call(fish_on, on_gait)
+	time.call(fish_off, off_gait)
+	var with_rig: float = time.call(fish_on, on_gait)
+	var without: float = time.call(fish_off, off_gait)
+	var layers_only := with_rig - without
+	print("  react per fish: %.1f us with the rig, %.1f us without; the rig adds %.1f us" % [with_rig, without, layers_only])
+	check(layers_only < 50.0, "the rig's layers cost under 0.05 ms per fish per frame (%.1f us)" % layers_only)
