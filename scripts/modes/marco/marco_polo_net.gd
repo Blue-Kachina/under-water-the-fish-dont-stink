@@ -1,5 +1,5 @@
 class_name MarcoPoloNet
-extends Node
+extends ModeNet
 ## Online Marco Polo (planning_marco_polo.md §8): CoopSession's child
 ## "MarcoPolo" (the same path everywhere, so its RPCs meet), carrying what's
 ## Marco Polo's own. CoopSession still does the session, the roster, the
@@ -25,8 +25,9 @@ extends Node
 const VIEW_RATE := 10.0
 const SEND_RATE := 30.0
 
-var coop: CoopSession
 var game: MarcoPoloMatch
+## The match last hooked (puppets leave it after unhook()).
+var _last_game: MarcoPoloMatch
 
 ## Host: bot fish -> its id (negative). Guest: id -> NetFish of the host's bot.
 var _bot_ids := {}
@@ -46,10 +47,25 @@ func is_host() -> bool:
 	return game != null and game.authority
 
 
-## Wires `match_node` up: what it does goes out.
-func hook(match_node: MarcoPoloMatch) -> void:
+func puppet_added(fish: FishController) -> void:
+	if is_instance_valid(_last_game):
+		_last_game.add_player(fish)
+
+
+func puppet_removed(fish: FishController) -> void:
+	if is_instance_valid(_last_game):
+		_last_game.remove_player(fish)
+
+
+func puppet_parent() -> Node:
+	return _last_game
+
+
+## Wires `mode_game` up: what it does goes out.
+func hook(mode_game: GameMode) -> void:
 	unhook()
-	game = match_node
+	game = mode_game as MarcoPoloMatch
+	_last_game = game
 	sent_views.clear()
 	if game.authority:
 		_number_bots()
@@ -243,9 +259,13 @@ func _apply_bots(list: Array) -> void:
 
 # --- Each tick -------------------------------------------------------------
 
+## The puppets follow their players (hidden once out, unless floating away), ours goes out,
+## then the bots and the views.
 func tick(delta: float) -> void:
 	if game == null or not is_instance_valid(game):
 		return
+	coop.follow_puppets(func(fish: FishController) -> bool: return not game.eliminated.has(fish) or game._floating.has(fish))
+	coop.send_own_fish(delta, [game.local_fish()])
 	for net: NetFish in _bot_nets.values():
 		if net.has_state() and is_instance_valid(net.fish):
 			net.apply()

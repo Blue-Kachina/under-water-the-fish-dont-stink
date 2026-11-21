@@ -37,8 +37,8 @@ var run: Node
 var panel: Node
 ## No joining at all (Marco Polo: one shared screen would give hiders away).
 var no_split_screen := false
-## How many players the last drop_extras() dropped (for Marco Polo's card note).
-var dropped_for_marco_polo := 0
+## How many players the last drop_extras() dropped (for a one-screen mode's card note).
+var dropped_for_one_screen := 0
 
 var _split: SplitScreen
 ## Where the fish live (main), and where the first player's views go back to.

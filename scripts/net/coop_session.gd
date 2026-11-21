@@ -1,29 +1,23 @@
 class_name CoopSession
 extends Node
-## Online co-op in Nature and Unnatural (NetSession's child "Coop", at the same
-## path on every machine, so its RPCs meet): the game's side of a session. A
-## session is in the mode the host was in when it started hosting (Unnatural if
-## it was in Unnatural, else Nature); a guest joins that mode. What's
-## Unnatural's own goes through the child UnnaturalNet; this keeps the session,
-## roster, players' fish, tuning and restarts for both.
+## Online co-op (NetSession's child "Coop", at the same path on every machine,
+## so its RPCs meet): the game's side of a session, the same for every mode. A
+## session is in the mode the host was in when it started hosting (a registered
+## mode with a net adapter: descriptor "net"; Nature from anywhere else); a guest
+## joins that mode. What's the mode's own goes through its adapter (a ModeNet,
+## a child of this one: NatureNet, UnnaturalNet, MarcoPoloNet, WhatStinksNet);
+## this keeps the session, roster, players' fish and tuning for all of them.
 ##
 ## Who runs what (going_coop.md §3):
 ## - Each machine runs its own players' fish, with no added input lag, and
 ##   sends their state and looks (FishController.replay_fx()) SEND_RATE times a
-##   second. Everyone else shows them as puppets (FishController.puppet),
-##   NetFish-interpolated a little behind.
-## - The host runs the world (NatureRun.authority): the schools' leaders and
-##   alarms (sent SCHOOL_RATE times a second; every machine swims the fish
-##   around them itself, School.follower), spawns and removals (with their
-##   seeds), the lone fish, pearl drops, the shared counts, restarts.
-## - A battery shows first where the attacker is, and is claimed to the host,
-##   which confirms it to everyone (two claims on one fish within
-##   NatureRun.SHARE_WINDOW share it). Pearls the same.
-## - Each player's points, multis and sprees are their own machine's; their
-##   awards are sent to the others' feeds.
-## - Only the host tunes: its fish and Nature tuning go to every guest on
-##   joining and whenever it changes, and the guests' tuning panels are locked
-##   to it (their own tuning comes back when they leave).
+##   second (send_own_fish, from the adapter's tick). Everyone else shows them as
+##   puppets (FishController.puppet), NetFish-interpolated a little behind.
+## - The host runs the world (the mode's authority); its adapter says what goes
+##   out and what a guest asks for.
+## - Only the host tunes: its fish tuning and every net mode's sections go to
+##   every guest on joining and whenever they change, and the guests' tuning
+##   panels are locked to it (their own tuning comes back when they leave).
 ##
 ## Players are named by a player id, pid = peer id * 100 + the slot's uid on
 ## its machine (PlayerSlot.uid), so a split-screen machine can bring several.
@@ -34,13 +28,15 @@ signal status_changed(text: String)
 
 ## Guests must run the same protocol.
 const VERSION := 1
-## Fish snapshots per second, and school leaders.
+## Fish snapshots per second.
 const SEND_RATE := 30.0
-const SCHOOL_RATE := 10.0
 ## Tuning changes are sent this long (s) after the last one, not every slider step.
 const TUNING_DELAY := 0.25
-## The tuning that's the host's (the camera stays each player's own).
-const TUNING_SECTIONS := ["fish", "gaits", "nature", "unnatural", "powerups", "marco_polo", "what_stinks", "hunter_size"]
+## The tuning that's the host's in every mode (the camera stays each player's
+## own); tuning_sections() adds every net mode's own sections.
+const CORE_TUNING_SECTIONS := ["fish", "gaits"]
+## The mode a session is in when the host's mode has no net adapter (its net key).
+const DEFAULT_NET_KEY := "nature"
 ## How often (s) guests time the round trip to the host, and send any change of
 ## their players (joining, leaving, a new fish).
 const PING_INTERVAL := 1.0
@@ -48,14 +44,6 @@ const FISH_SCENE := preload("res://scenes/fish.tscn")
 
 ## The game (main.gd), which registers itself.
 var main: Node
-var run: NatureRun
-## The Unnatural run in the session (instead of `run`), and its messages.
-var urun: UnnaturalRun
-var unnatural_net := UnnaturalNet.new()
-## The Marco Polo match in the session (instead of `run`), and its messages.
-var mpm: MarcoPoloMatch
-var marco_polo_net := MarcoPoloNet.new()
-## The What Stinks? match in the session (instead of `run`), and its messages.
 ## A registered mode with a net adapter (descriptor "net"), while it is hooked: its game, its
 ## adapter (ModeNet), and its id. _mode_nets: net_key -> adapter, one per such mode.
 var mgame: GameMode
@@ -71,12 +59,9 @@ var rtt := 0.0
 
 ## Remote players: pid -> NetFish (its .fish the puppet).
 var _remote := {}
-## The host's lone fish, on a guest.
-var _target_net := NetFish.new()
 ## The host's clock, learnt from its messages (a guest's).
 var _host_clock := NetFish.new()
 var _send_left := 0.0
-var _school_left := 0.0
 var _ping_left := 0.0
 ## Our fish's teleports so far (fish -> count): sent, so puppets snap.
 var _teleports := {}
@@ -87,7 +72,7 @@ var _own_tuning := {}
 ## Our players as last sent (a guest's), to notice changes.
 var _sent_players := []
 var _welcomed := false
-## Swapping our run for a guest's run (its ending isn't us leaving Nature).
+## Swapping our game for a guest's (its ending isn't us leaving the mode).
 var _switching := false
 ## Outgoing messages held back by the simulated lag: [due (us), callable].
 var _outbox: Array = []
@@ -97,10 +82,6 @@ var _next_index := 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	unnatural_net.coop = self
-	add_child(unnatural_net)
-	marco_polo_net.coop = self
-	add_child(marco_polo_net)
 	for d: Dictionary in ModeRegistry.net_descriptors():
 		var adapter: ModeNet = (d["net"] as GDScript).new()
 		adapter.coop = self
@@ -138,35 +119,23 @@ func _is_host() -> bool:
 	return NetSession.is_host()
 
 
-## The session's run here: Nature's or Unnatural's (null: none).
-func _game_run() -> Node:
-	if mpm and is_instance_valid(mpm):
-		return mpm
-	if mgame and is_instance_valid(mgame):
-		return mgame
-	if urun and is_instance_valid(urun):
-		return urun
-	if run and is_instance_valid(run):
-		return run
-	return null
-
-
-## Whether this machine is in Unnatural (the mode a session it hosts is in).
-func _in_unnatural() -> bool:
-	return main != null and main.get("current_mode") == "Unnatural"
-
-
-## Whether this machine is in Marco Polo (the mode a session it hosts is in).
-func _in_marco_polo() -> bool:
-	return main != null and main.get("current_mode") == "Marco Polo"
-
-
-## The descriptor of the registered mode with a net adapter that this machine is in ({} when none).
+## The descriptor of the registered mode with a net adapter that this machine is in (the
+## default net mode's when it's in none).
 func _net_mode() -> Dictionary:
-	if main == null:
-		return {}
 	var d := ModeRegistry.describe(str(main.get("current_mode")))
-	return d if d.has("net") else {}
+	return d if d.has("net") else _net_mode_of_key(DEFAULT_NET_KEY)
+
+
+## The tuning sections that are the host's: the core ones and every net mode's settings
+## (its descriptor's "settings_key", or its lower-cased id, and its "extra_settings").
+static func tuning_sections() -> Array:
+	var out := CORE_TUNING_SECTIONS.duplicate()
+	for d: Dictionary in ModeRegistry.net_descriptors():
+		if d.has("settings"):
+			out.append(d.get("settings_key", String(d["id"]).to_lower()))
+		for extra: Array in d.get("extra_settings", []):
+			out.append(extra[0])
+	return out
 
 
 ## The adapter of net key `key` (what a guest's welcome names), null when none.
@@ -200,27 +169,11 @@ func _on_session_started() -> void:
 		_welcomed = true
 		_set_status("Hosting: waiting for friends" if NetSession.backend == NetSession.Backend.STEAM
 				else "Hosting on port %d: waiting for friends" % NetSession.port)
-		var unnatural := _in_unnatural()
-		var marco_polo := _in_marco_polo()
 		var net_mode := _net_mode()
-		if marco_polo:
-			main.host_mode(main.MARCO_POLO)
-		elif not net_mode.is_empty():
-			main.host_mode(net_mode["id"])
-		elif unnatural:
-			main.host_unnatural_run()
-		else:
-			main.host_mode(main.NATURE)
+		main.host_mode(net_mode["id"])  # (one already running stays: its guests join it)
 		for entry in _local_players():
 			_add_to_roster(entry, 1)
-		if marco_polo:
-			_hook_marco_polo(main.marco_polo)
-		elif not net_mode.is_empty():
-			_hook_mode(main.active_mode(), net_mode)
-		elif unnatural:
-			_hook_unnatural(main.unnatural_run)
-		else:
-			_hook(main.nature_run)
+		_hook_mode(main.active_mode(), net_mode)
 	else:
 		_welcomed = false
 		_set_status("Connected: joining...")
@@ -232,40 +185,22 @@ func _on_session_ended(reason: String) -> void:
 	if main == null:
 		_set_status(reason)
 		return
-	var was_guest := _welcomed and run and not run.authority
-	var was_unnatural_guest := _welcomed and urun and is_instance_valid(urun) and not urun.authority
-	var was_marco_polo_guest := _welcomed and mpm and is_instance_valid(mpm) and not mpm.authority
 	var was_mode_guest: bool = _welcomed and mgame and is_instance_valid(mgame) and not mgame.get("authority")
 	var guest_of := _mode_net_id
-	_unhook()
-	_unhook_unnatural()
-	_unhook_marco_polo()
 	_unhook_mode()
 	for pid: int in _remote.keys():
 		_drop_remote(pid)
 	roster.clear()
 	_outbox.clear()
 	_welcomed = false
-	main._panel.set_sections_locked(TUNING_SECTIONS, false)
+	main._panel.set_sections_locked(tuning_sections(), false)
 	if not _own_tuning.is_empty():
 		main._panel.restore_tuning(_own_tuning)
 		_own_tuning = {}
 	_set_status(reason)
-	if was_guest:
+	if was_mode_guest:
 		_switching = true
-		main.solo_mode(main.NATURE)  # back to Nature on our own, the world ours again
-		_switching = false
-	elif was_unnatural_guest:
-		_switching = true
-		main.solo_unnatural_run()
-		_switching = false
-	elif was_marco_polo_guest:
-		_switching = true
-		main.solo_mode(main.MARCO_POLO)  # back to Marco Polo against bots, the match ours
-		_switching = false
-	elif was_mode_guest:
-		_switching = true
-		main.solo_mode(guest_of)  # back to the mode against bots, the game ours
+		main.solo_mode(guest_of)  # back to the mode on our own, the world ours again
 		_switching = false
 
 
@@ -280,160 +215,28 @@ func _on_peer_left(peer: int) -> void:
 	_set_status("A friend left: %d playing" % roster.size())
 
 
-func _on_marco_polo_ended() -> void:
-	_unhook_marco_polo()
-	if is_active() and not _switching:
-		NetSession.leave("Left Marco Polo, so the session ended" if _is_host() else "Left the session")
-
-
-## Wires a Marco Polo match up to the session (MarcoPoloNet), puppets joining it.
-func _hook_marco_polo(match_node: MarcoPoloMatch) -> void:
-	if mpm == match_node or match_node == null:
-		return
-	_unhook_marco_polo()
-	mpm = match_node
-	marco_polo_net.hook(mpm)
-	for net: NetFish in _remote.values():
-		if is_instance_valid(net.fish) and net.fish.get_parent() != mpm:
-			net.fish.reparent(mpm)
-		mpm.add_player(net.fish)
-	_sync_puppets()
-
-
-func _unhook_marco_polo() -> void:
-	marco_polo_net.unhook()
-	if mpm == null or not is_instance_valid(mpm):
-		mpm = null
-		return
-	for net: NetFish in _remote.values():
-		if is_instance_valid(net.fish):
-			mpm.remove_player(net.fish)
-	mpm = null
-
-
 func _on_mode_started(mode: GameMode) -> void:
 	if not is_active() or not (_welcomed or _is_host()):
 		return
-	if mode is NatureRun:
-		_hook(mode)
-		return
-	if mode is MarcoPoloMatch:
-		_hook_marco_polo(mode)
-		return
-	if mode.get(&"test_tank") != null:  # an Unnatural run (or the Test Tank)
-		_on_unnatural_started(mode)
-		return
+	# (its node is named by its id; a mode without "net", e.g. the Test Tank, is never in a session)
 	var d := ModeRegistry.describe(String(mode.name))
 	if d.has("net"):
 		_hook_mode(mode, d)
 
 
 func _on_mode_ended(id: String) -> void:
-	if id == main.MARCO_POLO:
-		_on_marco_polo_ended()
-		return
-	if id == main.UNNATURAL or id == main.TEST_TANK:
-		_on_unnatural_ended()
-		return
 	var d := ModeRegistry.describe(id)
-	if d.has("net"):
-		_unhook_mode()
-		if is_active() and not _switching:
-			NetSession.leave(("Left %s, so the session ended" % d["title"]) if _is_host() else "Left the session")
+	if not d.has("net"):
 		return
-	if id != main.NATURE:
-		return
-	_unhook()
+	_unhook_mode()
 	if is_active() and not _switching:
-		NetSession.leave("Left Nature, so the session ended" if _is_host() else "Left the session")
+		NetSession.leave(("Left %s, so the session ended" % d["title"]) if _is_host() else "Left the session")
 
 
-func _on_unnatural_started(unnatural_run: UnnaturalRun) -> void:
-	if is_active() and (_welcomed or _is_host()) and not unnatural_run.test_tank:
-		_hook_unnatural(unnatural_run)
-
-
-func _on_unnatural_ended() -> void:
-	_unhook_unnatural()
-	if is_active() and not _switching:
-		NetSession.leave("Left Unnatural, so the session ended" if _is_host() else "Left the session")
-
-
-## Wires an Unnatural run up to the session (UnnaturalNet), puppets joining it.
-func _hook_unnatural(unnatural_run: UnnaturalRun) -> void:
-	if urun == unnatural_run or unnatural_run == null:
-		return
-	_unhook_unnatural()
-	urun = unnatural_run
-	unnatural_net.hook(urun)
-	urun.restarted.connect(_on_restarted)
-	urun.fish_teleported.connect(_on_teleported)
-	for net: NetFish in _remote.values():
-		if is_instance_valid(net.fish) and net.fish.get_parent() != urun:
-			net.fish.reparent(urun)
-		urun.add_player(net.fish)
-	_sync_puppets()
-
-
-func _unhook_unnatural() -> void:
-	unnatural_net.unhook()
-	if urun == null or not is_instance_valid(urun):
-		urun = null
-		return
-	if urun.restarted.is_connected(_on_restarted):
-		urun.restarted.disconnect(_on_restarted)
-	if urun.fish_teleported.is_connected(_on_teleported):
-		urun.fish_teleported.disconnect(_on_teleported)
-	for net: NetFish in _remote.values():
-		if is_instance_valid(net.fish):
-			urun.remove_player(net.fish)
-	urun = null
-
-
-func _on_teleported(fish: FishController) -> void:
+## `fish` jumped (a mode's fish_teleported): ours go out with a new count, so puppets snap.
+func note_teleport(fish: FishController) -> void:
 	if not fish.puppet:
 		_teleports[fish] = _teleports.get(fish, 0) + 1
-
-
-## Wires a run up to the session: what it does goes out, puppets join it.
-func _hook(nature_run: NatureRun) -> void:
-	if run == nature_run or nature_run == null:
-		return
-	_unhook()
-	run = nature_run
-	run.school_spawned.connect(_on_school_spawned)
-	run.school_removed.connect(_on_school_removed)
-	run.battery_claimed.connect(_on_battery_claimed)
-	run.battery_confirmed.connect(_on_battery_confirmed)
-	run.battery_shared.connect(_on_battery_shared)
-	run.pearl_claimed.connect(_on_pearl_claimed)
-	run.pearl_confirmed.connect(_on_pearl_confirmed)
-	run.target_state.connect(_on_target_state)
-	run.restarted.connect(_on_restarted)
-	run.awarded.connect(_on_awarded)
-	run.fish_teleported.connect(func(fish: FishController) -> void:
-		if not fish.puppet:
-			_teleports[fish] = _teleports.get(fish, 0) + 1)
-	for net: NetFish in _remote.values():
-		if is_instance_valid(net.fish) and net.fish.get_parent() != run:
-			net.fish.reparent(run)
-		run.add_player(net.fish)
-	_sync_puppets()
-
-
-func _unhook() -> void:
-	if run == null or not is_instance_valid(run):
-		run = null
-		return
-	for sig: StringName in [&"school_spawned", &"school_removed", &"battery_claimed", &"battery_confirmed",
-			&"battery_shared", &"pearl_claimed", &"pearl_confirmed", &"target_state", &"restarted", &"awarded", &"fish_teleported"]:
-		for connection in run.get_signal_connection_list(sig):
-			if (connection.callable as Callable).get_object() == self:
-				run.disconnect(sig, connection.callable)
-	for net: NetFish in _remote.values():
-		if is_instance_valid(net.fish):
-			run.remove_player(net.fish)
-	run = null
 
 
 # --- Players ---------------------------------------------------------------
@@ -547,12 +350,12 @@ func _sync_puppets() -> void:
 			_remote[pid] = net
 			net.fish.set_look(entry.character, entry_species(entry))
 			net.fish.display_name = entry.name
-			var game := _game_run()
-			(game if game else main).add_child(net.fish)
+			var parent := mnet.puppet_parent() if _hooked() else null
+			(parent if parent else main).add_child(net.fish)
 			net.fish.make_puppet()
 			net.fish.visible = false  # until its first snapshot
-			if game:
-				game.add_player(net.fish)
+			if _hooked():
+				mnet.puppet_added(net.fish)
 		var species := entry_species(entry)
 		# A puppet a match has grown into a whale keeps that body (ModeData: swapped).
 		var swapped: bool = ModeData.swapped_owner(net.fish) != ""
@@ -566,9 +369,8 @@ func _drop_remote(pid: int) -> void:
 	var net: NetFish = _remote.get(pid)
 	_remote.erase(pid)
 	if net and is_instance_valid(net.fish):
-		var game := _game_run()
-		if game:
-			game.remove_player(net.fish)
+		if _hooked():
+			mnet.puppet_removed(net.fish)
 		net.fish.queue_free()
 
 
@@ -592,83 +394,37 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if is_active() and mgame and is_instance_valid(mgame):
+	if is_active() and _hooked():
 		mnet.tick(delta)
-		return
-	if is_active() and mpm and is_instance_valid(mpm):
-		_marco_polo_tick(delta)
-		return
-	if is_active() and urun and is_instance_valid(urun):
-		_unnatural_tick(delta)
-		return
-	if not is_active() or run == null or not is_instance_valid(run):
-		return
+
+
+## Puppets follow their players (a little behind), each shown as `shown` (Callable(fish) -> bool) says.
+func follow_puppets(shown: Callable) -> void:
 	for net: NetFish in _remote.values():
 		if net.has_state() and is_instance_valid(net.fish):
-			net.fish.visible = not net.fish.battered
+			net.fish.visible = shown.call(net.fish)
 			net.apply()
-	if not run.authority and _target_net.has_state() and not run.target.battered:
-		_target_net.fish = run.target
-		_target_net.apply()
+
+
+## Our players' fish among `fish_list` go out, SEND_RATE times a second (call it every physics
+## frame). True on the frames they went.
+func send_own_fish(delta: float, fish_list: Array) -> bool:
 	_send_left -= delta
-	if _send_left <= 0.0:
-		_send_left += 1.0 / SEND_RATE
-		var now := _now()
-		for fish in run.local_players():
-			var pid := pid_of(fish)
-			if pid >= 0:
-				_send_all("_fish_state", [pid, now, fish.global_position, fish.global_basis.get_rotation_quaternion(),
-						fish.linear_velocity, fish.replay_fx(), _teleports.get(fish, 0)], false)
-		if run.authority and not run.target.battered:
-			var target := run.target
-			_send_all("_target_snap", [now, target.global_position, target.global_basis.get_rotation_quaternion(),
-					target.linear_velocity, target.replay_fx(), _teleports.get(target, 0)], false)
-	if run.authority:
-		_school_left -= delta
-		if _school_left <= 0.0:
-			_school_left += 1.0 / SCHOOL_RATE
-			var states := []
-			for school in run.schools:
-				var state := school.net_state()
-				states.append([school.id, state[0], state[1], state[2]])
-			_send_all("_schools_snap", [_now(), states], false)
-
-
-## Unnatural: the puppets follow their players, ours go out, then UnnaturalNet's.
-func _unnatural_tick(delta: float) -> void:
-	for net: NetFish in _remote.values():
-		if net.has_state() and is_instance_valid(net.fish):
-			net.fish.visible = true
-			net.apply()
-	_send_left -= delta
-	if _send_left <= 0.0:
-		_send_left += 1.0 / SEND_RATE
-		var now := _now()
-		for fish in urun.local_players():
-			var pid := pid_of(fish)
-			if pid >= 0:
-				_send_all("_fish_state", [pid, now, fish.global_position, fish.global_basis.get_rotation_quaternion(),
-						fish.linear_velocity, fish.replay_fx(), _teleports.get(fish, 0)], false)
-	unnatural_net.tick(delta)
-
-
-## Marco Polo: the puppets follow their players (hidden once eliminated and
-## floated away), ours goes out, then MarcoPoloNet's.
-func _marco_polo_tick(delta: float) -> void:
-	for net: NetFish in _remote.values():
-		if net.has_state() and is_instance_valid(net.fish):
-			net.fish.visible = not mpm.eliminated.has(net.fish) or mpm._floating.has(net.fish)
-			net.apply()
-	_send_left -= delta
-	if _send_left <= 0.0:
-		_send_left += 1.0 / SEND_RATE
-		var now := _now()
-		var fish: FishController = mpm.local_fish()
+	if _send_left > 0.0:
+		return false
+	_send_left += 1.0 / SEND_RATE
+	var now := _now()
+	for fish: FishController in fish_list:
 		var pid := pid_of(fish)
 		if pid >= 0:
 			_send_all("_fish_state", [pid, now, fish.global_position, fish.global_basis.get_rotation_quaternion(),
 					fish.linear_velocity, fish.replay_fx(), _teleports.get(fish, 0)], false)
-	marco_polo_net.tick(delta)
+	return true
+
+
+## Whether a mode's game is wired up to the session now.
+func _hooked() -> bool:
+	return mnet != null and mgame != null and is_instance_valid(mgame)
 
 
 ## Wires a registered mode's game (descriptor `d`) up to the session through its adapter, puppets joining it.
@@ -758,112 +514,15 @@ func _flush_outbox() -> void:
 	_outbox = keep
 
 
-# --- Run -> session --------------------------------------------------------
-
-func _on_school_spawned(school: School, at: Vector3, heading: Vector3) -> void:
-	if run.authority:
-		_send_all("_school_spawned", [school.id, school.rng.seed, int(school.character), at, heading], true)
-
-
-func _on_school_removed(id: int) -> void:
-	if run.authority:
-		_send_all("_school_removed", [id], true)
-
-
-func _on_battery_claimed(key: String, attacker: FishController, chain: int) -> void:
-	_send_to(1, "_claim_battery", [key, pid_of(attacker), chain], true)
-
-
-func _on_battery_confirmed(key: String, attackers: Array, at: Vector3, pearl_id: int) -> void:
-	if run.authority:
-		_send_all("_battery_confirmed", [key, attackers.map(pid_of), at, pearl_id], true)
-
-
-func _on_battery_shared(key: String, attacker: FishController) -> void:
-	if run.authority:
-		_send_all("_battery_shared", [key, pid_of(attacker)], true)
-
-
-func _on_pearl_claimed(id: int, by: FishController) -> void:
-	_send_to(1, "_claim_pearl", [id, pid_of(by)], true)
-
-
-func _on_pearl_confirmed(id: int, by: FishController) -> void:
-	if run.authority:
-		_send_all("_pearl_confirmed", [id, pid_of(by)], true)
-
-
-func _on_target_state(present: bool, at: Transform3D, target_name: String, generation: int) -> void:
-	if run.authority:
-		_teleports[run.target] = _teleports.get(run.target, 0) + 1
-		_send_all("_target_state", [present, at, target_name, generation], true)
-
-
-func _on_restarted() -> void:
-	var game := _game_run()
-	if game and game.get("authority"):
-		_send_all("_restart", [], true)
-
-
-func _on_awarded(event: Dictionary) -> void:
-	var by: Variant = event.get("by")
-	if not is_instance_valid(by) or (by as FishController).puppet:
-		return
-	var sent := event.duplicate()
-	sent.erase("by")
-	sent.merge(run.score_of(by).stats())  # the scoreboard's numbers ride along
-	_send_all("_award", [pid_of(by), sent], true)
-
-
 # --- Host side -------------------------------------------------------------
 
 func _host_tuning() -> Dictionary:
 	var snapshot: Dictionary = main._panel.tuning_snapshot()
 	var sections := {}
-	for section: String in TUNING_SECTIONS:
+	for section: String in tuning_sections():
 		if snapshot.has(section):
 			sections[section] = snapshot[section]
 	return sections
-
-
-## The session's world for a guest joining, in whichever mode it is.
-func _world_of_mode() -> Dictionary:
-	if mpm and is_instance_valid(mpm):
-		return marco_polo_net.world()
-	if mgame and is_instance_valid(mgame):
-		return mnet.world()
-	if urun and is_instance_valid(urun):
-		return unnatural_net.world()
-	return _world()
-
-
-## The world as it is now, for a guest joining.
-func _world() -> Dictionary:
-	var schools := []
-	for school in run.schools:
-		schools.append([school.id, school.rng.seed, int(school.character), school.leader_position, school.leader_heading,
-				school.alarm, school.alive_mask(), school.home])
-	var pearls := []
-	for pearl in run.pearls_out:
-		if is_instance_valid(pearl) and pearl.id >= 0 and pearl.absorbing == null:
-			pearls.append([pearl.id, pearl.global_position])
-	var target := run.target
-	return {
-		"schools": schools,
-		"pearls": pearls,
-		"target": [not target.battered, target.global_transform, target.display_name, run._target_generation],
-		"counts": run.rules.save(pid_of),
-		"scores": _scores(),
-	}
-
-
-## Every player's scoreboard numbers (NatureScore.save()), by player id.
-func _scores() -> Dictionary:
-	var scores := {}
-	for fish in run.players:
-		if is_instance_valid(fish):
-			scores[pid_of(fish)] = run.score_of(fish).save()
-	return scores
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -880,7 +539,7 @@ func _hello(version: int, players: Array) -> void:
 	for entry: Dictionary in players:
 		_add_to_roster(entry, peer)
 	_sync_puppets()
-	var world: Dictionary = _world_of_mode()
+	var world: Dictionary = mnet.world() if _hooked() else {}
 	_send_to(peer, "_welcome", [roster, _host_tuning(), world], true)
 	_send_all("_roster", [roster], true)
 	_set_status("Hosting: %d playing" % roster.size())
@@ -901,20 +560,6 @@ func _players(players: Array) -> void:
 	_send_all("_roster", [roster], true)
 
 
-@rpc("any_peer", "call_remote", "reliable")
-func _claim_battery(key: String, pid: int, chain: int) -> void:
-	var fish := fish_of(pid)
-	if _is_host() and run and fish:
-		run.confirm_battery(key, fish, chain)
-
-
-@rpc("any_peer", "call_remote", "reliable")
-func _claim_pearl(id: int, pid: int) -> void:
-	var fish := fish_of(pid)
-	if _is_host() and run and fish:
-		run.confirm_pearl(id, fish)
-
-
 @rpc("any_peer", "call_remote", "unreliable")
 func _ping(time: float) -> void:
 	_send_to(multiplayer.get_remote_sender_id(), "_pong", [time], false)
@@ -932,54 +577,17 @@ func _welcome(host_roster: Dictionary, tuning: Dictionary, world: Dictionary) ->
 	_welcomed = true
 	roster = host_roster
 	_own_tuning = main._panel.tuning_snapshot()
-	if world.get("mode", "nature") == "marco_polo":
-		_apply_tuning(tuning)  # before the match: it reads the host's settings as it starts
-		_switching = true
-		main.join_mode(main.MARCO_POLO, {"arena": str(world.get("arena", "Ocean"))})  # our own player in the host's match
-		_switching = false
-		_hook_marco_polo(main.marco_polo)
-		marco_polo_net.apply_world(world)
-		_set_status("Playing with %d others" % (roster.size() - _local_players().size()))
+	var joined_mode := _net_mode_of_key(str(world.get("mode", DEFAULT_NET_KEY)))
+	if joined_mode.is_empty():
+		NetSession.leave("The host is in a mode this game doesn't have")
 		return
-	var joined_mode := _net_mode_of_key(str(world.get("mode", "nature")))
-	if not joined_mode.is_empty():
-		_apply_tuning(tuning)  # before the match: it reads the host's settings as it starts
-		_switching = true
-		main.guest_mode(joined_mode["id"])  # our own player in the host's game
-		_switching = false
-		_hook_mode(main.active_mode(), joined_mode)
-		mnet.apply_world(world)
-		_set_status("Playing with %d others" % (roster.size() - _local_players().size()))
-		return
-	if world.get("mode", "nature") == "unnatural":
-		_apply_tuning(tuning)  # before the run: it reads the host's settings as it starts
-		_switching = true
-		main.guest_unnatural_run()  # a run of our own players, the world the host's
-		_switching = false
-		_hook_unnatural(main.unnatural_run)
-		unnatural_net.apply_world(world)
-		_set_status("Playing with %d others" % (roster.size() - _local_players().size()))
-		return
+	_apply_tuning(tuning)  # before the game: it reads the host's settings as it starts
 	_switching = true
-	main.join_mode(main.NATURE)  # a run of our own players, the world the host's
+	main.join_mode(joined_mode["id"], world)  # our own players in the host's game
 	_switching = false
-	_apply_tuning(tuning)
-	_hook(main.nature_run)
-	for entry: Array in world.schools:
-		var school := run.spawn_school(entry[0], entry[1], entry[2], entry[3], entry[4])
-		school.home = entry[7]
-		school.apply_alive_mask(entry[6])
-		school.set_net_state(entry[3], entry[4], entry[5], rtt / 2.0)
-	for entry: Array in world.pearls:
-		run.drop_pearl(entry[0], entry[1])
-	var target: Array = world.target
-	run.apply_target_state(target[0], target[1], target[2], target[3])
-	run.rules.restore(world.counts, fish_of)
-	var scores: Dictionary = world.get("scores", {})
-	for pid: Variant in scores:
-		var fish := fish_of(pid)
-		if fish and fish.puppet:
-			run.score_of(fish).restore(scores[pid])
+	_apply_tuning(tuning)  # and again, over the mode's preset if joining put it on
+	_hook_mode(main.active_mode(), joined_mode)
+	mnet.apply_world(world)
 	_set_status("Playing with %d others" % (roster.size() - _local_players().size()))
 
 
@@ -997,73 +605,7 @@ func _tuning(sections: Dictionary) -> void:
 
 func _apply_tuning(sections: Dictionary) -> void:
 	main._panel.restore_tuning(sections)
-	main._panel.set_sections_locked(TUNING_SECTIONS, true, "Tuned by the host")
-
-
-@rpc("authority", "call_remote", "reliable")
-func _restart() -> void:
-	if run and not run.authority:
-		run.restart()
-	elif urun and is_instance_valid(urun) and not urun.authority:
-		urun.restart()
-
-
-@rpc("authority", "call_remote", "reliable")
-func _school_spawned(id: int, school_seed: int, kind: int, at: Vector3, heading: Vector3) -> void:
-	if run and not run.authority:
-		run.spawn_school(id, school_seed, kind, at, heading)
-
-
-@rpc("authority", "call_remote", "reliable")
-func _school_removed(id: int) -> void:
-	if run and not run.authority:
-		run.remove_school_by_id(id)
-
-
-@rpc("authority", "call_remote", "unreliable")
-func _schools_snap(time: float, states: Array) -> void:
-	_host_clock.note_time(time)
-	if run == null or run.authority:
-		return
-	var age := maxf(_host_clock.sender_now() - time, 0.0) + rtt / 2.0
-	for state: Array in states:
-		var school := run.school_by_id(state[0])
-		if school:
-			school.set_net_state(state[1], state[2], state[3], age)
-
-
-@rpc("authority", "call_remote", "unreliable")
-func _target_snap(time: float, position: Vector3, rotation: Quaternion, velocity: Vector3, fx: PackedFloat32Array, teleports: int) -> void:
-	_host_clock.note_time(time)
-	_target_net.push(time, position, rotation, velocity, fx, teleports)
-
-
-@rpc("authority", "call_remote", "reliable")
-func _target_state(present: bool, at: Transform3D, target_name: String, generation: int) -> void:
-	if run and not run.authority:
-		_target_net.clear()  # it's somewhere new: no gliding from where it was
-		run.apply_target_state(present, at, target_name, generation)
-
-
-@rpc("authority", "call_remote", "reliable")
-func _battery_confirmed(key: String, pids: Array, at: Vector3, pearl_id: int) -> void:
-	if run and not run.authority:
-		var attackers := pids.map(fish_of).filter(func(fish: Variant) -> bool: return fish != null)
-		run.apply_battery_confirmed(key, attackers, at, pearl_id)
-
-
-@rpc("authority", "call_remote", "reliable")
-func _battery_shared(key: String, pid: int) -> void:
-	var fish := fish_of(pid)
-	if run and not run.authority and fish:
-		run.apply_battery_shared(key, fish)
-
-
-@rpc("authority", "call_remote", "reliable")
-func _pearl_confirmed(id: int, pid: int) -> void:
-	var fish := fish_of(pid)
-	if run and not run.authority and fish:
-		run.apply_pearl_confirmed(id, fish)
+	main._panel.set_sections_locked(tuning_sections(), true, "Tuned by the host")
 
 
 @rpc("authority", "call_remote", "unreliable")
@@ -1079,11 +621,3 @@ func _fish_state(pid: int, time: float, position: Vector3, rotation: Quaternion,
 	var net: NetFish = _remote.get(pid)
 	if net:
 		net.push(time, position, rotation, velocity, fx, teleports)
-
-
-@rpc("any_peer", "call_remote", "reliable")
-func _award(pid: int, event: Dictionary) -> void:
-	var fish := fish_of(pid)
-	if run and fish:
-		event["by"] = fish
-		run.relay_award(event)
