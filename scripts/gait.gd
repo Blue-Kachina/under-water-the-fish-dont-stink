@@ -132,3 +132,141 @@ func is_default() -> bool:
 	return stroke_axis == StrokeAxis.LATERAL and push_axis == PushAxis.NOSE and stroke_time == 1.0 \
 			and stroke_power == 1.0 and coast_drag == 1.0 and coast_buoyancy == 0.0 \
 			and surface_mode == SurfaceMode.NONE and visual == Visual.TAIL_BEND
+
+
+# --- The procedural rig (SwimRig, planning_core_roadmap.md 2.2/2.3) ---------------
+# Only the Hunter class's shark has one so far. Every number is a field here so the
+# GAITS panel tunes it live. A layer with weight 0 adds nothing.
+
+## Shark only: animate the body with the procedural SwimRig (layers that read how
+## the fish is moving) instead of the controller's tail pose. Off: the pose as it
+## always was. With every layer weight at 0 and rig_legacy_tail at 1 the rig
+## poses exactly as the old pose does.
+@export var procedural_rig := false
+## Rig: how much of the controller's own tail pose (its swim stroke and stride swing) is kept. 1: all of it (the old
+## pose). 0: none, the layers move the tail.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_legacy_tail := 1.0
+## Rig: how far in front of the bend the head bends the other way, as a fraction of the body's length. 0: the head
+## is rigid.
+@export_range(0.0, 0.6, 0.01, "or_greater") var rig_head_span := 0.3
+
+## Rig, Undulation layer: its weight (0 off). A travelling wave runs down the spine, deeper with effort, quicker with
+## speed, growing toward the tail.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_undulation := 0.0
+## Rig, Undulation: the wave's biggest total turn of the spine (rad) at full effort.
+@export_range(0.0, 3.0, 0.01, "or_greater") var rig_amplitude := 0.6
+## Rig, Undulation: how far behind each joint's beat is the one in front (rad of wave phase). More: a longer, lazier
+## wave. 0: the whole spine swings as one.
+@export_range(0.0, 3.2, 0.05, "or_greater") var rig_wave_lag := 1.0
+## Rig, Undulation: the Strouhal number: wave rate = this x speed / the tail's reach. More: a faster wave at any speed.
+@export_range(0.01, 2.0, 0.01, "or_greater") var rig_strouhal := 0.04
+## Rig, Undulation: the slowest the wave beats (Hz), at rest or crawling.
+@export_range(0.0, 10.0, 0.05, "or_greater") var rig_freq_min := 0.5
+## Rig, Undulation: the fastest the wave beats (Hz).
+@export_range(0.1, 20.0, 0.1, "or_greater") var rig_freq_max := 3.5
+## Rig, Undulation: how much of its top speed's wave a coasting fish keeps (0: it stops waving when the throttle is
+## off, 1: it waves as hard as its speed says).
+@export_range(0.0, 1.0, 0.05, "or_greater") var rig_coast_wave := 0.5
+## Rig, Undulation: how much of the wave's size sits at the tail. 1: the joints beat 1 : 4 : 9 (the tail most). 0: the
+## three alike.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_envelope := 1.0
+## Rig, Undulation: how far the head swings against the body's wave, of the wave's size.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_head_sway := 0.25
+## Rig, Undulation: how far the caudal fin flexes past the end of the spine, of the wave's size.
+@export_range(0.0, 3.0, 0.05, "or_greater") var rig_caudal_flex := 0.5
+## Rig, Undulation: how many degrees the caudal fin's flex runs ahead of the spine's own wave (the fin bends before the
+## stalk does).
+@export_range(0.0, 90.0, 1.0, "or_greater") var rig_caudal_lead := 8.0
+## Rig, Undulation: how much a stride's power deepens the wave (0: not at all), so a stride's timing shows on the
+## whole body.
+@export_range(0.0, 3.0, 0.05, "or_greater") var rig_cue_amp := 0.5
+## Rig: how quickly the layers' own smoothed values (the wave's size and rate) follow their targets (1/s).
+@export_range(0.5, 60.0, 0.5, "or_greater") var rig_ease := 5.0
+
+## Rig, TailDrive layer: its weight (0 off). A stride's swing (SwishySwim.tail_swing) drives the caudal fin at once, and
+## the bend is carried forward up the body behind it, each joint a moment later than the one behind.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_tail_drive := 0.0
+## Rig, TailDrive: how far a full stride swings the tail (rad), across and up/down.
+@export_range(0.0, 3.0, 0.01, "or_greater") var rig_stride_swing := 0.6
+## Rig, TailDrive: how quickly the caudal fin follows the swing (1/s).
+@export_range(1.0, 120.0, 0.5, "or_greater") var rig_tail_snap := 40.0
+## Rig, TailDrive: how quickly each joint follows the one behind it (1/s). Lower: a lazier, more whip-like carry up the
+## body.
+@export_range(1.0, 120.0, 0.5, "or_greater") var rig_stride_follow := 14.0
+
+## Rig, Turn layer: its weight (0 off). The spine bends into a turn by the turn's curvature (yaw rate over speed), the
+## body banks into it, the pectorals bank first and the inside one tucks while the outside one reaches out.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_turn := 0.0
+## Rig, Turn: how much the spine bends into a turn, times the turn's own curvature over its length. 1: as much as the
+## path curves; more: a more dramatic curl.
+@export_range(0.0, 10.0, 0.1, "or_greater") var rig_turn_bend := 6.0
+## Rig, Turn: the most the spine curls into a turn (rad, all joints together).
+@export_range(0.0, 3.0, 0.01, "or_greater") var rig_turn_max := 0.9
+## Rig, Turn: the yaw rate (rad/s) that counts as a full turn for the bank and the pectorals.
+@export_range(0.1, 10.0, 0.05, "or_greater") var rig_turn_ref := 1.5
+## Rig, Turn: the speed (m/s) below which a turn's curvature is worked out as if the fish were going this fast, so a
+## fish turning on the spot doesn't curl without limit; the bank also fades in over twice this.
+@export_range(0.1, 20.0, 0.1, "or_greater") var rig_turn_min_speed := 3.0
+## Rig, Turn: how far the body rolls into a full turn (rad).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_bank := 0.35
+## Rig, Turn: how quickly the spine's curl and the bank follow the turn (1/s).
+@export_range(0.5, 60.0, 0.5, "or_greater") var rig_turn_rate := 6.0
+## Rig, Turn: how far the pectorals roll into a full turn (rad), ahead of the body.
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_fin_bank := 0.5
+## Rig, Turn: how quickly the pectorals follow the turn (1/s); more than rig_turn_rate and they bank first.
+@export_range(0.5, 120.0, 0.5, "or_greater") var rig_fin_rate := 18.0
+## Rig, Turn: how far the inside pectoral tucks in and the outside one reaches out in a full turn (rad).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_fin_tuck := 0.4
+
+## Rig, Accel layer: its weight (0 off). Speeding up trails the tail down and lifts the nose, folds the pectorals back
+## and surges the body ahead; braking does the opposite (the tail folds up, the pectorals flare as brakes).
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_accel := 0.0
+## Rig, Accel: the acceleration (m/s squared, along the nose or up) that counts as full.
+@export_range(1.0, 200.0, 1.0, "or_greater") var rig_accel_ref := 25.0
+## Rig, Accel: how far the tail trails at full acceleration (rad of pitch at its end, + tip down when speeding up).
+@export_range(0.0, 2.0, 0.01, "or_greater") var rig_accel_tail := 0.5
+## Rig, Accel: how far the head lifts against the trailing tail at full acceleration (rad).
+@export_range(0.0, 1.0, 0.01, "or_greater") var rig_accel_head := 0.2
+## Rig, Accel: how far the pectorals fold back at full acceleration and flare at full braking (rad).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_accel_fins := 0.5
+## Rig, Accel: how far the whole body surges ahead at full acceleration (of its length).
+@export_range(0.0, 0.2, 0.001, "or_greater") var rig_accel_surge := 0.03
+## Rig, Accel: how quickly all of that follows the acceleration (1/s).
+@export_range(0.5, 60.0, 0.5, "or_greater") var rig_accel_rate := 6.0
+
+## Rig, Drift layer: its weight (0 off). When the nose and the travel part (slip), the rear of the body bends toward the
+## way it is really going and the pectorals flare as brakes.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_drift := 0.0
+## Rig, Drift: how far the rear of the body bends toward the velocity when the fish travels sideways (rad, all joints
+## together at a full sideways slip).
+@export_range(0.0, 2.0, 0.01, "or_greater") var rig_drift_bend := 0.7
+## Rig, Drift: how far the pectorals flare as brakes at a full sideways slip (rad).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_drift_fins := 0.6
+## Rig, Drift: how quickly the body follows the slip (1/s).
+@export_range(0.5, 60.0, 0.5, "or_greater") var rig_drift_rate := 6.0
+
+## Rig, FinStabilizer layer: its weight (0 off). The pectorals work as ailerons against the body's roll and pitch rates,
+## trim with the climb, and flutter with speed; the tail's own fin flutters with effort.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_fin_stabilizer := 0.0
+## Rig, FinStabilizer: how far the pectorals counter a roll or pitch (rad per rad/s of rate).
+@export_range(0.0, 1.0, 0.01, "or_greater") var rig_fin_stab := 0.15
+## Rig, FinStabilizer: how far the pectorals trim to a climb or dive (rad at a full one).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_fin_trim := 0.5
+## Rig, FinStabilizer: how far the pectorals flutter at full speed (rad).
+@export_range(0.0, 0.5, 0.005, "or_greater") var rig_fin_flutter := 0.08
+## Rig, FinStabilizer: how fast they flutter (Hz).
+@export_range(0.5, 30.0, 0.5, "or_greater") var rig_fin_flutter_hz := 6.0
+## Rig, FinStabilizer: how quickly the pectorals follow all of that (1/s).
+@export_range(0.5, 120.0, 0.5, "or_greater") var rig_fin_stab_rate := 15.0
+
+## Rig, Idle layer: its weight (0 off). A low hover when it isn't working: the pectorals scull and the tail sways
+## slowly. It fades out as effort and speed rise.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_idle := 0.0
+## Rig, Idle: how far the pectorals scull (rad).
+@export_range(0.0, 1.0, 0.01, "or_greater") var rig_idle_scull := 0.25
+## Rig, Idle: how far the tail sways (rad along the spine).
+@export_range(0.0, 1.0, 0.01, "or_greater") var rig_idle_sway := 0.12
+## Rig, Idle: how fast the hover beats (Hz).
+@export_range(0.1, 5.0, 0.05, "or_greater") var rig_idle_hz := 0.7
+## Rig, Idle: the speed (m/s) at which the hover has faded out completely.
+@export_range(0.1, 30.0, 0.1, "or_greater") var rig_idle_speed := 3.0

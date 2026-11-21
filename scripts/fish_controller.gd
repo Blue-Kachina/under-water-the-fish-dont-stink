@@ -348,9 +348,13 @@ const TIME_EPSILON := 0.0001
 ## rounder than the hitbox: at least 0.7 times as tall as it is wide.
 @export_range(0.5, 10.0, 0.05, "or_greater") var bow_girth := 1.8
 
-@export_group("Nature")
-## The slowest ram that batters Nature's target fish (m/s). RL's supersonic: 22.
-@export_range(0.0, 200.0, 0.5, "or_greater") var nature_batter_speed := 22.0
+## The slowest ram that batters (m/s). It left the fish for the Battery kit
+## (BatterySettings.batter_speed); this reads and writes that, for old callers.
+var nature_batter_speed: float:
+	get:
+		return BatterySettings.shared().batter_speed
+	set(value):
+		BatterySettings.shared().batter_speed = value
 
 @export_group("Jump & Dodge")
 ## Instant push along the fish's up axis on pressing jump. A double jump is this alone.
@@ -596,8 +600,13 @@ var input_source: PlayerInput
 var puppet := false
 var _puppet_velocity := Vector3.ZERO
 var _puppet_fx := PackedFloat32Array()
-## No input at all while set, e.g. during a kickoff countdown.
-var controls_locked := false
+## No input at all while set, e.g. during a kickoff countdown. Compat for
+## play_state == HELD (below): reading and writing it is the same as that.
+var controls_locked: bool:
+	get:
+		return _held
+	set(value):
+		_held = value
 ## A mode's multipliers on the tuned swimming (Unnatural's swim speed and
 ## stride power upgrades): on max_speed and forward_accel, and on stride_force.
 ## Not tuning, so never saved with it.
@@ -645,6 +654,48 @@ var team := -1
 var display_name := ""
 var _saved_layers := Vector2i.ONE
 var _idle_input := FishInput.new()  # what controls_locked reads
+
+## Where the fish is in a game: LIVE (plays), HELD (controls locked, e.g. a
+## kickoff countdown), OUT (battered: hidden, frozen, no collisions, until
+## revive(); the collision layers are saved and restored inside), PUPPET (shown,
+## not simulated: another machine's fish, see `puppet`). Reading gives the
+## state; writing HELD or LIVE sets the lock (it is remembered through OUT, so a
+## held fish is revived held), writing OUT is batter(), and PUPPET is read-only
+## (NetFish sets `puppet`). controls_locked, battered and puppet read through it.
+enum PlayState { LIVE, HELD, OUT, PUPPET }
+var play_state: PlayState:
+	get:
+		if puppet:
+			return PlayState.PUPPET
+		if battered:
+			return PlayState.OUT
+		return PlayState.HELD if _held else PlayState.LIVE
+	set(value):
+		match value:
+			PlayState.OUT:
+				if not battered:
+					batter()
+			PlayState.HELD:
+				_held = true
+			PlayState.LIVE:
+				_held = false
+var _held := false
+## A mode's named multipliers on the tuned swimming (push/pop), the read-out being the *_scale fields.
+var modifiers := FishModifiers.new(self)
+## A mode's save/restore switches (boost, surface, jump, strokes), push/pop.
+var capabilities := FishCapabilities.new(self)
+
+
+## Joins `team_index` for a match and tints the body in `color`.
+func join_team(team_index: int, color: Color) -> void:
+	team = team_index
+	team_color = color
+
+
+## Back to no team and the character's own colour.
+func leave_team() -> void:
+	team = -1
+	team_color = Color.TRANSPARENT
 
 # Latest input, sampled every physics tick.
 var input_forward := 0.0

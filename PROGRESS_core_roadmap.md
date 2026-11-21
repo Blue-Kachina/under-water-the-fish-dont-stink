@@ -18,9 +18,11 @@ D6 file moves done in worktree + committed, git: branch per track, push branches
 | T0b boundary | 0 | mode_boundary_probe (report only) | track/boundary | done |
 | T0c swimstate | 0 | M5 SwimState | track/swimstate | done, merged |
 | T1 swim | 1 | M4, M1, M2 | track/swim | running |
-| T2 rig | 2 | P1-P4 shark rig | track/rig | running |
+| T2 rig | 2 | P1-P4 shark rig | track/rig | done, merged (needs user eyes: D:/Dev/GameDev/wt/shots/rig) |
 | T3 hunt | 3 | H0-H4 done; H5-H7 | track/hunt | H5-H7 running |
-| T4 carve/rollout | 4 | M3, P5, Nature migration | track/carve etc | blocked |
+| T4a P5 rollout | 4 | Drowned Shark + 2 classes on rig | track/rollout | running |
+| T4b carve | 4 | M3 water carving | track/carve | waits on T1 + T3 H5 |
+| T4c nature | 4 | Nature migration | track/nature | waits on T3 H7 |
 
 ## Track sections
 ### T0a metrics
@@ -91,6 +93,13 @@ Open for T2 (rig): react() still derives the ray's `turned` and the Titan `_turn
 switching them to `swim.spin.y` is a feel change (render vs tick rate) so was left.
 ### T1 swim
 ### T2 rig
+Status 2026-11-21: P2, P3 (all 7 layers) and P4 BUILT on `track/rig` (worktree D:/Dev/GameDev/wt/rig), pushed. Shark only, `Gait.procedural_rig` off by default for every class.
+- Files: `scripts/swim_rig/` (`SwimRig` Node, `SwimPose`, `SpringChannel`, `RigLayer`, layers `RigLegacy`, `RigUndulation`, `RigTailDrive`, `RigTurn`, `RigAccel`, `RigDrift`, `RigFinStabilizer`, `RigIdle`); `Gait` gained ~45 `rig_*` exports (weights + every number, wide ranges, in the GAITS panel); `GaitSettings.default_for(HUNTER)` sets layers 1 and `rig_legacy_tail` 0 (applies only once the toggle is on); `FishModel` gained `rig_capable`/`rig`/`_rig_chain` (react() steps the rig; apply_bend/bend_transform use the Titan chain branch while engaged); `SharkModel.build` sets `rig_capable`. `fish_controller.gd` NOT touched.
+- Design: the rig reads only SwimState/Gait. The controller's own tail pivot pose is captured as the Legacy layer (zero-change state, weight `rig_legacy_tail`); the rig then writes the pivot, and recognises its own output so a controller-less fish holds its pose. Fin pivots belong to the controller (it lerps from its own value), so the rig turns a `RigFin` wrapper node inside each pivot (made lazily on first engage; rig off = no extra nodes). Spine = 3 equal arcs = exactly the old single arc when layers are 0 (gap 0.000000 m over 240 random frames). Sign conventions are in `swim_pose.gd` (bank + = left; turn curls the spine toward the turn's inside; accel + trails the tail down and lifts the head).
+- Probe `tests/swim_rig_probe` (headless, ~20 s): zero-change, toggle default off, per-layer blocks, stride cue still reaches every tail mesh with the same root/tip span, 60 s random soak no NaN (worst turn 1.25 rad), 50-fish bench. Bench (editor binary, upper bound): react 25 us/fish with rig vs 1.5 us without, so the rig adds ~24 us/fish (budget 50 us).
+- Shots `tests/shark_rig_shots` (windowed works; ran fine): sheets in D:/Dev/GameDev/wt/shots/rig (20 PNGs: straight_0/5/15/30 top+three_quarter, turn_15/30 top+three_quarter+side, brake_30, stride side+top, drift). Top row = rig off (controller pose copied into the tool), bottom = on. NEEDS THE USER'S EYES: whole pose feel, amplitude/frequency defaults (Strouhal 0.04, 0.5-3.5 Hz), turn curl, bank, fin motion. Note the shark is only 1.3 m long and speeds reach 23 m/s so wave frequency is clamped, not physical.
+- Polish list (2.3): done: envelope grows toward the tail (joints 1:4:9, bend starts behind the pectorals), caudal flex leads the spine by `rig_caudal_lead` deg, pectorals bank first (faster spring), stride power deepens the wave. NOT done: dorsal stiff-on-a-rider (the dorsal is not a bent part so it never flexes, but it is rigid with the model, not carried by the head counter-bend); gill beat.
+- Open: `setting_docs.gd` regenerated at the end of this track only if noted below; Legacy layer drops the powerslide tail kick when `rig_legacy_tail` is 0 (Drift covers sideways slip); hunter forms/Drowned Shark still on their own rigs (P5 not started); the Idle layer is on at rest by design (pose is zero at rest only with it off).
 ### T3 hunt
 **H0 DONE (2026-11-20, branch track/hunt, worktree D:/Dev/GameDev/wt/hunt).** Tests only; no gameplay script touched.
 - `tests/hunt_probe.gd` already drove kickoff, slow bump, player battery (+arcade replay), opponent battery, head-on faster, Fish Fry (+replay), time-up on points, new match, overtime start/live/battery win, arena edge, leave, Nature->Hunt. H0 added: `seed(20261120)` in `_ready`, 12 `_snap(label)` rows (phase, scores, style points, clock @0.01, overtime, overtime_elapsed, winner, fish_fry, battered[2], replay alive, event count) plus the `stat_event` log, written to `tests/fixtures/hunt_baseline.json`.
@@ -156,3 +165,27 @@ How Hunt is launched in probes: `main.set_mode(main.HUNT)` parks on a MatchCard 
 - 2026-11-20: T0a + T0b merged into roadmap/core. Finding (T0a): in open Ocean on Nature the FollowCamera yaw wobble is 0.00 deg (follow_air_rotation off), so plan F6 holds only near a surface; M4 acceptance must use `camera_wobble_follow` (7.17 deg). Verify F6 in real play.
 - 2026-11-20: T3 H1-H4 merged. hunt_probe baseline compare tolerates 0.011 float wobble (overtime_elapsed 1-tick jitter). audio_probe has 2 pre-existing failures.
 - 2026-11-20: T0c merged (phase 0 complete). Names: model.swim.* replaces old model fields (stride_swing->stride_dir, bell_gait->gait). Phases 1-3 launched in parallel.
+- 2026-11-21: T2 merged. setting_docs not regenerated for rig_* (do once at end: tools/gen_setting_docs.gd). P5 launched.
+
+## HANDOFF (written 2026-11-21, session limit reached)
+Resume as coordinator in a new session. Read this file + planning_core_roadmap.md first.
+
+State of `roadmap/core` (pushed): phase 0 (T0a metrics, T0b boundary, T0c SwimState), T2 shark rig (P1-P4) and Hunt H0-H4 are merged.
+
+Workers that were still running when the session ended (their agents are gone; work lives in worktrees/branches, may include UNCOMMITTED changes, so inspect `git -C <wt> status` and `git log` before relaunching):
+| Track | Worktree | Branch | Last known state |
+|---|---|---|---|
+| T1 swim (M4, M1, M2) | D:/Dev/GameDev/wt/swim | track/swim | no commits ahead of roadmap/core at last check; check the worktree for uncommitted work, read its "### T1 swim" section |
+| T3 hunt H5-H7 | D:/Dev/GameDev/wt/hunt | track/hunt | H5, H6, H7 committed (57f9f65, 47b027b, 8f8173c) but NOT yet merged or reviewed; discard test/probe gates unverified by coordinator. Run hunt_probe, mode_boundary_probe, swishy/nature/gait probes, then merge into roadmap/core |
+| T4a P5 rollout | D:/Dev/GameDev/wt/rollout | track/rollout | just started, nothing committed; read "### T4a P5 rollout" |
+Not started: T4b M3 water carving (after T1 + H5 merged; behind toggle, default off), T4c Nature migration (after H7 merged, same H0-H7 shape: School to kits first, TargetWheel to a camera claim, split-screen via add_player).
+
+Resume steps:
+1. `git checkout roadmap/core && git pull`; `git worktree list`; inspect each worktree's status/log.
+2. For each track branch with commits: merge into roadmap/core (only `git add` named paths in worktrees: fresh worktrees show ~800 CRLF-noise files; do not use `git add -A`/`commit -a` there or in main after `--import`). Resolve PROGRESS conflicts (dashboard rows). Re-run: hunt_probe, swim_state_probe, swim_rig_probe, swim_metrics_probe, gait_probe, swishy_probe, mode_boundary_probe --strict.
+3. Relaunch unfinished tracks with the same briefs as in the "Track sections" (each worker edits only its own section; worktree setup needs `.godot/`, `addons/godotsteam`, `addons/under-water-the-fish-dont-stinkExt/bin/windows/` copied from the main checkout, then `--import`).
+4. At the end: regenerate setting_docs (`tools/gen_setting_docs.gd`; not yet done for rig_* settings), make the debug build (export `--export-debug` to the ABSOLUTE path D:/Dev/GameDev/under-water-the-fish-dont-stink/builds/windows/FishPlayground.exe), hand off for play-testing.
+
+Known pre-existing failures (not from this work): audio_probe (2), pick_card_probe, pause_probe, unnatural_coop_probe, hider_looks_probe, preview_jitter_probe, school_probe flake, two_stage_bite_probe broken. hunt_probe baseline compare tolerates 0.011 float wobble.
+
+For the user to play-test / review: shark rig shots in D:/Dev/GameDev/wt/shots/rig (toggle Gait.procedural_rig for shark); F6 camera wobble is 0.00 deg in open Nature Ocean (only near surface); M1 held-vs-flick, M2 gentle curve, M4 settle cam when T1 lands; M3 carving later. Decisions D1-D5 taken as recommended; D6 file moves done in worktree; D7 nothing discarded.
