@@ -135,7 +135,9 @@ func _snap(label: String) -> void:
 		# The host's mode lists and the picker's tile order: registering the mode must not move them.
 		row["modes"] = Array(main.MODES)
 		row["match_modes"] = Array(main.MATCH_MODES)
+		row["match_modes"].sort()  # a set: its order is not behaviour
 		row["nature_modes"] = Array(main.NATURE_MODES)
+		row["nature_modes"].sort()
 		row["tile_order"] = Array(main.MODE_TILES.keys())
 		row["tile_title"] = main.MODE_TILES[main.UNNATURAL].title
 		row["tank_title"] = main.MODE_TILES[main.TEST_TANK].title

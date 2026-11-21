@@ -29,8 +29,6 @@ extends Node3D
 ## A Nature run started (Play, a restart doesn't count), or ended.
 signal mode_started(mode: GameMode)
 signal mode_ended(id: String)
-signal unnatural_started(run: UnnaturalRun)
-signal unnatural_ended
 signal marco_polo_started(game: MarcoPoloMatch)
 signal marco_polo_ended
 signal what_stinks_started(game: WhatStinksMatch)
@@ -58,11 +56,11 @@ const OBSTACLE_COURSE := "Obstacle Course"
 const REPLAYS := "Replays"
 const MARCO_POLO := "Marco Polo"
 const WHAT_STINKS := "What Stinks?"
-const _CORE_MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS, REPLAYS]
+const _CORE_MODES := [FREE_PLAY, ONE_V_ONE, FREE_SWIM, OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS, REPLAYS]
 ## Modes played as a match, which wait on a card for Play.
-const _CORE_MATCH_MODES := [ONE_V_ONE, UNNATURAL, TEST_TANK, MARCO_POLO, WHAT_STINKS]
+const _CORE_MATCH_MODES := [ONE_V_ONE, MARCO_POLO, WHAT_STINKS]
 ## Modes played on Nature's tuning.
-const _CORE_NATURE_MODES := [UNNATURAL, TEST_TANK, OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS]
+const _CORE_NATURE_MODES := [OBSTACLE_COURSE, MARCO_POLO, WHAT_STINKS]
 ## Nature's tuning: Extra Swishy strides, no boost.
 const NATURE_PRESET := "res://presets/nature.cfg"
 ## Mode -> the environment it's played in.
@@ -70,8 +68,6 @@ const MODE_ENVIRONMENTS := {
 	FREE_PLAY: "Aquarium Arena",
 	ONE_V_ONE: "Aquarium Arena",
 	FREE_SWIM: "Ocean",
-	UNNATURAL: "Ocean",
-	TEST_TANK: "Ocean",
 	OBSTACLE_COURSE: "Obstacle Course",
 	MARCO_POLO: "Sunken Temple",  # its card's arena picker decides (mode_environment())
 	WHAT_STINKS: "Ocean",
@@ -81,9 +77,6 @@ const MODE_ENVIRONMENTS := {
 ## pitch (the featured tile), a short line (a small tile), its line icon
 ## (HexBadge), its colours (the tile, its accent) and how it can be played.
 const _CORE_TILES := {
-	UNNATURAL: {"title": "Unnatural", "icon": "mode_unnatural", "colors": [Color(0.25, 0.04, 0.08), Color(0.93, 0.25, 0.3)],
-		"pitch": "A blood moon has turned every fish but you. Survive the zombie horde, level up and stack powerups from chests.",
-		"short": "Survive the zombie horde", "play": ["Solo", "Split-screen", "Online"]},
 	"Fish Sticks": {"title": "Fish Sticks", "icon": "mode_1v1", "colors": [Color(0.04, 0.17, 0.3), Color(0.35, 0.65, 1.0)],
 		"pitch": "Fish-ball in the aquarium arena: play a 1v1 against a bot, or Free Play with no clock.",
 		"short": "1v1 or Free Play with a ball", "play": ["Solo"]},
@@ -99,9 +92,6 @@ const _CORE_TILES := {
 	OBSTACLE_COURSE: {"title": "Obstacle Course", "icon": "mode_obstacle_course", "colors": [Color(0.16, 0.12, 0.05), Color(1.0, 0.8, 0.3)],
 		"pitch": "Hoops, ramps and walls to swim through, round and over.",
 		"short": "Hoops, ramps and walls", "play": ["Solo"]},
-	TEST_TANK: {"title": "Test Tank", "icon": "mode_test_tank", "colors": [Color(0.12, 0.08, 0.2), Color(0.75, 0.55, 1.0)],
-		"pitch": "Unnatural's shooting range: dummies to hit, every stat to set, and a DPS readout.",
-		"short": "Dummies and a DPS readout", "play": ["Solo"]},
 	MARCO_POLO: {"title": "Marco Polo", "icon": "mode_marco_polo", "colors": [Color(0.03, 0.14, 0.12), Color(0.4, 1.0, 0.7)],
 		"pitch": "Hide and seek by sound. Score in the seeker's sight, keep quiet, and don't get tagged.",
 		"short": "Hide and seek by sound", "play": ["Solo", "Online"]},
@@ -139,9 +129,13 @@ var NATURE_MODES: Array = _CORE_NATURE_MODES + ModeRegistry.tuned_ids()
 var MODE_TILES: Dictionary = ModeRegistry.merged_tiles(_CORE_TILES)
 ## Free Swim's endless terrain (null outside Free Swim or with terrain_stream off).
 var _terrain_stream: TerrainStream
-## The Unnatural run being played, if any, and its HUD.
-var unnatural_run: UnnaturalRun
-var _unnatural_hud: UnnaturalHud
+## The Unnatural run (or Test Tank) being played, if any (a registered mode's node), and its HUD.
+var unnatural_run: Object:
+	get:
+		return _modes.active if _modes.active_id() in [UNNATURAL, TEST_TANK] else null
+var _unnatural_hud: Object:
+	get:
+		return unnatural_run.hud if unnatural_run else null
 ## The Marco Polo match being played, if any.
 var marco_polo: MarcoPoloMatch
 ## The What Stinks? match being played, if any.
@@ -423,7 +417,7 @@ func set_character(character: FishCharacter.FishClass) -> void:
 	else:
 		_fish.set_look(character, species)
 	if unnatural_run:
-		unnatural_run.start()  # its loadout comes from the class (Change Character is off there for now)
+		unnatural_run.restart()  # its loadout comes from the class (Change Character is off there for now)
 	elif not (match_1v1 or _modes.active or marco_polo or what_stinks):
 		_fish.set_spawn(_environment.spawn_transform())
 	# Otherwise it's worn now, mid-match: 1v1, Nature and Hunt keep nothing of the class (no
@@ -527,10 +521,6 @@ func reset_play() -> void:
 		if what_stinks.authority:
 			what_stinks.start_match()
 		return
-	if unnatural_run:
-		if unnatural_run.authority:
-			unnatural_run.start()  # online, the host's restart is everyone's
-		return
 	_fish.set_spawn(_environment.spawn_transform())  # re-read: the aquarium's depends on the ball type
 	_fish.respawning.emit()
 	if _environment is Arena:
@@ -551,8 +541,6 @@ func _reset_label() -> String:
 		return "Restart match" if marco_polo.authority else ""
 	if what_stinks:
 		return "Restart match" if what_stinks.authority else ""
-	if unnatural_run:
-		return "Reset the tank" if unnatural_run.test_tank else "Restart run"
 	return "Reset"
 
 
@@ -815,10 +803,6 @@ static func _match_card_text(mode: String) -> String:
 	match mode:
 		ONE_V_ONE:
 			return "1v1 against a bot: %d minutes on the clock, overtime on a tie." % int(Match1v1.MATCH_TIME / 60.0)
-		TEST_TANK:
-			return "Test Tank: Unnatural's shooting range. Immortal dummies wait ahead (a cluster, and lines at 10, 20 and 40 m) and the DPS readout shows each damage source. Set your level, every stat, the dummies and a chasing horde in the tuning panel's UNNATURAL > Test Tank. R resets."
-		UNNATURAL:
-				return "Unnatural: there's a blood moon tonight, and every fish in the sea has turned but you. Survive the zombie horde. Your fish bites on its own: huge ghost jaws snap on whatever's ahead. Ram them at speed to batter them too (it doesn't hurt you), but any other touch does. Swim through the XP pearls they drop to level up."
 		MARCO_POLO:
 			return "Marco Polo: hide and seek by sound. Each round one fish seeks and the rest hide: you seek once, and a bot seeks while you hide (Start as picks which comes first). Hiders score while they're in the seeker's line of sight, even unseen, but every noise (fast swimming, flips, badly timed strides) shows them to the seeker, layer by layer. The seeker tags by touch (click the left stick, or M, to call \"Marco!\"); hiders throw a Fake Fish with RB. Y swaps follow and free cam, as in Unnatural. Last Fish Swimming: tagged is out. Join the Seekers: tagged hunts with them."
 		WHAT_STINKS:
@@ -886,7 +870,7 @@ func _apply_mode() -> void:
 			_local.dropped_for_marco_polo = _local.count() - 1
 		elif not one_screen:
 			_local.dropped_for_marco_polo = 0
-	if current_mode != UNNATURAL and not ModeRegistry.describe(current_mode).get("split_screen", false) and _local:
+	if not ModeRegistry.describe(current_mode).get("split_screen", false) and _local:
 		_local.drop_extras()  # split-screen co-op is Unnatural's and the modes' that allow it
 	_use_nature_tuning(current_mode in NATURE_MODES)
 	_use_course_cam(current_mode == OBSTACLE_COURSE)
@@ -938,15 +922,13 @@ func _sync_terrain_stream() -> void:
 
 ## A match, a Nature run or a Hunt is on.
 func _playing() -> bool:
-	return match_1v1 != null or _modes.active != null or unnatural_run != null or marco_polo != null or what_stinks != null
+	return match_1v1 != null or _modes.active != null or marco_polo != null or what_stinks != null
 
 
 ## The mode of the match being played ("" when none).
 func _playing_mode() -> String:
 	if match_1v1:
 		return ONE_V_ONE
-	if unnatural_run:
-		return TEST_TANK if unnatural_run.test_tank else UNNATURAL
 	if marco_polo:
 		return MARCO_POLO
 	if what_stinks:
@@ -999,9 +981,6 @@ func _start_match() -> void:
 		return
 	if current_mode == WHAT_STINKS:
 		_start_what_stinks()
-		return
-	if current_mode in [UNNATURAL, TEST_TANK]:
-		_start_unnatural(current_mode == TEST_TANK)
 		return
 	match_1v1 = Match1v1.new()
 	match_1v1.name = "Match"
@@ -1174,7 +1153,7 @@ func host_unnatural_run() -> void:
 		return
 	_end_match()
 	_close_match_card()
-	_start_unnatural(false, true)
+	_start_registered(UNNATURAL, {"authority": true})
 
 
 ## Online co-op's guest in Unnatural: a run of our players in the host's world.
@@ -1182,7 +1161,7 @@ func guest_unnatural_run() -> void:
 	set_mode(UNNATURAL)
 	_end_match()
 	_close_match_card()
-	_start_unnatural(false, false)
+	_start_registered(UNNATURAL, {"authority": false})
 
 
 ## Back from being a guest: Unnatural on our own again, the world ours.
@@ -1191,50 +1170,10 @@ func solo_unnatural_run() -> void:
 		return
 	_end_match()
 	_close_match_card()
-	_start_unnatural(false, true)
-
-
-## Unnatural (or its Test Tank): the run with every local player (LocalCoop),
-## its HUD, and the survivor cam. The world's run here (`authority`) unless
-## this is an online session's guest.
-func _start_unnatural(test_tank := false, authority := true) -> void:
-	unnatural_run = UnnaturalRun.new()
-	unnatural_run.name = "TestTank" if test_tank else "Unnatural"
-	unnatural_run.test_tank = test_tank
-	unnatural_run.authority = authority
-	unnatural_run.setup(_environment as Ocean, _fish)
-	for slot in _local.slots:
-		slot.fish.set_meta("coop_index", slot.index)
-		if slot.index > 0:
-			unnatural_run.players.append(slot.fish)
-	_environment.add_child(unnatural_run)
-	_camera.ball = null
-	_camera.ball_cam = false
-	SurvivorCam.apply(_camera, true, unnatural_run.settings)
-	_camera.snap()
-	_hud.survivor_cam = true
-	_unnatural_hud = UnnaturalHud.new()
-	_unnatural_hud.name = "UnnaturalHud"
-	_unnatural_hud.run = unnatural_run
-	_unnatural_hud.fish = _fish
-	add_child(_unnatural_hud)
-	_local.slots[0].mode_hud = _unnatural_hud
-	_local.attach_run(unnatural_run)  # each player's survivor cam and HUD
-	unnatural_started.emit(unnatural_run)
+	_start_registered(UNNATURAL, {"authority": true})
 
 
 func _end_match() -> void:
-	if unnatural_run:
-		_local.detach_run()
-		_local.slots[0].mode_hud = null
-		SurvivorCam.apply(_camera, false, unnatural_run.settings)
-		_hud.survivor_cam = false
-		unnatural_run.end()
-		unnatural_run.queue_free()
-		unnatural_run = null
-		_unnatural_hud.queue_free()
-		_unnatural_hud = null
-		unnatural_ended.emit()
 	if marco_polo:
 		marco_polo.end()
 		marco_polo.queue_free()

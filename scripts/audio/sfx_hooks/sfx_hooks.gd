@@ -110,12 +110,12 @@ func _on_node_added(node: Node) -> void:
 	elif node is Match1v1:
 		_attach.call_deferred(node, MatchSounds.new(), &"sfx_hook")
 		_attach.call_deferred(node, BatteredSounds.new(), &"sfx_battered")
-	elif node is UnnaturalRun:
-		_attach.call_deferred(node, UnnaturalSounds.new())
-	elif node is Boss:
-		_attach.call_deferred(node, BossSounds.new())
-	elif node is FishAttack:
-		_watch(node, (node as FishAttack).fired, _on_attack_fired.bind(node))
+	elif node.has_method(&"sfx_hook_node"):
+		# A mode's own node type (an Unnatural boss) makes its sound hook.
+		_attach.call_deferred(node, node.call(&"sfx_hook_node"))
+	elif node.has_method(&"sfx_fire_id"):
+		# A mode's attack node: a sound from its fish's place when it goes off.
+		_watch(node, node.get("fired"), _on_attack_fired.bind(node))
 	elif node is TargetWheel:
 		_attach.call_deferred(node, WheelSounds.new())
 	elif node is BaseButton:
@@ -187,10 +187,11 @@ func _on_button_pressed(button: BaseButton) -> void:
 		request(id)
 
 
-## An Unnatural attack goes off: its own sound, from the fish's place.
-func _on_attack_fired(attack: FishAttack) -> void:
-	if is_instance_valid(attack.fish) and not attack.fish.puppet:
-		Sfx.play_at("unnatural/%s_fire" % attack.source(), attack.fish.global_position)
+## A mode's attack goes off: its own sound (sfx_fire_id()), from the fish's place.
+func _on_attack_fired(attack: Node) -> void:
+	var fish: FishController = attack.get("fish")
+	if is_instance_valid(fish) and not fish.puppet:
+		Sfx.play_at(attack.call(&"sfx_fire_id"), fish.global_position)
 
 
 func _on_slider_changed(value: float, slider: Slider) -> void:

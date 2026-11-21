@@ -1,5 +1,5 @@
 class_name UnnaturalRun
-extends Node
+extends GameMode
 ## Unnatural mode in the Ocean (planning_unnatural.md): there's a blood moon
 ## tonight and every fish in the sea has turned, except the players. The
 ## zombies (a Horde) come after them; they survive, level up and (later) dig up
@@ -345,6 +345,39 @@ var _kind_rng: RandomNumberGenerator
 var _seabed_seed := SEABED_SEED
 
 
+## The picker tile, environment, tuning, card and settings (GameMode's descriptor).
+static func descriptor() -> Dictionary:
+	return {
+		"id": "Unnatural", "title": "Unnatural", "icon": "mode_unnatural",
+		"colors": [Color(0.25, 0.04, 0.08), Color(0.93, 0.25, 0.3)],
+		"pitch": "A blood moon has turned every fish but you. Survive the zombie horde, level up and stack powerups from chests.",
+		"short": "Survive the zombie horde", "play": ["Solo", "Split-screen", "Online"],
+		"environment": "Ocean", "match": true, "after": "Hunt", "tile_before": "Fish Sticks",
+		"tuning_preset": "res://presets/nature.cfg",
+		"card_text": UnnaturalRun.card_text, "reset_label": "Restart run", "split_screen": true,
+		"settings": UnnaturalSettings, "setup_rows": UnnaturalRun.setup_rows,
+		"extra_settings": [["powerups", "Powerups", PowerupSettings]],
+		"sfx": [[UnnaturalSounds, &"sfx_hook"]],
+	}
+
+
+static func card_text() -> String:
+	return "Unnatural: there's a blood moon tonight, and every fish in the sea has turned but you. Survive the zombie horde. Your fish bites on its own: huge ghost jaws snap on whatever's ahead. Ram them at speed to batter them too (it doesn't hurt you), but any other touch does. Swim through the XP pearls they drop to level up."
+
+
+## The mode setup modal's rows (ModeSetups): the run's length.
+static func setup_rows(setup: ModeSetup, row: Callable) -> void:
+	var us := UnnaturalSettings.shared()
+	setup.rows.append(row.call("Run length", [["Short", "One stage."], ["Standard", "%d stages." % us.standard_stages],
+			["Endless", "Until the sea wins."]], clampi(us.run_length, 0, 2), func(i: int) -> void: us.run_length = i))
+
+
+## The host's world for this start (the survivor cam, HUD and split-screen players).
+var _world: ModeWorld
+## The first player's HUD (UnnaturalHud), made at start() and freed at release().
+var hud: UnnaturalHud
+
+
 func setup(run_ocean: Ocean, player_fish: FishController) -> void:
 	ocean = run_ocean
 	player = player_fish
@@ -408,11 +441,11 @@ func _ready() -> void:
 		stage_completed.connect(func() -> void: run_log.finish("won"))
 	for fish in players:
 		_join(fish)
-	start()
+	restart()
 
 
-## Everyone back at the start: the horde gone, level 1, full health.
-func start() -> void:
+## Everyone back at the start: the horde gone, level 1, full health (R; the old start()).
+func restart() -> void:
 	_log_quit()
 	if authority:
 		restarted.emit()
@@ -496,7 +529,7 @@ func _log_quit() -> void:
 
 
 ## The class survival sim's scenario (planning_bosses_and_survival.md §5b),
-## right after start(): the run's clock jumps to `seconds`, so difficulty,
+## right after restart(): the run's clock jumps to `seconds`, so difficulty,
 ## zombie hp, the roster's unlocks and the director's baseline follow. The
 ## stage events already past are dropped (all of them unless `keep_events`),
 ## and the boss rift stays shut. The team is at `player_level` (each level's
@@ -582,7 +615,88 @@ func spawn_for(fish: FishController, spawn: Transform3D) -> Transform3D:
 
 
 ## Hands the players' fish back. Call before freeing the run.
+## The environment is ready: the world's local players (split-screen ones past the first)
+## and whether this machine runs the world (an online guest's doesn't).
+func enter(world: ModeWorld) -> void:
+	_world = world
+	authority = world.options.get("authority", true)
+	setup(world.environment as Ocean, world.fish)
+	for slot: PlayerSlot in world.slots:
+		slot.fish.set_meta("coop_index", slot.index)
+		if slot.index > 0:
+			players.append(slot.fish)
+
+
+## Play: the survivor cam on the first player's view, their HUD, and every local player wired in.
+func start() -> void:
+	var camera: Node = _world.camera
+	camera.ball = null
+	camera.ball_cam = false
+	SurvivorCam.apply(camera, true, settings)
+	camera.snap()
+	_world.hud.survivor_cam = true
+	hud = UnnaturalHud.new()
+	hud.name = "UnnaturalHud"
+	hud.run = self
+	hud.fish = _world.fish
+	_world.host.add_child(hud)
+	_world.slots[0].mode_hud = hud
+	_world.host.attach_local_players(self)  # each player's survivor cam and HUD
+
+
+## R: the run again (online, only the host's restart is everyone's).
+func reset() -> void:
+	if authority:
+		restart()
+
+
+## A local player's own survivor cam, chest view and (past the first) HUD
+## (LocalCoop calls it for each slot, and for anyone joining later).
+func attach_player(slot: PlayerSlot) -> void:
+	slot.camera.ball = null
+	slot.camera.ball_cam = false
+	slot.camera.cull_mask = TreasureChest.view_mask(slot.index)  # their chests, not the others'
+	SurvivorCam.apply(slot.camera, true, settings)
+	if slot.index > 0 and not is_instance_valid(slot.mode_hud):
+		var their_hud := UnnaturalHud.new()
+		their_hud.name = "UnnaturalHud%d" % (slot.index + 1)
+		their_hud.run = self
+		their_hud.fish = slot.fish
+		slot.mode_hud = their_hud
+		slot.camera.get_parent().add_child(their_hud)
+	if slot.mode_hud is UnnaturalHud:
+		(slot.mode_hud as UnnaturalHud).player_camera = slot.camera  # its follow / free cam note
+	if slot.index > 0 and is_instance_valid(slot.hud):
+		slot.hud.survivor_cam = true  # no controls line, as for the first player
+
+
+func detach_player(slot: PlayerSlot) -> void:
+	var camera: Node = slot.camera
+	if not is_instance_valid(camera):
+		return
+	SurvivorCam.apply(camera, false, settings)
+	camera.cull_mask = 0xFFFFF
+	if slot.index > 0 and is_instance_valid(slot.mode_hud):
+		slot.mode_hud.queue_free()
+	slot.mode_hud = null
+	if slot.index > 0 and is_instance_valid(slot.hud):
+		slot.hud.survivor_cam = false
+
+
+## After end(): the first player's HUD goes.
+func release() -> void:
+	if is_instance_valid(hud):
+		hud.queue_free()
+	hud = null
+
+
+## Leaving: the players' views back to the usual chase cam, then the run's own teardown.
 func end() -> void:
+	if _world != null:
+		_world.host.detach_local_players()
+		_world.slots[0].mode_hud = null
+		SurvivorCam.apply(_world.camera, false, settings)
+		_world.hud.survivor_cam = false
 	_log_quit()
 	set_physics_process(false)
 	horde.set_physics_process(false)

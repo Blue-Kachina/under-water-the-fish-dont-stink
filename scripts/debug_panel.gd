@@ -40,7 +40,7 @@ const PREVIEW_DIR := "res://assets/ui/previews"
 ## The sections in order: [id, title]. Game, Display and Controls are
 ## UISettings and Controls; the rest are tuning targets.
 const SECTIONS := [["game", "Game"], ["display", "Display"], ["audio", "Audio"], ["controls", "Controls"], ["camera", "Camera"], ["fish", "Fish"], ["battery", "Battery"],
-		["gaits", "Gaits"], ["ball", "Ball"], ["unnatural", "Unnatural"], ["powerups", "Powerups"], ["marco_polo", "Marco Polo"], ["what_stinks", "What Stinks?"], ["hunter_size", "Hunter Size"], ["water_look", "Water Look"]]
+		["gaits", "Gaits"], ["ball", "Ball"], ["marco_polo", "Marco Polo"], ["what_stinks", "What Stinks?"], ["hunter_size", "Hunter Size"], ["water_look", "Water Look"]]
 ## Who each tuning section is for ("Used by ...").
 const USED_BY := {
 	"camera": "the follow camera, in every mode",
@@ -234,7 +234,7 @@ func _ready() -> void:
 		if _mode_settings.has(entry[0]):
 			_targets[entry[0]] = _mode_settings[entry[0]]
 	_targets.merge({"fish": fish, "gaits": GaitSettings.shared(), "camera": follow_camera, "ball": ball_settings,
-			"unnatural": UnnaturalSettings.shared(), "powerups": PowerupSettings.shared(), "marco_polo": MarcoPoloSettings.shared(),
+			"marco_polo": MarcoPoloSettings.shared(),
 			"what_stinks": WhatStinksSettings.shared(), "hunter_size": HunterSize.shared(),
 			"water_look": WaterLook.shared()})
 	for section: String in _targets:
@@ -272,6 +272,11 @@ func _build_section_list() -> void:
 		_mode_used_by[id] = String(d["title"])
 		_sections.insert(at + 1, [id, d["title"]])
 		at += 1
+		for extra: Array in d.get("extra_settings", []):  # more sections of the same mode: [id, title, script]
+			_mode_settings[extra[0]] = (extra[2] as GDScript).call(&"shared")
+			_mode_used_by[extra[0]] = String(extra[1])
+			_sections.insert(at + 1, [extra[0], extra[1]])
+			at += 1
 
 
 func is_open() -> bool:

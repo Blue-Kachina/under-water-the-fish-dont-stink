@@ -264,3 +264,7 @@ func _exit_tree() -> void:
 				run.horde.remove(index)
 	parts.clear()
 
+
+## SfxHooks asks for a boss's sound hook.
+func sfx_hook_node() -> Node:
+	return BossSounds.new()

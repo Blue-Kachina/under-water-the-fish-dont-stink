@@ -76,7 +76,7 @@ func _run() -> void:
 	await _ticks(5)
 	run = main.unnatural_run
 	var horde := run.horde
-	run.start()
+	run.restart()
 	await _ticks(5)
 
 	print("the murk:")

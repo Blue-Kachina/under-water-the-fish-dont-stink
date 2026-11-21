@@ -86,7 +86,7 @@ func _run() -> void:
 			settings.fish_attack = kind
 			TestTank.apply_preset(level, settings)
 			await _ticks(3)
-			run.start()
+			run.restart()
 			await _ticks(2)
 			var centre := middle
 			var rng := RandomNumberGenerator.new()

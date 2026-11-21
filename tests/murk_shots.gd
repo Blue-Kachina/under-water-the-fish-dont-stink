@@ -37,7 +37,7 @@ func _run() -> void:
 	await _frames(10)
 	var run: UnnaturalRun = main.unnatural_run
 	var horde := run.horde
-	run.start()
+	run.restart()
 	await _frames(20)
 	fish.freeze = true
 	settings.card_choices = 0  # no level-up pause mid-ladder

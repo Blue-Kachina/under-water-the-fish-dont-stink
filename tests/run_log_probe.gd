@@ -115,7 +115,7 @@ func _run() -> void:
 	log_of.save()
 	var left := Array(DirAccess.get_files_at(RunLog.dir)).filter(func(f: String) -> bool: return f.begins_with("run_") and f.ends_with(".json"))
 	check(left.size() == settings.run_logs_keep and log_of.saved_path.get_file() in left, "only the newest %d stay (%d)" % [settings.run_logs_keep, left.size()])
-	run.start()
+	run.restart()
 	await _ticks(2)
 	check(run.run_log.samples.is_empty() and run.run_log.ending.is_empty(), "a restart starts a fresh log")
 

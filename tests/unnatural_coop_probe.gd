@@ -46,6 +46,8 @@ func _run() -> void:
 	print("joining:")
 	_press(PADS[0], LocalCoop.JOIN_BUTTON)
 	await _ticks(5)
+	_press(PADS[0], JOY_BUTTON_A)  # the joiner's character screen: Dive in
+	await _ticks(5)
 	check(local.count() == 2 and run.players.size() == 2, "Back/View joins the Unnatural run")
 	var split: SplitScreen = main.get_node_or_null("SplitScreen")
 	check(split != null and split.count() == 2, "the window splits")

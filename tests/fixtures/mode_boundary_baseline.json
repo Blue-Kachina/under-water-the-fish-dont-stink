@@ -1,23 +1,16 @@
 {
 	"note": "Today's violations. tests/mode_boundary_probe.gd --record rewrites it; it should only ever shrink.",
-	"total": 133,
+	"total": 108,
 	"violations": {
 		"audio/sfx_hooks/sfx_hooks.gd": {
 			"BatteredSounds": 1,
-			"Boss": 1,
-			"BossSounds": 1,
-			"FishAttack": 3,
-			"Match1v1": 1,
-			"UnnaturalRun": 1,
-			"UnnaturalSounds": 1
+			"Match1v1": 1
 		},
 		"debug_panel.gd": {
 			"HunterSize": 1,
 			"MarcoPoloSettings": 1,
 			"Powerup": 4,
-			"PowerupSettings": 1,
 			"Rarity": 1,
-			"UnnaturalSettings": 1,
 			"WhatStinksSettings": 1
 		},
 		"fish_model.gd": {
@@ -29,14 +22,8 @@
 		"hud.gd": {
 			"Match1v1": 8
 		},
-		"kits/school_look.gd": {
-			"ZombieLooks": 1
-		},
 		"local_coop.gd": {
-			"Match1v1": 1,
-			"TreasureChest": 1,
-			"UnnaturalHud": 3,
-			"UnnaturalRun": 5
+			"Match1v1": 1
 		},
 		"main.gd": {
 			"CourseSkill": 2,
@@ -44,8 +31,6 @@
 			"MarcoPoloMatch": 3,
 			"MarcoPoloSettings": 11,
 			"Match1v1": 3,
-			"UnnaturalHud": 2,
-			"UnnaturalRun": 3,
 			"WhatStinksMatch": 3,
 			"WhatStinksSettings": 5,
 			"path:marco_polo/fish_tank_arena.gd": 1,
@@ -72,7 +57,6 @@
 			"HunterForms": 4,
 			"MarcoPoloMatch": 1,
 			"MarcoPoloSettings": 12,
-			"UnnaturalSettings": 1,
 			"WhatStinksMatch": 1,
 			"WhatStinksSettings": 13
 		}

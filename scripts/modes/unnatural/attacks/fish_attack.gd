@@ -417,3 +417,8 @@ func worn_material(glow := 0.6) -> StandardMaterial3D:
 
 static func worn_mesh(mesh: Mesh, material: Material, at: Vector3, turn := Vector3.ZERO) -> MeshInstance3D:
 	return Powerup.worn_mesh(mesh, material, at, turn)
+
+
+## SfxHooks asks for the sound an attack makes going off.
+func sfx_fire_id() -> String:
+	return "unnatural/%s_fire" % source()

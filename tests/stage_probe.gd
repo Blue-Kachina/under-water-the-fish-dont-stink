@@ -170,7 +170,7 @@ func _run() -> void:
 	check(run.near_whirlpool(fish) and run.whirlpool.height >= settings.arena_ceiling - settings.arena_floor, "the whirlpool is a column: seabed to surface")
 	run.enter_whirlpool(fish)
 	check(completed[0] and run.stage_complete and run.is_over, "entering it: STAGE COMPLETE, the run's over (won)")
-	run.start()
+	run.restart()
 	await _ticks(3)
 	check(run.bosses.is_empty() and not run.stage_complete and run.timeline.pending.size() == 5 and horde.alive_count() == 0, "R: a fresh stage")
 	_finish()

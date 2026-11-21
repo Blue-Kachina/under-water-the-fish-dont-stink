@@ -105,7 +105,7 @@ func _run() -> void:
 	check(run.stats_of(fish).get("rifts", 0) == 1, "counted in the run's stats")
 
 	print("on time:")
-	run.start()
+	run.restart()
 	await _ticks(3)
 	rift = run.rift
 	check(is_instance_valid(rift) and not rift.spent, "a fresh rift on a new start")
@@ -125,7 +125,7 @@ func _run() -> void:
 
 	print("off:")
 	settings.rift = false
-	run.start()
+	run.restart()
 	await _ticks(3)
 	check(not is_instance_valid(run.rift), "rift off: none")
 	settings.rift = true

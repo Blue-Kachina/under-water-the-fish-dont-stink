@@ -24,11 +24,10 @@ static func build(main: Node, mode: String) -> ModeSetup:
 	setup.accent = tile.colors[1] if tile.has("colors") else UITheme.AQUA
 	setup.set_meta("mode", mode)
 	var role := RoleCharacters.DEFAULT
+	var registered_rows: Variant = ModeRegistry.describe(mode).get("setup_rows", null)
+	if registered_rows is Callable:
+		(registered_rows as Callable).call(setup, _row)  # a registered mode lists its own rows (its descriptor)
 	match mode:
-		UNNATURAL:
-			var us := UnnaturalSettings.shared()
-			setup.rows.append(_row("Run length", [["Short", "One stage."], ["Standard", "%d stages." % us.standard_stages],
-					["Endless", "Until the sea wins."]], clampi(us.run_length, 0, 2), func(i: int) -> void: us.run_length = i))
 		FISH_STICKS:
 			setup.set_meta("variant", FISH_STICKS_MODES[0])
 			setup.rows.append(_row("Mode", [["1v1", "Against a bot: five minutes, overtime on a tie."], ["Free Play", "The arena and a ball, no clock."]], 0,

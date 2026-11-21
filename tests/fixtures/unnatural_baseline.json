@@ -16,12 +16,12 @@
 			"locked": false,
 			"match_modes": [
 				"1v1",
-				"Unnatural",
-				"Test Tank",
+				"Hunt",
 				"Marco Polo",
-				"What Stinks?",
 				"Nature",
-				"Hunt"
+				"Test Tank",
+				"Unnatural",
+				"What Stinks?"
 			],
 			"mode": "Unnatural",
 			"modes": [
@@ -38,13 +38,13 @@
 				"Replays"
 			],
 			"nature_modes": [
-				"Unnatural",
-				"Test Tank",
-				"Obstacle Course",
+				"Hunt",
 				"Marco Polo",
-				"What Stinks?",
 				"Nature",
-				"Hunt"
+				"Obstacle Course",
+				"Test Tank",
+				"Unnatural",
+				"What Stinks?"
 			],
 			"playing_mode": "",
 			"reset_label": "",
