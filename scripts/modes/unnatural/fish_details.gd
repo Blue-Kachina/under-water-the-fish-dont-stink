@@ -42,6 +42,11 @@ const TAGS := {
 ## signature_amount ("+10%"); passive, passive_text,
 ## passive_stat ([value, label], or [] for none); skill, skill_text,
 ## skill_stats ([[value, label], ...]); hp, iframes.
+## The stat `fish_class` grows by itself every level, by name (the home screen's class line).
+static func growth_title(fish_class: FishCharacter.FishClass) -> String:
+	return StatBlock.title(StatBlock.signature(fish_class))
+
+
 static func details(fish_class: FishCharacter.FishClass) -> Dictionary:
 	var s := UnnaturalSettings.shared()
 	var attack_kind := FishAttack.kind_for(fish_class)

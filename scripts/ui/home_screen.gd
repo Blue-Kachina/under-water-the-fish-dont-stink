@@ -345,7 +345,8 @@ func _show_fish(character: FishCharacter.FishClass) -> void:
 	_fish_name.text = FishCharacter.display_name(character)
 	_species_name.text = FishCharacter.species_name(character, species)
 	_species_count.text = ("Species %d of %d" % [species + 1, FishCharacter.species_count(character)]).to_upper()
-	_fish_bias.text = ("%s +  ·  %s" % [StatBlock.title(StatBlock.signature(character)), Traversal.title(character)]).to_upper()
+	var growth: Variant = ModeRegistry.provided("class_growth")  # a registered mode's growth stat title (Unnatural's)
+	_fish_bias.text = ("%s +  ·  %s" % [(growth as Callable).call(character), Traversal.title(character)] if growth is Callable 			else Traversal.title(character)).to_upper()
 	_refresh_details()
 
 
@@ -407,7 +408,10 @@ func _refresh_details() -> void:
 		return
 	var s := _s
 	var character := _character()
-	var info := FishDetails.details(character)
+	var provider: Variant = ModeRegistry.provided("class_details")  # a registered mode's class facts (Unnatural's)
+	if not provider is Callable:
+		return
+	var info: Dictionary = (provider as Callable).call(character)
 
 	# The class's name, the species shown, and a way out.
 	var header := HBoxContainer.new()
@@ -837,8 +841,9 @@ class FishShowcase extends SubViewportContainer:
 	var _model: FishModel
 	## A Hunter form's fish (show_form), in place of _model.
 	var _fish: FishController
-	## The swimming (HunterPreview) that owns _fish, when a Hunter form is shown.
-	var _preview: HunterPreview
+	## The swimming (a registered mode's "form_preview": What Stinks?'s HunterPreview) that owns _fish,
+	## when a Hunter form is shown.
+	var _preview: Node3D
 	var _shown_form := ""
 	var _shown := -1
 	var _shown_species := -1
@@ -897,11 +902,14 @@ class FishShowcase extends SubViewportContainer:
 	func show_form(key: String) -> void:
 		if _preview and _shown_form == key:
 			return
+		var preview_script: Variant = ModeRegistry.provided("form_preview")
+		if not preview_script is GDScript:
+			return
 		_shown = -1
 		_shown_species = -1
 		_drop_shown()
 		_shown_form = key
-		_preview = HunterPreview.new()
+		_preview = (preview_script as GDScript).new()
 		_pivot.add_child(_preview)
 		_preview.setup(key)  # dressed as a match dresses it, then swimming in place with the form's own gait
 		_fish = _preview.fish

@@ -300,6 +300,26 @@ static func is_weapon(powerup_id: String) -> bool:
 	return powerup_id in Weapons.POWERUPS
 
 
+## The badge shape for what `powerup_id` is: a diamond for a weapon, a hexagon
+## for an item. (Tomes aren't powerups: HexBadge.Shape.SQUARE.)
+static func badge_shape(powerup_id: String) -> HexBadge.Shape:
+	return HexBadge.Shape.DIAMOND if is_weapon(powerup_id) else HexBadge.Shape.HEX
+
+
+## The tuning panel's Powerups tab for an option group (descriptor "panel_tabs"): by the
+## rarity of the powerup the group is named for, weapons on their own.
+static func panel_tab(group: String) -> String:
+	if group == "Cursed":
+		return "Cursed"
+	if group == "Fish attack (weapon)":
+		return "Weapons"
+	var name := group.trim_suffix(" (boss)")
+	for id in ids():
+		if title(id) == name:
+			return "Weapons" if is_weapon(id) else Rarity.NAMES[tier(id)].capitalize()
+	return "General"
+
+
 ## Rolls `chance` (0..1).
 func roll(chance: float) -> bool:
 	return chance > 0.0 and run.rng.randf() < chance

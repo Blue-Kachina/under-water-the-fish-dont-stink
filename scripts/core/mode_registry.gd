@@ -12,7 +12,7 @@ var _world: ModeWorld
 
 ## THE registry: one line per migrated mode.
 static func scripts() -> Array[GDScript]:
-	return [Match1v1, NatureRun, HuntMatch, UnnaturalRun, TestTankRun, MarcoPoloMatch, WhatStinksMatch]
+	return [Match1v1, NatureRun, HuntMatch, UnnaturalRun, TestTankRun, CourseMode, MarcoPoloMatch, WhatStinksMatch]
 
 
 static func descriptors() -> Array[Dictionary]:
@@ -101,6 +101,15 @@ static func model_provider(fish_class: int) -> Callable:
 		if models.has(fish_class):
 			return models[fish_class]
 	return Callable()
+
+
+## The first registered descriptor's value for `key` (null when none has it): a provider the
+## core asks for without naming the mode (e.g. "form_preview", "class_details").
+static func provided(key: String) -> Variant:
+	for d in descriptors():
+		if d.has(key):
+			return d[key]
+	return null
 
 
 ## The registered descriptors with a net adapter (descriptor "net").

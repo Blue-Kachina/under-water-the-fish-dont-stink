@@ -138,12 +138,6 @@ static func draw_badge(canvas: CanvasItem, centre: Vector2, size: float, id: Str
 	draw_glyph(canvas, id, centre, size * glyph_share(shape), UITheme.INK, 2.0 if hud else 1.8)
 
 
-## The shape for what powerup or weapon `id` is: a diamond for a weapon, a
-## hexagon for an item. (Tomes aren't powerups: Shape.SQUARE.)
-static func shape_of(id: String) -> Shape:
-	return Shape.DIAMOND if Powerup.is_weapon(id) else Shape.HEX
-
-
 static func glyph_share(shape: Shape) -> float:
 	return DIAMOND_GLYPH_SHARE if shape == Shape.DIAMOND else GLYPH_SHARE
 

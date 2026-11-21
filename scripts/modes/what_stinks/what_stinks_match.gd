@@ -163,7 +163,7 @@ static func descriptor() -> Dictionary:
 		"settings": WhatStinksSettings, "settings_key": "what_stinks", "settings_after": "marco_polo",
 		"extra_settings": [["hunter_size", "Hunter Size", HunterSize]],
 		"models": {FishCharacter.FishClass.MONSTER: HunterFormModel.build},
-		"net": WhatStinksNet, "net_key": "what_stinks", "setup": WhatStinksSetup,
+		"net": WhatStinksNet, "net_key": "what_stinks", "setup": WhatStinksSetup, "form_preview": HunterPreview,
 	}
 
 

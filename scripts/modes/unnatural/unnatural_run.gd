@@ -364,6 +364,7 @@ static func descriptor() -> Dictionary:
 		"card_text": UnnaturalRun.card_text, "reset_label": "Restart run", "split_screen": true,
 		"settings": UnnaturalSettings, "setup_rows": UnnaturalRun.setup_rows,
 		"extra_settings": [["powerups", "Powerups", PowerupSettings]], "net": UnnaturalNet, "net_key": "unnatural",
+		"panel_tabs": {"powerups": Powerup.panel_tab}, "class_details": FishDetails.details, "class_growth": FishDetails.growth_title,
 		"sfx": [[UnnaturalSounds, &"sfx_hook"]],
 	}
 

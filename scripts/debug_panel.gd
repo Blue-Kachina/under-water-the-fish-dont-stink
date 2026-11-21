@@ -214,6 +214,8 @@ var _sections: Array = SECTIONS
 ## Registered mode section id -> its settings object, and who uses it.
 var _mode_settings := {}
 var _mode_used_by := {}
+## Section id -> a registered mode's tab rule (descriptor "panel_tabs": Callable(group) -> tab title).
+var _mode_tab_rules := {}
 ## Section id -> the tab shown.
 var _tab_at := {}
 var _tab_bar: HBoxContainer
@@ -257,11 +259,13 @@ func _build_section_list() -> void:
 	_sections = SECTIONS.duplicate()
 	_mode_settings.clear()
 	_mode_used_by.clear()
+	_mode_tab_rules.clear()
 	var at := -1
 	for i in _sections.size():
 		if _sections[i][0] == "ball":
 			at = i
 	for d: Dictionary in ModeRegistry.descriptors():
+		_mode_tab_rules.merge(d.get("panel_tabs", {}))
 		var script: GDScript = d.get("settings", null)
 		if script == null:
 			continue
@@ -641,25 +645,17 @@ func _list_for(key: String, group: String) -> VBoxContainer:
 
 
 ## The tab title an option belongs under by rule ("" when TABS decides it by
-## its group): Powerups by the rarity of the powerup the group is named for,
-## Controls by keyboard or controller.
+## its group): Controls by keyboard or controller, Audio by the sound board, and a
+## registered mode's section by its descriptor's "panel_tabs" rule (Powerups by rarity).
 func _tab_for(key: String, group: String) -> String:
-	match key.get_slice("/", 0):
+	var section := key.get_slice("/", 0)
+	match section:
 		"controls":
 			return "Keyboard & Mouse" if key.begins_with("controls/kb:") else "Controller"
 		"audio":
 			return "Sound Board" if key.begins_with("audio/board:") else "Sound"
-		"powerups":
-			if group == "Cursed":
-				return "Cursed"
-			if group == "Fish attack (weapon)":
-				return "Weapons"
-			var name := group.trim_suffix(" (boss)")
-			for id in Powerup.ids():
-				if Powerup.title(id) == name:
-					return "Weapons" if Powerup.is_weapon(id) else Rarity.NAMES[Powerup.tier(id)].capitalize()
-			return "General"
-	return ""
+	var rule: Variant = _mode_tab_rules.get(section, null)
+	return (rule as Callable).call(group) if rule is Callable else ""
 
 
 ## Drops tabs nothing went in (Powerups has no Epic powerup yet).
