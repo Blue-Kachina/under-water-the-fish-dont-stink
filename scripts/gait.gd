@@ -233,3 +233,14 @@ func is_default() -> bool:
 @export_range(0.0, 0.2, 0.001, "or_greater") var rig_accel_surge := 0.03
 ## Rig, Accel: how quickly all of that follows the acceleration (1/s).
 @export_range(0.5, 60.0, 0.5, "or_greater") var rig_accel_rate := 6.0
+
+## Rig, Drift layer: its weight (0 off). When the nose and the travel part (slip), the rear of the body bends toward the
+## way it is really going and the pectorals flare as brakes.
+@export_range(0.0, 2.0, 0.05, "or_greater") var rig_drift := 0.0
+## Rig, Drift: how far the rear of the body bends toward the velocity when the fish travels sideways (rad, all joints
+## together at a full sideways slip).
+@export_range(0.0, 2.0, 0.01, "or_greater") var rig_drift_bend := 0.7
+## Rig, Drift: how far the pectorals flare as brakes at a full sideways slip (rad).
+@export_range(0.0, 1.5, 0.01, "or_greater") var rig_drift_fins := 0.6
+## Rig, Drift: how quickly the body follows the slip (1/s).
+@export_range(0.5, 60.0, 0.5, "or_greater") var rig_drift_rate := 6.0

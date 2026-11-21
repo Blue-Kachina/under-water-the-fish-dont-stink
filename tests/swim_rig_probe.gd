@@ -42,7 +42,7 @@ func zero_gait(on := true) -> Gait:
 
 ## The Gait's layer weights, in layer order (each step adds its own).
 func layer_fields() -> Array[String]:
-	return ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel"]
+	return ["rig_undulation", "rig_tail_drive", "rig_turn", "rig_accel", "rig_drift"]
 
 
 ## A state at `speed` m/s straight ahead, effort from the throttle.
@@ -87,6 +87,7 @@ func _run() -> void:
 	_tail_drive()
 	_turn()
 	_accel()
+	_drift()
 	print("swim_rig_probe: %s" % ("all checks passed" if failures == 0 else "%d FAILED" % failures))
 	get_tree().quit(1 if failures else 0)
 
@@ -288,3 +289,21 @@ func _accel() -> void:
 	step.accel = Vector3(0.0, 0.0, -25.0)
 	eased.react(DT, step)
 	check(eased.rig.pose.tail_pitch < 0.05, "a jolt of acceleration is eased in (%.3f rad after one frame)" % eased.rig.pose.tail_pitch)
+
+
+func _drift() -> void:
+	print("Drift:")
+	var gait := only(["rig_drift"])
+	check(absf(settle(gait, moving(15.0), 1.0).rig.pose.spine_yaw()) < 1e-6, "no slip: no bend")
+	for side: float in [1.0, -1.0]:
+		var s := moving(15.0)
+		s.slip = Vector3(8.0 * side, 0.0, 0.0)  # sliding toward the right (+X) or the left
+		var model := settle(gait, s, 1.5)
+		var p := model.rig.pose
+		var name := "right" if side > 0.0 else "left"
+		check(p.spine_yaw() * side > 0.2, "sliding to the %s bends the rear toward it (%.3f rad)" % [name, p.spine_yaw()])
+		check(absf(p.joint_yaw[2]) > absf(p.joint_yaw[0]), "more toward the tail (%.3f vs %.3f)" % [p.joint_yaw[2], p.joint_yaw[0]])
+		check(p.fin_sweep.x > 0.1 and p.fin_sweep.y > 0.1, "both pectorals flare as brakes (%.2f)" % p.fin_sweep.x)
+	var climbing := moving(15.0)
+	climbing.slip = Vector3(0.0, 8.0, 0.0)
+	check(settle(gait, climbing, 1.5).rig.pose.spine_pitch() < -0.1, "drifting upward lifts the tail end toward the velocity")
