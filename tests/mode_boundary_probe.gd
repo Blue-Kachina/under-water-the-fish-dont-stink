@@ -39,9 +39,9 @@ const CORE := [
 ## ChompKit still sit inside the unnatural folder: listing them by file takes
 ## them out of that mode's own files.
 const KITS := [
-	"school.gd", "school_fish.gd", "school_look.gd", "unnatural/seabed.gd", "terrain/",
+	"unnatural/seabed.gd", "terrain/",
 	"unnatural/traversal.gd", "battery.gd", "style_points.gd", "match_stats.gd",
-	"goal_recorder.gd", "goal_replay.gd", "replay/", "fish_bot.gd", "kits/", "wander_bot.gd",
+	"goal_recorder.gd", "goal_replay.gd", "replay/", "fish_bot.gd", "kits/",
 	"fx_kit.gd", "unnatural/chomp_kit.gd", "scenery/", "water_look.gd", "fx/", "xray_outline.gd",
 	"rl/",
 ]
