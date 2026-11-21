@@ -166,3 +166,26 @@ How Hunt is launched in probes: `main.set_mode(main.HUNT)` parks on a MatchCard 
 - 2026-11-20: T3 H1-H4 merged. hunt_probe baseline compare tolerates 0.011 float wobble (overtime_elapsed 1-tick jitter). audio_probe has 2 pre-existing failures.
 - 2026-11-20: T0c merged (phase 0 complete). Names: model.swim.* replaces old model fields (stride_swing->stride_dir, bell_gait->gait). Phases 1-3 launched in parallel.
 - 2026-11-21: T2 merged. setting_docs not regenerated for rig_* (do once at end: tools/gen_setting_docs.gd). P5 launched.
+
+## HANDOFF (written 2026-11-21, session limit reached)
+Resume as coordinator in a new session. Read this file + planning_core_roadmap.md first.
+
+State of `roadmap/core` (pushed): phase 0 (T0a metrics, T0b boundary, T0c SwimState), T2 shark rig (P1-P4) and Hunt H0-H4 are merged.
+
+Workers that were still running when the session ended (their agents are gone; work lives in worktrees/branches, may include UNCOMMITTED changes, so inspect `git -C <wt> status` and `git log` before relaunching):
+| Track | Worktree | Branch | Last known state |
+|---|---|---|---|
+| T1 swim (M4, M1, M2) | D:/Dev/GameDev/wt/swim | track/swim | no commits ahead of roadmap/core at last check; check the worktree for uncommitted work, read its "### T1 swim" section |
+| T3 hunt H5-H7 | D:/Dev/GameDev/wt/hunt | track/hunt | H5, H6, H7 committed (57f9f65, 47b027b, 8f8173c) but NOT yet merged or reviewed; discard test/probe gates unverified by coordinator. Run hunt_probe, mode_boundary_probe, swishy/nature/gait probes, then merge into roadmap/core |
+| T4a P5 rollout | D:/Dev/GameDev/wt/rollout | track/rollout | just started, nothing committed; read "### T4a P5 rollout" |
+Not started: T4b M3 water carving (after T1 + H5 merged; behind toggle, default off), T4c Nature migration (after H7 merged, same H0-H7 shape: School to kits first, TargetWheel to a camera claim, split-screen via add_player).
+
+Resume steps:
+1. `git checkout roadmap/core && git pull`; `git worktree list`; inspect each worktree's status/log.
+2. For each track branch with commits: merge into roadmap/core (only `git add` named paths in worktrees: fresh worktrees show ~800 CRLF-noise files; do not use `git add -A`/`commit -a` there or in main after `--import`). Resolve PROGRESS conflicts (dashboard rows). Re-run: hunt_probe, swim_state_probe, swim_rig_probe, swim_metrics_probe, gait_probe, swishy_probe, mode_boundary_probe --strict.
+3. Relaunch unfinished tracks with the same briefs as in the "Track sections" (each worker edits only its own section; worktree setup needs `.godot/`, `addons/godotsteam`, `addons/under-water-the-fish-dont-stinkExt/bin/windows/` copied from the main checkout, then `--import`).
+4. At the end: regenerate setting_docs (`tools/gen_setting_docs.gd`; not yet done for rig_* settings), make the debug build (export `--export-debug` to the ABSOLUTE path D:/Dev/GameDev/under-water-the-fish-dont-stink/builds/windows/FishPlayground.exe), hand off for play-testing.
+
+Known pre-existing failures (not from this work): audio_probe (2), pick_card_probe, pause_probe, unnatural_coop_probe, hider_looks_probe, preview_jitter_probe, school_probe flake, two_stage_bite_probe broken. hunt_probe baseline compare tolerates 0.011 float wobble.
+
+For the user to play-test / review: shark rig shots in D:/Dev/GameDev/wt/shots/rig (toggle Gait.procedural_rig for shark); F6 camera wobble is 0.00 deg in open Nature Ocean (only near surface); M1 held-vs-flick, M2 gentle curve, M4 settle cam when T1 lands; M3 carving later. Decisions D1-D5 taken as recommended; D6 file moves done in worktree; D7 nothing discarded.
