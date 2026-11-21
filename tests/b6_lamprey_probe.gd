@@ -294,7 +294,7 @@ func _drill_once(bite: HunterBite, tag: String, assert_shape: bool, which: Strin
 				overshoot = true
 		_check(overshoot or true, "%s: ring-out recorded" % tag)
 		o.camera = maxf(o.max_stretch, 1.0 + 0.4 * maxf(o.max_disc, 0.0))
-		_check(float(fish.get_meta("exaggerate_peak", 1.0)) >= 1.0, "%s: the camera margin is published on the fish" % tag)
+		_check(float(ModeData.get_value(fish, "what_stinks", "exaggerate_peak", 1.0)) >= 1.0, "%s: the camera margin is published on the fish" % tag)
 	else:
 		o.camera = maxf(o.max_stretch, 1.0)
 	o.min_stretch = o.min_stretch

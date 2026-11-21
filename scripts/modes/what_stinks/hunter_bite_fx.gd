@@ -324,12 +324,12 @@ func _stop(share: float) -> void:
 	var fish := hb.fish
 	if seconds <= 0.0 or fish.controls_locked:
 		return
-	fish.controls_locked = true
+	fish.play_state = FishController.PlayState.HELD
 	_hitstop += 1
 	var mine := _hitstop
 	get_tree().create_timer(seconds, true, false, true).timeout.connect(func() -> void:
 		if is_instance_valid(fish) and mine == _hitstop and (not may_unlock.is_valid() or may_unlock.call()):
-			fish.controls_locked = false)
+			fish.play_state = FishController.PlayState.LIVE)
 
 
 ## The pooled sparks (made the first time).

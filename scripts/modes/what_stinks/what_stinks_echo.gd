@@ -32,6 +32,8 @@ signal local_buttons(mask: int)
 signal local_burst(amount: float)
 
 const BUTTONS := ["jump", "boost", "powerslide", "air_roll"]
+## The sniff's name on the Hunter's modifiers.
+const SNIFF_MODS := "what_stinks.sniff"
 
 var game: WhatStinksMatch
 var settings := WhatStinksSettings.shared()
@@ -480,10 +482,9 @@ func _set_sniff(hunter: FishController, on: bool) -> void:
 		return
 	sniffing[hunter] = on
 	if on:
-		_sniff_saved[hunter] = maxf(settings.sniff_speed, 0.01)  # the factor, undone by dividing: other slowdowns (an open bite) come and go meanwhile
-		hunter.speed_scale *= maxf(settings.sniff_speed, 0.01)
-		hunter.top_speed_scale *= maxf(settings.sniff_speed, 0.01)
-		hunter.boost_scale *= maxf(settings.sniff_speed, 0.01)
+		var factor := maxf(settings.sniff_speed, 0.01)
+		_sniff_saved[hunter] = factor  # its own modifier set: other slowdowns (an open bite) come and go meanwhile
+		hunter.modifiers.push(SNIFF_MODS, {"speed": factor, "top_speed": factor, "boost": factor})
 	else:
 		_restore_sniff(hunter)
 	sniff_changed.emit(hunter, on)
@@ -493,9 +494,7 @@ func _restore_sniff(hunter: FishController) -> void:
 	var factor := float(_sniff_saved.get(hunter, 0.0))
 	_sniff_saved.erase(hunter)
 	if factor > 0.0 and is_instance_valid(hunter):
-		hunter.speed_scale /= factor
-		hunter.top_speed_scale /= factor
-		hunter.boost_scale /= factor
+		hunter.modifiers.pop(SNIFF_MODS)
 
 
 func _drop_sniff_all() -> void:

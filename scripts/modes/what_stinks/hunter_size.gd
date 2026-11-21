@@ -25,6 +25,8 @@ const CAM_POWER := 0.75
 ## The size a match is played at: locked here, off the match card (play-test 2026-11-07: the form feels
 ## right at 0.5x and worse the bigger it gets). The panel's size_mult still moves it, as a debug option.
 const MATCH_SIZE := 0.5
+## Its name on the fish's modifiers (FishController.modifiers).
+const MODS := "what_stinks.size"
 
 static var _shared: HunterSize
 
@@ -68,13 +70,13 @@ func size_of(fish: Node = null) -> float:
 ## form's class and species (FishController.set_look). Returns the size used.
 func apply(fish: FishController, form: Dictionary) -> float:
 	var s := size_of(fish)
-	fish.body_scale = HunterForm.body_scale(form) * s
-	fish.top_speed_scale = float(form["speed"]) * pow(s, speed_exp)
-	fish.accel_scale = float(form["accel"]) * pow(s, accel_exp)
-	fish.boost_scale = pow(s, speed_exp)  # the boost's push, so a big one reaches its higher top speed
-	fish.drag_scale = float(form["accel"])  # heavy to start, hard to stop (as the Titans); not with size, or a big one is capped by its own drag
-	fish.turn_scale = float(form["turn"]) * pow(s, -turn_exp)
-	fish.rl_turn_scale = fish.turn_scale  # the RL air control only honours this one
+	var turn := float(form["turn"]) * pow(s, -turn_exp)
+	fish.modifiers.push(MODS, {"body": HunterForm.body_scale(form) * s,
+			"top_speed": float(form["speed"]) * pow(s, speed_exp),
+			"accel": float(form["accel"]) * pow(s, accel_exp),
+			"boost": pow(s, speed_exp),  # the boost's push, so a big one reaches its higher top speed
+			"drag": float(form["accel"]),  # heavy to start, hard to stop (as the Titans); not with size, or a big one is capped by its own drag
+			"turn": turn, "rl_turn": turn})  # the RL air control only honours rl_turn
 	rescale_lod(fish)
 	return s
 
