@@ -29,7 +29,7 @@ func check(ok: bool, what: String) -> void:
 
 func _run() -> void:
 	print("only inputs:")
-	var source := FileAccess.get_file_as_string("res://scripts/hunter_bot.gd")
+	var source := FileAccess.get_file_as_string("res://scripts/kits/hunter_bot.gd")
 	var writes := RegEx.create_from_string("(linear_velocity|angular_velocity|global_position|global_transform)\\s*[-+*]?=|apply_(push|impulse|central|force|torque)")
 	check(writes.search(source) == null, "the bot's script never moves its fish itself")
 
