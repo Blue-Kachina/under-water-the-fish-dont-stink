@@ -39,6 +39,8 @@ var _trail := PackedVector3Array()
 var _age := 0.0
 var _wave := 0.0
 var _wave_clock := 0.0
+## Gait.trail_rig: the shared speed, turn and wave clock (TrailAdapter); null (the default) is the form's own.
+var _adapter: TrailAdapter
 var _speed := 0.0
 var _last_at := Vector3.ZERO
 var _offsets := PackedVector3Array()
@@ -151,15 +153,29 @@ func _swim_look() -> void:
 	var k := radius / 3.72
 	var dt := get_process_delta_time()
 	var at := fish.global_position
-	if dt > 0.0:  # measured as well as read: a hunter's velocity is not always the body's
-		_speed = lerpf(_speed, maxf(fish.linear_velocity.length(), at.distance_to(_last_at) / dt), 1.0 - exp(-8.0 * dt))
-	_last_at = at
-	var t := clampf(_speed / maxf(fish.max_boost_speed * fish.top_speed_scale * 0.6, 0.1), 0.0, 1.0)  # of its own top speed (a long body never reached length / 2 m/s)
-	var turn := clampf(absf(fish.angular_velocity.y) / 1.5, 0.0, 1.0)
+	_adapter = TrailAdapter.sync(_adapter, fish)
+	var t: float
+	var turn: float
+	if _adapter != null:  # the SwimState's speed and turn, in place of the estimates below
+		_adapter.update(dt, _speed)
+		_speed = _adapter.speed
+		_last_at = at
+		t = _adapter.speed_t(fish.max_boost_speed * fish.top_speed_scale * 0.6)
+		turn = _adapter.turn
+	else:
+		if dt > 0.0:  # measured as well as read: a hunter's velocity is not always the body's
+			_speed = lerpf(_speed, maxf(fish.linear_velocity.length(), at.distance_to(_last_at) / dt), 1.0 - exp(-8.0 * dt))
+		_last_at = at
+		t = clampf(_speed / maxf(fish.max_boost_speed * fish.top_speed_scale * 0.6, 0.1), 0.0, 1.0)  # of its own top speed (a long body never reached length / 2 m/s)
+		turn = clampf(absf(fish.angular_velocity.y) / 1.5, 0.0, 1.0)
 	var amp := k * (WAVE_REST + WAVE_SWIM * t + WAVE_TURN * turn) * 7.0 * _flex()
 	_wave = lerpf(_wave, amp, 0.1)
 	# The stroke's rate follows the speed (rad/s); the clock is advanced here so a change of rate never jumps the phase.
-	_wave_clock = fposmod(_wave_clock + dt * lerpf(1.2, 8.0, t), TAU)
+	if _adapter != null:
+		_wave_clock = _adapter.advance(dt, lerpf(1.2, 8.0, t))
+		_adapter.bend(rig, dt, length)  # the rig layers' pose on the trail, when Gait.trail_pose is above 0
+	else:
+		_wave_clock = fposmod(_wave_clock + dt * lerpf(1.2, 8.0, t), TAU)
 	skin.set_shader_parameter("wave_clock", _wave_clock)
 	skin.set_shader_parameter("spine_wave", Vector4(_wave, 0.1 * 88.2 / length, 1.0, 0.18))
 	var warn := 0.0

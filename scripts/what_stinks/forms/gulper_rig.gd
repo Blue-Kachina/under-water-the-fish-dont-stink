@@ -61,6 +61,8 @@ var _last_basis := Basis.IDENTITY
 var _last_at := Vector3.ZERO
 var _speed := 0.0
 var _wave_clock := 0.0
+## Gait.trail_rig: the shared speed, turn and wave clock (TrailAdapter); null (the default) is the form's own.
+var _adapter: TrailAdapter
 var _riders: Array = []
 var _light: OmniLight3D
 var _suction: CPUParticles3D
@@ -185,7 +187,12 @@ func _process(delta: float) -> void:
 		omega = spin.get_axis() * (angle if angle < PI else angle - TAU) / delta
 	var turn := Vector2(omega.dot(basis.y), omega.dot(basis.x)).limit_length(8.0)
 	_turn = _turn.lerp(turn, 1.0 - exp(-12.0 * delta))
-	_speed = lerpf(_speed, at.distance_to(_last_at) / delta, 1.0 - exp(-8.0 * delta))
+	_adapter = TrailAdapter.sync(_adapter, fish)
+	if _adapter != null:  # the SwimState's speed, in place of the measured one
+		_adapter.update(delta, _speed)
+		_speed = _adapter.speed
+	else:
+		_speed = lerpf(_speed, at.distance_to(_last_at) / delta, 1.0 - exp(-8.0 * delta))
 	_last_basis = basis
 	_last_at = at
 	speed_frac = clampf(_speed / maxf(fish.max_boost_speed * fish.top_speed_scale * wave_full_speed, 0.1), 0.0, 1.0)
@@ -258,6 +265,8 @@ func _pose(delta: float) -> void:
 	for s in range(1, N):
 		var dir := Basis(Vector3.RIGHT, _lag_pitch[s]) * (Basis(Vector3.UP, _lag_yaw[s]) * Vector3.BACK)
 		rig.points[s] = rig.points[s - 1] + dir * step
+	if _adapter != null:  # the rig layers' pose on the lagged spine, when Gait.trail_pose is above 0
+		_adapter.bend(rig, delta, rig.length * global_basis.x.length())
 	rig._frames()
 	rig.apply()
 	for rider: Array in _riders:
@@ -281,7 +290,10 @@ func _dress(delta: float) -> void:
 	var swim := lerpf(wave_idle, wave_swim, speed_frac)
 	# The stroke's rate follows the speed (rad/s: a slow eel ripples, a fast one thrashes); the clock is advanced here so
 	# a change of rate never jumps the phase.
-	_wave_clock = fposmod(_wave_clock + delta * lerpf(stroke_idle, stroke_full, speed_frac), TAU)
+	if _adapter != null:
+		_wave_clock = _adapter.advance(delta, lerpf(stroke_idle, stroke_full, speed_frac))
+	else:
+		_wave_clock = fposmod(_wave_clock + delta * lerpf(stroke_idle, stroke_full, speed_frac), TAU)
 	skin.set_shader_parameter("wave_clock", _wave_clock)
 	skin.set_shader_parameter("spine_wave", Vector4(WAVE_AMP * k * swim, 0.2 / k, 1.0, 0.3))
 	skin.set_shader_parameter("pouch_ripple", lerpf(0.05, 0.16, speed_frac) + gape * 0.04)
