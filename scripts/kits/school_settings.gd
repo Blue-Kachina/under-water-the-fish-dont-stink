@@ -65,6 +65,9 @@ static func shared() -> SchoolSettings:
 @export_range(0.0, 3.0, 0.05, "or_greater") var ripple_delay := 0.35
 ## How much a fish rolls into its turns (0 stays level).
 @export_range(0.0, 3.0, 0.05, "or_greater") var bank := 0.6
+## How far (m) a school's fish keep off the sea floor and its rock, where there's one: the leader keeps this
+## plus the school's half-height clear, so the formation fits above.
+@export_range(0.0, 10.0, 0.1, "or_greater") var floor_room := 1.0
 
 @export_group("Performance")
 ## How often schools steer (steps per second). Each frame draws between the

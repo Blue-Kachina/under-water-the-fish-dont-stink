@@ -126,6 +126,6 @@ static func shared() -> NatureSettings:
 ## Off: open water, as before. (Hunt's own floor switch and depth are in HuntSettings.)
 @export var nature_floor := false
 @export_range(10.0, 400.0, 1.0, "or_greater") var nature_floor_depth := 60.0
-## Hunt's floor: how far above it fish are kept (m), and how hard (m/s² per metre under).
+## Hunt's and Nature's floor: how far above it fish are kept (m), and how hard (m/s² per metre under).
 @export_range(0.0, 20.0, 0.1, "or_greater") var floor_clearance := 1.5
 @export_range(0.0, 50.0, 0.1, "or_greater") var floor_push := 6.0

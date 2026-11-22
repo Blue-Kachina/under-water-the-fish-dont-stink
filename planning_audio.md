@@ -248,7 +248,7 @@ Hook = the existing signal or function it hangs off.
 | `fish/boost_loop` | while boosting | P1 | loop, pitch follows speed | `_update_boost` |
 | `fish/boost_stop` | boost released | P2 | tail | |
 | `fish/boost_empty` | tried to boost with none left | P3 | | |
-| `fish/supersonic` | crossing `SUPERSONIC_SPEED` | P2 | a "whoomp" + optional `fish/supersonic_loop` | speed check |
+| `fish/supersonic` | crossing `SUPERSONIC_SPEED` | P2 | a "whoomp" | speed check |
 | `fish/land` | touching floor/wall after air | P2 | intensity = impact speed | `_detect_surface` |
 | `fish/scrape_loop` | sliding along a wall/floor | P3 | loop | tyres/surface |
 | `fish/breach`, `fish/splash` | leaving / re-entering the water surface | P2 | big one: also flips the World filter | `ocean`/surface |
@@ -434,6 +434,231 @@ folder, but the separate **Music** picker (§2.3) chooses which profile's music 
 
 **Count:** about 60 P1 events, 60 P2 and 25 P3. A usable first profile is roughly the P1
 list.
+
+---
+
+### 3.11 Added since this list was written
+
+Generated from `scripts/audio/sound_catalog.gd` on 2026-11-22; that file is the source of truth, and the recording
+sheet (Settings > Audio > Write recording sheet) always matches it. Flags: `3d` placed in the world,
+`loop` sustained, `pitched` climbs a scale, `layers` takes `@n` layers. Fallback = the sound it borrows when it has no file.
+
+#### `match/` Matches
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `match/goal_horn_aquarium` | P3 |  | The aquarium arena's own goal horn (falls back to match/goal_horn). | `match/goal_horn` |
+
+#### `unnatural/` Unnatural
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `unnatural/attack_own_hit` | P1 | 3d voices=3 cd=0.03 | Any attack lands (every attack falls back to this one). |  |
+| `unnatural/sting_hit` | P1 | 3d voices=3 cd=0.03 | Anemone Sting lands. | `unnatural/attack_own_hit` |
+| `unnatural/bite_hit` | P1 | 3d voices=3 cd=0.03 | Ghost Bite lands. | `unnatural/attack_own_hit` |
+| `unnatural/lash_hit` | P1 | 3d voices=3 cd=0.03 | Shock Lash lands. | `unnatural/attack_own_hit` |
+| `unnatural/thrust_hit` | P1 | 3d voices=3 cd=0.03 | Bill Thrust lands. | `unnatural/attack_own_hit` |
+| `unnatural/bubbles_hit` | P1 | 3d voices=3 cd=0.03 | Bubble Volley lands. | `unnatural/attack_own_hit` |
+| `unnatural/spines_hit` | P1 | 3d voices=3 cd=0.03 | Spine Burst lands. | `unnatural/attack_own_hit` |
+| `unnatural/punch_fire` | P1 | 3d voices=3 | Cavitation Punch throws a glove. | `unnatural/attack_own_fire` |
+| `unnatural/punch_hit` | P1 | 3d voices=3 cd=0.03 | Cavitation Punch lands (the glove, then the bubble collapsing). | `unnatural/attack_own_hit` |
+| `unnatural/zombie_die_chase` | P3 | 3d layers voices=4 cd=0.04 | A chaser dies (falls back to unnatural/zombie_die). | `unnatural/zombie_die` |
+| `unnatural/zombie_die_swarm` | P3 | 3d layers voices=4 cd=0.04 | A swarmer dies (falls back to unnatural/zombie_die). | `unnatural/zombie_die` |
+| `unnatural/zombie_die_tank` | P3 | 3d layers voices=4 cd=0.04 | A tank dies (falls back to unnatural/zombie_die). | `unnatural/zombie_die` |
+| `unnatural/zombie_die_lunge` | P3 | 3d layers voices=4 cd=0.04 | A lunger dies (falls back to unnatural/zombie_die). | `unnatural/zombie_die` |
+| `unnatural/zombie_die_glide` | P3 | 3d layers voices=4 cd=0.04 | A glider dies (falls back to unnatural/zombie_die). | `unnatural/zombie_die` |
+| `unnatural/card_reveal_uncommon` | P2 |  | An uncommon card shows. |  |
+| `unnatural/card_reveal_rare` | P2 |  | A rare card shows. |  |
+| `unnatural/card_reveal_epic` | P2 |  | An epic card shows. |  |
+| `unnatural/card_reveal_legendary` | P2 |  | A legendary card shows. |  |
+| `unnatural/card_reveal_boss` | P2 |  | A boss card shows. |  |
+| `unnatural/card_reveal_cursed` | P2 |  | A cursed card shows. It should feel wrong. |  |
+| `unnatural/pickup_magnet` | P1 |  | Magnet pickup. |  |
+| `unnatural/pickup_hourglass` | P1 |  | Hourglass pickup. |  |
+| `unnatural/pickup_lightning` | P1 |  | Lightning bolt pickup: a big arena-wide electric crack. |  |
+| `unnatural/chest_boss_item` | P1 | 3d | A boss's chest opens on its boss item: bigger, deeper, triumphant. |  |
+| `unnatural/rift_woken` | P1 |  | A crevice under rubble is opened and the final boss wakes early (falls back to stage/boss_warn). | `stage/boss_warn` |
+
+#### `pw/` Powerups
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `pw/haze_scatter` | P1 | 3d voices=2 | Purple Haze lobs its bombs. | `pw/depth_charge_drop` |
+| `pw/haze_burst` | P1 | 3d voices=4 cd=0.05 | A Purple Haze bomb bursts into a cloud. | `fx/explosion` |
+| `pw/maw_suck` | P2 | 3d voices=2 | Gulper's Maw opens and starts sucking zombies in. |  |
+| `pw/maw_spit` | P2 | 3d voices=2 | Gulper's Maw gulps shut and spits its volley. |  |
+| `pw/brood_bite` | P2 | 3d voices=3 cd=0.05 | A Hagfish Brood hagfish bites and knots on. |  |
+| `pw/disc_latch` | P2 | 3d voices=2 | Queen's Disc latches on (a wet suck). |  |
+| `pw/disc_drain` | P3 | voices=1 cd=0.2 | Queen's Disc drains a sip of life back to you. |  |
+| `pw/crown_burst` | P2 | 3d voices=2 | Angel's Crown bursts open on your head. |  |
+| `pw/crown_lash` | P2 | 3d voices=3 cd=0.05 | One of Angel's Crown's lashes. |  |
+| `pw/jaws_ready` | P2 | voices=1 | Drowned Jaws are ready: your next attack chomps. |  |
+
+#### `boss/` Bosses
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `boss/shark_bite_wind` | P2 | 3d voices=2 | The Drowned Shark draws back to chomp: a low creak and a growl building (about a tenth of a second). |  |
+| `boss/shark_jaw_open` | P2 | 3d voices=2 | Its jaw cracks open: a wet, bony pop, then the hold that follows is silence you can hear. |  |
+| `boss/shark_snap` | P2 | 3d voices=2 | The lunge, just before the jaws land: a short heavy whoosh. The crunch itself is boss/chomp. |  |
+| `boss/chomp` | P1 | 3d voices=2 | A boss's jaws snap shut (the Drowned Shark, the King of Herrings). |  |
+| `boss/chomp_thud` | P1 | 3d voices=2 | A chomp lands: the low impact under the crunch (a boss's bite or grab, Drowned Jaws). |  |
+| `boss/chomp_miss` | P1 | 3d voices=2 | A chomp misses: the jaws clack shut on nothing. |  |
+| `boss/grab` | P1 | 3d | A final boss grabs a player: swallowed, coiled, latched on, knotted or crowned. |  |
+| `boss/break_free` | P1 |  | A held player strides free of a final boss. |  |
+| `boss/gulper_suck` | P2 | 3d | The Gulper Mother starts sucking a player in. |  |
+| `boss/angel_lock` | P2 | 3d | The Fallen Angel locks on to a player. |  |
+
+#### `hunter/` Hunters
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `hunter/jaw_open` | P1 | 3d voices=2 | A Hunter's jaws open on the press: a creak or a whoosh at the mouth (the Drowned Shark's; short, it answers the button on the same frame). | `boss/shark_jaw_open` |
+| `hunter/jaw_hold` | P2 | loop 3d voices=2 | A Hunter's jaws held open: a growl whose pitch and loudness rise with the charge. | `boss/leviathan_arrive` |
+| `hunter/charged` | P2 | 3d voices=2 | The held bite reaches full charge: a click or a ping. | `ui/select` |
+| `hunter/strain` | P3 | 3d voices=2 | A whale's mouth is full and strains against its limit. | `boss/chomp_miss` |
+| `hunter/strike` | P2 | 3d voices=2 | The release: a swoosh as the jaws (or cones, coil, disc) lunge. | `boss/shark_snap` |
+| `hunter/chomp` | P1 | 3d voices=2 | A Hunter's bite lands on fish: the crunch. | `boss/chomp` |
+| `hunter/crunch` | P2 | 3d pitched voices=4 cd=0.03 | One more fish in the bite: a short crunch, climbing the scale through the chain. | `boss/chomp_thud` |
+| `hunter/miss` | P2 | 3d voices=2 | A Hunter's jaws shut on nothing. | `boss/chomp_miss` |
+
+#### `whale/` Hunter whales
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `whale/gape_open` | P2 | 3d voices=2 | A whale's huge mouth drops open: a deep groan and the rush of water in. | `boss/gulper_suck` |
+| `whale/engulf` | P2 | 3d pitched voices=4 cd=0.05 | A fish swims into a whale's open mouth: a small pop, climbing with each. | `boss/gulper_suck` |
+| `whale/gulp` | P1 | 3d voices=2 | The whale's mouth slams shut on everything in it: a deep gulp. | `pw/maw_spit` |
+| `whale/spray` | P3 | 3d voices=2 | Water pushed out of the whale's closing mouth. | `boss/leviathan_spit` |
+
+#### `angel/` Hunter Fallen Angel
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `angel/cones_open` | P2 | 3d voices=2 | The Fallen Angel's buccal cones splay open. | `boss/angel_lock` |
+| `angel/lock` | P2 | loop 3d voices=2 | The Fallen Angel is locked on to its target: a tightening hum. | `boss/angel_lock` |
+| `angel/lock_lost` | P2 | 3d | The lock snaps (the target got away). | `boss/chomp_miss` |
+| `angel/lash` | P1 | 3d voices=2 | The cones lash out. | `boss/grab` |
+| `angel/denied` | P2 | 3d | A press with nothing in range: the crown flickers and refuses. | `ui/denied` |
+
+#### `gulper/` Hunter Gulper Mother
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `gulper/suck` | P2 | loop 3d voices=2 | The Gulper Mother's pouch sucks fish in: a rising draw. | `boss/gulper_suck` |
+| `gulper/snap` | P1 | 3d voices=2 | The pouch snaps shut on what it caught. | `pw/maw_spit` |
+
+#### `king/` Hunter King of Herrings
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `king/coil` | P2 | loop 3d voices=2 | The King of Herrings coils tighter: a creak that rises. | `boss/leviathan_arrive` |
+| `king/whip` | P1 | 3d voices=2 | The King's whip-sweep. | `boss/chomp` |
+
+#### `lamprey/` Hunter Lamprey Queen
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `lamprey/rasp` | P2 | loop 3d voices=2 | The Lamprey Queen's teeth spin up: a rasp that speeds up. | `boss/grab` |
+| `lamprey/drill` | P1 | 3d voices=2 | The Lamprey Queen's corkscrew dash through a school. | `boss/grab` |
+
+#### `octopus/` octopus
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `octopus/flare` | P2 | 3d voices=2 | The Ember Octopus rears its arms into a crown on the press. | `hunter/jaw_open` |
+| `octopus/charge` | P2 | loop 3d voices=2 | The Ember Octopus holds its crown: a rising hum that climbs with the charge. | `hunter/jaw_hold` |
+| `octopus/lock` | P2 | 3d voices=4 cd=0.04 | An arm locks on a target: a short high tick. | `angel/lock` |
+| `octopus/lock_lost` | P2 | 3d voices=2 | A lock slips (the target got away or left the cone). | `angel/lock_lost` |
+| `octopus/lash` | P1 | 3d voices=4 cd=0.03 | Arms whip out on the release. | `king/whip` |
+| `octopus/crack` | P1 | 3d voices=4 cd=0.03 | A lashing arm cracks at its tip. | `king/whip` |
+| `octopus/hit` | P1 | 3d pitched voices=4 cd=0.03 | A lashing arm lands on a fish, climbing the scale through the chain. | `hunter/crunch` |
+| `octopus/miss` | P2 | 3d voices=2 | A lashing arm closes on nothing. | `hunter/miss` |
+| `octopus/jet` | P2 | 3d voices=2 cd=0.1 | The Ember Octopus fires a jet pulse from its siphon. | `whale/spray` |
+| `octopus/foot` | P3 | 3d voices=4 cd=0.05 | An arm plants a sucker on the floor: a wet pop. | `fx/pop` |
+| `octopus/grab` | P2 | 3d pitched voices=4 cd=0.04 | A grappling arm latches on a fish: a wet suck, climbing the scale with each arm that holds. | `fx/pop` |
+| `octopus/snap_off` | P2 | 3d voices=2 | A grappling arm loses its fish (too far, or taken): a slack snap. | `angel/lock_lost` |
+| `octopus/torn` | P2 | 3d voices=2 | A grabbed fish tears the arm off with a dash: a rip. | `angel/lock_lost` |
+| `octopus/yank` | P1 | 3d voices=2 | The release: every held arm yanks taut. | `king/whip` |
+| `octopus/beak` | P1 | 3d voices=2 | The beak snaps on everything the arms reeled in. | `boss/chomp` |
+| `octopus/whiff` | P2 | 3d voices=2 | A grapple tap with nothing in reach: one arm flicks at nothing. | `hunter/miss` |
+
+#### `angler/` angler
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `angler/flare` | P2 | 3d voices=2 | The Lantern Angler flares its esca and gapes on the press. | `hunter/jaw_open` |
+| `angler/hum` | P2 | loop 3d voices=2 | The Lantern Angler holds its lure: a low hum. | `hunter/jaw_hold` |
+| `angler/snap` | P1 | 3d voices=2 | The Lantern Angler snaps its jaws shut on the release. | `boss/chomp` |
+
+#### `mp/` Marco Polo
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `mp/marco` | P1 | 3d | The seeker calls \"Marco!\" (heard by everyone, from the seeker). |  |
+| `mp/polo` | P1 | 3d voices=6 | A hider (or a Fake Fish) answers \"Polo!\". |  |
+| `mp/tag` | P1 |  | A seeker tags a hider: TAGGED! |  |
+| `mp/eliminated` | P1 |  | A tagged hider is out (Last Fish Swimming): belly-up and floating away. |  |
+| `mp/ping` | P2 | voices=3 cd=0.05 | A blip lands on the seeker's sonar scope (seeker only). |  |
+| `mp/seen` | P2 | voices=1 cd=0.4 | A soft tick while you're in the seeker's sight and scoring (only on the hider's own machine). |  |
+| `mp/heartbeat` | P3 | 3d voices=2 cd=0.3 | Optional: the seeker hears a faint heartbeat from a hider at the cardiovascular layer. |  |
+| `mp/aura` | P2 | 3d voices=2 cd=0.3 | A hider flares into the aura layer (a big blunder). |  |
+| `mp/count` | P1 | pitched | The seeker's count while the hiders scatter (climbs). | `match/countdown` |
+| `mp/bump` | P1 | 3d layers voices=3 cd=0.08 | Two fish bump, or a fish knocks off a porthole's rim: a soft fleshy thud with a scale scrape, harder at speed. | `fish/bump` |
+| `mp/round_over` | P1 |  | The round ends: the ROUND_OVER card. |  |
+| `mp/fake_throw` | P3 |  | Throwing a Fake Fish (only the thrower hears it; it makes no noise in the game). |  |
+| `mp/fake_pop` | P1 | 3d | A Fake Fish bursts into bubbles (end of its life, or tagged). | `fx/pop` |
+| `mp/fooled` | P1 |  | The seeker tagged a Fake Fish: FOOLED! |  |
+| `mp/porthole_in` | P2 | 3d | Slipping into a porthole. |  |
+| `mp/porthole_out` | P1 | 3d | Jumping out of a porthole: a loud whoosh. |  |
+| `mp/gasp` | P2 | voices=1 cd=0.6 | Gasping while the Out of Water gauge fills (the hider in the porthole). |  |
+| `mp/fish_out_of_water` | P1 | 3d | The gauge fills: FISH OUT OF WATER! The fish flops out gasping. |  |
+| `mp/airstone` | P2 | 3d loop voices=6 | An aquarium airstone / bubble curtain fizzing. | `arena/bubble_column_loop` |
+| `mp/chest_burp` | P2 | 3d voices=2 | The aquarium's treasure chest pops open and burps bubbles. |  |
+| `mp/whomp` | P1 | 3d voices=4 cd=0.2 | A Titan's fluke power stroke: a deep whomp, louder with stride strength. |  |
+| `mp/whomp_boost` | P1 | 3d voices=3 cd=0.15 | A Titan's hard boost beat. |  |
+| `mp/voice_humpback` | P1 | 3d | A humpback Titan's auto Marco! call: a short sung phrase. |  |
+| `mp/voice_blue` | P1 | 3d | A blue whale Titan's auto Marco! call: a low moan. |  |
+| `mp/voice_orca` | P1 | 3d | An orca Titan's auto Marco! call: a click train. |  |
+| `mp/voice_beluga` | P1 | 3d | A beluga Titan's auto Marco! call: chirps and clicks. |  |
+| `mp/voice_sperm` | P1 | 3d | A sperm whale Titan's auto Marco! call: slow, heavy clicks. |  |
+| `mp/marco_tell` | P2 | 3d | Blowhole bubbles just before a Titan's call (marco_tell_time). |  |
+| `mp/whale_grow` | P1 | 3d | A caught hider grows into a Titan. |  |
+| `mp/pick_cycle` | P3 | voices=1 cd=0.05 | The whale pick card: species or skin changes. |  |
+| `mp/pick_lock` | P2 |  | The whale pick card: the pick locks in. |  |
+| `mp/wake_swirl` | P3 | 3d voices=2 cd=0.3 | Optional: a Titan's vortex ring passes close. |  |
+
+#### `race/` Fin-ish Line
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `race/countdown` | P1 | pitched | 3, 2, 1 before the start (climbs). | `match/countdown` |
+| `race/go` | P1 |  | GO: the race starts. | `match/go` |
+| `race/lap` | P1 |  | You finish a lap. | `ui/select` |
+| `race/final_lap` | P1 |  | You begin the final lap. | `ui/select` |
+| `race/finish` | P1 |  | You cross the finish line. | `match/go` |
+| `race/race_over` | P2 |  | The race is over (the finish clock ran out or everyone is home). | `match/time_up` |
+| `race/rescue` | P2 |  | You are put back on the track (rescue). | `fish/reset` |
+| `race/wrong_way` | P2 | cd=1.5 | A warning beep while you swim the wrong way. | `ui/back` |
+| `race/stream_loop` | P2 | loop voices=1 | A bubble stream carries you (louder in its core). | `arena/bubble_column_loop` |
+| `race/slipstream_loop` | P2 | loop voices=1 | Wind in a rival's wake (slipstream gain). |  |
+
+#### `voice/` Callouts
+
+| Event id | P | Flags | When | Fallback |
+|---|---|---|---|---|
+| `voice/go` | P3 |  | Callout: go! |  |
+| `voice/goal` | P3 |  | Callout: goal! |  |
+| `voice/fish_fry` | P3 |  | Callout: Fish Fry! |  |
+| `voice/win` | P3 |  | Callout: you win. |  |
+| `voice/lose` | P3 |  | Callout: you lose. |  |
+| `voice/level_up` | P3 |  | Callout: level up. |  |
+| `voice/ring_warn` | P3 |  | Callout: the ring closes. |  |
+| `voice/miniboss_warn` | P3 |  | Callout: the Drowned Shark rises. |  |
+| `voice/boss_warn` | P3 |  | Callout: the Blood Leviathan wakes. |  |
+| `voice/stampede_warn` | P3 |  | Callout: stampede. |  |
+| `voice/tide_warn` | P3 |  | Callout: the tide turns. |  |
+| `voice/boss_arrive` | P3 |  | Callout: a boss arrives. |  |
 
 ---
 

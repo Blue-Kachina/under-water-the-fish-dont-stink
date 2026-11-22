@@ -52,6 +52,8 @@ public:
 		float ero_amp1 = 1.2f, ero_freq1 = 0.17f, ero_amp2 = 0.5f, ero_freq2 = 0.41f, ero_fbm = 0.6f, ero_fade = 3.0f;
 		float strata_amp = 0.35f, strata_spacing = 4.8f;
 		float blend = 4.0f;
+		// Slab: a solid block up to `slab_top` (local y, 0 = off) that replaces the floor/plateau/ring heightfield; channels carve it.
+		float slab_top = 0.0f, slab_amp = 0.0f, slab_freq = 0.02f;
 		// Navigability
 		bool nav = true;
 		Vector3 spawn = Vector3(0, 10, 0);
@@ -63,6 +65,7 @@ public:
 		std::vector<float> tunnels;   // ax ay az bx by bz r (7)
 		std::vector<float> cavities;  // cx cy cz rx ry rz (6)
 		std::vector<float> clearings; // x z r (3)
+		std::vector<float> channels;  // ax ay az bx by bz width_a width_b height_a height_b open (11): a chain carved from the slab
 	};
 
 private:

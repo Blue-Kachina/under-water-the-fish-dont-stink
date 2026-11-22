@@ -179,6 +179,12 @@ var _title: Label
 var _subtitle: Label
 var _detail: VBoxContainer
 var _detail_scroll: ScrollContainer
+## The options column's scroll, and the box of lists in it.
+var _rows_scroll: ScrollContainer
+var _rows_content: Control
+## The sections column's scroll, and its list of buttons.
+var _rail_scroll: ScrollContainer
+var _rail_content: Control
 ## The mouse's way back a column (B on a controller): over the options to the
 ## sections, over the detail pane to its option. Shown when there's a column to go back to.
 var _rows_back: Button
@@ -416,7 +422,16 @@ func _build_ui() -> void:
 	for side in ["left", "right", "top", "bottom"]:
 		rail_margin.add_theme_constant_override("margin_" + side, roundi(10.0 * s))
 	rail.add_child(rail_margin)
-	rail_margin.add_child(rail_list)
+	# More sections than fit (every mode adds its own) scroll, rather than
+	# making the whole screen taller than the window and pushing the options'
+	# bottom rows off it.
+	_rail_scroll = ScrollContainer.new()
+	_rail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rail_margin.add_child(_rail_scroll)
+	rail_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_rail_scroll.add_child(rail_list)
+	_rail_content = rail_list
+	_follow_focus(_rail_scroll, rail_list)
 	for entry: Array in _sections:
 		var button := SectionButton.new()
 		button.setup(entry[0], entry[1], s)
@@ -462,14 +477,19 @@ func _build_ui() -> void:
 	var middle := VBoxContainer.new()
 	middle.custom_minimum_size.x = 520.0 * s
 	lower.add_child(middle)
+	# Not follow_focus: that measures from where the rows were last laid out,
+	# which is stale after more than one step a frame (held) or a new tab, and
+	# left the focused row off the bottom. _follow_focus does it instead.
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.follow_focus = true
 	middle.add_child(scroll)
+	_rows_scroll = scroll
 	var lists := VBoxContainer.new()
 	lists.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(lists)
+	_rows_content = lists
+	_follow_focus(scroll, lists)
 	for entry: Array in _sections:
 		var list := VBoxContainer.new()
 		list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1325,9 +1345,50 @@ func _confine_detail_focus() -> void:
 
 
 ## The hints and the back arrows follow the column focus is in.
-func _on_focus_changed(_focus: Control) -> void:
+func _on_focus_changed(focus: Control) -> void:
 	if is_open():
 		_refresh_hints()
+		if focus is Row and _rows_scroll.is_ancestor_of(focus):
+			_keep_in_view.call_deferred(focus, _rows_scroll, _rows_content)
+		elif focus is SectionButton and _rail_scroll.is_ancestor_of(focus):
+			_keep_in_view.call_deferred(focus, _rail_scroll, _rail_content)
+
+
+## Our own follow_focus for `scroll` (holding `content`): Godot's measures from
+## where things were last laid out, which is stale after more than one step a
+## frame (held) or a new tab. When the list's length or the view changes (a new
+## tab, rows shown or hidden, the window), the focused item again.
+func _follow_focus(scroll: ScrollContainer, content: Control) -> void:
+	scroll.get_v_scroll_bar().changed.connect(func() -> void:
+		var focus := get_viewport().gui_get_focus_owner() if is_inside_tree() else null
+		if focus != null and scroll.is_ancestor_of(focus):
+			_keep_in_view(focus, scroll, content))
+
+
+## Scrolls `scroll` so `row` (focused, somewhere in `content`) shows, with a
+## row's worth of the list past it when there is more, so you see what's
+## coming. Deferred, after the lists have been laid out, and measured inside
+## the list (not on screen), so it holds however far focus moved since.
+func _keep_in_view(row: Control, scroll_box: ScrollContainer, content: Control) -> void:
+	if not is_instance_valid(row) or not row.has_focus():
+		return
+	var top := 0.0
+	var node: Control = row
+	while node != content and node != null:
+		top += node.position.y
+		node = node.get_parent_control()
+	var bottom := top + row.size.y
+	var view := scroll_box.size.y
+	# A row picked with the mouse is already under it: just fit it, or the list
+	# would slide under the pointer and pick the next one.
+	var lead := 0.0 if row.get_global_rect().has_point(row.get_global_mouse_position()) \
+			else minf(row.size.y + row.get_parent_control().get_theme_constant("separation"), view / 4.0)
+	var scroll := float(scroll_box.scroll_vertical)
+	if top - lead < scroll:
+		scroll = top - lead
+	elif bottom + lead > scroll + view:
+		scroll = bottom + lead - view
+	scroll_box.scroll_vertical = maxi(roundi(scroll), 0)
 
 
 func _refresh_hints() -> void:

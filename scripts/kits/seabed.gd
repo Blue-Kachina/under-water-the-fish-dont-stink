@@ -34,6 +34,8 @@ var scatter: Scatter
 var flora: FloraField
 ## The procedural rock (null with terrain off).
 var terrain: Terrain
+## A ready-made layout for the rock (a mode's own fixed course) instead of one rolled from the seed; set before setup().
+var fixed_layout: TerrainLayout
 ## The set pieces (phase 7) and the background schools.
 var pieces: Array[Node3D] = []
 var schools: Array[School] = []
@@ -112,7 +114,7 @@ func setup(settings: TerrainSettings, rng_seed := 11, edge_tall := 40.0) -> void
 			terrain = Terrain.new()
 			terrain.name = "Terrain"
 			add_child(terrain)
-			terrain.build(settings, rng_seed, radius, edge_height)
+			terrain.build(settings, rng_seed, radius, edge_height, fixed_layout)
 		_build_set_pieces()
 	_build_ruins()
 	_build_reef()

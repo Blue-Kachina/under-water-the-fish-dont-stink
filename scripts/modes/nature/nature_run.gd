@@ -107,6 +107,8 @@ var rng := RandomNumberGenerator.new()
 ## The lone fish.
 var target: FishController
 var bot: WanderBot
+## The sea floor's base (global y; -INF: no floor, nature_floor off): fish and schools are kept above it.
+var floor_y := -INF
 var schools: Array[School] = []
 ## The team's counts and each player's share.
 var rules := CoopRules.new()
@@ -298,7 +300,8 @@ func _ready() -> void:
 	else:
 		target.make_puppet()  # where the host says (target_state, its snapshots)
 	if settings.nature_floor and ocean is Ocean:
-		OceanFloor.stream(self, (ocean as Ocean).spawn_transform().origin, settings.nature_floor_depth, player, 17)
+		var stream := OceanFloor.stream(self, (ocean as Ocean).spawn_transform().origin, settings.nature_floor_depth, player, 17)
+		floor_y = stream.global_position.y
 	restart()
 
 
@@ -486,6 +489,8 @@ func _physics_process(delta: float) -> void:
 	_batter_school_fish()
 	_place_hitboxes(delta)
 	_update_lone_target(delta)
+	if floor_y > -INF:
+		OceanFloor.keep_above(players + [target], floor_y, settings.floor_clearance, settings.floor_push, delta)
 	for fish in local_players():
 		score_of(fish).update(delta, fish.speed, fish.nature_batter_speed)
 		if not _focus_ok(focus_of(fish)):
@@ -573,6 +578,7 @@ func spawn_school(id: int, school_seed: int, kind: FishCharacter.FishClass, at: 
 	school.id = id
 	school.follower = not authority
 	school.threats.assign(players)
+	school.floor_y = floor_y
 	add_child(school)
 	school.setup(settings, at, heading, kind, school_seed)
 	schools.append(school)

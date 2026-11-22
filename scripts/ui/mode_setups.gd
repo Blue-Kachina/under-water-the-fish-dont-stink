@@ -55,8 +55,9 @@ static func build_character(main: Node, role: String) -> ModeSetup:
 	return setup
 
 
-## A joining player's: their fish's own to start from (not the first player's).
-static func build_join(player: String, pad: int, fish_class: FishCharacter.FishClass, species: int) -> ModeSetup:
+## A joining player's: their fish's own to start from (not the first player's). `picker` ({"script": ...}) is the
+## running mode's own join pick (descriptor "join_pick": static join_setup(setup, fish)), which swaps the pool.
+static func build_join(player: String, pad: int, fish_class: FishCharacter.FishClass, species: int, picker := {}, fish: FishController = null) -> ModeSetup:
 	var setup := ModeSetup.new()
 	setup.kicker = "Joining"
 	setup.title = player
@@ -65,6 +66,8 @@ static func build_join(player: String, pad: int, fish_class: FishCharacter.FishC
 	setup.pool = ModeSetup.fish_pool()
 	setup.pool_index = ModeSetup.pool_index_of(setup.pool, fish_class)
 	setup.species_index = ModeSetup.species_slot(setup.pool[setup.pool_index], species)
+	if picker.has("script"):
+		(picker["script"] as GDScript).call("join_setup", setup, fish)
 	return setup
 
 
@@ -132,8 +135,10 @@ static func apply_character(main: Node, setup: ModeSetup) -> void:
 	main.set_species(species)
 
 
-## Their pick on a joined player's fish.
-static func wear(setup: ModeSetup, fish: FishController) -> void:
+## Their pick on a joined player's fish (the mode's own join pick, when it has one, wears it).
+static func wear(setup: ModeSetup, fish: FishController, picker := {}) -> void:
+	if picker.has("script") and bool((picker["script"] as GDScript).call("join_wear", setup, fish)):
+		return
 	var entry: Dictionary = setup.pool[setup.pool_index]
 	fish.set_look(entry.character, ModeSetup.species_of(entry, setup.species_index))
 

@@ -46,7 +46,7 @@ const KITS := [
 ]
 ## Mode folders (every .gd below is that mode's) and single mode files.
 const MODE_DIRS := {
-	"modes/unnatural/": "unnatural", "modes/hunt/": "hunt", "modes/nature/": "nature", "modes/one_v_one/": "1v1", "modes/marco/": "marco", "modes/what_stinks/": "what_stinks", "modes/course/": "course",
+	"modes/unnatural/": "unnatural", "modes/hunt/": "hunt", "modes/nature/": "nature", "modes/one_v_one/": "1v1", "modes/marco/": "marco", "modes/what_stinks/": "what_stinks", "modes/course/": "course", "modes/race/": "race",
 }
 const MODE_FILES := {
 	"audio/sfx_hooks/battered_sounds.gd": "unnatural",

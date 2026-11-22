@@ -22,6 +22,7 @@ const SECTIONS := {
 	"what_stinks": ["res://scripts/modes/what_stinks/what_stinks_settings.gd"],
 	"hunter_size": ["res://scripts/modes/what_stinks/hunter_size.gd"],
 	"water_look": ["res://scripts/water_look.gd"],
+	"race": ["res://scripts/modes/race/race_settings.gd"],
 }
 ## The Gait exports, which the GAITS section shows once per class.
 const GAIT_SCRIPT := "res://scripts/gait.gd"

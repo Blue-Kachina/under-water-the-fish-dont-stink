@@ -245,6 +245,8 @@ func _ready() -> void:
 	field = WhatStinksField.new()
 	field.name = "Field"
 	field.authority = authority
+	if seabed != null:
+		field.floor_y = center.y - settings.floor_depth
 	add_child(field)
 	join = WhatStinksJoin.new()
 	join.name = "Join"

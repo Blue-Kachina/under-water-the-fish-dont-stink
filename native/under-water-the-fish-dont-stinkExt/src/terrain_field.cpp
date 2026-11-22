@@ -148,6 +148,35 @@ inline float ellipsoid(const Vector3 &p, const Vector3 &r) {
 	return k1 > 0.0f ? k0 * (k0 - 1.0f) / k1 : -std::min(r.x, std::min(r.y, r.z));
 }
 
+// One channel segment (a piece of a race track's carved water): an elliptical cross-section (width across, height up)
+// swept from a to b, joined to its neighbours along mitre planes so a chain of them bends without gaps. `open` leaves the
+// slot above the middle open to the sky (a canyon) instead of closing the ellipse (a tunnel or an overhang).
+struct Chan {
+	Vector3 a, b, dir, lat, vert, na, nb;
+	float len = 1.0f, wa = 20.0f, wb = 20.0f, ha = 12.0f, hb = 12.0f, reach = 0.0f;
+	bool open = true;
+};
+
+// Signed distance (m, negative inside the water) from p to the channel segment.
+inline float channel_dist(const Chan &c, const Vector3 &p) {
+	const Vector3 pa = p - c.a;
+	const float along = pa.dot(c.dir);
+	const float t = clampf(along / c.len, 0.0f, 1.0f);
+	const float u = pa.dot(c.lat), v = pa.dot(c.vert);
+	const float rx = 0.5f * lerpf(c.wa, c.wb, t), ry = 0.5f * lerpf(c.ha, c.hb, t);
+	float dc;
+	if (c.open && v > 0.0f) {
+		dc = std::fabs(u) - rx;
+	} else {
+		const float k0 = std::sqrt(u * u / (rx * rx) + v * v / (ry * ry));
+		const float k1 = std::sqrt(u * u / (rx * rx * rx * rx) + v * v / (ry * ry * ry * ry));
+		dc = k1 > 1e-9f ? k0 * (k0 - 1.0f) / k1 : -std::min(rx, ry);
+	}
+	const float ex = std::max(-pa.dot(c.na), (p - c.b).dot(c.nb));
+	const float ox = std::max(dc, 0.0f), oy = std::max(ex, 0.0f);
+	return std::min(std::max(dc, ex), 0.0f) + std::sqrt(ox * ox + oy * oy);
+}
+
 // splitmix64, for scatter sampling.
 struct Dice {
 	uint64_t state;
@@ -220,6 +249,9 @@ void TerrainField::configure(const Dictionary &d) {
 	TF_GET(blend);
 	TF_GET(clearance);
 	TF_GET(lip);
+	TF_GET(slab_top);
+	TF_GET(slab_amp);
+	TF_GET(slab_freq);
 #undef TF_GET
 	q.nav = d.get("nav", true);
 	q.drop_specks = d.get("drop_specks", true);
@@ -229,6 +261,7 @@ void TerrainField::configure(const Dictionary &d) {
 	q.tunnels = to_vec(d.get("tunnels", PackedFloat32Array()));
 	q.cavities = to_vec(d.get("cavities", PackedFloat32Array()));
 	q.clearings = to_vec(d.get("clearings", PackedFloat32Array()));
+	q.channels = to_vec(d.get("channels", PackedFloat32Array()));
 	p = q;
 	built = false;
 }
@@ -329,6 +362,48 @@ Dictionary TerrainField::generate() {
 		mesa_reach[m] = r[4] * (1.0f + std::max(r[6], 0.0f) + std::max(r[7], 0.0f)) + p.blend + p.warp_xz * 0.7f + 3.0f;
 	}
 	const int clear_count = (int)(p.clearings.size() / 3);
+	// Channels: segments with mitre joins to the segment before and after (chained where one's end meets the next's start).
+	std::vector<Chan> chans;
+	for (size_t n = 0; n + 11 <= p.channels.size(); n += 11) {
+		const float *r = &p.channels[n];
+		Chan ch;
+		ch.a = Vector3(r[0], r[1], r[2]);
+		ch.b = Vector3(r[3], r[4], r[5]);
+		ch.wa = r[6];
+		ch.wb = r[7];
+		ch.ha = r[8];
+		ch.hb = r[9];
+		ch.open = r[10] > 0.5f;
+		Vector3 ab = ch.b - ch.a;
+		ch.len = std::max(ab.length(), 1e-3f);
+		ch.dir = ab / ch.len;
+		Vector3 lat = ch.dir.cross(Vector3(0, 1, 0));
+		ch.lat = lat.length() > 1e-3f ? lat.normalized() : Vector3(1, 0, 0);
+		ch.vert = ch.lat.cross(ch.dir).normalized();
+		ch.na = ch.dir;
+		ch.nb = ch.dir;
+		ch.reach = 0.5f * std::max(ch.wa, ch.wb) + p.blend + 3.0f;
+		chans.push_back(ch);
+	}
+	for (size_t n = 0; n < chans.size(); n++) {
+		const size_t prev = (n + chans.size() - 1) % chans.size(), next = (n + 1) % chans.size();
+		if (chans[prev].b.distance_to(chans[n].a) < 0.05f) {
+			Vector3 m = chans[prev].dir + chans[n].dir;
+			if (m.length() > 0.1f) {
+				chans[n].na = m.normalized();
+			}
+		}
+		if (chans[next].a.distance_to(chans[n].b) < 0.05f) {
+			Vector3 m = chans[n].dir + chans[next].dir;
+			if (m.length() > 0.1f) {
+				chans[n].nb = m.normalized();
+			}
+		}
+	}
+	const int chan_count = (int)chans.size();
+	const int MAXCH = 40;
+	std::vector<uint8_t> cand_chn(chan_count > 0 ? cols : 0, 0);
+	std::vector<uint16_t> cand_ch(chan_count > 0 ? (size_t)cols * MAXCH : 0);
 	run_threads(nz, [&](int ka, int kb) {
 		for (int k = ka; k < kb; k++) {
 			for (int i = 0; i < nx; i++) {
@@ -363,9 +438,22 @@ Dictionary TerrainField::generate() {
 					float rise = smoothstepf(p.ring_inner, p.ring_outer, rr);
 					top += p.ring_height * rise * (0.85f + 0.15f * fbm2(wx * 0.03f, wz * 0.03f, 2, S + 42u));
 				}
+				if (p.slab_top > 0.0f) {
+					top = p.slab_top + (p.slab_amp > 0.0f ? p.slab_amp * fbm2(x * p.slab_freq, z * p.slab_freq, 2, S + 81u) : 0.0f);
+				}
 				col_floor[col] = fl;
 				col_top[col] = top;
 				col_n[col] = fbm2(x * 0.05f, z * 0.05f, 2, S + 51u);
+				if (chan_count > 0) {
+					int cn = 0;
+					for (int m = 0; m < chan_count && cn < MAXCH; m++) {
+						const Chan &ch = chans[m];
+						if (seg_dist2(x, z, ch.a.x, ch.a.z, ch.b.x, ch.b.z) < ch.reach) {
+							cand_ch[(size_t)col * MAXCH + cn++] = (uint16_t)m;
+						}
+					}
+					cand_chn[col] = (uint8_t)cn;
+				}
 				int nc = 0;
 				for (int m = 0; m < mesa_count && nc < MAXC; m++) {
 					const float *rec = &p.mesas[m * 10];
@@ -422,16 +510,26 @@ Dictionary TerrainField::generate() {
 				const float x = p.origin.x + i * c, z = p.origin.z + k * c;
 				const float top = col_top[col], fl = col_floor[col];
 				const int nc = cand_n[col];
+				const int chn = chan_count > 0 ? cand_chn[col] : 0;
 				for (int j = 0; j < ny; j++) {
 					const float y = p.origin.y + j * c;
 					float s = y - top;
 					float w[3] = { 0.0f, 0.0f, 0.0f };
 					bool warped = false;
-					if (nc > 0 || arch_count > 0 || std::fabs(s) < band + p.blend) {
+					if (nc > 0 || chn > 0 || arch_count > 0 || std::fabs(s) < band + p.blend) {
 						warp_at(i, j, k, w);
 						warped = true;
 					}
 					const float qx = x + w[0], qy = y + w[1], qz = z + w[2];
+					if (chn > 0) {
+						// The channel: water carved out of whatever the column holds (mesas and arches below stand across it).
+						const Vector3 here(x, y, z);
+						float dch = BIG;
+						for (int n = 0; n < chn; n++) {
+							dch = std::min(dch, channel_dist(chans[cand_ch[(size_t)col * MAXCH + n]], here));
+						}
+						s = smax(s, -dch, p.blend);
+					}
 					for (int n = 0; n < nc; n++) {
 						const float *m = &p.mesas[cand[col * MAXC + n] * 10];
 						const float base = m[9], tall = m[5];

@@ -21,7 +21,7 @@ const BUSES := {"ui": "UI", "voice": "Voice", "music": "Music", "amb": "Ambience
 const CATEGORIES := {
 	"ui": "Menus", "fish": "Your fish", "ball": "Ball", "arena": "Arena", "match": "Matches", "hunt": "Hunt",
 	"battered": "Battered", "nature": "Nature", "unnatural": "Unnatural", "pw": "Powerups", "stage": "Stage events",
-	"boss": "Bosses", "hunter": "Hunters", "whale": "Hunter whales", "angel": "Hunter Fallen Angel", "gulper": "Hunter Gulper Mother", "king": "Hunter King of Herrings", "lamprey": "Hunter Lamprey Queen", "mp": "Marco Polo", "fx": "Shared effects", "amb": "Ambience", "voice": "Callouts", "music": "Music",
+	"boss": "Bosses", "hunter": "Hunters", "whale": "Hunter whales", "angel": "Hunter Fallen Angel", "gulper": "Hunter Gulper Mother", "king": "Hunter King of Herrings", "lamprey": "Hunter Lamprey Queen", "mp": "Marco Polo", "race": "Fin-ish Line", "fx": "Shared effects", "amb": "Ambience", "voice": "Callouts", "music": "Music",
 }
 
 const ROWS := [
@@ -163,6 +163,7 @@ const ROWS := [
 	["unnatural/chest_buried", 2, "3d", "A treasure chest appears."],
 	["unnatural/chest_open", 1, "3d", "A chest opens."],
 	["unnatural/chest_boss_item", 1, "3d", "A boss's chest opens on its boss item: bigger, deeper, triumphant."],
+	["unnatural/rift_woken", 1, "", "A crevice under rubble is opened and the final boss wakes early (falls back to stage/boss_warn)."],
 	["unnatural/powerup_lost", 2, "", "Sunken Idol takes a powerup."],
 	["unnatural/pearl", 2, "pitched cd=0.03", "A pearl (currency): shares the Nature pearl's scale."],
 
@@ -288,6 +289,18 @@ const ROWS := [
 	["mp/ping", 2, "voices=3 cd=0.05", "A blip lands on the seeker's sonar scope (seeker only)."],
 	["mp/seen", 2, "voices=1 cd=0.4", "A soft tick while you're in the seeker's sight and scoring (only on the hider's own machine)."],
 	["mp/heartbeat", 3, "3d voices=2 cd=0.3", "Optional: the seeker hears a faint heartbeat from a hider at the cardiovascular layer."],
+
+	# Fin-ish Line (race).
+	["race/countdown", 1, "pitched", "3, 2, 1 before the start (climbs)."],
+	["race/go", 1, "", "GO: the race starts."],
+	["race/lap", 1, "", "You finish a lap."],
+	["race/final_lap", 1, "", "You begin the final lap."],
+	["race/finish", 1, "", "You cross the finish line."],
+	["race/race_over", 2, "", "The race is over (the finish clock ran out or everyone is home)."],
+	["race/rescue", 2, "", "You are put back on the track (rescue)."],
+	["race/wrong_way", 2, "cd=1.5", "A warning beep while you swim the wrong way."],
+	["race/stream_loop", 2, "loop voices=1", "A bubble stream carries you (louder in its core)."],
+	["race/slipstream_loop", 2, "loop voices=1", "Wind in a rival's wake (slipstream gain)."],
 	["mp/aura", 2, "3d voices=2 cd=0.3", "A hider flares into the aura layer (a big blunder)."],
 	["mp/count", 1, "pitched", "The seeker's count while the hiders scatter (climbs)."],
 	["mp/bump", 1, "3d layers voices=3 cd=0.08", "Two fish bump, or a fish knocks off a porthole's rim: a soft fleshy thud with a scale scrape, harder at speed."],
@@ -358,6 +371,7 @@ const ROWS := [
 ## Events that borrow another's sound when a profile lacks theirs: id -> id.
 const FALLBACKS := {
 	"match/goal_horn_aquarium": "match/goal_horn",
+	"unnatural/rift_woken": "stage/boss_warn",
 	"unnatural/zombie_die_chase": "unnatural/zombie_die",
 	"unnatural/zombie_die_swarm": "unnatural/zombie_die",
 	"unnatural/zombie_die_tank": "unnatural/zombie_die",
@@ -382,6 +396,15 @@ const FALLBACKS := {
 	"mp/bump": "fish/bump",
 	"mp/fake_pop": "fx/pop",
 	"mp/count": "match/countdown",
+	"race/countdown": "match/countdown",
+	"race/go": "match/go",
+	"race/lap": "ui/select",
+	"race/final_lap": "ui/select",
+	"race/finish": "match/go",
+	"race/race_over": "match/time_up",
+	"race/rescue": "fish/reset",
+	"race/wrong_way": "ui/back",
+	"race/stream_loop": "arena/bubble_column_loop",
 	"mp/airstone": "arena/bubble_column_loop",
 	"hunter/jaw_open": "boss/shark_jaw_open",
 	"hunter/jaw_hold": "boss/leviathan_arrive",

@@ -80,6 +80,11 @@ const PLAYER_RADIUS := 0.75
 ## Null away from a run.
 var run  # the mode's run (a duck: horde, hit(), health_of(), attack_of()...), else null
 var fish: FishController
+## A factor on every skill's cooldown (a mode that wants them longer or shorter).
+var cooldown_scale := 1.0
+## The class whose twist and skill the fish uses when it isn't its own (-1: its own class): a model with no
+## class twist of its own can borrow one.
+var skill_class := -1
 var settings: TraversalSettings
 ## Where the skills' effects go: the run, else the node given.
 var host: Node
@@ -174,7 +179,7 @@ func reset() -> void:
 
 
 func fish_class() -> FishCharacter.FishClass:
-	return fish.character
+	return skill_class as FishCharacter.FishClass if skill_class >= 0 else fish.character
 
 
 ## Whether `twist`'s fish is this one, with twists on.
@@ -368,8 +373,8 @@ func on_hurt() -> void:
 
 
 func _cool_for(seconds: float) -> void:
-	_cool = seconds
-	_cool_total = seconds
+	_cool = seconds * cooldown_scale
+	_cool_total = _cool
 
 
 func _shield(seconds: float) -> void:

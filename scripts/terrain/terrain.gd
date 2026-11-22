@@ -29,15 +29,16 @@ var _settings: TerrainSettings
 
 
 ## Builds the terrain for `seed_value` (blocking): generate, mesh, then the nodes. `height` is the depth band's height.
-func build(settings: TerrainSettings, seed_value: int, radius: float, height: float) -> void:
-	prepare(settings, seed_value, radius, height)
+## `fixed` is a ready-made layout (a mode's own, fixed course) used instead of rolling one from the seed.
+func build(settings: TerrainSettings, seed_value: int, radius: float, height: float, fixed: TerrainLayout = null) -> void:
+	prepare(settings, seed_value, radius, height, fixed)
 	apply(settings)
 
 
 ## The heavy half (thread-safe: touches no nodes): generates the field and meshes every chunk.
-func prepare(settings: TerrainSettings, seed_value: int, radius: float, height: float) -> void:
+func prepare(settings: TerrainSettings, seed_value: int, radius: float, height: float, fixed: TerrainLayout = null) -> void:
 	var t0 := Time.get_ticks_usec()
-	layout = TerrainLayout.roll(settings, seed_value, radius, height)
+	layout = fixed if fixed != null else TerrainLayout.roll(settings, seed_value, radius, height)
 	field = TerrainField.new()
 	field.configure(layout.params)
 	stats = field.generate()

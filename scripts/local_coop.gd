@@ -187,10 +187,11 @@ func join(pad: int, pick_character := false) -> PlayerSlot:
 	view.add_child(slot.arcade)
 	if pick_character:
 		slot.fish.controls_locked = true
-		var setup := ModeSetups.build_join(slot.fish.display_name, pad, slot.fish.character, slot.fish.species)
+		var picker := _join_picker()
+		var setup := ModeSetups.build_join(slot.fish.display_name, pad, slot.fish.character, slot.fish.species, picker, slot.fish)
 		setup.confirmed.connect(func() -> void:
 			if slots.has(slot):
-				ModeSetups.wear(setup, slot.fish)
+				ModeSetups.wear(setup, slot.fish, picker)
 				slot.fish.controls_locked = false
 				_enter_run(slot))
 		setup.cancelled.connect(func() -> void:
@@ -202,6 +203,18 @@ func join(pad: int, pick_character := false) -> PlayerSlot:
 	_refresh_cameras()
 	players_changed.emit(slots.size())
 	return slot
+
+
+## The running mode's own join-time character pick (descriptor "join_pick": a script with static join_setup(setup, fish)
+## and join_wear(setup, fish)), or {} for the plain fish pool.
+func _join_picker() -> Dictionary:
+	var script: GDScript = run.get_script() if is_instance_valid(run) else null
+	if script == null:
+		return {}
+	var descriptor: Variant = script.call("descriptor")
+	if descriptor is Dictionary and (descriptor as Dictionary).has("join_pick"):
+		return {"script": (descriptor as Dictionary)["join_pick"]}
+	return {}
 
 
 ## `slot`'s fish into the run (once its character's picked).

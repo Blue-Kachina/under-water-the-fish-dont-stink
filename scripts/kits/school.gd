@@ -88,6 +88,9 @@ var centre := Node3D.new()
 var threats: Array[FishController] = []
 ## How scared it is, 0..1: it tightens and swerves away as this rises.
 var alarm := 0.0
+## The flat sea floor under it (global y; -INF: none). Its fish keep floor_room off that and off the terrain's rock
+## (Terrain.active), whichever is higher, as the fish with physics do: school fish have none of their own.
+var floor_y := -INF
 
 ## The leader: where it is, which way it heads (unit), and its spot to swim to.
 var leader_position := Vector3.ZERO
@@ -225,6 +228,7 @@ func detail_count() -> int:
 func pick_spot() -> void:
 	var flat := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.3, 1.0) * settings.roam_radius
 	_spot = home + Vector3(flat.x, rng.randf_range(-1.0, 1.0) * settings.roam_height, flat.y)
+	_spot = _clear_of_ground(_spot, _leader_room())
 
 
 ## The school's size (along its heading): half its length, at the current spread.
@@ -267,6 +271,7 @@ func _step(delta: float) -> void:
 	_move_leader(delta)
 	_refresh_neighbours()
 	_move_fish(delta)
+	_keep_off_ground()
 	if not _pulls.is_empty():
 		_age_pulls(delta)
 	_apply_claims(delta)
@@ -320,6 +325,7 @@ func _follow_leader(delta: float) -> void:
 			leader_position = _net_position
 		else:
 			leader_position = leader_position.lerp(_net_position, 1.0 - exp(-8.0 * delta))
+	leader_position = _clear_of_ground(leader_position, _leader_room())
 	_history.append(_leader_frame())
 	var keep := ceili(settings.ripple_delay / delta) + 2
 	if _history.size() > keep:
@@ -347,10 +353,63 @@ func _move_leader(delta: float) -> void:
 		if angle > 0.0001:
 			leader_heading = leader_heading.slerp(flee, minf(turn / angle, 1.0)).normalized()
 	leader_position += leader_heading * settings.school_speed * delta
+	leader_position = _clear_of_ground(leader_position, _leader_room())
 	_history.append(_leader_frame())
 	var keep := ceili(settings.ripple_delay / delta) + 2
 	if _history.size() > keep:
 		_history = _history.slice(_history.size() - keep)
+
+
+## How far the leader keeps off the floor and rock: floor_room plus the school's half-height, so its fish fit above.
+func _leader_room() -> float:
+	return settings.floor_room + settings.spread + settings.wander
+
+
+## `at` lifted to `room` m over the floor under it and moved out of any rock so it has `room` m round it.
+func _clear_of_ground(at: Vector3, room: float) -> Vector3:
+	at.y = maxf(at.y, Terrain.floor_y(at.x, at.z, floor_y) + room)
+	for i in 4:
+		var push := Terrain.push(at, room)
+		if push == Vector3.ZERO:
+			break
+		at += push
+	return at
+
+
+## Every live fish under floor_y + floor_room lifted onto it, and any closer than floor_room to the terrain's rock
+## moved out along the rock's normal (one batched native call, as the horde's), each losing the speed it had into it.
+func _keep_off_ground() -> void:
+	var room := settings.floor_room
+	var flat := floor_y + room
+	var terrain := Terrain.active
+	var rock := terrain != null and is_instance_valid(terrain) and terrain.is_inside_tree() and terrain.field != null
+	if not rock and floor_y == -INF:
+		return
+	var to_local := terrain.global_transform.affine_inverse() if rock else Transform3D.IDENTITY
+	var picked := PackedInt32Array()
+	var points := PackedVector3Array()
+	for i in _position.size():
+		if _alive[i] == 0 or _held.has(i):
+			continue
+		if _position[i].y < flat:
+			_position[i].y = flat
+			_velocity[i].y = maxf(_velocity[i].y, 0.0)
+		if rock:
+			picked.append(i)
+			points.append(to_local * _position[i])
+	if picked.is_empty():
+		return
+	var pushes := terrain.field.push_out(points, room)
+	for n in picked.size():
+		if pushes[n] == Vector3.ZERO:
+			continue
+		var i := picked[n]
+		var push := terrain.global_basis * pushes[n]
+		_position[i] += push
+		var out := push.normalized()
+		var into := _velocity[i].dot(out)
+		if into < 0.0:
+			_velocity[i] -= out * into
 
 
 ## A share of the fish (every NEIGHBOUR_REFRESH-th) find their nearest few again.

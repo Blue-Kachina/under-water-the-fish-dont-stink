@@ -25,6 +25,8 @@ var rng := RandomNumberGenerator.new()
 var threats: Array[FishController] = []
 ## The schools' alarm range x this (the Hunter's size).
 var alarm_scale := 1.0
+## The sea floor's flat height (global y; -INF: no floor), for its schools to keep off (School.floor_y).
+var floor_y := -INF
 ## The classes the prey play, for build() to make schools of (empty: any class).
 var prey_kinds: Array[FishCharacter.FishClass] = []
 
@@ -98,6 +100,7 @@ func add_school(at: Vector3, heading: Vector3, kind: FishCharacter.FishClass, co
 	school.id = id
 	_next_id = maxi(_next_id, id + 1)
 	school.threats.assign(threats)
+	school.floor_y = floor_y
 	add_child(school)
 	school.set_meta("ws_bait", school_settings.bait_range)
 	school_settings.bait_range *= alarm_scale

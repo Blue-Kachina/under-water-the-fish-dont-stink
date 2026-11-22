@@ -449,6 +449,24 @@ One Hunter (a monster form, played by a person or a bot) against prey in an Ocea
 - **Stomach** (Upset Stomach variant, panel tab Stomach; `WhatStinksMatch.satiation/queasy/_spit/_hurl`): the Hunter's belly starts at `satiation_start` 0.25 of `satiation_max` 100, drains `satiation_decay` 0.5/s, and a school fish adds `satiation_per_fish` 4 x its mass (body length / `satiation_ref_length` 0.8 m, ^`satiation_size_exp` 1, x `fish_scale` when `satiation_uses_fish_scale`). A prey player in the bite is spat out, not eaten: flung `spit_speed` 22 m/s from the mouth, dazed `spit_daze` 4 s (no boost, no joining), the Hunter loses `spit_satiation_loss` 15 satiation, gains `queasy_per_spit` 1 of `queasy_max` 3 (settles `queasy_decay` 0.01/s) and can't bite for `spit_cooldown` 3 s. Full belly: the Hunter wins; queasy at max: it hurls (held for the round; the prey win when every Hunter has); clock out below full: the prey win. Schools respawn steadily (`respawn_every` 6 s, 0 off: each school below its first size gains `respawn_batch` 3; a wiped school is replaced after `respawn_school_delay` 10 s at least `respawn_school_gap` 80 m from the Hunters). Scoring: Hunter `satiation_points` 1 per satiation earned (+ the early `time_bonus` on a win); prey `spit_points` 60 per spit they caused + `survive_points` + `survivor_bonus` when they win. Bots: the Hunter bot ignores a prey it can read (exposure >= `hunter_bot_avoid_exposure` 0.3) and holds its bite while one is in the frustum; prey bots wait at the schools nearest the Hunter's start (`prey_bot_baits`). HUD: Belly and queasy bars under the headline (everyone sees them), "Prey spat out" count, round cards by reason.
 - **Camera** (`WhatStinksCam`, panel tab Camera): Unnatural's follow cam (`UnnaturalRun.steady_camera`, Settle style, from the Unnatural panel) for every role, with the form framing (`HunterSize.frame`) on top; without it the FollowCamera held still in open water. While a round is live, the ball cam button locks on a school (Nature's ball cam and `TargetWheel`): a tap toggles it and looks at the school nearest and ahead (cost = distance x (`lock_behind_cost` 1.5 - how far ahead), within `lock_range` 0 = any), holding `wheel_hold_time` 0.3 s opens the school wheel (live schools only, name, fish left, edge arrows `school_arrows` on), stick + release locks one, `lock_swing` 1.2 is the swing speed. `lock_on` on; `lock_on_prey` on gives prey the same (not the school they joined). A wiped-out school moves it on. Countdown, round over and eaten (spectating): follow cam only.
 
+## 9. Fin-ish Line (`scripts/modes/race/`, `planning_race.md`, `race_phase0.md`)
+
+Race mode (id `race`): laps of a script-authored track against a field of racers (humans and bots, default 8, card 2-12), everyone on the same swim speed. Panel section RACE (`RaceSettings`, key `race`).
+
+| Thing | Rule |
+|---|---|
+| Field | Every fish class (not Monster), the Hunter forms and the Titans (skins as species) are racers (`RaceRoster`, 68 entries). The setup screen (`RaceSetup`) lists them grouped; the pick is saved per role (`racer`). |
+| Speed | One shared top speed: `race_top_speed` 20 m/s, as the `race.shared` FishModifiers set (top_speed, accel, stride). Class differences are only `RaceHandling` rows (turn, coast/drag, bump weight, stream grip, skill cooldown) as `race.handling`. |
+| Size | Bodies are scaled to `race_size_cap` 2.4 m (2x a Skirmisher), hitbox too (`race.size`). |
+| Skills | The class mobility skill (Traversal) on the boost button with a race cooldown (`skill_cooldown_scale`); Hunters and Titans use the Skirmisher's Dash. Card toggle Skills. |
+| Start | Countdown (`countdown` 3 s) then GO; a stride timed within `start_window` of GO gets `start_surge` 3 m/s. |
+| Laps | Gates in order; a lap counts only when every gate was passed; progress = last gate + distance past it. |
+| Bumps | Software, weighted, no damage (`bumps`, `bump_strength`). Ghost time `ghost_time` after the start and a rescue. |
+| Currents | Bubble streams push along the track; slipstream (`slip_gain`, `slip_delay`) adds top speed behind another racer. |
+| Rescue | Out of bounds, wrong way, stuck, or hold the powerslide button: fade, then back at the last gate with the carried speed. |
+| Finish | The first human home starts `finish_clock` 30 s for the others; the race ends when all humans are done or the clock runs out; the rest are placed by progress. Personal bests in `playground.cfg` `[race_best]`. |
+| Bots | `RaceBot` (difficulty tiers); the rubber band applies to bots only. |
+
 ## Keeping this up to date
 
 When you add, change, rename or remove a fish, weapon, tome, powerup, stat, drop or default value, update the matching table here in the same change. New ids go in the right section and rarity tier. Facet steps and milestones come from `weapons.gd`, numbers from the settings resources.

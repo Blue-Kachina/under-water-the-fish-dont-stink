@@ -19,7 +19,7 @@ signal closed
 
 ## The big modes, in order; the featured one comes out of here (or MORE).
 const PRIMARY := ["Unnatural", "Marco Polo", "Fish Sticks", "Hunt", "Nature", "Obstacle Course"]
-const MORE := ["Test Tank", "What Stinks?"]  # (Free Swim is retired: refining_weaponry.md §2.8)
+const MORE := ["Test Tank", "What Stinks?", "race"]  # (Free Swim is retired: refining_weaponry.md §2.8)
 ## Modes left out unless shown (SELECT, after the Konami code). What Stinks? is
 ## in development (what_stinks.md): move it to PRIMARY when it's ready.
 const HIDDEN := ["Fish Sticks", "Test Tank", "What Stinks?"]
